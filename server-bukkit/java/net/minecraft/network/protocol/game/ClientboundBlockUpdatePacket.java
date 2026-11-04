@@ -1,0 +1,32 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.protocol.game;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.state.BlockState;
+public class ClientboundBlockUpdatePacket implements Packet<ClientGamePacketListener> {
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundBlockUpdatePacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundBlockUpdatePacket.STREAM_CODEC", () -> StreamCodec.composite(BlockPos.STREAM_CODEC, ClientboundBlockUpdatePacket::getPos, ByteBufCodecs.idMapper(Block.BLOCK_STATE_REGISTRY), ClientboundBlockUpdatePacket::getBlockState, ClientboundBlockUpdatePacket::new));
+    public ClientboundBlockUpdatePacket(BlockPos pos, BlockState state) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket#<init>");
+    }
+    public ClientboundBlockUpdatePacket(BlockGetter level, BlockPos pos) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket#<init>");
+    }
+    public PacketType<ClientboundBlockUpdatePacket> type() {
+        return GamePacketTypes.CLIENTBOUND_BLOCK_UPDATE;
+    }
+    public void handle(ClientGamePacketListener listener) {
+        listener.handleBlockUpdate(this);
+    }
+    public BlockState getBlockState() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket#getBlockState");
+    }
+    public BlockPos getPos() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket#getPos");
+    }
+}

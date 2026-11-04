@@ -50,7 +50,19 @@ constexpr std::int32_t kCustomCompletionsId = 0x17;
     return world == nullptr ? 0 : world->gameTime();
 }
 
-[[nodiscard]] std::optional<storage::StoredItemStack> decodeItem(const std::string& bytes) {
+[[nodiscard]] std::string encodeItem(const storage::StoredItemStack& stack) {
+    wire::nbt::NbtCompound root;
+    root.putString("id", stack.id);
+    root.putInt("count", stack.count);
+    root.set("components", wire::nbt::NbtTag::ofCompound(stack.components));
+    const std::vector<std::uint8_t> bytes =
+        wire::nbt::nbtIO::writeAnonymous(wire::nbt::NbtTag::ofCompound(std::move(root)));
+    return std::string{bytes.begin(), bytes.end()};
+}
+
+} // namespace
+
+std::optional<storage::StoredItemStack> decodeItem(const std::string& bytes) {
     const std::expected<wire::nbt::AnonymousTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::readAnonymous(
         std::span<const std::uint8_t>{reinterpret_cast<const std::uint8_t*>(bytes.data()), bytes.size()});
     const wire::nbt::NbtCompound* root = read.has_value() ? read->tag.get<wire::nbt::NbtCompound>() : nullptr;
@@ -63,18 +75,6 @@ constexpr std::int32_t kCustomCompletionsId = 0x17;
     }
     return stack;
 }
-
-[[nodiscard]] std::string encodeItem(const storage::StoredItemStack& stack) {
-    wire::nbt::NbtCompound root;
-    root.putString("id", stack.id);
-    root.putInt("count", stack.count);
-    root.set("components", wire::nbt::NbtTag::ofCompound(stack.components));
-    const std::vector<std::uint8_t> bytes =
-        wire::nbt::nbtIO::writeAnonymous(wire::nbt::NbtTag::ofCompound(std::move(root)));
-    return std::string{bytes.begin(), bytes.end()};
-}
-
-} // namespace
 
 std::optional<Value> misc(Context& context, const Verb verb, const std::string_view name, const Args& args) {
     player::PlayerSession& session = context.session;

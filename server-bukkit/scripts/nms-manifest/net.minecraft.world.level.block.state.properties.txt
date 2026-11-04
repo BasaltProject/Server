@@ -1,0 +1,487 @@
+//// AttachFace.java
+import net.minecraft.util.StringRepresentable;
+public enum AttachFace implements StringRepresentable {
+    FLOOR, WALL, CEILING;
+    public String getSerializedName();
+}
+//// BambooLeaves.java
+import net.minecraft.util.StringRepresentable;
+public enum BambooLeaves implements StringRepresentable {
+    NONE, SMALL, LARGE;
+    public String toString();
+    public String getSerializedName();
+}
+//// BedPart.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum BedPart implements StringRepresentable {
+    HEAD, FOOT;
+    public static final Codec<BedPart> CODEC;
+    public String toString();
+    public String getSerializedName();
+}
+//// BellAttachType.java
+import net.minecraft.util.StringRepresentable;
+public enum BellAttachType implements StringRepresentable {
+    FLOOR, CEILING, SINGLE_WALL, DOUBLE_WALL;
+    public String getSerializedName();
+}
+//// BlockSetType.java
+import com.mojang.serialization.Codec;
+import java.util.stream.Stream;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.level.block.SoundType;
+public record BlockSetType(String name, boolean canOpenByHand, boolean canOpenByWindCharge, boolean canButtonBeActivatedByArrows, PressurePlateSensitivity pressurePlateSensitivity, SoundType soundType, SoundEvent doorClose, SoundEvent doorOpen, SoundEvent trapdoorClose, SoundEvent trapdoorOpen, SoundEvent pressurePlateClickOff, SoundEvent pressurePlateClickOn, SoundEvent buttonClickOff, SoundEvent buttonClickOn) {
+    public static final Codec<BlockSetType> CODEC;
+    public static final BlockSetType IRON;
+    public static final BlockSetType COPPER;
+    public static final BlockSetType GOLD;
+    public static final BlockSetType STONE;
+    public static final BlockSetType POLISHED_BLACKSTONE;
+    public static final BlockSetType OAK;
+    public static final BlockSetType SPRUCE;
+    public static final BlockSetType BIRCH;
+    public static final BlockSetType ACACIA;
+    public static final BlockSetType CHERRY;
+    public static final BlockSetType JUNGLE;
+    public static final BlockSetType DARK_OAK;
+    public static final BlockSetType PALE_OAK;
+    public static final BlockSetType POPLAR;
+    public static final BlockSetType CRIMSON;
+    public static final BlockSetType WARPED;
+    public static final BlockSetType MANGROVE;
+    public static final BlockSetType BAMBOO;
+    public BlockSetType(String name);
+    public static Stream<BlockSetType> values();
+    public static enum PressurePlateSensitivity {
+        EVERYTHING, MOBS;
+    }
+}
+//// BlockStateProperties.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.FrontAndTop;
+import net.minecraft.world.level.block.CopperGolemStatueBlock;
+import net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerState;
+import net.minecraft.world.level.block.entity.vault.VaultState;
+public class BlockStateProperties {
+    public static final BooleanProperty ATTACHED;
+    public static final BooleanProperty BERRIES;
+    public static final BooleanProperty BLOOM;
+    public static final BooleanProperty BOTTOM;
+    public static final BooleanProperty CAN_SUMMON;
+    public static final BooleanProperty CONDITIONAL;
+    public static final BooleanProperty DISARMED;
+    public static final BooleanProperty DRAG;
+    public static final BooleanProperty ENABLED;
+    public static final BooleanProperty EXTENDED;
+    public static final BooleanProperty EYE;
+    public static final BooleanProperty FALLING;
+    public static final BooleanProperty HANGING;
+    public static final BooleanProperty HAS_BOTTLE_0;
+    public static final BooleanProperty HAS_BOTTLE_1;
+    public static final BooleanProperty HAS_BOTTLE_2;
+    public static final BooleanProperty HAS_RECORD;
+    public static final BooleanProperty HAS_BOOK;
+    public static final BooleanProperty INVERTED;
+    public static final BooleanProperty IN_WALL;
+    public static final BooleanProperty LIT;
+    public static final BooleanProperty LOCKED;
+    public static final BooleanProperty NATURAL;
+    public static final BooleanProperty OCCUPIED;
+    public static final BooleanProperty OPEN;
+    public static final BooleanProperty PERSISTENT;
+    public static final BooleanProperty POWERED;
+    public static final BooleanProperty SHORT;
+    public static final BooleanProperty SHRIEKING;
+    public static final BooleanProperty SIGNAL_FIRE;
+    public static final BooleanProperty SNOWY;
+    public static final BooleanProperty TIP;
+    public static final BooleanProperty TRIGGERED;
+    public static final BooleanProperty UNSTABLE;
+    public static final BooleanProperty WATERLOGGED;
+    public static final EnumProperty<Direction.Axis> HORIZONTAL_AXIS;
+    public static final EnumProperty<Direction.Axis> AXIS;
+    public static final BooleanProperty UP;
+    public static final BooleanProperty DOWN;
+    public static final BooleanProperty NORTH;
+    public static final BooleanProperty EAST;
+    public static final BooleanProperty SOUTH;
+    public static final BooleanProperty WEST;
+    public static final EnumProperty<Direction> FACING;
+    public static final EnumProperty<Direction> FACING_HOPPER;
+    public static final EnumProperty<Direction> HORIZONTAL_FACING;
+    public static final IntegerProperty FLOWER_AMOUNT;
+    public static final IntegerProperty SEGMENT_AMOUNT;
+    public static final EnumProperty<FrontAndTop> ORIENTATION;
+    public static final EnumProperty<AttachFace> ATTACH_FACE;
+    public static final EnumProperty<BellAttachType> BELL_ATTACHMENT;
+    public static final EnumProperty<WallSide> EAST_WALL;
+    public static final EnumProperty<WallSide> NORTH_WALL;
+    public static final EnumProperty<WallSide> SOUTH_WALL;
+    public static final EnumProperty<WallSide> WEST_WALL;
+    public static final EnumProperty<RedstoneSide> EAST_REDSTONE;
+    public static final EnumProperty<RedstoneSide> NORTH_REDSTONE;
+    public static final EnumProperty<RedstoneSide> SOUTH_REDSTONE;
+    public static final EnumProperty<RedstoneSide> WEST_REDSTONE;
+    public static final EnumProperty<DoubleBlockHalf> DOUBLE_BLOCK_HALF;
+    public static final EnumProperty<Half> HALF;
+    public static final EnumProperty<SideChainPart> SIDE_CHAIN_PART;
+    public static final EnumProperty<RailShape> RAIL_SHAPE;
+    public static final EnumProperty<RailShape> RAIL_SHAPE_STRAIGHT;
+    public static final int MAX_AGE_1 = 1;
+    public static final int MAX_AGE_2 = 2;
+    public static final int MAX_AGE_3 = 3;
+    public static final int MAX_AGE_4 = 4;
+    public static final int MAX_AGE_5 = 5;
+    public static final int MAX_AGE_7 = 7;
+    public static final int MAX_AGE_15 = 15;
+    public static final int MAX_AGE_25 = 25;
+    public static final IntegerProperty AGE_1;
+    public static final IntegerProperty AGE_2;
+    public static final IntegerProperty AGE_3;
+    public static final IntegerProperty AGE_4;
+    public static final IntegerProperty AGE_5;
+    public static final IntegerProperty AGE_7;
+    public static final IntegerProperty AGE_15;
+    public static final IntegerProperty AGE_25;
+    public static final IntegerProperty BITES;
+    public static final IntegerProperty CANDLES;
+    public static final IntegerProperty DELAY;
+    public static final int MAX_DISTANCE = 7;
+    public static final IntegerProperty DISTANCE;
+    public static final IntegerProperty EGGS;
+    public static final IntegerProperty HATCH;
+    public static final IntegerProperty LAYERS;
+    public static final int MIN_LEVEL = 0;
+    public static final int MIN_LEVEL_CAULDRON = 1;
+    public static final int MAX_LEVEL_3 = 3;
+    public static final int MAX_LEVEL_8 = 8;
+    public static final IntegerProperty LEVEL_CAULDRON;
+    public static final IntegerProperty LEVEL_COMPOSTER;
+    public static final IntegerProperty LEVEL_FLOWING;
+    public static final IntegerProperty LEVEL_HONEY;
+    public static final int MAX_LEVEL_15 = 15;
+    public static final IntegerProperty LEVEL;
+    public static final IntegerProperty MOISTURE;
+    public static final IntegerProperty NOTE;
+    public static final IntegerProperty PICKLES;
+    public static final IntegerProperty POWER;
+    public static final IntegerProperty STAGE;
+    public static final int STABILITY_MAX_DISTANCE = 7;
+    public static final IntegerProperty STABILITY_DISTANCE;
+    public static final int MIN_RESPAWN_ANCHOR_CHARGES = 0;
+    public static final int MAX_RESPAWN_ANCHOR_CHARGES = 4;
+    public static final IntegerProperty RESPAWN_ANCHOR_CHARGES;
+    public static final IntegerProperty DRIED_GHAST_HYDRATION_LEVELS;
+    public static final IntegerProperty ROTATION_16;
+    public static final EnumProperty<BedPart> BED_PART;
+    public static final EnumProperty<ChestType> CHEST_TYPE;
+    public static final EnumProperty<ComparatorMode> MODE_COMPARATOR;
+    public static final EnumProperty<DoorHingeSide> DOOR_HINGE;
+    public static final EnumProperty<NoteBlockInstrument> NOTEBLOCK_INSTRUMENT;
+    public static final EnumProperty<PistonType> PISTON_TYPE;
+    public static final EnumProperty<SlabType> SLAB_TYPE;
+    public static final EnumProperty<StairsShape> STAIRS_SHAPE;
+    public static final EnumProperty<StructureMode> STRUCTUREBLOCK_MODE;
+    public static final EnumProperty<BambooLeaves> BAMBOO_LEAVES;
+    public static final EnumProperty<Tilt> TILT;
+    public static final EnumProperty<Direction> VERTICAL_DIRECTION;
+    public static final EnumProperty<SpeleothemThickness> SPELEOTHEM_THICKNESS;
+    public static final EnumProperty<SculkSensorPhase> SCULK_SENSOR_PHASE;
+    public static final BooleanProperty SLOT_0_OCCUPIED;
+    public static final BooleanProperty SLOT_1_OCCUPIED;
+    public static final BooleanProperty SLOT_2_OCCUPIED;
+    public static final BooleanProperty SLOT_3_OCCUPIED;
+    public static final BooleanProperty SLOT_4_OCCUPIED;
+    public static final BooleanProperty SLOT_5_OCCUPIED;
+    public static final IntegerProperty DUSTED;
+    public static final BooleanProperty CRACKED;
+    public static final BooleanProperty CRAFTING;
+    public static final EnumProperty<TrialSpawnerState> TRIAL_SPAWNER_STATE;
+    public static final EnumProperty<VaultState> VAULT_STATE;
+    public static final EnumProperty<CreakingHeartState> CREAKING_HEART_STATE;
+    public static final BooleanProperty OMINOUS;
+    public static final EnumProperty<TestBlockMode> TEST_BLOCK_MODE;
+    public static final BooleanProperty MAP;
+    public static final EnumProperty<CopperGolemStatueBlock.Pose> COPPER_GOLEM_POSE;
+    public static final EnumProperty<PotentSulfurState> POTENT_SULFUR_STATE;
+}
+//// BooleanProperty.java
+import java.util.List;
+import java.util.Optional;
+public final class BooleanProperty extends Property<Boolean> {
+    private BooleanProperty(String name);
+    public List<Boolean> getPossibleValues();
+    public static BooleanProperty create(String name);
+    public Optional<Boolean> getValue(String name);
+    public String getName(Boolean value);
+    public int getInternalIndex(Boolean value);
+}
+//// ChestType.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum ChestType implements StringRepresentable {
+    SINGLE, LEFT, RIGHT;
+    public static final Codec<ChestType> CODEC;
+    public String getSerializedName();
+    public ChestType getOpposite();
+}
+//// ComparatorMode.java
+import net.minecraft.util.StringRepresentable;
+public enum ComparatorMode implements StringRepresentable {
+    COMPARE, SUBTRACT;
+    public String toString();
+    public String getSerializedName();
+}
+//// CreakingHeartState.java
+import net.minecraft.util.StringRepresentable;
+public enum CreakingHeartState implements StringRepresentable {
+    UPROOTED, DORMANT, AWAKE;
+    public String toString();
+    public String getSerializedName();
+}
+//// DoorHingeSide.java
+import net.minecraft.util.StringRepresentable;
+public enum DoorHingeSide implements StringRepresentable {
+    LEFT, RIGHT;
+    public String toString();
+    public String getSerializedName();
+}
+//// DoubleBlockHalf.java
+import net.minecraft.core.Direction;
+import net.minecraft.util.StringRepresentable;
+public enum DoubleBlockHalf implements StringRepresentable {
+    UPPER, LOWER;
+    public Direction getDirectionToOther();
+    public String toString();
+    public String getSerializedName();
+    public DoubleBlockHalf getOtherHalf();
+}
+//// EnumProperty.java
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.util.StringRepresentable;
+public final class EnumProperty<T extends Enum<T> & StringRepresentable> extends Property<T> {
+    private EnumProperty(String name, Class<T> clazz, List<T> values);
+    public List<T> getPossibleValues();
+    public Optional<T> getValue(String name);
+    public String getName(T value);
+    public int getInternalIndex(T value);
+    public boolean equals(Object o);
+    public int generateHashCode();
+    public static <T extends Enum<T> & StringRepresentable> EnumProperty<T> create(String name, Class<T> clazz);
+    public static <T extends Enum<T> & StringRepresentable> EnumProperty<T> create(String name, Class<T> clazz, Predicate<T> filter);
+    public static <T extends Enum<T> & StringRepresentable> EnumProperty<T> create(String name, Class<T> clazz, T... values);
+    public static <T extends Enum<T> & StringRepresentable> EnumProperty<T> create(String name, Class<T> clazz, List<T> values);
+}
+//// Half.java
+import net.minecraft.util.StringRepresentable;
+public enum Half implements StringRepresentable {
+    TOP, BOTTOM;
+    public String toString();
+    public String getSerializedName();
+}
+//// IntegerProperty.java
+import java.util.List;
+import java.util.Optional;
+public final class IntegerProperty extends Property<Integer> {
+    private IntegerProperty(String name, int min, int max);
+    public List<Integer> getPossibleValues();
+    public boolean equals(Object o);
+    public int generateHashCode();
+    public static IntegerProperty create(String name, int min, int max);
+    public Optional<Integer> getValue(String name);
+    public String getName(Integer value);
+    public int getInternalIndex(Integer value);
+}
+//// NoteBlockInstrument.java
+import net.minecraft.core.Holder;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.StringRepresentable;
+public enum NoteBlockInstrument implements StringRepresentable {
+    HARP, BASEDRUM, SNARE, HAT, BASS, FLUTE, BELL, GUITAR, CHIME, XYLOPHONE, IRON_XYLOPHONE, COW_BELL, DIDGERIDOO, BIT, BANJO, PLING, TRUMPET, TRUMPET_EXPOSED, TRUMPET_OXIDIZED, TRUMPET_WEATHERED, ZOMBIE, SKELETON, CREEPER, DRAGON, WITHER_SKELETON, PIGLIN, CUSTOM_HEAD;
+    public String getSerializedName();
+    public Holder<SoundEvent> getSoundEvent();
+    public boolean isTunable();
+    public boolean hasCustomSound();
+    public boolean worksAboveNoteBlock();
+    static enum Type {
+        BASE_BLOCK, MOB_HEAD, CUSTOM;
+    }
+}
+//// PistonType.java
+import net.minecraft.util.StringRepresentable;
+public enum PistonType implements StringRepresentable {
+    DEFAULT, STICKY;
+    public String toString();
+    public String getSerializedName();
+}
+//// PotentSulfurState.java
+import net.minecraft.util.StringRepresentable;
+public enum PotentSulfurState implements StringRepresentable {
+    DRY, WET, DORMANT, ERUPTING, CONTINUOUS;
+    public String toString();
+    public String getSerializedName();
+}
+//// Property.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
+import net.minecraft.world.level.block.state.StateHolder;
+public abstract class Property<T extends Comparable<T>> {
+    protected Property(String name, Class<T> clazz);
+    public Value<T> value(T value);
+    public Value<T> value(StateHolder<?, ?> stateHolder);
+    public Stream<Value<T>> getAllValues();
+    public Codec<T> codec();
+    public Codec<Value<T>> valueCodec();
+    public String getName();
+    public Class<T> getValueClass();
+    public abstract List<T> getPossibleValues();
+    public abstract String getName(T value);
+    public abstract Optional<T> getValue(String name);
+    public abstract int getInternalIndex(T value);
+    public String toString();
+    public boolean equals(Object o);
+    public final int hashCode();
+    public int generateHashCode();
+    public <U, S extends StateHolder<?, S>> DataResult<S> parseValue(DynamicOps<U> ops, S state, U value);
+    public static record Value<T extends Comparable<T>>(Property<T> property, T value) {
+        public String toString();
+        public String valueName();
+    }
+}
+//// RailShape.java
+import net.minecraft.util.StringRepresentable;
+public enum RailShape implements StringRepresentable {
+    NORTH_SOUTH, EAST_WEST, ASCENDING_EAST, ASCENDING_WEST, ASCENDING_NORTH, ASCENDING_SOUTH, SOUTH_EAST, SOUTH_WEST, NORTH_WEST, NORTH_EAST;
+    public String getName();
+    public String toString();
+    public boolean isSlope();
+    public String getSerializedName();
+}
+//// RedstoneSide.java
+import net.minecraft.util.StringRepresentable;
+public enum RedstoneSide implements StringRepresentable {
+    UP, SIDE, NONE;
+    public String toString();
+    public String getSerializedName();
+    public boolean isConnected();
+}
+//// RotationSegment.java
+import java.util.Optional;
+import net.minecraft.core.Direction;
+public class RotationSegment {
+    public static int getMaxSegmentIndex();
+    public static int convertToSegment(Direction direction);
+    public static int convertToSegment(float rotDegrees);
+    public static Optional<Direction> convertToDirection(int segment);
+    public static float convertToDegrees(int segment);
+}
+//// SculkSensorPhase.java
+import net.minecraft.util.StringRepresentable;
+public enum SculkSensorPhase implements StringRepresentable {
+    INACTIVE, ACTIVE, COOLDOWN;
+    public String toString();
+    public String getSerializedName();
+}
+//// SideChainPart.java
+import net.minecraft.util.StringRepresentable;
+public enum SideChainPart implements StringRepresentable {
+    UNCONNECTED, RIGHT, CENTER, LEFT;
+    public String toString();
+    public String getSerializedName();
+    public boolean isConnected();
+    public boolean isConnectionTowards(SideChainPart endPart);
+    public boolean isChainEnd();
+    public SideChainPart whenConnectedToTheRight();
+    public SideChainPart whenConnectedToTheLeft();
+    public SideChainPart whenDisconnectedFromTheRight();
+    public SideChainPart whenDisconnectedFromTheLeft();
+}
+//// SlabType.java
+import net.minecraft.util.StringRepresentable;
+public enum SlabType implements StringRepresentable {
+    TOP, BOTTOM, DOUBLE;
+    public String toString();
+    public String getSerializedName();
+}
+//// SpeleothemThickness.java
+import net.minecraft.util.StringRepresentable;
+public enum SpeleothemThickness implements StringRepresentable {
+    TIP_MERGE, TIP, FRUSTUM, MIDDLE, BASE;
+    public String toString();
+    public String getSerializedName();
+}
+//// StairsShape.java
+import net.minecraft.util.StringRepresentable;
+public enum StairsShape implements StringRepresentable {
+    STRAIGHT, INNER_LEFT, INNER_RIGHT, OUTER_LEFT, OUTER_RIGHT;
+    public String toString();
+    public String getSerializedName();
+}
+//// StructureMode.java
+import com.mojang.serialization.Codec;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.StringRepresentable;
+public enum StructureMode implements StringRepresentable {
+    SAVE, LOAD, CORNER, DATA;
+    public static final Codec<StructureMode> LEGACY_CODEC;
+    public String getSerializedName();
+    public Component getDisplayName();
+}
+//// TestBlockMode.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum TestBlockMode implements StringRepresentable {
+    START, LOG, FAIL, ACCEPT;
+    public static final Codec<TestBlockMode> CODEC;
+    public static final StreamCodec<ByteBuf, TestBlockMode> STREAM_CODEC;
+    public String getSerializedName();
+    public Component getDisplayName();
+    public Component getDetailedMessage();
+}
+//// Tilt.java
+import net.minecraft.util.StringRepresentable;
+public enum Tilt implements StringRepresentable {
+    NONE, UNSTABLE, PARTIAL, FULL;
+    public String getSerializedName();
+    public boolean causesVibration();
+}
+//// WallSide.java
+import net.minecraft.util.StringRepresentable;
+public enum WallSide implements StringRepresentable {
+    NONE, LOW, TALL;
+    public String toString();
+    public String getSerializedName();
+}
+//// WoodType.java
+import com.mojang.serialization.Codec;
+import java.util.stream.Stream;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.level.block.SoundType;
+public record WoodType(String name, BlockSetType setType, SoundType soundType, SoundType hangingSignSoundType, SoundEvent fenceGateClose, SoundEvent fenceGateOpen) {
+    public static final Codec<WoodType> CODEC;
+    public static final WoodType OAK;
+    public static final WoodType SPRUCE;
+    public static final WoodType BIRCH;
+    public static final WoodType ACACIA;
+    public static final WoodType CHERRY;
+    public static final WoodType JUNGLE;
+    public static final WoodType DARK_OAK;
+    public static final WoodType PALE_OAK;
+    public static final WoodType POPLAR;
+    public static final WoodType CRIMSON;
+    public static final WoodType WARPED;
+    public static final WoodType MANGROVE;
+    public static final WoodType BAMBOO;
+    public WoodType(String name, BlockSetType setType);
+    public static Stream<WoodType> values();
+}

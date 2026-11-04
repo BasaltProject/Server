@@ -216,6 +216,10 @@ void LoadedWorldRef::setWeather(bool raining, bool thundering) {
     }
 }
 
+bool LoadedWorldRef::difficultyLocked() const { return world_->difficultyLocked(); }
+
+void LoadedWorldRef::setDifficultyLocked(bool locked) { world_->setDifficultyLocked(locked); }
+
 bool LoadedWorldRef::setDifficulty(std::string_view name) {
     if (name != "peaceful" && name != "easy" && name != "normal" && name != "hard") {
         return false;

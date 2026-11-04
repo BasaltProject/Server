@@ -59,8 +59,24 @@ public final class ServerAccess {
                 return BuiltInRegistries.ENTITY_TYPE;
             case "block_entity_type":
                 return BuiltInRegistries.BLOCK_ENTITY_TYPE;
+            case "sound_event":
+                return BuiltInRegistries.SOUND_EVENT;
+            case "data_component_type":
+                return BuiltInRegistries.DATA_COMPONENT_TYPE;
+            case "mob_effect":
+                return BuiltInRegistries.MOB_EFFECT;
+            case "stat_type":
+                return BuiltInRegistries.STAT_TYPE;
+            case "enchantment":
+                return enchantments(key);
             case "biome":
                 return biomes();
+            case "dimension_type":
+                return dimensionTypes();
+            case "worldgen/configured_feature":
+                return features(key, false);
+            case "worldgen/placed_feature":
+                return features(key, true);
             default:
                 return new MappedRegistry<>(castKey(key));
         }
@@ -69,6 +85,41 @@ public final class ServerAccess {
     @SuppressWarnings("unchecked")
     private static ResourceKey<? extends Registry<Object>> castKey(ResourceKey<? extends Registry<?>> key) {
         return (ResourceKey<? extends Registry<Object>>) key;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static MappedRegistry<?> features(ResourceKey<? extends Registry<?>> key, boolean placed) {
+        MappedRegistry registry = new MappedRegistry<>(castKey(key));
+        for (Identifier id : NativeFeatures.ids()) {
+            registry.register(id, placed ? NativeFeatures.placed(id) : new NativeFeature(id));
+        }
+        return registry;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static MappedRegistry<?> enchantments(ResourceKey<? extends Registry<?>> key) {
+        MappedRegistry registry = new MappedRegistry<>(castKey(key));
+        for (String id : org.basaltmc.bukkit.InventoryNatives.enchantmentIds()) {
+            Identifier parsed = Identifier.parse(id);
+            registry.register(parsed, EnchantmentFactory.build(parsed));
+        }
+        return registry;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static MappedRegistry<?> dimensionTypes() {
+        MappedRegistry registry = new MappedRegistry<>(net.minecraft.core.registries.Registries.DIMENSION_TYPE);
+        registry.register(Identifier.withDefaultNamespace("overworld"), dimensionType(false, true, false, false, 1.0, -64, 384, 384, 0.0F));
+        registry.register(Identifier.withDefaultNamespace("overworld_caves"), dimensionType(false, true, true, false, 1.0, -64, 384, 384, 0.0F));
+        registry.register(Identifier.withDefaultNamespace("the_nether"), dimensionType(true, false, true, false, 8.0, 0, 256, 128, 0.1F));
+        registry.register(Identifier.withDefaultNamespace("the_end"), dimensionType(true, false, false, true, 1.0, 0, 256, 256, 0.0F));
+        return registry;
+    }
+
+    private static net.minecraft.world.level.dimension.DimensionType dimensionType(boolean fixedTime, boolean skyLight,
+            boolean ceiling, boolean dragon, double scale, int minY, int height, int logicalHeight, float ambient) {
+        return new net.minecraft.world.level.dimension.DimensionType(fixedTime, skyLight, ceiling, dragon, scale, minY, height,
+            logicalHeight, null, ambient, null, null, null, null, null, Optional.empty());
     }
 
     private static MappedRegistry<Biome> biomes() {

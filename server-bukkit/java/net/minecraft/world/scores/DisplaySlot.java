@@ -1,5 +1,9 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.scores;
-public enum DisplaySlot {
+
+import java.util.function.IntFunction;
+import net.minecraft.util.StringRepresentable;
+public enum DisplaySlot implements StringRepresentable {
     LIST,
     SIDEBAR,
     BELOW_NAME,
@@ -21,5 +25,10 @@ public enum DisplaySlot {
     TEAM_WHITE;
     public int id() {
         return ordinal();
+    }
+    public static final StringRepresentable.EnumCodec<DisplaySlot> CODEC = StringRepresentable.fromEnum(DisplaySlot::values);
+    public static final IntFunction<DisplaySlot> BY_ID = i -> values()[Math.floorMod(i, values().length)];
+    public String getSerializedName() {
+        return name().toLowerCase(java.util.Locale.ROOT).replace("team_", "sidebar.team.");
     }
 }

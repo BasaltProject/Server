@@ -87,6 +87,9 @@ struct ModelHooks {
     std::function<bool(world::LoadedWorld& world, std::int32_t id, std::string_view action, std::string_view text,
                        std::int32_t value)>
         raidBar;
+    std::function<std::int32_t(world::LoadedWorld& world, std::int32_t id, std::string_view action,
+                               const std::array<std::int32_t, 4>& arguments, std::int32_t value)>
+        raidControl;
     std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> endGatewayAt;
     std::function<std::int32_t()> nextEntityId;
     std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,

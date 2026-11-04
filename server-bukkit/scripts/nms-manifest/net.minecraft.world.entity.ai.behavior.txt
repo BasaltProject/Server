@@ -1,0 +1,1136 @@
+//// AcquirePoi.java
+import com.mojang.datafixers.util.Pair;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
+import net.minecraft.world.level.pathfinder.Path;
+public class AcquirePoi {
+    public static final int SCAN_RANGE = 48;
+    public static BehaviorControl<PathfinderMob> create(Predicate<Holder<PoiType>> poiType, MemoryModuleType<GlobalPos> memoryToAcquire, boolean onlyIfAdult, Optional<Byte> onPoiAcquisitionEvent, BiPredicate<ServerLevel, BlockPos> validPoi);
+    public static BehaviorControl<PathfinderMob> create(Predicate<Holder<PoiType>> poiType, MemoryModuleType<GlobalPos> memoryToAcquire, boolean onlyIfAdult, Optional<Byte> onPoiAcquisitionEvent);
+    public static BehaviorControl<PathfinderMob> create(Predicate<Holder<PoiType>> poiType, MemoryModuleType<GlobalPos> memoryToValidate, MemoryModuleType<GlobalPos> memoryToAcquire, boolean onlyIfAdult, Optional<Byte> onPoiAcquisitionEvent, BiPredicate<ServerLevel, BlockPos> validPoi);
+    public static Path findPathToPois(Mob body, Set<Pair<Holder<PoiType>, BlockPos>> pois);
+    static class JitteredLinearRetry {
+        public JitteredLinearRetry(RandomSource random, long firstAttemptTimestamp);
+        public void markAttempt(long timestamp);
+        public boolean isStillValid(long timestamp);
+        public boolean shouldRetry(long timestamp);
+        public String toString();
+    }
+}
+//// AnimalMakeLove.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.animal.Animal;
+public class AnimalMakeLove extends Behavior<Animal> {
+    public AnimalMakeLove(EntityType<? extends Animal> partnerType);
+    public AnimalMakeLove(EntityType<? extends Animal> partnerType, float speedModifier, int closeEnoughDistance);
+    protected boolean checkExtraStartConditions(ServerLevel level, Animal body);
+    protected void start(ServerLevel level, Animal body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, Animal body, long timestamp);
+    protected void tick(ServerLevel level, Animal body, long timestamp);
+    protected void stop(ServerLevel level, Animal body, long timestamp);
+}
+//// AnimalPanic.java
+import java.util.function.Function;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class AnimalPanic<E extends PathfinderMob> extends Behavior<E> {
+    public AnimalPanic(float speedMultiplier);
+    public AnimalPanic(float speedMultiplier, int flyHeight);
+    public AnimalPanic(float speedMultiplier, Function<PathfinderMob, TagKey<DamageType>> panicCausingDamageTypes);
+    public AnimalPanic(float speedMultiplier, Function<PathfinderMob, TagKey<DamageType>> panicCausingDamageTypes, Function<E, Vec3> positionGetter);
+    protected boolean checkExtraStartConditions(ServerLevel level, E body);
+    protected boolean canStillUse(ServerLevel level, E body, long timestamp);
+    protected void start(ServerLevel level, E body, long timestamp);
+    protected void stop(ServerLevel level, E body, long timestamp);
+    protected void tick(ServerLevel level, E body, long timestamp);
+}
+//// AssignProfessionFromJobSite.java
+import net.minecraft.world.entity.npc.villager.Villager;
+public class AssignProfessionFromJobSite {
+    public static BehaviorControl<Villager> create();
+}
+//// BabyFollowAdult.java
+import java.util.function.Function;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class BabyFollowAdult {
+    public static OneShot<LivingEntity> create(UniformInt followRange, float speedModifier);
+    public static OneShot<LivingEntity> create(UniformInt followRange, Function<LivingEntity, Float> speedModifier, MemoryModuleType<? extends LivingEntity> nearestVisibleType, boolean targetEye);
+}
+//// BackUpIfTooClose.java
+import net.minecraft.world.entity.Mob;
+public class BackUpIfTooClose {
+    public static OneShot<Mob> create(int tooCloseDistance, float strafeSpeed);
+}
+//// BecomePassiveIfMemoryPresent.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class BecomePassiveIfMemoryPresent {
+    public static BehaviorControl<LivingEntity> create(MemoryModuleType<?> pacifyingMemory, int pacifyDuration);
+}
+//// Behavior.java
+import java.util.Map;
+import java.util.Set;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.MemoryStatus;
+public abstract class Behavior<E extends LivingEntity> implements BehaviorControl<E> {
+    public static final int DEFAULT_DURATION = 60;
+    protected final Map<MemoryModuleType<?>, MemoryStatus> entryCondition;
+    public Behavior(Map<MemoryModuleType<?>, MemoryStatus> entryCondition);
+    public Behavior(Map<MemoryModuleType<?>, MemoryStatus> entryCondition, int timeOutDuration);
+    public Behavior(Map<MemoryModuleType<?>, MemoryStatus> entryCondition, int minDuration, int maxDuration);
+    public Status getStatus();
+    public Set<MemoryModuleType<?>> getRequiredMemories();
+    public final boolean tryStart(ServerLevel level, E body, long timestamp);
+    protected void start(ServerLevel level, E body, long timestamp);
+    public final void tickOrStop(ServerLevel level, E body, long timestamp);
+    protected void tick(ServerLevel level, E body, long timestamp);
+    public final void doStop(ServerLevel level, E body, long timestamp);
+    protected void stop(ServerLevel level, E body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, E body, long timestamp);
+    protected boolean timedOut(long timestamp);
+    protected boolean checkExtraStartConditions(ServerLevel level, E body);
+    public String debugString();
+    protected boolean hasRequiredMemories(E body);
+    public static enum Status {
+        STOPPED, RUNNING;
+    }
+}
+//// BehaviorControl.java
+import java.util.Set;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public interface BehaviorControl<E extends LivingEntity> {
+    Behavior.Status getStatus();
+    Set<MemoryModuleType<?>> getRequiredMemories();
+    boolean tryStart(ServerLevel level, E body, long timestamp);
+    void tickOrStop(ServerLevel level, E body, long timestamp);
+    void doStop(ServerLevel level, E body, long timestamp);
+    String debugString();
+}
+//// BehaviorUtils.java
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.Brain;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
+public class BehaviorUtils {
+    private BehaviorUtils();
+    public static void lockGazeAndWalkToEachOther(LivingEntity entity1, LivingEntity entity2, float speedModifier, int closeEnoughDistance);
+    public static boolean entityIsVisible(Brain<?> brain, LivingEntity targetEntity);
+    public static boolean targetIsValid(Brain<?> brain, MemoryModuleType<? extends LivingEntity> memory, EntityType<?> targetType);
+    public static void lookAtEntity(LivingEntity looker, LivingEntity targetEntity);
+    public static void setWalkAndLookTargetMemories(LivingEntity walker, Entity targetEntity, float speedModifier, int closeEnoughDistance);
+    public static void setWalkAndLookTargetMemories(LivingEntity walker, BlockPos targetPos, float speedModifier, int closeEnoughDistance);
+    public static void setWalkAndLookTargetMemories(LivingEntity walker, PositionTracker target, float speedModifier, int closeEnoughDistance);
+    public static void throwItem(LivingEntity thrower, ItemStack item, Vec3 targetPos);
+    public static void throwItem(LivingEntity thrower, ItemStack item, Vec3 targetPos, Vec3 throwVelocity, float handYDistanceFromEye);
+    public static SectionPos findSectionClosestToVillage(ServerLevel level, SectionPos center, int radius);
+    public static boolean isWithinAttackRange(Mob body, LivingEntity target, int projectileAttackRangeMargin);
+    public static boolean isOtherTargetMuchFurtherAwayThanCurrentAttackTarget(LivingEntity body, LivingEntity otherTarget, double howMuchFurtherAway);
+    public static boolean canSee(LivingEntity body, LivingEntity target);
+    public static LivingEntity getNearestTarget(LivingEntity body, Optional<LivingEntity> target1, LivingEntity target2);
+    public static LivingEntity getTargetNearestMe(LivingEntity body, LivingEntity target1, LivingEntity target2);
+    public static Optional<LivingEntity> getLivingEntityFromUUIDMemory(LivingEntity body, MemoryModuleType<UUID> memoryType);
+    public static Vec3 getRandomSwimmablePos(PathfinderMob body, int maxHorizontalDistance, int maxVerticalDistance);
+    public static boolean isBreeding(LivingEntity body);
+}
+//// BlockPosTracker.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
+public class BlockPosTracker implements PositionTracker {
+    public BlockPosTracker(BlockPos blockPos);
+    public BlockPosTracker(Vec3 vec);
+    public Vec3 currentPosition();
+    public BlockPos currentBlockPosition();
+    public boolean isVisibleBy(LivingEntity body);
+    public String toString();
+}
+//// CelebrateVillagersSurvivedRaid.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class CelebrateVillagersSurvivedRaid extends Behavior<Villager> {
+    public CelebrateVillagersSurvivedRaid(int minDuration, int maxDuration);
+    protected boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+    protected void stop(ServerLevel level, Villager body, long timestamp);
+    protected void tick(ServerLevel level, Villager body, long timestamp);
+}
+//// ChargeAttack.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.animal.Animal;
+public class ChargeAttack extends Behavior<Animal> {
+    public ChargeAttack(int timeBetweenAttacks, TargetingConditions chargeTargeting, float speed, float knockbackForce, double maxChargeDistance, double maxTargetDetectionDistance, SoundEvent chargeSound);
+    protected boolean checkExtraStartConditions(ServerLevel level, Animal body);
+    protected boolean canStillUse(ServerLevel level, Animal body, long timestamp);
+    protected void start(ServerLevel level, Animal body, long timestamp);
+    protected void tick(ServerLevel level, Animal body, long timestamp);
+    protected void stop(ServerLevel level, Animal body, long timestamp);
+}
+//// CopyMemoryWithExpiry.java
+import java.util.function.Predicate;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class CopyMemoryWithExpiry {
+    public static <E extends LivingEntity, T> BehaviorControl<E> create(Predicate<E> copyIfTrue, MemoryModuleType<? extends T> sourceMemory, MemoryModuleType<T> targetMemory, UniformInt durationOfCopy);
+}
+//// CountDownCooldownTicks.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class CountDownCooldownTicks extends Behavior<LivingEntity> {
+    public CountDownCooldownTicks(MemoryModuleType<Integer> cooldownTicks);
+    protected boolean timedOut(long timestamp);
+    protected boolean canStillUse(ServerLevel level, LivingEntity body, long timestamp);
+    protected void tick(ServerLevel level, LivingEntity body, long timestamp);
+    protected void stop(ServerLevel level, LivingEntity body, long timestamp);
+}
+//// Croak.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.animal.frog.Frog;
+public class Croak extends Behavior<Frog> {
+    public Croak();
+    protected boolean checkExtraStartConditions(ServerLevel level, Frog body);
+    protected boolean canStillUse(ServerLevel level, Frog body, long timestamp);
+    protected void start(ServerLevel level, Frog body, long timestamp);
+    protected void stop(ServerLevel level, Frog body, long timestamp);
+    protected void tick(ServerLevel level, Frog body, long timestamp);
+}
+//// CrossbowAttack.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.CrossbowAttackMob;
+public class CrossbowAttack<E extends Mob & CrossbowAttackMob, T extends LivingEntity> extends Behavior<E> {
+    public CrossbowAttack();
+    protected boolean checkExtraStartConditions(ServerLevel level, E body);
+    protected boolean canStillUse(ServerLevel level, E body, long timestamp);
+    protected void tick(ServerLevel level, E body, long timestamp);
+    protected void stop(ServerLevel level, E body, long timestamp);
+    static enum CrossbowState {
+        UNCHARGED, CHARGING, CHARGED, READY_TO_ATTACK;
+    }
+}
+//// DismountOrSkipMounting.java
+import java.util.function.BiPredicate;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+public class DismountOrSkipMounting {
+    public static <E extends LivingEntity> BehaviorControl<E> create(int maxWalkDistToRideTarget, BiPredicate<E, Entity> dontRideIf);
+}
+//// DoNothing.java
+import java.util.Set;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class DoNothing implements BehaviorControl<LivingEntity> {
+    public DoNothing(int minDuration, int maxDuration);
+    public Behavior.Status getStatus();
+    public Set<MemoryModuleType<?>> getRequiredMemories();
+    public final boolean tryStart(ServerLevel level, LivingEntity body, long timestamp);
+    public final void tickOrStop(ServerLevel level, LivingEntity body, long timestamp);
+    public final void doStop(ServerLevel level, LivingEntity body, long timestamp);
+    public String debugString();
+}
+//// EntityTracker.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
+public class EntityTracker implements PositionTracker {
+    public EntityTracker(Entity entity, boolean trackEyeHeight);
+    public EntityTracker(Entity entity, boolean trackEyeHeight, boolean targetEyeHeight);
+    public Vec3 currentPosition();
+    public BlockPos currentBlockPosition();
+    public boolean isVisibleBy(LivingEntity body);
+    public Entity getEntity();
+    public String toString();
+}
+//// EraseMemoryIf.java
+import java.util.function.Predicate;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class EraseMemoryIf {
+    public static <E extends LivingEntity> BehaviorControl<E> create(Predicate<E> predicate, MemoryModuleType<?> memoryType);
+}
+//// FollowTemptation.java
+import java.util.function.Function;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.PathfinderMob;
+public class FollowTemptation extends Behavior<PathfinderMob> {
+    public static final int TEMPTATION_COOLDOWN = 100;
+    public static final double DEFAULT_CLOSE_ENOUGH_DIST = 2.5;
+    public static final double BACKED_UP_CLOSE_ENOUGH_DIST = 3.5;
+    public FollowTemptation(Function<LivingEntity, Float> speedModifier);
+    public FollowTemptation(Function<LivingEntity, Float> speedModifier, Function<LivingEntity, Double> closeEnoughDistance);
+    public FollowTemptation(Function<LivingEntity, Float> speedModifier, Function<LivingEntity, Double> closeEnoughDistance, boolean lookInTheEyes);
+    protected float getSpeedModifier(PathfinderMob body);
+    protected boolean timedOut(long timestamp);
+    protected boolean canStillUse(ServerLevel level, PathfinderMob body, long timestamp);
+    protected void stop(ServerLevel level, PathfinderMob body, long timestamp);
+    protected void tick(ServerLevel level, PathfinderMob body, long timestamp);
+}
+//// GateBehavior.java
+import com.mojang.datafixers.util.Pair;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.MemoryStatus;
+public class GateBehavior<E extends LivingEntity> implements BehaviorControl<E> {
+    public GateBehavior(Map<MemoryModuleType<?>, MemoryStatus> entryCondition, Set<MemoryModuleType<?>> exitErasedMemories, OrderPolicy orderPolicy, RunningPolicy runningPolicy, List<Pair<? extends BehaviorControl<? super E>, Integer>> behaviors);
+    public Behavior.Status getStatus();
+    public Set<MemoryModuleType<?>> getRequiredMemories();
+    public final boolean tryStart(ServerLevel level, E body, long timestamp);
+    public final void tickOrStop(ServerLevel level, E body, long timestamp);
+    public final void doStop(ServerLevel level, E body, long timestamp);
+    public String debugString();
+    public static enum OrderPolicy {
+        ORDERED, SHUFFLED;
+        public void apply(ShufflingList<?> list);
+    }
+    public static enum RunningPolicy {
+        RUN_ONE, TRY_ALL;
+        public abstract <E extends LivingEntity> void apply(Stream<BehaviorControl<? super E>> behaviors, ServerLevel level, E body, long timestamp);
+    }
+}
+//// GiveGiftToHero.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class GiveGiftToHero extends Behavior<Villager> {
+    public GiveGiftToHero(int timeout);
+    protected boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    protected void start(ServerLevel level, Villager body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+    protected void tick(ServerLevel level, Villager villager, long timestamp);
+    protected void stop(ServerLevel level, Villager body, long timestamp);
+}
+//// GoAndGiveItemsToTarget.java
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.phys.Vec3;
+public class GoAndGiveItemsToTarget<E extends LivingEntity> extends Behavior<E> {
+    public GoAndGiveItemsToTarget(Function<LivingEntity, Optional<PositionTracker>> targetPositionGetter, float speedModifier, int timeoutDuration, ItemThrower<E> itemThrower, MemoryModuleType<Integer> cooldownMemory, int cooldownDuration, Predicate<E> hasItemPredicate);
+    protected boolean checkExtraStartConditions(ServerLevel level, E body);
+    protected boolean canStillUse(ServerLevel level, E body, long timestamp);
+    protected void start(ServerLevel level, E body, long timestamp);
+    protected void tick(ServerLevel level, E body, long timestamp);
+    public interface ItemThrower<E> {
+        void throwItem(ServerLevel level, E thrower, Vec3 targetPos);
+    }
+}
+//// GoToClosestVillage.java
+import net.minecraft.world.entity.npc.villager.Villager;
+public class GoToClosestVillage {
+    public static BehaviorControl<Villager> create(float speedModifier, int closeEnoughDistance);
+}
+//// GoToPotentialJobSite.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class GoToPotentialJobSite extends Behavior<Villager> {
+    public GoToPotentialJobSite(float speedModifier);
+    protected boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+    protected void tick(ServerLevel level, Villager body, long timestamp);
+    protected void stop(ServerLevel level, Villager body, long timestamp);
+}
+//// GoToTargetLocation.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class GoToTargetLocation {
+    public static <E extends Mob> OneShot<E> create(MemoryModuleType<BlockPos> locationMemory, int closeEnoughDist, float speedModifier);
+}
+//// GoToWantedItem.java
+import java.util.function.Predicate;
+import net.minecraft.world.entity.LivingEntity;
+public class GoToWantedItem {
+    public static BehaviorControl<LivingEntity> create(float speedModifier, boolean interruptOngoingWalk, int maxDistToWalk);
+    public static <E extends LivingEntity> BehaviorControl<E> create(Predicate<E> predicate, float speedModifier, boolean interruptOngoingWalk, int maxDistToWalk);
+}
+//// HarvestFarmland.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class HarvestFarmland extends Behavior<Villager> {
+    public static final float SPEED_MODIFIER = 0.5F;
+    public HarvestFarmland();
+    protected boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    protected void start(ServerLevel level, Villager body, long timestamp);
+    protected void stop(ServerLevel level, Villager body, long timestamp);
+    protected void tick(ServerLevel level, Villager body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+}
+//// InsideBrownianWalk.java
+import net.minecraft.world.entity.PathfinderMob;
+public class InsideBrownianWalk {
+    public static BehaviorControl<PathfinderMob> create(float speedModifier);
+}
+//// InteractWith.java
+import java.util.function.Predicate;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class InteractWith {
+    public static <T extends LivingEntity> BehaviorControl<LivingEntity> of(EntityType<? extends T> type, int interactionRange, MemoryModuleType<T> interactionTarget, float speedModifier, int stopDistance);
+    public static <E extends LivingEntity, T extends LivingEntity> BehaviorControl<E> of(EntityType<? extends T> type, int interactionRange, Predicate<E> selfFilter, Predicate<T> targetFilter, MemoryModuleType<T> interactionTarget, float speedModifier, int stopDistance);
+}
+//// InteractWithDoor.java
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.pathfinder.Node;
+public class InteractWithDoor {
+    public static BehaviorControl<LivingEntity> create();
+    public static void closeDoorsThatIHaveOpenedOrPassedThrough(ServerLevel level, LivingEntity body, Node movingFromNode, Node movingToNode, Set<GlobalPos> doors, Optional<List<LivingEntity>> nearestEntities);
+}
+//// JumpOnBed.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Mob;
+public class JumpOnBed extends Behavior<Mob> {
+    public JumpOnBed(float speedModifier);
+    protected boolean checkExtraStartConditions(ServerLevel level, Mob body);
+    protected void start(ServerLevel level, Mob body, long timestamp);
+    protected void stop(ServerLevel level, Mob body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, Mob body, long timestamp);
+    protected boolean timedOut(long timestamp);
+    protected void tick(ServerLevel level, Mob body, long timestamp);
+}
+//// LocateHidingPlace.java
+import net.minecraft.world.entity.LivingEntity;
+public class LocateHidingPlace {
+    public static OneShot<LivingEntity> create(int radius, float speedModifier, int closeEnoughDist);
+}
+//// LongJumpMidJump.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.entity.Mob;
+public class LongJumpMidJump extends Behavior<Mob> {
+    public static final int TIME_OUT_DURATION = 100;
+    public LongJumpMidJump(UniformInt timeBetweenLongJumps, SoundEvent landingSound);
+    protected boolean canStillUse(ServerLevel level, Mob body, long timestamp);
+    protected void start(ServerLevel level, Mob body, long timestamp);
+    protected void stop(ServerLevel level, Mob body, long timestamp);
+}
+//// LongJumpToPreferredBlock.java
+import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.block.Block;
+public class LongJumpToPreferredBlock<E extends Mob> extends LongJumpToRandomPos<E> {
+    public LongJumpToPreferredBlock(UniformInt timeBetweenLongJumps, int maxLongJumpHeight, int maxLongJumpWidth, float maxJumpVelocity, Function<E, SoundEvent> getJumpSound, TagKey<Block> preferredBlockTag, float preferredBlocksChance, BiPredicate<E, BlockPos> acceptableLandingSpot);
+    protected void start(ServerLevel level, E body, long timestamp);
+    protected Optional<LongJumpToRandomPos.PossibleJump> getJumpCandidate(ServerLevel level);
+}
+//// LongJumpToRandomPos.java
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.phys.Vec3;
+public class LongJumpToRandomPos<E extends Mob> extends Behavior<E> {
+    protected static final int FIND_JUMP_TRIES = 20;
+    protected static final int MIN_PATHFIND_DISTANCE_TO_VALID_JUMP = 8;
+    protected final int maxLongJumpHeight;
+    protected final int maxLongJumpWidth;
+    protected final float maxJumpVelocityMultiplier;
+    protected List<PossibleJump> jumpCandidates;
+    protected Optional<Vec3> initialPosition;
+    protected Vec3 chosenJump;
+    protected int findJumpTries;
+    protected long prepareJumpStart;
+    public LongJumpToRandomPos(UniformInt timeBetweenLongJumps, int maxLongJumpHeight, int maxLongJumpWidth, float maxJumpVelocityMultiplier, Function<E, SoundEvent> getJumpSound);
+    public static <E extends Mob> boolean defaultAcceptableLandingSpot(E body, BlockPos targetPos);
+    public LongJumpToRandomPos(UniformInt timeBetweenLongJumps, int maxLongJumpHeight, int maxLongJumpWidth, float maxJumpVelocityMultiplier, Function<E, SoundEvent> getJumpSound, BiPredicate<E, BlockPos> acceptableLandingSpot);
+    protected boolean checkExtraStartConditions(ServerLevel level, Mob body);
+    protected boolean canStillUse(ServerLevel level, Mob body, long timestamp);
+    protected void start(ServerLevel level, E body, long timestamp);
+    protected void tick(ServerLevel level, E body, long timestamp);
+    protected void pickCandidate(ServerLevel level, E body, long timestamp);
+    protected Optional<PossibleJump> getJumpCandidate(ServerLevel level);
+    protected Vec3 calculateOptimalJumpVector(Mob body, Vec3 targetPos);
+    public static record PossibleJump(BlockPos targetPos, int weight) {
+    }
+}
+//// LongJumpUtil.java
+import java.util.Optional;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.phys.Vec3;
+public final class LongJumpUtil {
+    public static Optional<Vec3> calculateJumpVectorForAngle(Mob body, Vec3 targetPos, float maxJumpVelocity, int angle, boolean checkCollision);
+}
+//// LookAndFollowTradingPlayerSink.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class LookAndFollowTradingPlayerSink extends Behavior<Villager> {
+    public LookAndFollowTradingPlayerSink(float speedModifier);
+    protected boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+    protected void start(ServerLevel level, Villager body, long timestamp);
+    protected void stop(ServerLevel level, Villager body, long timestamp);
+    protected void tick(ServerLevel level, Villager body, long timestamp);
+    protected boolean timedOut(long timestamp);
+}
+//// LookAtTargetSink.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Mob;
+public class LookAtTargetSink extends Behavior<Mob> {
+    public LookAtTargetSink(int minDuration, int maxDuration);
+    protected boolean canStillUse(ServerLevel level, Mob body, long timestamp);
+    protected void stop(ServerLevel level, Mob body, long timestamp);
+    protected void tick(ServerLevel level, Mob body, long timestamp);
+}
+//// MeleeAttack.java
+import java.util.function.Predicate;
+import net.minecraft.world.entity.Mob;
+public class MeleeAttack {
+    public static <T extends Mob> OneShot<T> create(int cooldownBetweenAttacks);
+    public static <T extends Mob> OneShot<T> create(Predicate<T> canAttackPredicate, int cooldownBetweenAttacks);
+}
+//// Mount.java
+import net.minecraft.world.entity.LivingEntity;
+public class Mount {
+    public static BehaviorControl<LivingEntity> create(float speedModifier);
+}
+//// MoveToSkySeeingSpot.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+public class MoveToSkySeeingSpot {
+    public static OneShot<LivingEntity> create(float speedModifier);
+    public static boolean hasNoBlocksAbove(ServerLevel level, LivingEntity body, BlockPos target);
+}
+//// MoveToTargetSink.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Mob;
+public class MoveToTargetSink extends Behavior<Mob> {
+    public MoveToTargetSink();
+    public MoveToTargetSink(int minTimeout, int maxTimeout);
+    protected boolean checkExtraStartConditions(ServerLevel level, Mob body);
+    protected boolean canStillUse(ServerLevel level, Mob body, long timestamp);
+    protected void stop(ServerLevel level, Mob body, long timestamp);
+    protected void start(ServerLevel level, Mob body, long timestamp);
+    protected void tick(ServerLevel level, Mob body, long timestamp);
+}
+//// OneShot.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.behavior.declarative.Trigger;
+public abstract class OneShot<E extends LivingEntity> implements BehaviorControl<E>, Trigger<E> {
+    public OneShot();
+    public final Behavior.Status getStatus();
+    public final boolean tryStart(ServerLevel level, E body, long timestamp);
+    public final void tickOrStop(ServerLevel level, E body, long timestamp);
+    public final void doStop(ServerLevel level, E body, long timestamp);
+    public String debugString();
+}
+//// PlayTagWithOtherKids.java
+import net.minecraft.world.entity.PathfinderMob;
+public class PlayTagWithOtherKids {
+    public static BehaviorControl<PathfinderMob> create();
+}
+//// PoiCompetitorScan.java
+import net.minecraft.world.entity.npc.villager.Villager;
+public class PoiCompetitorScan {
+    public static BehaviorControl<Villager> create();
+}
+//// PositionTracker.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
+public interface PositionTracker {
+    Vec3 currentPosition();
+    BlockPos currentBlockPosition();
+    boolean isVisibleBy(LivingEntity body);
+}
+//// PrepareRamNearestTarget.java
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+public class PrepareRamNearestTarget<E extends PathfinderMob> extends Behavior<E> {
+    public static final int TIME_OUT_DURATION = 160;
+    public PrepareRamNearestTarget(ToIntFunction<E> getCooldownOnFail, int minRamDistance, int maxRamDistance, float walkSpeed, TargetingConditions ramTargeting, int ramPrepareTime, Function<E, SoundEvent> getPrepareRamSound);
+    protected void start(ServerLevel level, PathfinderMob body, long timestamp);
+    protected void stop(ServerLevel level, E body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, PathfinderMob body, long timestamp);
+    protected void tick(ServerLevel level, E body, long timestamp);
+    public static class RamCandidate {
+        public RamCandidate(BlockPos startPosition, BlockPos targetPosition, LivingEntity target);
+        public BlockPos getStartPosition();
+        public BlockPos getTargetPosition();
+        public LivingEntity getTarget();
+    }
+}
+//// RamTarget.java
+import java.util.function.Function;
+import java.util.function.ToDoubleFunction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.animal.goat.Goat;
+public class RamTarget extends Behavior<Goat> {
+    public static final int TIME_OUT_DURATION = 200;
+    public static final float RAM_SPEED_FORCE_FACTOR = 1.65F;
+    public RamTarget(Function<Goat, UniformInt> getTimeBetweenRams, TargetingConditions ramTargeting, float speed, ToDoubleFunction<Goat> getKnockbackForce, Function<Goat, SoundEvent> getImpactSound, Function<Goat, SoundEvent> getHornBreakSound);
+    protected boolean checkExtraStartConditions(ServerLevel level, Goat body);
+    protected boolean canStillUse(ServerLevel level, Goat body, long timestamp);
+    protected void start(ServerLevel level, Goat body, long timestamp);
+    protected void tick(ServerLevel level, Goat body, long timestamp);
+    protected void finishRam(ServerLevel level, Goat body);
+}
+//// RandomLookAround.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.entity.Mob;
+public class RandomLookAround extends Behavior<Mob> {
+    public RandomLookAround(IntProvider interval, float maxYaw, float minPitch, float maxPitch);
+    protected void start(ServerLevel level, Mob body, long timestamp);
+}
+//// RandomStroll.java
+import net.minecraft.world.entity.PathfinderMob;
+public class RandomStroll {
+    public static OneShot<PathfinderMob> stroll(float speedModifier);
+    public static OneShot<PathfinderMob> stroll(float speedModifier, boolean mayStrollFromWater);
+    public static BehaviorControl<PathfinderMob> stroll(float speedModifier, int maxHorizontalDistance, int maxVerticalDistance);
+    public static BehaviorControl<PathfinderMob> fly(float speedModifier);
+    public static BehaviorControl<PathfinderMob> swim(float speedModifier);
+}
+//// ReactToBell.java
+import net.minecraft.world.entity.LivingEntity;
+public class ReactToBell {
+    public static BehaviorControl<LivingEntity> create();
+}
+//// ResetProfession.java
+import net.minecraft.world.entity.npc.villager.Villager;
+public class ResetProfession {
+    public static BehaviorControl<Villager> create();
+}
+//// ResetRaidStatus.java
+import net.minecraft.world.entity.LivingEntity;
+public class ResetRaidStatus {
+    public static BehaviorControl<LivingEntity> create();
+}
+//// RingBell.java
+import net.minecraft.world.entity.LivingEntity;
+public class RingBell {
+    public static final int RING_BELL_FROM_DISTANCE = 3;
+    public static BehaviorControl<LivingEntity> create();
+}
+//// RunOne.java
+import com.mojang.datafixers.util.Pair;
+import java.util.List;
+import java.util.Map;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.MemoryStatus;
+public class RunOne<E extends LivingEntity> extends GateBehavior<E> {
+    public RunOne(List<Pair<? extends BehaviorControl<? super E>, Integer>> weightedBehaviors);
+    public RunOne(Map<MemoryModuleType<?>, MemoryStatus> entryCondition, List<Pair<? extends BehaviorControl<? super E>, Integer>> weightedBehaviors);
+}
+//// SetClosestHomeAsWalkTarget.java
+import net.minecraft.world.entity.PathfinderMob;
+public class SetClosestHomeAsWalkTarget {
+    public static BehaviorControl<PathfinderMob> create(float speedModifier);
+}
+//// SetEntityLookTarget.java
+import java.util.function.Predicate;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MobCategory;
+public class SetEntityLookTarget {
+    public static BehaviorControl<LivingEntity> create(MobCategory category, float maxDist);
+    public static OneShot<LivingEntity> create(EntityType<?> type, float maxDist);
+    public static OneShot<LivingEntity> create(float maxDist);
+    public static OneShot<LivingEntity> create(Predicate<LivingEntity> predicate, float maxDist);
+}
+//// SetEntityLookTargetSometimes.java
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+public class SetEntityLookTargetSometimes {
+    public static BehaviorControl<LivingEntity> create(float maxDist, UniformInt interval);
+    public static BehaviorControl<LivingEntity> create(EntityType<?> type, float maxDist, UniformInt interval);
+    public static final class Ticker {
+        public Ticker(UniformInt interval);
+        public boolean tickDownAndCheck(RandomSource random);
+    }
+}
+//// SetHiddenState.java
+import net.minecraft.world.entity.LivingEntity;
+public class SetHiddenState {
+    public static BehaviorControl<LivingEntity> create(int seconds, int closeEnoughDist);
+}
+//// SetLookAndInteract.java
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+public class SetLookAndInteract {
+    public static BehaviorControl<LivingEntity> create(EntityType<?> type, int interactionRange);
+}
+//// SetRaidStatus.java
+import net.minecraft.world.entity.LivingEntity;
+public class SetRaidStatus {
+    public static BehaviorControl<LivingEntity> create();
+}
+//// SetWalkTargetAwayFrom.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class SetWalkTargetAwayFrom {
+    public static BehaviorControl<PathfinderMob> pos(MemoryModuleType<BlockPos> memory, float speedModifier, int desiredDistance, boolean interruptCurrentWalk);
+    public static OneShot<PathfinderMob> entity(MemoryModuleType<? extends Entity> memory, float speedModifier, int desiredDistance, boolean interruptCurrentWalk);
+}
+//// SetWalkTargetFromAttackTargetIfTargetOutOfReach.java
+import java.util.function.Function;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+public class SetWalkTargetFromAttackTargetIfTargetOutOfReach {
+    public static BehaviorControl<Mob> create(float speedModifier);
+    public static BehaviorControl<Mob> create(Function<LivingEntity, Float> speedModifier);
+}
+//// SetWalkTargetFromBlockMemory.java
+import net.minecraft.core.GlobalPos;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class SetWalkTargetFromBlockMemory {
+    public static OneShot<Villager> create(MemoryModuleType<GlobalPos> memoryType, float speedModifier, int closeEnoughDist, int tooFarDistance, int tooLongUnreachableDuration);
+}
+//// SetWalkTargetFromLookTarget.java
+import java.util.function.Function;
+import java.util.function.Predicate;
+import net.minecraft.world.entity.LivingEntity;
+public class SetWalkTargetFromLookTarget {
+    public static OneShot<LivingEntity> create(float speedModifier, int closeEnoughDistance);
+    public static OneShot<LivingEntity> create(Predicate<LivingEntity> canSetWalkTargetPredicate, Function<LivingEntity, Float> speedModifier, int closeEnoughDistance);
+}
+//// ShowTradesToPlayer.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class ShowTradesToPlayer extends Behavior<Villager> {
+    public ShowTradesToPlayer(int minDuration, int maxDuration);
+    public boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    public boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+    public void start(ServerLevel level, Villager body, long timestamp);
+    public void tick(ServerLevel level, Villager body, long timestamp);
+    public void stop(ServerLevel level, Villager body, long timestamp);
+}
+//// ShufflingList.java
+import com.mojang.serialization.Codec;
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Stream;
+public class ShufflingList<U> implements Iterable<U> {
+    protected final List<WeightedEntry<U>> entries;
+    public ShufflingList();
+    private ShufflingList(List<WeightedEntry<U>> entries);
+    public static <U> Codec<ShufflingList<U>> codec(Codec<U> elementCodec);
+    public ShufflingList<U> add(U data, int weight);
+    public ShufflingList<U> shuffle();
+    public Stream<U> stream();
+    public Iterator<U> iterator();
+    public String toString();
+    public static class WeightedEntry<T> {
+        private WeightedEntry(T data, int weight);
+        public T getData();
+        public int getWeight();
+        public String toString();
+        public static <E> Codec<WeightedEntry<E>> codec(Codec<E> elementCodec);
+    }
+}
+//// SleepInBed.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+public class SleepInBed extends Behavior<LivingEntity> {
+    public static final int COOLDOWN_AFTER_BEING_WOKEN = 100;
+    public SleepInBed();
+    protected boolean checkExtraStartConditions(ServerLevel level, LivingEntity body);
+    protected boolean canStillUse(ServerLevel level, LivingEntity body, long timestamp);
+    protected void start(ServerLevel level, LivingEntity body, long timestamp);
+    protected boolean timedOut(long timestamp);
+    protected void stop(ServerLevel level, LivingEntity body, long timestamp);
+}
+//// SocializeAtBell.java
+import net.minecraft.world.entity.LivingEntity;
+public class SocializeAtBell {
+    public static OneShot<LivingEntity> create();
+}
+//// SpearApproach.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.PathfinderMob;
+public class SpearApproach extends Behavior<PathfinderMob> {
+    public SpearApproach(double speedModifierWhenRepositioning, float approachDistance);
+    protected boolean checkExtraStartConditions(ServerLevel level, PathfinderMob body);
+    protected void start(ServerLevel level, PathfinderMob body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, PathfinderMob body, long timestamp);
+    protected void tick(ServerLevel level, PathfinderMob mob, long timestamp);
+    protected void stop(ServerLevel level, PathfinderMob body, long timestamp);
+    protected boolean timedOut(long timestamp);
+}
+//// SpearAttack.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.PathfinderMob;
+public class SpearAttack extends Behavior<PathfinderMob> {
+    public static final int MIN_REPOSITION_DISTANCE = 6;
+    public static final int MAX_REPOSITION_DISTANCE = 7;
+    public SpearAttack(double speedModifierWhenCharging, double speedModifierWhenRepositioning, float targetInRangeRadius);
+    protected boolean checkExtraStartConditions(ServerLevel level, PathfinderMob body);
+    protected void start(ServerLevel level, PathfinderMob body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, PathfinderMob body, long timestamp);
+    protected void tick(ServerLevel level, PathfinderMob mob, long timestamp);
+    protected void stop(ServerLevel level, PathfinderMob body, long timestamp);
+    protected boolean timedOut(long timestamp);
+    public static enum SpearStatus {
+        APPROACH, CHARGING, RETREAT;
+    }
+}
+//// SpearRetreat.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.PathfinderMob;
+public class SpearRetreat extends Behavior<PathfinderMob> {
+    public static final int MIN_COOLDOWN_DISTANCE = 9;
+    public static final int MAX_COOLDOWN_DISTANCE = 11;
+    public static final int MAX_FLEEING_TIME = 100;
+    public SpearRetreat(double speedModifierWhenRepositioning);
+    protected boolean checkExtraStartConditions(ServerLevel level, PathfinderMob body);
+    protected void start(ServerLevel level, PathfinderMob body, long timestamp);
+    protected boolean canStillUse(ServerLevel level, PathfinderMob body, long timestamp);
+    protected void tick(ServerLevel level, PathfinderMob mob, long timestamp);
+    protected void stop(ServerLevel level, PathfinderMob body, long timestamp);
+}
+//// StartAttacking.java
+import java.util.Optional;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+public class StartAttacking {
+    public static <E extends Mob> BehaviorControl<E> create(TargetFinder<E> targetFinderFunction);
+    public static <E extends Mob> BehaviorControl<E> create(StartAttackingCondition<E> canAttackPredicate, TargetFinder<E> targetFinderFunction);
+    public interface StartAttackingCondition<E> {
+        boolean test(ServerLevel level, E body);
+    }
+    public interface TargetFinder<E> {
+        Optional<? extends LivingEntity> get(ServerLevel level, E body);
+    }
+}
+//// StartCelebratingIfTargetDead.java
+import java.util.function.BiPredicate;
+import net.minecraft.world.entity.LivingEntity;
+public class StartCelebratingIfTargetDead {
+    public static BehaviorControl<LivingEntity> create(int celebrateDuration, BiPredicate<LivingEntity, LivingEntity> dancePredicate);
+}
+//// StayCloseToTarget.java
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import net.minecraft.world.entity.LivingEntity;
+public class StayCloseToTarget {
+    public static BehaviorControl<LivingEntity> create(Function<LivingEntity, Optional<PositionTracker>> targetPositionGetter, Predicate<LivingEntity> shouldRunPredicate, int closeEnough, int tooFar, float speedModifier);
+}
+//// StopAttackingIfTargetInvalid.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+public class StopAttackingIfTargetInvalid {
+    public static <E extends Mob> BehaviorControl<E> create(TargetErasedCallback<E> onTargetErased);
+    public static <E extends Mob> BehaviorControl<E> create(StopAttackCondition stopAttackingWhen);
+    public static <E extends Mob> BehaviorControl<E> create();
+    public static <E extends Mob> BehaviorControl<E> create(StopAttackCondition stopAttackingWhen, TargetErasedCallback<E> onTargetErased, boolean canGrowTiredOfTryingToReachTarget);
+    public interface StopAttackCondition {
+        boolean test(ServerLevel level, LivingEntity target);
+    }
+    public interface TargetErasedCallback<E> {
+        void accept(ServerLevel level, E body, LivingEntity target);
+    }
+}
+//// StopBeingAngryIfTargetDead.java
+import net.minecraft.world.entity.LivingEntity;
+public class StopBeingAngryIfTargetDead {
+    public static BehaviorControl<LivingEntity> create();
+}
+//// StrollAroundPoi.java
+import net.minecraft.core.GlobalPos;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class StrollAroundPoi {
+    public static OneShot<PathfinderMob> create(MemoryModuleType<GlobalPos> memoryType, float speedModifier, int maxDistanceFromPoi);
+}
+//// StrollToPoi.java
+import net.minecraft.core.GlobalPos;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+public class StrollToPoi {
+    public static BehaviorControl<PathfinderMob> create(MemoryModuleType<GlobalPos> memoryType, float speedModifier, int closeEnoughDist, int maxDistanceFromPoi);
+}
+//// StrollToPoiList.java
+import java.util.List;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class StrollToPoiList {
+    public static BehaviorControl<Villager> create(MemoryModuleType<List<GlobalPos>> strollToMemoryType, float speedModifier, int closeEnoughDist, int maxDistanceFromPoi, MemoryModuleType<GlobalPos> mustBeCloseToMemoryType);
+}
+//// Swim.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.material.Fluid;
+public class Swim<T extends Mob> extends Behavior<T> {
+    public Swim(float chance);
+    public Swim(float chance, TagKey<Fluid> fluid);
+    protected boolean checkExtraStartConditions(ServerLevel level, Mob body);
+    protected boolean canStillUse(ServerLevel level, Mob body, long timestamp);
+    protected void tick(ServerLevel level, Mob body, long timestamp);
+}
+//// TradeWithVillager.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class TradeWithVillager extends Behavior<Villager> {
+    public TradeWithVillager();
+    protected boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+    protected void start(ServerLevel level, Villager myBody, long timestamp);
+    protected void tick(ServerLevel level, Villager body, long timestamp);
+    protected void stop(ServerLevel level, Villager body, long timestamp);
+}
+//// TransportItemsBetweenContainers.java
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import org.apache.commons.lang3.function.TriConsumer;
+public class TransportItemsBetweenContainers extends Behavior<PathfinderMob> {
+    public static final int TARGET_INTERACTION_TIME = 60;
+    public TransportItemsBetweenContainers(float speedModifier, Predicate<BlockState> sourceBlockType, Predicate<BlockState> destinationBlockType, int horizontalSearchDistance, int verticalSearchDistance, Map<ContainerInteractionState, OnTargetReachedInteraction> onTargetInteractionActions, Consumer<PathfinderMob> onStartTravelling, Predicate<TransportItemTarget> shouldQueueForTarget);
+    protected void start(ServerLevel level, PathfinderMob body, long timestamp);
+    protected boolean checkExtraStartConditions(ServerLevel level, PathfinderMob body);
+    protected boolean canStillUse(ServerLevel level, PathfinderMob body, long timestamp);
+    protected boolean timedOut(long timestamp);
+    protected void tick(ServerLevel level, PathfinderMob body, long timestamp);
+    protected void onTravelToTarget(TransportItemTarget target, Level level, PathfinderMob body);
+    protected void onReachedTarget(TransportItemTarget target, Level level, PathfinderMob body);
+    protected void setVisitedBlockPos(PathfinderMob body, Level level, BlockPos target);
+    protected void markVisitedBlockPosAsUnreachable(PathfinderMob body, Level level, BlockPos target);
+    protected void stopTargetingCurrentTarget(PathfinderMob body);
+    protected void clearMemoriesAfterMatchingTargetFound(PathfinderMob body);
+    protected void stop(ServerLevel level, PathfinderMob body, long timestamp);
+    public static enum TransportItemState {
+        TRAVELLING, QUEUING, INTERACTING;
+    }
+    public static enum ContainerInteractionState {
+        PICKUP_ITEM, PICKUP_NO_ITEM, PLACE_ITEM, PLACE_NO_ITEM;
+    }
+    public static record TransportItemTarget(BlockPos pos, Container container, BlockEntity blockEntity, BlockState state) {
+        public static TransportItemTarget tryCreatePossibleTarget(BlockEntity blockEntity, Level level);
+        public static TransportItemTarget tryCreatePossibleTarget(BlockPos blockPos, Level level);
+    }
+    public interface OnTargetReachedInteraction extends TriConsumer<PathfinderMob, TransportItemTarget, Integer> {
+    }
+}
+//// TriggerGate.java
+import com.mojang.datafixers.util.Pair;
+import java.util.List;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.behavior.declarative.Trigger;
+public class TriggerGate {
+    public static <E extends LivingEntity> OneShot<E> triggerOneShuffled(List<Pair<? extends Trigger<? super E>, Integer>> weightedTriggers);
+    public static <E extends LivingEntity> OneShot<E> triggerGate(List<Pair<? extends Trigger<? super E>, Integer>> weightedBehaviors, GateBehavior.OrderPolicy orderPolicy, GateBehavior.RunningPolicy runningPolicy);
+}
+//// TryFindLand.java
+import net.minecraft.world.entity.PathfinderMob;
+public class TryFindLand {
+    public static BehaviorControl<PathfinderMob> create(int range, float speedModifier);
+}
+//// TryFindLandNearLiquid.java
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.level.material.Fluid;
+public class TryFindLandNearLiquid {
+    public static BehaviorControl<PathfinderMob> create(int range, float speedModifier, TagKey<Fluid> fluidTag);
+}
+//// TryFindLiquid.java
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.level.material.Fluid;
+public class TryFindLiquid {
+    public static BehaviorControl<PathfinderMob> create(int range, float speedModifier, TagKey<Fluid> fluidTag);
+}
+//// TryLaySpawnOnFluidNearLand.java
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.block.Block;
+public class TryLaySpawnOnFluidNearLand {
+    public static BehaviorControl<LivingEntity> create(Block spawnBlock);
+}
+//// UpdateActivityFromSchedule.java
+import net.minecraft.world.entity.LivingEntity;
+public class UpdateActivityFromSchedule {
+    public static BehaviorControl<LivingEntity> create();
+}
+//// UseBonemeal.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class UseBonemeal extends Behavior<Villager> {
+    public UseBonemeal();
+    protected boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+    protected void start(ServerLevel level, Villager body, long timestamp);
+    protected void stop(ServerLevel level, Villager body, long timestamp);
+    protected void tick(ServerLevel level, Villager body, long timestamp);
+}
+//// ValidateNearbyPoi.java
+import java.util.function.Predicate;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.Holder;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
+public class ValidateNearbyPoi {
+    public static BehaviorControl<LivingEntity> create(Predicate<Holder<PoiType>> poiType, MemoryModuleType<GlobalPos> memoryType);
+}
+//// VillageBoundRandomStroll.java
+import net.minecraft.world.entity.PathfinderMob;
+public class VillageBoundRandomStroll {
+    public static OneShot<PathfinderMob> create(float speedModifier);
+    public static OneShot<PathfinderMob> create(float speedModifier, int maxXyDist, int maxYDist);
+}
+//// VillagerCalmDown.java
+import net.minecraft.world.entity.LivingEntity;
+public class VillagerCalmDown {
+    public static BehaviorControl<LivingEntity> create();
+}
+//// VillagerGoalPackages.java
+import com.google.common.collect.ImmutableList;
+import com.mojang.datafixers.util.Pair;
+import net.minecraft.core.Holder;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.villager.VillagerProfession;
+public class VillagerGoalPackages {
+    public static final int INTERACT_DIST_SQR = 5;
+    public static final int INTERACT_WALKUP_DIST = 2;
+    public static final float INTERACT_SPEED_MODIFIER = 0.5F;
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getCorePackage(Holder<VillagerProfession> profession, float speedModifier);
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getWorkPackage(Holder<VillagerProfession> profession, float speedModifier);
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getPlayPackage(float speedModifier);
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getRestPackage(float speedModifier);
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getMeetPackage(float speedModifier);
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getIdlePackage(float speedModifier);
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getPanicPackage(float speedModifier);
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getPreRaidPackage(float speedModifier);
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getRaidPackage(float speedModifier);
+    public static ImmutableList<Pair<Integer, ? extends BehaviorControl<? super Villager>>> getHidePackage(float speedModifier);
+}
+//// VillagerMakeLove.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class VillagerMakeLove extends Behavior<Villager> {
+    public VillagerMakeLove();
+    protected boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+    protected void start(ServerLevel level, Villager body, long timestamp);
+    protected void tick(ServerLevel level, Villager body, long timestamp);
+    protected void stop(ServerLevel level, Villager body, long timestamp);
+}
+//// VillagerPanicTrigger.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class VillagerPanicTrigger extends Behavior<Villager> {
+    public VillagerPanicTrigger();
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+    protected void start(ServerLevel level, Villager body, long timestamp);
+    protected void tick(ServerLevel level, Villager body, long timestamp);
+    public static boolean hasHostile(LivingEntity myBody);
+    public static boolean isHurt(LivingEntity myBody);
+}
+//// WakeUp.java
+import net.minecraft.world.entity.LivingEntity;
+public class WakeUp {
+    public static BehaviorControl<LivingEntity> create();
+}
+//// WorkAtComposter.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class WorkAtComposter extends WorkAtPoi {
+    protected void useWorkstation(ServerLevel level, Villager body);
+}
+//// WorkAtPoi.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.villager.Villager;
+public class WorkAtPoi extends Behavior<Villager> {
+    public WorkAtPoi();
+    protected boolean checkExtraStartConditions(ServerLevel level, Villager body);
+    protected void start(ServerLevel level, Villager body, long timestamp);
+    protected void useWorkstation(ServerLevel level, Villager body);
+    protected boolean canStillUse(ServerLevel level, Villager body, long timestamp);
+}
+//// YieldJobSite.java
+import net.minecraft.world.entity.npc.villager.Villager;
+public class YieldJobSite {
+    public static BehaviorControl<Villager> create(float speedModifier);
+}

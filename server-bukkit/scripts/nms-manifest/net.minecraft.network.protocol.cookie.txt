@@ -1,0 +1,40 @@
+//// ClientCookiePacketListener.java
+import net.minecraft.network.ClientboundPacketListener;
+public interface ClientCookiePacketListener extends ClientboundPacketListener {
+    void handleRequestCookie(ClientboundCookieRequestPacket packet);
+}
+//// ClientboundCookieRequestPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.Identifier;
+public record ClientboundCookieRequestPacket(Identifier key) implements Packet<ClientCookiePacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundCookieRequestPacket> STREAM_CODEC;
+    private ClientboundCookieRequestPacket(FriendlyByteBuf input);
+    public PacketType<ClientboundCookieRequestPacket> type();
+    public void handle(ClientCookiePacketListener listener);
+}
+//// CookiePacketTypes.java
+import net.minecraft.network.protocol.PacketType;
+public class CookiePacketTypes {
+    public static final PacketType<ClientboundCookieRequestPacket> CLIENTBOUND_COOKIE_REQUEST;
+    public static final PacketType<ServerboundCookieResponsePacket> SERVERBOUND_COOKIE_RESPONSE;
+}
+//// ServerCookiePacketListener.java
+import net.minecraft.network.protocol.game.ServerPacketListener;
+public interface ServerCookiePacketListener extends ServerPacketListener {
+    void handleCookieResponse(ServerboundCookieResponsePacket packet);
+}
+//// ServerboundCookieResponsePacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.Identifier;
+public record ServerboundCookieResponsePacket(Identifier key, byte [] payload) implements Packet<ServerCookiePacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ServerboundCookieResponsePacket> STREAM_CODEC;
+    private ServerboundCookieResponsePacket(FriendlyByteBuf input);
+    public PacketType<ServerboundCookieResponsePacket> type();
+    public void handle(ServerCookiePacketListener listener);
+}

@@ -1,0 +1,56 @@
+//// BlockInWorld.java
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+public class BlockInWorld {
+    public BlockInWorld(LevelReader level, BlockPos pos, boolean loadChunks);
+    public BlockState getState();
+    public BlockEntity getEntity();
+    public LevelReader getLevel();
+    public BlockPos getPos();
+    public static Predicate< BlockInWorld> hasState(Predicate<BlockState> predicate);
+}
+//// BlockPattern.java
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.LevelReader;
+public class BlockPattern {
+    public BlockPattern(Predicate<BlockInWorld>[][][] pattern);
+    public int getDepth();
+    public int getHeight();
+    public int getWidth();
+    public Predicate<BlockInWorld>[][][] getPattern();
+    public BlockPatternMatch matches(LevelReader level, BlockPos origin, Direction forwards, Direction up);
+    public BlockPatternMatch find(LevelReader level, BlockPos origin);
+    public static LoadingCache<BlockPos, BlockInWorld> createLevelCache(LevelReader level, boolean loadChunks);
+    protected static BlockPos translateAndRotate(BlockPos origin, Direction forwardsDirection, Direction upDirection, int right, int down, int forwards);
+    static class BlockCacheLoader extends CacheLoader<BlockPos, BlockInWorld> {
+        public BlockCacheLoader(LevelReader level, boolean loadChunks);
+        public BlockInWorld load(BlockPos key);
+    }
+    public static class BlockPatternMatch {
+        public BlockPatternMatch(BlockPos frontTopLeft, Direction forwards, Direction up, LoadingCache<BlockPos, BlockInWorld> cache, int width, int height, int depth);
+        public BlockPos getFrontTopLeft();
+        public Direction getForwards();
+        public Direction getUp();
+        public int getWidth();
+        public int getHeight();
+        public int getDepth();
+        public BlockInWorld getBlock(int right, int down, int forwards);
+        public String toString();
+    }
+}
+//// BlockPatternBuilder.java
+import java.util.function.Predicate;
+public class BlockPatternBuilder {
+    private BlockPatternBuilder();
+    public BlockPatternBuilder aisle(String... aisle);
+    public static BlockPatternBuilder start();
+    public BlockPatternBuilder where(char character, Predicate< BlockInWorld> predicate);
+    public BlockPattern build();
+}

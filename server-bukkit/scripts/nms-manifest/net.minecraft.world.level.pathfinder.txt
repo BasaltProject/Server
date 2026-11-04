@@ -1,0 +1,262 @@
+//// AmphibiousNodeEvaluator.java
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.PathNavigationRegion;
+public class AmphibiousNodeEvaluator extends WalkNodeEvaluator {
+    public AmphibiousNodeEvaluator(boolean prefersShallowSwimming);
+    public void prepare(PathNavigationRegion level, Mob entity);
+    public void done();
+    public Node getStart();
+    public Target getTarget(double x, double y, double z);
+    public int getNeighbors(Node[] neighbors, Node pos);
+    protected boolean isAmphibious();
+    public PathType getPathType(PathfindingContext context, int x, int y, int z);
+}
+//// BinaryHeap.java
+public class BinaryHeap {
+    public Node insert(Node node);
+    public void clear();
+    public Node peek();
+    public Node pop();
+    public void remove(Node node);
+    public void changeCost(Node node, float newCost);
+    public int size();
+    public boolean isEmpty();
+    public Node[] getHeap();
+}
+//// FlyNodeEvaluator.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.PathNavigationRegion;
+public class FlyNodeEvaluator extends WalkNodeEvaluator {
+    public void prepare(PathNavigationRegion level, Mob entity);
+    public void done();
+    public Node getStart();
+    protected boolean canStartAt(BlockPos pos);
+    public Target getTarget(double x, double y, double z);
+    public int getNeighbors(Node[] neighbors, Node pos);
+    protected Node findAcceptedNode(int x, int y, int z);
+    protected PathType getCachedPathType(int x, int y, int z);
+    public PathType getPathType(PathfindingContext context, int x, int y, int z);
+}
+//// Node.java
+import com.mojang.datafixers.util.Function3;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.phys.Vec3;
+public class Node {
+    public static final StreamCodec<ByteBuf, Node> DEBUG_STREAM_CODEC;
+    public final int x;
+    public final int y;
+    public final int z;
+    public int heapIdx;
+    public float g;
+    public float h;
+    public float f;
+    public Node cameFrom;
+    public boolean closed;
+    public float walkedDistance;
+    public float costMalus;
+    public PathType type;
+    protected static <N extends Node> StreamCodec<ByteBuf, N> createDebugStreamCodec(Function3<Integer, Integer, Integer, N> factory);
+    public Node(int x, int y, int z);
+    public Node cloneAndMove(int x, int y, int z);
+    public static int createHash(int x, int y, int z);
+    public float distanceTo(Node to);
+    public float distanceToXZ(Node to);
+    public float distanceTo(BlockPos pos);
+    public float distanceToSqr(Node to);
+    public float distanceToSqr(BlockPos pos);
+    public float distanceManhattan(Node to);
+    public float distanceManhattan(BlockPos pos);
+    public BlockPos asBlockPos();
+    public Vec3 asVec3();
+    public boolean equals(Object o);
+    public int hashCode();
+    public boolean inOpenSet();
+    public String toString();
+}
+//// NodeEvaluator.java
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.PathNavigationRegion;
+import net.minecraft.world.level.block.state.BlockState;
+public abstract class NodeEvaluator {
+    protected PathfindingContext currentContext;
+    protected Mob mob;
+    protected final Int2ObjectMap<Node> nodes;
+    protected int entityWidth;
+    protected int entityHeight;
+    protected int entityDepth;
+    protected boolean canPassDoors;
+    protected boolean canOpenDoors;
+    protected boolean canFloat;
+    protected boolean canWalkOverFences;
+    public void prepare(PathNavigationRegion level, Mob entity);
+    public void done();
+    protected Node getNode(BlockPos pos);
+    protected Node getNode(int x, int y, int z);
+    public abstract Node getStart();
+    public abstract Target getTarget(double x, double y, double z);
+    protected Target getTargetNodeAt(double x, double y, double z);
+    public abstract int getNeighbors(Node[] neighbors, Node pos);
+    public abstract PathType getPathTypeOfMob(PathfindingContext context, int x, int y, int z, Mob mob);
+    public abstract PathType getPathType(PathfindingContext context, int x, int y, int z);
+    public PathType getPathType(Mob mob, BlockPos pos);
+    public void setCanPassDoors(boolean canPassDoors);
+    public void setCanOpenDoors(boolean canOpenDoors);
+    public void setCanFloat(boolean canFloat);
+    public void setCanWalkOverFences(boolean canWalkOverFences);
+    public boolean canPassDoors();
+    public boolean canOpenDoors();
+    public boolean canFloat();
+    public boolean canWalkOverFences();
+    public static boolean isBurningBlock(BlockState blockState);
+}
+//// Path.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.Set;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public final class Path {
+    public static final StreamCodec<ByteBuf, Path> DEBUG_STREAM_CODEC;
+    public Path(List<Node> nodes, BlockPos target, boolean reached);
+    public void advance();
+    public boolean notStarted();
+    public boolean isDone();
+    public Node getEndNode();
+    public Node getNode(int i);
+    public void truncateNodes(int index);
+    public void replaceNode(int index, Node replaceWith);
+    public int getNodeCount();
+    public int getNextNodeIndex();
+    public void setNextNodeIndex(int nextNodeIndex);
+    public Vec3 getEntityPosAtNode(Entity entity, int index);
+    public BlockPos getNodePos(int index);
+    public Vec3 getNextEntityPos(Entity entity);
+    public BlockPos getNextNodePos();
+    public Node getNextNode();
+    public Node getPreviousNode();
+    public boolean sameAs(Path path);
+    public boolean equals(Object obj);
+    public int hashCode();
+    public boolean canReach();
+    void setDebug(List<Node> openSet, List<Node> closedSet, Set<Target> targets);
+    public DebugData debugData();
+    public String toString();
+    public BlockPos getTarget();
+    public float getDistToTarget();
+    public Path copy();
+    public static record DebugData(List<Node> openSet, List<Node> closedSet, Set<Target> targetNodes) {
+        public static final StreamCodec<ByteBuf, DebugData> STREAM_CODEC;
+    }
+}
+//// PathComputationType.java
+public enum PathComputationType {
+    LAND, WATER, AIR;
+}
+//// PathFinder.java
+import java.util.Set;
+import java.util.function.BooleanSupplier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.PathNavigationRegion;
+public class PathFinder {
+    public PathFinder(NodeEvaluator nodeEvaluator, int maxVisitedNodes);
+    public void setCaptureDebug(BooleanSupplier captureDebug);
+    public void setMaxVisitedNodes(int maxVisitedNodes);
+    public Path findPath(PathNavigationRegion level, Mob entity, Set<BlockPos> targets, float maxPathLength, int reachRange, float maxVisitedNodesMultiplier);
+    protected float distance(Node from, Node to);
+}
+//// PathType.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public enum PathType {
+    BLOCKED, OPEN, WALKABLE, WALKABLE_DOOR, TRAPDOOR, POWDER_SNOW, ON_TOP_OF_POWDER_SNOW, FENCE, LAVA, WATER, WATER_BORDER, RAIL, UNPASSABLE_RAIL, FIRE_IN_NEIGHBOR, FIRE, DAMAGING_IN_NEIGHBOR, DAMAGING, DOOR_OPEN, DOOR_WOOD_CLOSED, DOOR_IRON_CLOSED, BREACH, LEAVES, STICKY_HONEY, COCOA, DAMAGE_CAUTIOUS, ON_TOP_OF_TRAPDOOR, BIG_MOBS_CLOSE_TO_DANGER;
+    public static final StreamCodec<ByteBuf, PathType> STREAM_CODEC;
+    public float getMalus();
+}
+//// PathTypeCache.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.BlockGetter;
+public class PathTypeCache {
+    public PathType getOrCompute(BlockGetter level, BlockPos pos);
+    public void invalidate(BlockPos pos);
+}
+//// PathfindingContext.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.CollisionGetter;
+import net.minecraft.world.level.block.state.BlockState;
+public class PathfindingContext {
+    public PathfindingContext(CollisionGetter level, Mob mob);
+    public PathType getPathTypeFromState(int x, int y, int z);
+    public BlockState getBlockState(BlockPos pos);
+    public CollisionGetter level();
+    public BlockPos mobPosition();
+}
+//// SwimNodeEvaluator.java
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.PathNavigationRegion;
+public class SwimNodeEvaluator extends NodeEvaluator {
+    public SwimNodeEvaluator(boolean allowBreaching);
+    public void prepare(PathNavigationRegion level, Mob entity);
+    public void done();
+    public Node getStart();
+    public Target getTarget(double x, double y, double z);
+    public int getNeighbors(Node[] neighbors, Node pos);
+    protected boolean isNodeValid(Node node);
+    protected Node findAcceptedNode(int x, int y, int z);
+    protected PathType getCachedBlockType(int x, int y, int z);
+    public PathType getPathType(PathfindingContext context, int x, int y, int z);
+    public PathType getPathTypeOfMob(PathfindingContext context, int x, int y, int z, Mob mob);
+}
+//// Target.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class Target extends Node {
+    public static final StreamCodec<ByteBuf, Target> DEBUG_STREAM_CODEC;
+    public Target(Node node);
+    public Target(int x, int y, int z);
+    public void updateBest(float heuristic, Node node);
+    public Node getBestNode();
+    public void setReached();
+    public boolean isReached();
+}
+//// WalkNodeEvaluator.java
+import java.util.Set;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.PathNavigationRegion;
+public class WalkNodeEvaluator extends NodeEvaluator {
+    public static final double SPACE_BETWEEN_WALL_POSTS = 0.5;
+    public WalkNodeEvaluator();
+    public void prepare(PathNavigationRegion level, Mob entity);
+    public void done();
+    public Node getStart();
+    protected Node getStartNode(BlockPos pos);
+    protected boolean canStartAt(BlockPos pos);
+    public Target getTarget(double x, double y, double z);
+    public int getNeighbors(Node[] neighbors, Node pos);
+    protected boolean isNeighborValid(Node neighbor, Node current);
+    protected boolean isDiagonalValid(Node pos, Node ew, Node ns);
+    protected boolean isDiagonalValid(Node diagonal);
+    protected double getFloorLevel(BlockPos pos);
+    public static double getFloorLevel(BlockGetter level, BlockPos pos);
+    protected boolean isAmphibious();
+    protected Node findAcceptedNode(int x, int y, int z, int jumpSize, double nodeHeight, Direction travelDirection, PathType blockPathTypeCurrent);
+    protected PathType getCachedPathType(int x, int y, int z);
+    public PathType getPathTypeOfMob(PathfindingContext context, int x, int y, int z, Mob mob);
+    public Set<PathType> getPathTypeWithinMobBB(PathfindingContext context, int x, int y, int z);
+    public PathType getPathType(PathfindingContext context, int x, int y, int z);
+    public static PathType getPathTypeStatic(Mob mob, BlockPos pos);
+    public static PathType getPathTypeStatic(PathfindingContext context, BlockPos.MutableBlockPos pos);
+    public static PathType checkNeighbourBlocks(PathfindingContext context, int x, int y, int z, PathType blockPathType);
+    protected static PathType getPathTypeFromState(BlockGetter level, BlockPos pos);
+}

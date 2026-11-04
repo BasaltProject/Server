@@ -1,0 +1,1154 @@
+//// AngleArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import java.util.Collection;
+import net.minecraft.commands.CommandSourceStack;
+public class AngleArgument implements ArgumentType<SingleAngle> {
+    public static final SimpleCommandExceptionType ERROR_NOT_COMPLETE;
+    public static final SimpleCommandExceptionType ERROR_INVALID_ANGLE;
+    public static AngleArgument angle();
+    public static float getAngle(CommandContext<CommandSourceStack> context, String name);
+    public SingleAngle parse(StringReader reader) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+    public static final class SingleAngle {
+        private SingleAngle(float angle, boolean isRelative);
+        public float getAngle(CommandSourceStack sender);
+    }
+}
+//// ArgumentSignatures.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.chat.MessageSignature;
+import net.minecraft.network.chat.SignableCommand;
+import net.minecraft.network.codec.StreamCodec;
+public record ArgumentSignatures(List<Entry> entries) {
+    public static final ArgumentSignatures EMPTY;
+    public static final StreamCodec<ByteBuf, ArgumentSignatures> STREAM_CODEC;
+    public static ArgumentSignatures signCommand(SignableCommand<?> command, Signer signer);
+    public static record Entry(String name, MessageSignature signature) {
+        public static final StreamCodec<ByteBuf, Entry> STREAM_CODEC;
+    }
+    public interface Signer {
+        MessageSignature sign(String content);
+    }
+}
+//// ComponentArgument.java
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import java.util.Collection;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.parsing.packrat.commands.ParserBasedArgument;
+import net.minecraft.world.entity.Entity;
+public class ComponentArgument extends ParserBasedArgument<Component> {
+    public static final DynamicCommandExceptionType ERROR_INVALID_COMPONENT;
+    private ComponentArgument(HolderLookup.Provider registries);
+    public static Component getRawComponent(CommandContext<CommandSourceStack> context, String name);
+    public static Component getResolvedComponent(CommandContext<CommandSourceStack> context, String name, Entity contentEntity) throws CommandSyntaxException;
+    public static Component getResolvedComponent(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static ComponentArgument textComponent(CommandBuildContext context);
+    public Collection<String> getExamples();
+}
+//// CompoundTagArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.Collection;
+import net.minecraft.nbt.CompoundTag;
+public class CompoundTagArgument implements ArgumentType<CompoundTag> {
+    private CompoundTagArgument();
+    public static CompoundTagArgument compoundTag();
+    public static <S> CompoundTag getCompoundTag(CommandContext<S> context, String name);
+    public CompoundTag parse(StringReader reader) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+}
+//// DimensionArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+public class DimensionArgument implements ArgumentType<Identifier> {
+    public Identifier parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static DimensionArgument dimension();
+    public static ServerLevel getDimension(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+}
+//// EntityAnchorArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public class EntityAnchorArgument implements ArgumentType<Anchor> {
+    public static Anchor getAnchor(CommandContext<CommandSourceStack> context, String name);
+    public static EntityAnchorArgument anchor();
+    public Anchor parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static enum Anchor {
+        FEET, EYES;
+        public static Anchor getByName(String name);
+        public Vec3 apply(Entity entity);
+        public Vec3 apply(CommandSourceStack source);
+    }
+}
+//// EntityArgument.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.selector.EntitySelector;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+public class EntityArgument implements ArgumentType<EntitySelector> {
+    public static final SimpleCommandExceptionType ERROR_NOT_SINGLE_ENTITY;
+    public static final SimpleCommandExceptionType ERROR_NOT_SINGLE_PLAYER;
+    public static final SimpleCommandExceptionType ERROR_ONLY_PLAYERS_ALLOWED;
+    public static final SimpleCommandExceptionType NO_ENTITIES_FOUND;
+    public static final SimpleCommandExceptionType NO_PLAYERS_FOUND;
+    public static final SimpleCommandExceptionType ERROR_SELECTORS_NOT_ALLOWED;
+    protected EntityArgument(boolean single, boolean playersOnly);
+    public static EntityArgument entity();
+    public static Entity getEntity(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static EntityArgument entities();
+    public static Collection<? extends Entity> getEntities(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Collection<? extends Entity> getOptionalEntities(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Collection<ServerPlayer> getOptionalPlayers(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static EntityArgument player();
+    public static ServerPlayer getPlayer(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static EntityArgument players();
+    public static Collection<ServerPlayer> getPlayers(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public EntitySelector parse(StringReader reader) throws CommandSyntaxException;
+    public <S> EntitySelector parse(StringReader reader, S source) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> contextBuilder, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static class Info implements ArgumentTypeInfo<EntityArgument, Template> {
+        public void serializeToNetwork(Template template, FriendlyByteBuf out);
+        public Template deserializeFromNetwork(FriendlyByteBuf in);
+        public void serializeToJson(Template template, JsonObject out);
+        public Template unpack(EntityArgument argument);
+        public final class Template implements ArgumentTypeInfo.Template<EntityArgument> {
+            private Template(boolean single, boolean playersOnly);
+            public EntityArgument instantiate(CommandBuildContext context);
+            public ArgumentTypeInfo<EntityArgument, ?> type();
+        }
+    }
+}
+//// GameModeArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.level.GameType;
+public class GameModeArgument implements ArgumentType<GameType> {
+    public GameType parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static GameModeArgument gameMode();
+    public static GameType getGameMode(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+}
+//// GameProfileArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.selector.EntitySelector;
+import net.minecraft.server.players.NameAndId;
+public class GameProfileArgument implements ArgumentType<Result> {
+    public static final SimpleCommandExceptionType ERROR_UNKNOWN_PLAYER;
+    public static Collection<NameAndId> getGameProfiles(CommandContext<CommandSourceStack> source, String name) throws CommandSyntaxException;
+    public static GameProfileArgument gameProfile();
+    public <S> Result parse(StringReader reader, S source) throws CommandSyntaxException;
+    public Result parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> contextBuilder, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static class SelectorResult implements Result {
+        public SelectorResult(EntitySelector selector);
+        public Collection<NameAndId> getNames(CommandSourceStack sender) throws CommandSyntaxException;
+    }
+    public interface Result {
+        Collection<NameAndId> getNames(CommandSourceStack sender) throws CommandSyntaxException;
+    }
+}
+//// HeightmapTypeArgument.java
+import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.level.levelgen.Heightmap;
+public class HeightmapTypeArgument extends StringRepresentableArgument<Heightmap.Types> {
+    private HeightmapTypeArgument();
+    public static HeightmapTypeArgument heightmap();
+    public static Heightmap.Types getHeightmap(CommandContext<CommandSourceStack> context, String name);
+    protected String convertId(String id);
+}
+//// HexColorArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+public class HexColorArgument implements ArgumentType<Integer> {
+    public static final DynamicCommandExceptionType ERROR_INVALID_HEX;
+    private HexColorArgument();
+    public static HexColorArgument hexColor();
+    public static Integer getHexColor(CommandContext<CommandSourceStack> context, String name);
+    public Integer parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> contextBuilder, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// IdentifierArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.Collection;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.resources.Identifier;
+public class IdentifierArgument implements ArgumentType<Identifier> {
+    public static IdentifierArgument id();
+    public static Identifier getId(CommandContext<CommandSourceStack> context, String name);
+    public Identifier parse(StringReader reader) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+}
+//// MessageArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.Collection;
+import java.util.function.Consumer;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.selector.EntitySelector;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.PlayerChatMessage;
+public class MessageArgument implements SignedArgument<Message> {
+    public static MessageArgument message();
+    public static Component getMessage(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static void resolveChatMessage(CommandContext<CommandSourceStack> context, String name, Consumer<PlayerChatMessage> task) throws CommandSyntaxException;
+    public Message parse(StringReader reader) throws CommandSyntaxException;
+    public <S> Message parse(StringReader reader, S source) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+    public static record Message(String text, Part[] parts) {
+        public Component toComponent(CommandSourceStack sender, boolean allowSelectors) throws CommandSyntaxException;
+        public static Message parseText(StringReader reader, boolean allowSelectors) throws CommandSyntaxException;
+    }
+    public static record Part(int start, int end, EntitySelector selector) {
+        public Component toComponent(CommandSourceStack sender) throws CommandSyntaxException;
+    }
+}
+//// NbtPathArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import java.util.Collection;
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+public class NbtPathArgument implements ArgumentType<NbtPath> {
+    public static final SimpleCommandExceptionType ERROR_INVALID_NODE;
+    public static final SimpleCommandExceptionType ERROR_DATA_TOO_DEEP;
+    public static final DynamicCommandExceptionType ERROR_NOTHING_FOUND;
+    public static NbtPathArgument nbtPath();
+    public static NbtPath getPath(CommandContext<CommandSourceStack> context, String name);
+    public NbtPath parse(StringReader reader) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+    public static class NbtPath {
+        public static final Codec<NbtPath> CODEC;
+        public static NbtPath of(String string) throws CommandSyntaxException;
+        public NbtPath(String original, Node[] nodes, Object2IntMap<Node> nodeToOriginalPosition);
+        public List<Tag> get(Tag tag) throws CommandSyntaxException;
+        public int countMatching(Tag tag);
+        public List<Tag> getOrCreate(Tag tag, Supplier<Tag> newTagValue) throws CommandSyntaxException;
+        public static boolean isTooDeep(Tag tag, int depth);
+        public int set(Tag tag, Tag toAdd) throws CommandSyntaxException;
+        public int insert(int index, CompoundTag target, List<Tag> toInsert) throws CommandSyntaxException;
+        public int remove(Tag tag);
+        public String toString();
+        public String asString();
+    }
+    interface Node {
+        void getTag(Tag parent, List<Tag> output);
+        void getOrCreateTag(Tag parent, Supplier<Tag> child, List<Tag> output);
+        Tag createPreferredParentTag();
+        int setTag(Tag parent, Supplier<Tag> toAdd);
+        int removeTag(Tag parent);
+        default List<Tag> get(List<Tag> tags);
+        default List<Tag> getOrCreate(List<Tag> tags, Supplier<Tag> child);
+        default List<Tag> collect(List<Tag> tags, BiConsumer<Tag, List<Tag>> collector);
+    }
+    static class CompoundChildNode implements Node {
+        public CompoundChildNode(String name);
+        public void getTag(Tag parent, List<Tag> output);
+        public void getOrCreateTag(Tag parent, Supplier<Tag> child, List<Tag> output);
+        public Tag createPreferredParentTag();
+        public int setTag(Tag parent, Supplier<Tag> toAdd);
+        public int removeTag(Tag parent);
+    }
+    static class IndexedElementNode implements Node {
+        public IndexedElementNode(int index);
+        public void getTag(Tag parent, List<Tag> output);
+        public void getOrCreateTag(Tag parent, Supplier<Tag> child, List<Tag> output);
+        public Tag createPreferredParentTag();
+        public int setTag(Tag parent, Supplier<Tag> toAdd);
+        public int removeTag(Tag parent);
+    }
+    static class MatchElementNode implements Node {
+        public MatchElementNode(CompoundTag pattern);
+        public void getTag(Tag parent, List<Tag> output);
+        public void getOrCreateTag(Tag parent, Supplier<Tag> child, List<Tag> output);
+        public Tag createPreferredParentTag();
+        public int setTag(Tag parent, Supplier<Tag> toAdd);
+        public int removeTag(Tag parent);
+    }
+    static class AllElementsNode implements Node {
+        public static final AllElementsNode INSTANCE;
+        public void getTag(Tag parent, List<Tag> output);
+        public void getOrCreateTag(Tag parent, Supplier<Tag> child, List<Tag> output);
+        public Tag createPreferredParentTag();
+        public int setTag(Tag parent, Supplier<Tag> toAdd);
+        public int removeTag(Tag parent);
+    }
+    static class MatchObjectNode implements Node {
+        public MatchObjectNode(String name, CompoundTag pattern);
+        public void getTag(Tag parent, List<Tag> output);
+        public void getOrCreateTag(Tag parent, Supplier<Tag> child, List<Tag> output);
+        public Tag createPreferredParentTag();
+        public int setTag(Tag parent, Supplier<Tag> toAdd);
+        public int removeTag(Tag parent);
+    }
+    static class MatchRootObjectNode implements Node {
+        public MatchRootObjectNode(CompoundTag pattern);
+        public void getTag(Tag self, List<Tag> output);
+        public void getOrCreateTag(Tag self, Supplier<Tag> child, List<Tag> output);
+        public Tag createPreferredParentTag();
+        public int setTag(Tag parent, Supplier<Tag> toAdd);
+        public int removeTag(Tag parent);
+    }
+}
+//// NbtTagArgument.java
+import com.mojang.brigadier.context.CommandContext;
+import java.util.Collection;
+import net.minecraft.nbt.Tag;
+import net.minecraft.util.parsing.packrat.commands.ParserBasedArgument;
+public class NbtTagArgument extends ParserBasedArgument<Tag> {
+    private NbtTagArgument();
+    public static NbtTagArgument nbtTag();
+    public static <S> Tag getNbtTag(CommandContext<S> context, String name);
+    public Collection<String> getExamples();
+}
+//// ObjectiveArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.scores.Objective;
+public class ObjectiveArgument implements ArgumentType<String> {
+    public static ObjectiveArgument objective();
+    public static Objective getObjective(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Objective getWritableObjective(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public String parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// ObjectiveCriteriaArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.stats.StatType;
+import net.minecraft.world.scores.criteria.ObjectiveCriteria;
+public class ObjectiveCriteriaArgument implements ArgumentType<ObjectiveCriteria> {
+    public static final DynamicCommandExceptionType ERROR_INVALID_VALUE;
+    private ObjectiveCriteriaArgument();
+    public static ObjectiveCriteriaArgument criteria();
+    public static ObjectiveCriteria getCriteria(CommandContext<CommandSourceStack> context, String name);
+    public ObjectiveCriteria parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public <T> String getName(StatType<T> type, Object value);
+    public Collection<String> getExamples();
+}
+//// OperationArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.scores.ScoreAccess;
+public class OperationArgument implements ArgumentType<Operation> {
+    public static OperationArgument operation();
+    public static Operation getOperation(CommandContext<CommandSourceStack> context, String name);
+    public Operation parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    interface SimpleOperation extends Operation {
+        int apply(int a, int b) throws CommandSyntaxException;
+        default void apply(ScoreAccess a, ScoreAccess b) throws CommandSyntaxException;
+    }
+    public interface Operation {
+        void apply(ScoreAccess a, ScoreAccess b) throws CommandSyntaxException;
+    }
+}
+//// ParticleArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.particles.ParticleOptions;
+public class ParticleArgument implements ArgumentType<ParticleOptions> {
+    public static final DynamicCommandExceptionType ERROR_UNKNOWN_PARTICLE;
+    public static final DynamicCommandExceptionType ERROR_INVALID_OPTIONS;
+    public ParticleArgument(CommandBuildContext context);
+    public static ParticleArgument particle(CommandBuildContext context);
+    public static ParticleOptions getParticle(CommandContext<CommandSourceStack> context, String name);
+    public ParticleOptions parse(StringReader reader) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+    public static ParticleOptions readParticle(StringReader reader, HolderLookup.Provider registries) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+}
+//// RangeArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.Collection;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.commands.CommandSourceStack;
+public interface RangeArgument<T extends MinMaxBounds<?>> extends ArgumentType<T> {
+    static Ints intRange();
+    static Floats floatRange();
+    public static class Ints implements RangeArgument<MinMaxBounds.Ints> {
+        public static MinMaxBounds.Ints getRange(CommandContext<CommandSourceStack> context, String name);
+        public MinMaxBounds.Ints parse(StringReader reader) throws CommandSyntaxException;
+        public Collection<String> getExamples();
+    }
+    public static class Floats implements RangeArgument<MinMaxBounds.Doubles> {
+        public static MinMaxBounds.Doubles getRange(CommandContext<CommandSourceStack> context, String name);
+        public MinMaxBounds.Doubles parse(StringReader reader) throws CommandSyntaxException;
+        public Collection<String> getExamples();
+    }
+}
+//// ResourceArgument.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
+import com.mojang.brigadier.exceptions.Dynamic3CommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.timeline.Timeline;
+public class ResourceArgument<T> implements ArgumentType<Holder.Reference<T>> {
+    public static final Dynamic2CommandExceptionType ERROR_UNKNOWN_RESOURCE;
+    public static final Dynamic3CommandExceptionType ERROR_INVALID_RESOURCE_TYPE;
+    public ResourceArgument(CommandBuildContext context, ResourceKey<? extends Registry<T>> registryKey);
+    public static <T> ResourceArgument<T> resource(CommandBuildContext context, ResourceKey<? extends Registry<T>> key);
+    public static <T> Holder.Reference<T> getResource(CommandContext<CommandSourceStack> context, String name, ResourceKey<Registry<T>> registryKey) throws CommandSyntaxException;
+    public static Holder.Reference<Attribute> getAttribute(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Holder.Reference<EntityType<?>> getSummonableEntityType(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Holder.Reference<MobEffect> getMobEffect(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Holder.Reference<Enchantment> getEnchantment(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Holder.Reference<WorldClock> getClock(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Holder.Reference<Timeline> getTimeline(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public Holder.Reference<T> parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static class Info<T> implements ArgumentTypeInfo<ResourceArgument<T>, Info<T>.Template> {
+        public void serializeToNetwork(Info<T>.Template template, FriendlyByteBuf out);
+        public Info<T>.Template deserializeFromNetwork(FriendlyByteBuf in);
+        public void serializeToJson(Info<T>.Template template, JsonObject out);
+        public Info<T>.Template unpack(ResourceArgument<T> argument);
+        public final class Template implements ArgumentTypeInfo.Template<ResourceArgument<T>> {
+            private Template(ResourceKey<? extends Registry<T>> registryKey);
+            public ResourceArgument<T> instantiate(CommandBuildContext context);
+            public ArgumentTypeInfo<ResourceArgument<T>, ?> type();
+        }
+    }
+}
+//// ResourceKeyArgument.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class ResourceKeyArgument<T> implements ArgumentType<ResourceKey<T>> {
+    public ResourceKeyArgument(ResourceKey<? extends Registry<T>> registryKey);
+    public ResourceKeyArgument(ResourceKey<? extends Registry<T>> registryKey, Predicate<T> filter);
+    public static <T> ResourceKeyArgument<T> key(ResourceKey<? extends Registry<T>> key);
+    public static <T> ResourceKeyArgument<T> key(ResourceKey<? extends Registry<T>> key, Predicate<T> filter);
+    public static <T> ResourceKey<T> getRegistryKey(CommandContext<CommandSourceStack> context, String name, ResourceKey<Registry<T>> registryKey, DynamicCommandExceptionType exceptionType) throws CommandSyntaxException;
+    public static Holder.Reference<Structure> getStructure(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Holder.Reference<StructureTemplatePool> getStructureTemplatePool(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static RecipeHolder<?> getRecipe(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static AdvancementHolder getAdvancement(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public ResourceKey<T> parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static class Info<T> implements ArgumentTypeInfo<ResourceKeyArgument<T>, Info<T>.Template> {
+        public void serializeToNetwork(Info<T>.Template template, FriendlyByteBuf out);
+        public Info<T>.Template deserializeFromNetwork(FriendlyByteBuf in);
+        public void serializeToJson(Info<T>.Template template, JsonObject out);
+        public Info<T>.Template unpack(ResourceKeyArgument<T> argument);
+        public final class Template implements ArgumentTypeInfo.Template<ResourceKeyArgument<T>> {
+            private Template(ResourceKey<? extends Registry<T>> registryKey);
+            public ResourceKeyArgument<T> instantiate(CommandBuildContext context);
+            public ArgumentTypeInfo<ResourceKeyArgument<T>, ?> type();
+        }
+    }
+}
+//// ResourceOrIdArgument.java
+import com.mojang.brigadier.ImmutableStringReader;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.dialog.Dialog;
+import net.minecraft.util.parsing.packrat.commands.Grammar;
+import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+public class ResourceOrIdArgument<T> implements ArgumentType<Holder<T>> {
+    static final Collection<String> EXAMPLES;
+    public static final DynamicCommandExceptionType ERROR_FAILED_TO_PARSE;
+    public static final Dynamic2CommandExceptionType ERROR_NO_SUCH_ELEMENT;
+    public static final DynamicOps<Tag> OPS;
+    protected ResourceOrIdArgument(CommandBuildContext context, ResourceKey<? extends Registry<T>> registryKey, Codec<T> codec);
+    public static <T, O> Grammar<Result<T, O>> createGrammar(ResourceKey<? extends Registry<T>> registryKey, DynamicOps<O> ops);
+    public static LootTableArgument lootTable(CommandBuildContext context);
+    public static Holder<LootTable> getLootTable(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static LootModifierArgument lootModifier(CommandBuildContext context);
+    public static Holder<LootItemFunction> getLootModifier(CommandContext<CommandSourceStack> context, String name);
+    public static LootPredicateArgument lootPredicate(CommandBuildContext context);
+    public static Holder<LootItemCondition> getLootPredicate(CommandContext<CommandSourceStack> context, String name);
+    public static ContextFloatProviderArgument floatProvider(CommandBuildContext context);
+    public static Holder<ContextFloatProvider> getFloatProvider(CommandContext<CommandSourceStack> context, String name);
+    public static ContextIntProviderArgument intProvider(CommandBuildContext context);
+    public static Holder<ContextIntProvider> getIntProvider(CommandContext<CommandSourceStack> context, String name);
+    public static FeatureArgument feature(CommandBuildContext context);
+    public static Holder<Feature> getFeature(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static DialogArgument dialog(CommandBuildContext context);
+    public static Holder<Dialog> getDialog(CommandContext<CommandSourceStack> context, String name);
+    public Holder<T> parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static class LootTableArgument extends ResourceOrIdArgument<LootTable> {
+        protected LootTableArgument(CommandBuildContext context);
+    }
+    public static class LootModifierArgument extends ResourceOrIdArgument<LootItemFunction> {
+        protected LootModifierArgument(CommandBuildContext context);
+    }
+    public static class LootPredicateArgument extends ResourceOrIdArgument<LootItemCondition> {
+        protected LootPredicateArgument(CommandBuildContext context);
+    }
+    public static class ContextFloatProviderArgument extends ResourceOrIdArgument<ContextFloatProvider> {
+        protected ContextFloatProviderArgument(CommandBuildContext context);
+    }
+    public static class ContextIntProviderArgument extends ResourceOrIdArgument<ContextIntProvider> {
+        protected ContextIntProviderArgument(CommandBuildContext context);
+    }
+    public static class FeatureArgument extends ResourceOrIdArgument<Feature> {
+        protected FeatureArgument(CommandBuildContext context);
+    }
+    public static class DialogArgument extends ResourceOrIdArgument<Dialog> {
+        protected DialogArgument(CommandBuildContext context);
+    }
+    public static record InlineResult<T, O>(O value) implements Result<T, O> {
+        public Holder<T> parse(ImmutableStringReader reader, HolderLookup.Provider lookup, DynamicOps<O> ops, Codec<T> codec, HolderLookup.RegistryLookup<T> elementLookup) throws CommandSyntaxException;
+    }
+    public static record ReferenceResult<T, O>(ResourceKey<T> key) implements Result<T, O> {
+        public Holder<T> parse(ImmutableStringReader reader, HolderLookup.Provider lookup, DynamicOps<O> ops, Codec<T> codec, HolderLookup.RegistryLookup<T> elementLookup) throws CommandSyntaxException;
+    }
+    public interface Result<T, O> {
+        Holder<T> parse(ImmutableStringReader reader, HolderLookup.Provider lookup, DynamicOps<O> ops, Codec<T> codec, HolderLookup.RegistryLookup<T> elementLookup) throws CommandSyntaxException;
+    }
+}
+//// ResourceOrTagArgument.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.mojang.datafixers.util.Either;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceKey;
+public class ResourceOrTagArgument<T> implements ArgumentType<Result<T>> {
+    public ResourceOrTagArgument(CommandBuildContext context, ResourceKey<? extends Registry<T>> registryKey);
+    public static <T> ResourceOrTagArgument<T> resourceOrTag(CommandBuildContext context, ResourceKey<? extends Registry<T>> key);
+    public static <T> Result<T> getResourceOrTag(CommandContext<CommandSourceStack> context, String name, ResourceKey<Registry<T>> registryKey) throws CommandSyntaxException;
+    public Result<T> parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    static record ResourceResult<T>(Holder.Reference<T> value) implements Result<T> {
+        public Either<Holder.Reference<T>, HolderSet.Named<T>> unwrap();
+        public <E> Optional<Result<E>> cast(ResourceKey<? extends Registry<E>> registryKey);
+        public boolean test(Holder<T> holder);
+        public String asPrintable();
+    }
+    static record TagResult<T>(HolderSet.Named<T> tag) implements Result<T> {
+        public Either<Holder.Reference<T>, HolderSet.Named<T>> unwrap();
+        public <E> Optional<Result<E>> cast(ResourceKey<? extends Registry<E>> registryKey);
+        public boolean test(Holder<T> holder);
+        public String asPrintable();
+    }
+    public static class Info<T> implements ArgumentTypeInfo<ResourceOrTagArgument<T>, Info<T>.Template> {
+        public void serializeToNetwork(Info<T>.Template template, FriendlyByteBuf out);
+        public Info<T>.Template deserializeFromNetwork(FriendlyByteBuf in);
+        public void serializeToJson(Info<T>.Template template, JsonObject out);
+        public Info<T>.Template unpack(ResourceOrTagArgument<T> argument);
+        public final class Template implements ArgumentTypeInfo.Template<ResourceOrTagArgument<T>> {
+            private Template(ResourceKey<? extends Registry<T>> registryKey);
+            public ResourceOrTagArgument<T> instantiate(CommandBuildContext context);
+            public ArgumentTypeInfo<ResourceOrTagArgument<T>, ?> type();
+        }
+    }
+    public interface Result<T> extends Predicate<Holder<T>> {
+        Either<Holder.Reference<T>, HolderSet.Named<T>> unwrap();
+        <E> Optional<Result<E>> cast(ResourceKey<? extends Registry<E>> registryKey);
+        String asPrintable();
+    }
+}
+//// ResourceOrTagKeyArgument.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.mojang.datafixers.util.Either;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+public class ResourceOrTagKeyArgument<T> implements ArgumentType<Result<T>> {
+    public ResourceOrTagKeyArgument(ResourceKey<? extends Registry<T>> registryKey);
+    public static <T> ResourceOrTagKeyArgument<T> resourceOrTagKey(ResourceKey<? extends Registry<T>> key);
+    public static <T> Result<T> getResourceOrTagKey(CommandContext<CommandSourceStack> context, String name, ResourceKey<Registry<T>> registryKey, DynamicCommandExceptionType exceptionType) throws CommandSyntaxException;
+    public Result<T> parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    static record ResourceResult<T>(ResourceKey<T> key) implements Result<T> {
+        public Either<ResourceKey<T>, TagKey<T>> unwrap();
+        public <E> Optional<Result<E>> cast(ResourceKey<? extends Registry<E>> registryKey);
+        public boolean test(Holder<T> holder);
+        public String asPrintable();
+    }
+    static record TagResult<T>(TagKey<T> key) implements Result<T> {
+        public Either<ResourceKey<T>, TagKey<T>> unwrap();
+        public <E> Optional<Result<E>> cast(ResourceKey<? extends Registry<E>> registryKey);
+        public boolean test(Holder<T> holder);
+        public String asPrintable();
+    }
+    public static class Info<T> implements ArgumentTypeInfo<ResourceOrTagKeyArgument<T>, Info<T>.Template> {
+        public void serializeToNetwork(Info<T>.Template template, FriendlyByteBuf out);
+        public Info<T>.Template deserializeFromNetwork(FriendlyByteBuf in);
+        public void serializeToJson(Info<T>.Template template, JsonObject out);
+        public Info<T>.Template unpack(ResourceOrTagKeyArgument<T> argument);
+        public final class Template implements ArgumentTypeInfo.Template<ResourceOrTagKeyArgument<T>> {
+            private Template(ResourceKey<? extends Registry<T>> registryKey);
+            public ResourceOrTagKeyArgument<T> instantiate(CommandBuildContext context);
+            public ArgumentTypeInfo<ResourceOrTagKeyArgument<T>, ?> type();
+        }
+    }
+    public interface Result<T> extends Predicate<Holder<T>> {
+        Either<ResourceKey<T>, TagKey<T>> unwrap();
+        <E> Optional<Result<E>> cast(ResourceKey<? extends Registry<E>> registryKey);
+        String asPrintable();
+    }
+}
+//// ResourceSelectorArgument.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceKey;
+public class ResourceSelectorArgument<T> implements ArgumentType<Collection<Holder.Reference<T>>> {
+    public static final Dynamic2CommandExceptionType ERROR_NO_MATCHES;
+    private ResourceSelectorArgument(CommandBuildContext context, ResourceKey<? extends Registry<T>> registryKey);
+    public Collection<Holder.Reference<T>> parse(StringReader reader) throws CommandSyntaxException;
+    public static <T> Collection<Holder.Reference<T>> parse(StringReader reader, HolderLookup<T> registry);
+    public static <T> ResourceSelectorArgument<T> resourceSelector(CommandBuildContext context, ResourceKey<? extends Registry<T>> registry);
+    public static <T> Collection<Holder.Reference<T>> getSelectedResources(CommandContext<CommandSourceStack> context, String name);
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static class Info<T> implements ArgumentTypeInfo<ResourceSelectorArgument<T>, Info<T>.Template> {
+        public void serializeToNetwork(Info<T>.Template template, FriendlyByteBuf out);
+        public Info<T>.Template deserializeFromNetwork(FriendlyByteBuf in);
+        public void serializeToJson(Info<T>.Template template, JsonObject out);
+        public Info<T>.Template unpack(ResourceSelectorArgument<T> argument);
+        public final class Template implements ArgumentTypeInfo.Template<ResourceSelectorArgument<T>> {
+            private Template(ResourceKey<? extends Registry<T>> registryKey);
+            public ResourceSelectorArgument<T> instantiate(CommandBuildContext context);
+            public ArgumentTypeInfo<ResourceSelectorArgument<T>, ?> type();
+        }
+    }
+}
+//// ScoreHolderArgument.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import java.util.Collection;
+import java.util.function.Supplier;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.selector.EntitySelector;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.scores.ScoreHolder;
+public class ScoreHolderArgument implements ArgumentType<Result> {
+    public static final SuggestionProvider<CommandSourceStack> SUGGEST_SCORE_HOLDERS;
+    public ScoreHolderArgument(boolean multiple);
+    public static ScoreHolder getName(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Collection<ScoreHolder> getNames(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Collection<ScoreHolder> getNamesWithDefaultWildcard(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Collection<ScoreHolder> getNames(CommandContext<CommandSourceStack> context, String name, Supplier<Collection<ScoreHolder>> wildcard) throws CommandSyntaxException;
+    public static ScoreHolderArgument scoreHolder();
+    public static ScoreHolderArgument scoreHolders();
+    public Result parse(StringReader reader) throws CommandSyntaxException;
+    public <S> Result parse(StringReader reader, S source) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+    public static class SelectorResult implements Result {
+        public SelectorResult(EntitySelector selector);
+        public Collection<ScoreHolder> getNames(CommandSourceStack sender, Supplier<Collection<ScoreHolder>> wildcard) throws CommandSyntaxException;
+    }
+    public static class Info implements ArgumentTypeInfo<ScoreHolderArgument, Template> {
+        public void serializeToNetwork(Template template, FriendlyByteBuf out);
+        public Template deserializeFromNetwork(FriendlyByteBuf in);
+        public void serializeToJson(Template template, JsonObject out);
+        public Template unpack(ScoreHolderArgument argument);
+        public final class Template implements ArgumentTypeInfo.Template<ScoreHolderArgument> {
+            private Template(boolean multiple);
+            public ScoreHolderArgument instantiate(CommandBuildContext context);
+            public ArgumentTypeInfo<ScoreHolderArgument, ?> type();
+        }
+    }
+    public interface Result {
+        Collection<ScoreHolder> getNames(CommandSourceStack sender, Supplier<Collection<ScoreHolder>> wildcard) throws CommandSyntaxException;
+    }
+}
+//// ScoreboardSlotArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.scores.DisplaySlot;
+public class ScoreboardSlotArgument implements ArgumentType<DisplaySlot> {
+    public static final DynamicCommandExceptionType ERROR_INVALID_VALUE;
+    private ScoreboardSlotArgument();
+    public static ScoreboardSlotArgument displaySlot();
+    public static DisplaySlot getDisplaySlot(CommandContext<CommandSourceStack> context, String name);
+    public DisplaySlot parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// SignedArgument.java
+import com.mojang.brigadier.arguments.ArgumentType;
+public interface SignedArgument<T> extends ArgumentType<T> {
+}
+//// SlotArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+public class SlotArgument implements ArgumentType<Integer> {
+    public static SlotArgument slot();
+    public static int getSlot(CommandContext<CommandSourceStack> context, String name);
+    public Integer parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> contextBuilder, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// SlotSourceArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.Holder;
+import net.minecraft.world.inventory.SlotRange;
+import net.minecraft.world.item.slot.SlotSource;
+public class SlotSourceArgument implements ArgumentType<Result> {
+    private SlotSourceArgument(CommandBuildContext context);
+    public static SlotSourceArgument slotSource(CommandBuildContext context);
+    public static Result getSlotSource(CommandContext<CommandSourceStack> context, String name);
+    public Result parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> contextBuilder, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static record HolderResult(Holder<SlotSource> holder) implements Result {
+        public SlotSource value();
+        public Optional<String> name();
+    }
+    public static record LiteralResult(SlotRange slotRange) implements Result {
+        public SlotSource value();
+        public Optional<String> name();
+    }
+    public interface Result {
+        SlotSource value();
+        Optional<String> name();
+    }
+}
+//// SlotsArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.inventory.SlotRange;
+public class SlotsArgument implements ArgumentType<SlotRange> {
+    static final Collection<String> EXAMPLES;
+    public static SlotsArgument slots();
+    public static SlotRange getSlots(CommandContext<CommandSourceStack> context, String name);
+    public SlotRange parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> contextBuilder, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// StringRepresentableArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.mojang.serialization.Codec;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+import net.minecraft.util.StringRepresentable;
+public class StringRepresentableArgument<T extends Enum<T> & StringRepresentable> implements ArgumentType<T> {
+    protected StringRepresentableArgument(Codec<T> codec, Supplier<T[]> values);
+    public T parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    protected String convertId(String id);
+}
+//// StyleArgument.java
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import java.util.Collection;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.network.chat.Style;
+import net.minecraft.util.parsing.packrat.commands.ParserBasedArgument;
+public class StyleArgument extends ParserBasedArgument<Style> {
+    public static final DynamicCommandExceptionType ERROR_INVALID_STYLE;
+    private StyleArgument(HolderLookup.Provider registries);
+    public static Style getStyle(CommandContext<CommandSourceStack> context, String name);
+    public static StyleArgument style(CommandBuildContext context);
+    public Collection<String> getExamples();
+}
+//// SwingAnimationArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.item.SwingAnimationType;
+public class SwingAnimationArgument implements ArgumentType<SwingAnimationType> {
+    public SwingAnimationType parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static SwingAnimationArgument swingAnimationType();
+    public static SwingAnimationType getSwingAnimationType(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+}
+//// TeamArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.scores.PlayerTeam;
+public class TeamArgument implements ArgumentType<String> {
+    public static TeamArgument team();
+    public static PlayerTeam getTeam(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public String parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> contextBuilder, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// TeamColorArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.scores.TeamColor;
+public class TeamColorArgument implements ArgumentType<TeamColor> {
+    public static final DynamicCommandExceptionType ERROR_INVALID_VALUE;
+    private TeamColorArgument();
+    public static TeamColorArgument teamColor();
+    public static TeamColor getTeamColor(CommandContext<CommandSourceStack> context, String name);
+    public TeamColor parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> contextBuilder, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// TemplateMirrorArgument.java
+import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.level.block.Mirror;
+public class TemplateMirrorArgument extends StringRepresentableArgument<Mirror> {
+    private TemplateMirrorArgument();
+    public static StringRepresentableArgument<Mirror> templateMirror();
+    public static Mirror getMirror(CommandContext<CommandSourceStack> context, String name);
+}
+//// TemplateRotationArgument.java
+import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.level.block.Rotation;
+public class TemplateRotationArgument extends StringRepresentableArgument<Rotation> {
+    private TemplateRotationArgument();
+    public static TemplateRotationArgument templateRotation();
+    public static Rotation getRotation(CommandContext<CommandSourceStack> context, String name);
+}
+//// TimeArgument.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.network.FriendlyByteBuf;
+public class TimeArgument implements ArgumentType<Integer> {
+    private TimeArgument(int minimum);
+    public static TimeArgument time();
+    public static TimeArgument time(int minimum);
+    public Integer parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    public static class Info implements ArgumentTypeInfo<TimeArgument, Template> {
+        public void serializeToNetwork(Template template, FriendlyByteBuf out);
+        public Template deserializeFromNetwork(FriendlyByteBuf in);
+        public void serializeToJson(Template template, JsonObject out);
+        public Template unpack(TimeArgument argument);
+        public final class Template implements ArgumentTypeInfo.Template<TimeArgument> {
+            private Template(int min);
+            public TimeArgument instantiate(CommandBuildContext context);
+            public ArgumentTypeInfo<TimeArgument, ?> type();
+        }
+    }
+}
+//// UuidArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import java.util.Collection;
+import java.util.UUID;
+import net.minecraft.commands.CommandSourceStack;
+public class UuidArgument implements ArgumentType<UUID> {
+    public static final SimpleCommandExceptionType ERROR_INVALID_UUID;
+    public static UUID getUuid(CommandContext<CommandSourceStack> source, String name);
+    public static UuidArgument uuid();
+    public UUID parse(StringReader reader) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+}
+//// WaypointArgument.java
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.waypoints.WaypointTransmitter;
+public class WaypointArgument {
+    public static final SimpleCommandExceptionType ERROR_NOT_A_WAYPOINT;
+    public static WaypointTransmitter getWaypoint(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+}

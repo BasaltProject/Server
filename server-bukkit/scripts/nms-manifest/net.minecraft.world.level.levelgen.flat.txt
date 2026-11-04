@@ -1,0 +1,71 @@
+//// FlatLayerInfo.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class FlatLayerInfo {
+    public static final Codec<FlatLayerInfo> CODEC;
+    public FlatLayerInfo(int height, Block block);
+    public FlatLayerInfo(int height, Holder<Block> block);
+    public int getHeight();
+    public BlockState getBlockState();
+    public FlatLayerInfo heightLimited(int maxHeight);
+    public String toString();
+}
+//// FlatLevelGeneratorPreset.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.Item;
+public record FlatLevelGeneratorPreset(Holder<Item> displayItem, FlatLevelGeneratorSettings settings) {
+    public static final Codec<FlatLevelGeneratorPreset> DIRECT_CODEC;
+    public static final Codec<Holder<FlatLevelGeneratorPreset>> CODEC;
+}
+//// FlatLevelGeneratorPresets.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class FlatLevelGeneratorPresets {
+    public static final ResourceKey<FlatLevelGeneratorPreset> CLASSIC_FLAT;
+    public static final ResourceKey<FlatLevelGeneratorPreset> TUNNELERS_DREAM;
+    public static final ResourceKey<FlatLevelGeneratorPreset> WATER_WORLD;
+    public static final ResourceKey<FlatLevelGeneratorPreset> OVERWORLD;
+    public static final ResourceKey<FlatLevelGeneratorPreset> SNOWY_KINGDOM;
+    public static final ResourceKey<FlatLevelGeneratorPreset> BOTTOMLESS_PIT;
+    public static final ResourceKey<FlatLevelGeneratorPreset> DESERT;
+    public static final ResourceKey<FlatLevelGeneratorPreset> REDSTONE_READY;
+    public static final ResourceKey<FlatLevelGeneratorPreset> TEST_WORLD;
+    public static final ResourceKey<FlatLevelGeneratorPreset> THE_VOID;
+    public static void bootstrap(BootstrapContext<FlatLevelGeneratorPreset> context);
+    static class Bootstrap {
+        private Bootstrap(BootstrapContext<FlatLevelGeneratorPreset> context);
+        public void run();
+    }
+}
+//// FlatLevelGeneratorSettings.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeGenerationSettings;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
+public class FlatLevelGeneratorSettings {
+    public static final Codec<FlatLevelGeneratorSettings> CODEC;
+    private FlatLevelGeneratorSettings(Optional<HolderSet<StructureSet>> structureOverrides, List<FlatLayerInfo> layers, boolean lakes, boolean features, Optional<Holder<Biome>> biome, Holder.Reference<Biome> fallbackBiome, Holder<PlacedFeature> lavaUnderground, Holder<PlacedFeature> lavaSurface);
+    public FlatLevelGeneratorSettings(Optional<HolderSet<StructureSet>> structureOverrides, Holder<Biome> biome, List<Holder<PlacedFeature>> lakes);
+    public FlatLevelGeneratorSettings withBiomeAndLayers(List<FlatLayerInfo> layers, Optional<HolderSet<StructureSet>> structureOverrides, Holder<Biome> biome);
+    public void setDecoration();
+    public void setAddLakes();
+    public BiomeGenerationSettings adjustGenerationSettings(Holder<Biome> sourceBiome);
+    public Optional<HolderSet<StructureSet>> structureOverrides();
+    public Holder<Biome> getBiome();
+    public List<FlatLayerInfo> getLayersInfo();
+    public List<BlockState> getLayers();
+    public void updateLayers();
+    public static FlatLevelGeneratorSettings getDefault(HolderGetter<Biome> biomes, HolderGetter<StructureSet> structureSets, HolderGetter<PlacedFeature> placedFeatures);
+    public static Holder<Biome> getDefaultBiome(HolderGetter<Biome> biomes);
+    public static List<Holder<PlacedFeature>> createLakesList(HolderGetter<PlacedFeature> placedFeatures);
+}

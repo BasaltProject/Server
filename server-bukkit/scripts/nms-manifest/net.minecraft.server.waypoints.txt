@@ -1,0 +1,16 @@
+//// ServerWaypointManager.java
+import java.util.Set;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.waypoints.WaypointManager;
+import net.minecraft.world.waypoints.WaypointTransmitter;
+public class ServerWaypointManager implements WaypointManager<WaypointTransmitter> {
+    public void trackWaypoint(WaypointTransmitter waypoint);
+    public void updateWaypoint(WaypointTransmitter waypoint);
+    public void untrackWaypoint(WaypointTransmitter waypoint);
+    public void addPlayer(ServerPlayer player);
+    public void updatePlayer(ServerPlayer player);
+    public void removePlayer(ServerPlayer player);
+    public void breakAllConnections();
+    public void remakeConnections(WaypointTransmitter waypoint);
+    public Set<WaypointTransmitter> transmitters();
+}

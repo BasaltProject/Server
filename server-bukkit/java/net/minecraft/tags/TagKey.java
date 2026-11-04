@@ -1,8 +1,13 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.tags;
 
 import net.minecraft.core.Registry;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import net.minecraft.network.codec.StreamCodec;
 
 public record TagKey<T>(ResourceKey<? extends Registry<T>> registry, Identifier location) {
     public static <T> TagKey<T> create(ResourceKey<? extends Registry<T>> registry, Identifier name) {
@@ -16,5 +21,17 @@ public record TagKey<T>(ResourceKey<? extends Registry<T>> registry, Identifier 
     @Override
     public String toString() {
         return "TagKey[" + registry.identifier() + " / " + location + "]";
+    }
+    public static <T> Codec<TagKey<T>> codec(ResourceKey<? extends Registry<T>> registryName) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.tags.TagKey#codec");
+    }
+    public static <T> Codec<TagKey<T>> hashedCodec(ResourceKey<? extends Registry<T>> registryName) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.tags.TagKey#hashedCodec");
+    }
+    public static <T> StreamCodec<ByteBuf, TagKey<T>> streamCodec(ResourceKey<? extends Registry<T>> registryName) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.tags.TagKey#streamCodec");
+    }
+    public <E> Optional<TagKey<E>> cast(ResourceKey<? extends Registry<E>> registry) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.tags.TagKey#cast");
     }
 }

@@ -1,0 +1,40 @@
+//// WorldPreset.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.levelgen.WorldDimensions;
+public class WorldPreset {
+    public static final Codec<WorldPreset> DIRECT_CODEC;
+    public static final Codec<Holder<WorldPreset>> CODEC;
+    public WorldPreset(Map<ResourceKey<LevelStem>, LevelStem> dimensions);
+    public WorldDimensions createWorldDimensions();
+    public Optional<LevelStem> overworld();
+}
+//// WorldPresets.java
+import java.util.Optional;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.levelgen.WorldDimensions;
+public class WorldPresets {
+    public static final ResourceKey<WorldPreset> NORMAL;
+    public static final ResourceKey<WorldPreset> FLAT;
+    public static final ResourceKey<WorldPreset> FLAT_ALL_DIMENSIONS;
+    public static final ResourceKey<WorldPreset> LARGE_BIOMES;
+    public static final ResourceKey<WorldPreset> AMPLIFIED;
+    public static final ResourceKey<WorldPreset> SINGLE_BIOME_SURFACE;
+    public static final ResourceKey<WorldPreset> DEBUG;
+    public static void bootstrap(BootstrapContext<WorldPreset> context);
+    public static Optional<ResourceKey<WorldPreset>> fromSettings(WorldDimensions dimensions);
+    public static WorldDimensions createNormalWorldDimensions(HolderLookup.Provider registries);
+    public static LevelStem getNormalOverworld(HolderLookup.Provider registries);
+    public static WorldDimensions createTestWorldDimensions(HolderLookup.Provider registries);
+    static class Bootstrap {
+        private Bootstrap(BootstrapContext<WorldPreset> context);
+        public void bootstrap();
+    }
+}

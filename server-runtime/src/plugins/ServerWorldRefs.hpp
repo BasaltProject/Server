@@ -124,6 +124,8 @@ public:
     [[nodiscard]] std::int64_t dayTime() const override;
     void setDayTime(std::int64_t ticks) override;
     void setWeather(bool raining, bool thundering) override;
+    bool difficultyLocked() const override;
+    void setDifficultyLocked(bool locked) override;
     bool setDifficulty(std::string_view name) override;
     [[nodiscard]] std::int32_t stateAt(std::int32_t x, std::int32_t y, std::int32_t z, bool load) override;
     bool setStateAt(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, bool notify) override;
@@ -149,6 +151,7 @@ public:
     std::int32_t useItemOn(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face, std::string_view item,
                            float yaw, float pitch) override;
     bool scheduleTick(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t delay, bool fluid) override;
+    bool hasScheduledTick(std::int32_t x, std::int32_t y, std::int32_t z) override;
     std::int32_t applyChanges(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
                               std::uint32_t effects) override;
     bool writeSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,

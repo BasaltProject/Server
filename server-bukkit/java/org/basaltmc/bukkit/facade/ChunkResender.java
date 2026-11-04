@@ -11,7 +11,7 @@ public final class ChunkResender extends ServerGamePacketListenerImpl {
     private final ServerChunkCache source;
 
     public ChunkResender(String world, ServerChunkCache source) {
-        super(new Connection(null));
+        super(new Connection((io.netty.channel.Channel) null));
         this.world = world;
         this.source = source;
     }

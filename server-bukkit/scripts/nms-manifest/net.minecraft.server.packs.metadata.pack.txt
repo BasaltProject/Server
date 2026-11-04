@@ -1,0 +1,41 @@
+//// PackFormat.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiFunction;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.util.InclusiveRange;
+public record PackFormat(int major, int minor) implements Comparable<PackFormat> {
+    public static final Codec<PackFormat> BOTTOM_CODEC;
+    public static final Codec<PackFormat> TOP_CODEC;
+    public static <ResultType, HolderType extends IntermediaryFormatHolder> DataResult<List<ResultType>> validateHolderList(List<HolderType> list, int lastPreMinorVersion, BiFunction<HolderType, InclusiveRange<PackFormat>, ResultType> constructor);
+    public static int lastPreMinorVersion(PackType type);
+    public static MapCodec<InclusiveRange<PackFormat>> packCodec(PackType type);
+    public static PackFormat of(int major, int minor);
+    public static PackFormat of(int major);
+    public InclusiveRange<PackFormat> minorRange();
+    public int compareTo(PackFormat other);
+    public String toString();
+    public static record IntermediaryFormat(Optional<PackFormat> min, Optional<PackFormat> max, Optional<Integer> format, Optional<InclusiveRange<Integer>> supported) {
+        public static final MapCodec<IntermediaryFormat> OVERLAY_CODEC;
+        public static IntermediaryFormat fromRange(InclusiveRange<PackFormat> range, int lastPreMinorVersion);
+        public int effectiveMinMajorVersion();
+        public DataResult<InclusiveRange<PackFormat>> validate(int lastPreMinorVersion, boolean hasPackFormatField, boolean requireOldField, String context, String oldFieldName);
+    }
+    public interface IntermediaryFormatHolder {
+        IntermediaryFormat format();
+    }
+}
+//// PackMetadataSection.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.util.InclusiveRange;
+public record PackMetadataSection(Component description, InclusiveRange<PackFormat> supportedFormats) {
+    public static final MetadataSectionType<PackMetadataSection> CLIENT_TYPE;
+    public static final MetadataSectionType<PackMetadataSection> SERVER_TYPE;
+    public static final MetadataSectionType<PackMetadataSection> FALLBACK_TYPE;
+    public static MetadataSectionType<PackMetadataSection> forPackType(PackType packType);
+}

@@ -1,0 +1,39 @@
+//// ContextKey.java
+import net.minecraft.resources.Identifier;
+public class ContextKey<T> {
+    public ContextKey(Identifier name);
+    public static <T> ContextKey<T> vanilla(String name);
+    public Identifier name();
+    public String toString();
+}
+//// ContextKeySet.java
+import java.util.Set;
+public class ContextKeySet {
+    private ContextKeySet(Set<ContextKey<?>> required, Set<ContextKey<?>> optional);
+    public Set<ContextKey<?>> required();
+    public Set<ContextKey<?>> allowed();
+    public String toString();
+    public static class Builder {
+        public Builder required(ContextKey<?> param);
+        public Builder optional(ContextKey<?> param);
+        public ContextKeySet build();
+    }
+}
+//// ContextMap.java
+import java.util.Map;
+public final class ContextMap {
+    public static final ContextMap EMPTY;
+    private ContextMap(Map<ContextKey<?>, Object> params);
+    public static Builder builder();
+    public boolean has(ContextKey<?> key);
+    public <T> T getOrThrow(ContextKey<T> key);
+    public <T> T get(ContextKey<T> key);
+    public <T> T getOrDefault(ContextKey<T> param, T _default);
+    public static class Builder {
+        private Builder();
+        public <T> Builder set(ContextKey<T> param, T value);
+        public <T> T get(ContextKey<T> param);
+        public ContextMap build();
+        public ContextMap buildAndValidate(ContextKeySet paramSet);
+    }
+}

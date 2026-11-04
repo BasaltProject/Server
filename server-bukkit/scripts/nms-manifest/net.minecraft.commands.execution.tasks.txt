@@ -1,0 +1,86 @@
+//// BuildContexts.java
+import com.mojang.brigadier.context.ContextChain;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import java.util.List;
+import net.minecraft.commands.ExecutionCommandSource;
+import net.minecraft.commands.execution.ChainModifiers;
+import net.minecraft.commands.execution.EntryAction;
+import net.minecraft.commands.execution.ExecutionContext;
+import net.minecraft.commands.execution.Frame;
+import net.minecraft.commands.execution.UnboundEntryAction;
+public class BuildContexts<T extends ExecutionCommandSource<T>> {
+    public static final DynamicCommandExceptionType ERROR_FORK_LIMIT_REACHED;
+    public BuildContexts(String commandInput, ContextChain<T> command);
+    protected void execute(T originalSource, List<T> initialSources, ExecutionContext<T> context, Frame frame, ChainModifiers initialModifiers);
+    protected void traceCommandStart(ExecutionContext<T> context, Frame frame);
+    public String toString();
+    public static class Unbound<T extends ExecutionCommandSource<T>> extends BuildContexts<T> implements UnboundEntryAction<T> {
+        public Unbound(String commandInput, ContextChain<T> command);
+        public void execute(T sender, ExecutionContext<T> context, Frame frame);
+    }
+    public static class Continuation<T extends ExecutionCommandSource<T>> extends BuildContexts<T> implements EntryAction<T> {
+        public Continuation(String commandInput, ContextChain<T> command, ChainModifiers modifiers, T originalSource, List<T> sources);
+        public void execute(ExecutionContext<T> context, Frame frame);
+    }
+    public static class TopLevel<T extends ExecutionCommandSource<T>> extends BuildContexts<T> implements EntryAction<T> {
+        public TopLevel(String commandInput, ContextChain<T> command, T source);
+        public void execute(ExecutionContext<T> context, Frame frame);
+    }
+}
+//// CallFunction.java
+import net.minecraft.commands.CommandResultCallback;
+import net.minecraft.commands.ExecutionCommandSource;
+import net.minecraft.commands.execution.ExecutionContext;
+import net.minecraft.commands.execution.Frame;
+import net.minecraft.commands.execution.UnboundEntryAction;
+import net.minecraft.commands.functions.InstantiatedFunction;
+public class CallFunction<T extends ExecutionCommandSource<T>> implements UnboundEntryAction<T> {
+    public CallFunction(InstantiatedFunction<T> function, CommandResultCallback resultCallback, boolean returnParentFrame);
+    public void execute(T sender, ExecutionContext<T> context, Frame frame);
+}
+//// ContinuationTask.java
+import java.util.List;
+import net.minecraft.commands.execution.CommandQueueEntry;
+import net.minecraft.commands.execution.EntryAction;
+import net.minecraft.commands.execution.ExecutionContext;
+import net.minecraft.commands.execution.Frame;
+public class ContinuationTask<T, P> implements EntryAction<T> {
+    private ContinuationTask(TaskProvider<T, P> taskFactory, List<P> arguments, Frame frame);
+    public void execute(ExecutionContext<T> context, Frame frame);
+    public static <T, P> void schedule(ExecutionContext<T> context, Frame frame, List<P> arguments, TaskProvider<T, P> taskFactory);
+    public interface TaskProvider<T, P> {
+        CommandQueueEntry<T> create(Frame frame, P argument);
+    }
+}
+//// ExecuteCommand.java
+import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.commands.ExecutionCommandSource;
+import net.minecraft.commands.execution.ChainModifiers;
+import net.minecraft.commands.execution.ExecutionContext;
+import net.minecraft.commands.execution.Frame;
+import net.minecraft.commands.execution.UnboundEntryAction;
+public class ExecuteCommand<T extends ExecutionCommandSource<T>> implements UnboundEntryAction<T> {
+    public ExecuteCommand(String commandInput, ChainModifiers modifiers, CommandContext<T> executionContext);
+    public void execute(T sender, ExecutionContext<T> context, Frame frame);
+}
+//// FallthroughTask.java
+import net.minecraft.commands.ExecutionCommandSource;
+import net.minecraft.commands.execution.EntryAction;
+import net.minecraft.commands.execution.ExecutionContext;
+import net.minecraft.commands.execution.Frame;
+public class FallthroughTask<T extends ExecutionCommandSource<T>> implements EntryAction<T> {
+    public static <T extends ExecutionCommandSource<T>> EntryAction<T> instance();
+    public void execute(ExecutionContext<T> context, Frame frame);
+}
+//// IsolatedCall.java
+import java.util.function.Consumer;
+import net.minecraft.commands.CommandResultCallback;
+import net.minecraft.commands.ExecutionCommandSource;
+import net.minecraft.commands.execution.EntryAction;
+import net.minecraft.commands.execution.ExecutionContext;
+import net.minecraft.commands.execution.ExecutionControl;
+import net.minecraft.commands.execution.Frame;
+public class IsolatedCall<T extends ExecutionCommandSource<T>> implements EntryAction<T> {
+    public IsolatedCall(Consumer<ExecutionControl<T>> taskOutput, CommandResultCallback output);
+    public void execute(ExecutionContext<T> context, Frame frame);
+}

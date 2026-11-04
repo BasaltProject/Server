@@ -1,0 +1,128 @@
+//// Chicken.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class Chicken extends Animal {
+    public float flap;
+    public float flapSpeed;
+    public float oFlapSpeed;
+    public float oFlap;
+    public float flapping;
+    public int eggTime;
+    public boolean isChickenJockey;
+    public Chicken(EntityType<? extends Chicken> type, Level level);
+    protected void registerGoals();
+    public EntityDimensions getDefaultDimensions(Pose pose);
+    public static AttributeSupplier.Builder createAttributes();
+    public void aiStep();
+    protected boolean isFlapping();
+    protected void onFlap();
+    protected SoundEvent getAmbientSound();
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected SoundEvent getDeathSound();
+    protected void playStepSound(BlockPos pos, BlockState blockState);
+    public Chicken getBreedOffspring(ServerLevel level, AgeableMob partner);
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData);
+    public boolean isFood(ItemStack itemStack);
+    protected int getBaseExperienceReward(ServerLevel level);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public void setVariant(Holder<ChickenVariant> variant);
+    public Holder<ChickenVariant> getVariant();
+    public <T> T get(DataComponentType<? extends T> type);
+    protected void applyImplicitComponents(DataComponentGetter components);
+    protected <T> boolean applyImplicitComponent(DataComponentType<T> type, T value);
+    public boolean removeWhenFarAway(double distSqr);
+    protected void positionRider(Entity passenger, Entity.MoveFunction moveFunction);
+    public boolean isChickenJockey();
+    public void setChickenJockey(boolean isChickenJockey);
+}
+//// ChickenSoundVariant.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.sounds.SoundEvent;
+public record ChickenSoundVariant(ChickenSoundSet adultSounds, ChickenSoundSet babySounds) {
+    public static final Codec<ChickenSoundVariant> DIRECT_CODEC;
+    public static final Codec<ChickenSoundVariant> NETWORK_CODEC;
+    public static final Codec<Holder<ChickenSoundVariant>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<ChickenSoundVariant>> STREAM_CODEC;
+    public static record ChickenSoundSet(Holder<SoundEvent> ambientSound, Holder<SoundEvent> hurtSound, Holder<SoundEvent> deathSound, Holder<SoundEvent> stepSound) {
+    }
+}
+//// ChickenSoundVariants.java
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.RandomSource;
+public class ChickenSoundVariants {
+    public static final ResourceKey<ChickenSoundVariant> CLASSIC;
+    public static final ResourceKey<ChickenSoundVariant> PICKY;
+    public static void bootstrap(BootstrapContext<ChickenSoundVariant> context);
+    public static Holder<ChickenSoundVariant> pickRandomSoundVariant(RegistryAccess registryAccess, RandomSource random);
+    public static enum SoundSet {
+        CLASSIC, PICKY;
+        public String getIdentifier();
+        public String getSoundEventIdentifier();
+    }
+}
+//// ChickenVariant.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.core.ClientAsset;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.entity.variant.ModelAndTexture;
+import net.minecraft.world.entity.variant.PriorityProvider;
+import net.minecraft.world.entity.variant.SpawnCondition;
+import net.minecraft.world.entity.variant.SpawnContext;
+import net.minecraft.world.entity.variant.SpawnPrioritySelectors;
+public record ChickenVariant(ModelAndTexture<ModelType> modelAndTexture, ClientAsset.ResourceTexture babyTexture, SpawnPrioritySelectors spawnConditions) implements PriorityProvider<SpawnContext, SpawnCondition> {
+    public static final Codec<ChickenVariant> DIRECT_CODEC;
+    public static final Codec<ChickenVariant> NETWORK_CODEC;
+    public static final Codec<Holder<ChickenVariant>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<ChickenVariant>> STREAM_CODEC;
+    private ChickenVariant(ModelAndTexture<ModelType> assetInfo, ClientAsset.ResourceTexture babyTexture);
+    public List<PriorityProvider.Selector<SpawnContext, SpawnCondition>> selectors();
+    public static enum ModelType implements StringRepresentable {
+        NORMAL, COLD;
+        public static final Codec<ModelType> CODEC;
+        public String getSerializedName();
+    }
+}
+//// ChickenVariants.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class ChickenVariants {
+    public static final ResourceKey<ChickenVariant> TEMPERATE;
+    public static final ResourceKey<ChickenVariant> WARM;
+    public static final ResourceKey<ChickenVariant> COLD;
+    public static final ResourceKey<ChickenVariant> DEFAULT;
+    public static void bootstrap(BootstrapContext<ChickenVariant> context);
+}

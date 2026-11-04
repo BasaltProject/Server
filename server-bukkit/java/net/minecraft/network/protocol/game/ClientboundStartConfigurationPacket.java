@@ -1,0 +1,22 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.protocol.game;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ClientboundStartConfigurationPacket implements Packet<ClientGamePacketListener> {
+    public static final ClientboundStartConfigurationPacket INSTANCE = new ClientboundStartConfigurationPacket();
+    public static final StreamCodec<ByteBuf, ClientboundStartConfigurationPacket> STREAM_CODEC = StreamCodec.unit(INSTANCE);
+    private ClientboundStartConfigurationPacket() {
+
+    }
+    public PacketType<ClientboundStartConfigurationPacket> type() {
+        return GamePacketTypes.CLIENTBOUND_START_CONFIGURATION;
+    }
+    public void handle(ClientGamePacketListener listener) {
+        listener.handleConfigurationStart(this);
+    }
+    public boolean isTerminal() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundStartConfigurationPacket#isTerminal");
+    }
+}

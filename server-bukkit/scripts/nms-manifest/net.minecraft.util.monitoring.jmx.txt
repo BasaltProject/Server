@@ -1,0 +1,20 @@
+//// MinecraftServerStatistics.java
+import java.util.function.Supplier;
+import javax.management.Attribute;
+import javax.management.AttributeList;
+import javax.management.DynamicMBean;
+import javax.management.MBeanInfo;
+import net.minecraft.server.MinecraftServer;
+public final class MinecraftServerStatistics implements DynamicMBean {
+    private MinecraftServerStatistics(MinecraftServer server);
+    public static void registerJmxMonitoring(MinecraftServer server);
+    public Object getAttribute(String attribute);
+    public void setAttribute(Attribute attribute);
+    public AttributeList getAttributes(String[] attributes);
+    public AttributeList setAttributes(AttributeList attributes);
+    public Object invoke(String actionName, Object[] params, String[] signature);
+    public MBeanInfo getMBeanInfo();
+    static final class AttributeDescription {
+        private AttributeDescription(String name, Supplier<Object> getter, String description, Class<?> type);
+    }
+}

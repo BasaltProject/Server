@@ -1,0 +1,767 @@
+//// BandwidthDebugMonitor.java
+import net.minecraft.util.debugchart.LocalSampleLogger;
+public class BandwidthDebugMonitor {
+    public BandwidthDebugMonitor(LocalSampleLogger bandwidthLogger);
+    public void onReceive(int bytes);
+    public void tick();
+}
+//// CipherBase.java
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import javax.crypto.Cipher;
+import javax.crypto.ShortBufferException;
+public class CipherBase {
+    protected CipherBase(Cipher cipher);
+    protected ByteBuf decipher(ChannelHandlerContext ctx, ByteBuf in) throws ShortBufferException;
+    protected void encipher(ByteBuf in, ByteBuf out) throws ShortBufferException;
+}
+//// CipherDecoder.java
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToMessageDecoder;
+import java.util.List;
+import javax.crypto.Cipher;
+public class CipherDecoder extends MessageToMessageDecoder<ByteBuf> {
+    public CipherDecoder(Cipher cipher);
+    protected void decode(ChannelHandlerContext ctx, ByteBuf msg, List<Object> out) throws Exception;
+}
+//// CipherEncoder.java
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToByteEncoder;
+import javax.crypto.Cipher;
+public class CipherEncoder extends MessageToByteEncoder<ByteBuf> {
+    public CipherEncoder(Cipher cipher);
+    protected void encode(ChannelHandlerContext ctx, ByteBuf msg, ByteBuf out) throws Exception;
+}
+//// ClientboundPacketListener.java
+import net.minecraft.network.protocol.PacketFlow;
+public interface ClientboundPacketListener extends PacketListener {
+    default PacketFlow flow();
+}
+//// CompressionDecoder.java
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.ByteToMessageDecoder;
+import java.util.List;
+public class CompressionDecoder extends ByteToMessageDecoder {
+    public static final int MAXIMUM_COMPRESSED_LENGTH = 2097152;
+    public static final int MAXIMUM_UNCOMPRESSED_LENGTH = 8388608;
+    public CompressionDecoder(int threshold, boolean validateDecompressed);
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception;
+    public void setThreshold(int threshold, boolean validateDecompressed);
+}
+//// CompressionEncoder.java
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToByteEncoder;
+public class CompressionEncoder extends MessageToByteEncoder<ByteBuf> {
+    public CompressionEncoder(int threshold);
+    protected void encode(ChannelHandlerContext ctx, ByteBuf uncompressed, ByteBuf out);
+    public int getThreshold();
+    public void setThreshold(int threshold);
+}
+//// Connection.java
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.SimpleChannelInboundHandler;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.util.function.Consumer;
+import javax.crypto.Cipher;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.login.ClientLoginPacketListener;
+import net.minecraft.network.protocol.status.ClientStatusPacketListener;
+import net.minecraft.server.network.EventLoopGroupHolder;
+import net.minecraft.util.debugchart.LocalSampleLogger;
+import org.slf4j.Marker;
+public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+    public static final Marker ROOT_MARKER;
+    public static final Marker PACKET_MARKER;
+    public static final Marker PACKET_RECEIVED_MARKER;
+    public static final Marker PACKET_SENT_MARKER;
+    public Connection(PacketFlow receiving);
+    public void channelActive(ChannelHandlerContext ctx) throws Exception;
+    public void channelInactive(ChannelHandlerContext ctx);
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause);
+    protected void channelRead0(ChannelHandlerContext ctx, Packet<?> packet);
+    public <T extends PacketListener> void setupInboundProtocol(ProtocolInfo<T> protocol, T packetListener);
+    public void setupOutboundProtocol(ProtocolInfo<?> protocol);
+    public void setListenerForServerboundHandshake(PacketListener packetListener);
+    public void initiateServerboundStatusConnection(String hostName, int port, ClientStatusPacketListener listener);
+    public void initiateServerboundPlayConnection(String hostName, int port, ClientLoginPacketListener listener);
+    public <S extends ServerboundPacketListener, C extends ClientboundPacketListener> void initiateServerboundPlayConnection(String hostName, int port, ProtocolInfo<S> outbound, ProtocolInfo<C> inbound, C listener, boolean transfer);
+    public void send(Packet<?> packet);
+    public void send(Packet<?> packet, ChannelFutureListener listener);
+    public void send(Packet<?> packet, ChannelFutureListener listener, boolean flush);
+    public void runOnceConnected(Consumer<Connection> action);
+    public void flushChannel();
+    public void tick();
+    protected void tickSecond();
+    public SocketAddress getRemoteAddress();
+    public String getLoggableAddress(boolean logIPs);
+    public void disconnect(Component reason);
+    public void disconnect(DisconnectionDetails details);
+    public boolean isMemoryConnection();
+    public PacketFlow getReceiving();
+    public PacketFlow getSending();
+    public static Connection connectToServer(InetSocketAddress address, EventLoopGroupHolder eventLoopGroupHolder, LocalSampleLogger bandwidthLogger);
+    public static ChannelFuture connect(InetSocketAddress address, EventLoopGroupHolder eventLoopGroupHolder, Connection connection);
+    public void configurePacketHandler(ChannelPipeline pipeline);
+    public static void configureSerialization(ChannelPipeline pipeline, PacketFlow inboundDirection, boolean local, BandwidthDebugMonitor monitor);
+    public static void configureInMemoryPipeline(ChannelPipeline pipeline, PacketFlow packetFlow);
+    public static Connection connectToLocalServer(SocketAddress address);
+    public static Connection fromChannel(Channel channel, PacketFlow flow, LocalSampleLogger bandwidthLogger);
+    public void setEncryptionKey(Cipher decryptCipher, Cipher encryptCipher);
+    public boolean isConnected();
+    public boolean isConnecting();
+    public PacketListener getPacketListener();
+    public DisconnectionDetails getDisconnectionDetails();
+    public void setReadOnly();
+    public void setupCompression(int threshold, boolean validateDecompressed);
+    public void handleDisconnection();
+    public float getAverageReceivedPackets();
+    public float getAverageSentPackets();
+    public void setBandwidthLogger(LocalSampleLogger bandwidthLogger);
+}
+//// ConnectionProtocol.java
+public enum ConnectionProtocol {
+    HANDSHAKING, PLAY, STATUS, LOGIN, CONFIGURATION;
+    public String id();
+}
+//// DisconnectionDetails.java
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+public record DisconnectionDetails(Component reason, Optional<Path> report, Optional<URI> bugReportLink) {
+    public DisconnectionDetails(Component reason);
+}
+//// FriendlyByteBuf.java
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.util.ByteProcessor;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
+import java.nio.channels.GatheringByteChannel;
+import java.nio.channels.ScatteringByteChannel;
+import java.nio.charset.Charset;
+import java.util.BitSet;
+import java.util.EnumSet;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
+import java.util.function.ToIntFunction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.Registry;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamEncoder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import org.joml.Quaternionf;
+import org.joml.Quaternionfc;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
+public class FriendlyByteBuf extends ByteBuf {
+    public static final short MAX_STRING_LENGTH;
+    public static final int MAX_COMPONENT_STRING_LENGTH = 262144;
+    public FriendlyByteBuf(ByteBuf source);
+    public <T> T readWithCodecTrusted(DynamicOps<Tag> ops, Codec<T> codec);
+    public <T> T readWithCodec(DynamicOps<Tag> ops, Codec<T> codec, NbtAccounter accounter);
+    public <T> FriendlyByteBuf writeWithCodec(DynamicOps<Tag> ops, Codec<T> codec, T value);
+    public <T> T readLenientJsonWithCodec(Codec<T> codec);
+    public <T> void writeJsonWithCodec(Codec<T> codec, T value);
+    public void readWithCount(Consumer<FriendlyByteBuf> reader);
+    public <E extends Enum<E>> void writeEnumSet(EnumSet<E> set, Class<E> clazz);
+    public <E extends Enum<E>> EnumSet<E> readEnumSet(Class<E> clazz);
+    public <T> void writeOptional(Optional<T> value, StreamEncoder<? super FriendlyByteBuf, T> valueWriter);
+    public <T> Optional<T> readOptional(StreamDecoder<? super FriendlyByteBuf, T> valueReader);
+    public <L, R> void writeEither(Either<L, R> value, StreamEncoder<? super FriendlyByteBuf, L> leftWriter, StreamEncoder<? super FriendlyByteBuf, R> rightWriter);
+    public <L, R> Either<L, R> readEither(StreamDecoder<? super FriendlyByteBuf, L> leftReader, StreamDecoder<? super FriendlyByteBuf, R> rightReader);
+    public <T> T readNullable(StreamDecoder<? super FriendlyByteBuf, T> valueDecoder);
+    public static <T, B extends ByteBuf> T readNullable(B input, StreamDecoder<? super B, T> valueDecoder);
+    public <T> void writeNullable(T value, StreamEncoder<? super FriendlyByteBuf, T> valueEncoder);
+    public static <T, B extends ByteBuf> void writeNullable(B output, T value, StreamEncoder<? super B, T> valueEncoder);
+    public byte[] readByteArray();
+    public static byte[] readByteArray(ByteBuf input);
+    public FriendlyByteBuf writeByteArray(byte[] bytes);
+    public static void writeByteArray(ByteBuf output, byte[] bytes);
+    public byte[] readByteArray(int maxSize);
+    public static byte[] readByteArray(ByteBuf input, int maxSize);
+    public FriendlyByteBuf writeVarIntArray(int[] ints);
+    public int[] readVarIntArray();
+    public int[] readVarIntArray(int maxSize);
+    public FriendlyByteBuf writeLongArray(long[] longs);
+    public static void writeLongArray(ByteBuf output, long[] longs);
+    public FriendlyByteBuf writeFixedSizeLongArray(long[] longs);
+    public static void writeFixedSizeLongArray(ByteBuf output, long[] longs);
+    public long[] readLongArray();
+    public long[] readFixedSizeLongArray(long[] output);
+    public static long[] readLongArray(ByteBuf input);
+    public static long[] readFixedSizeLongArray(ByteBuf input, long[] output);
+    public BlockPos readBlockPos();
+    public static BlockPos readBlockPos(ByteBuf input);
+    public FriendlyByteBuf writeBlockPos(BlockPos pos);
+    public static void writeBlockPos(ByteBuf output, BlockPos pos);
+    public ChunkPos readChunkPos();
+    public FriendlyByteBuf writeChunkPos(ChunkPos pos);
+    public static ChunkPos readChunkPos(ByteBuf input);
+    public static void writeChunkPos(ByteBuf output, ChunkPos chunkPos);
+    public GlobalPos readGlobalPos();
+    public void writeGlobalPos(GlobalPos globalPos);
+    public Vector3f readVector3f();
+    public static Vector3f readVector3f(ByteBuf input);
+    public void writeVector3f(Vector3f v);
+    public static void writeVector3f(ByteBuf output, Vector3fc v);
+    public Quaternionf readQuaternion();
+    public static Quaternionf readQuaternion(ByteBuf input);
+    public void writeQuaternion(Quaternionf q);
+    public static void writeQuaternion(ByteBuf output, Quaternionfc value);
+    public <T extends Enum<T>> T readEnum(Class<T> clazz);
+    public FriendlyByteBuf writeEnum(Enum<?> value);
+    public <T> T readById(IntFunction<T> converter);
+    public <T> FriendlyByteBuf writeById(ToIntFunction<T> converter, T value);
+    public int readVarInt();
+    public long readVarLong();
+    public FriendlyByteBuf writeUUID(UUID uuid);
+    public static void writeUUID(ByteBuf output, UUID uuid);
+    public UUID readUUID();
+    public static UUID readUUID(ByteBuf input);
+    public FriendlyByteBuf writeVarInt(int value);
+    public FriendlyByteBuf writeVarLong(long value);
+    public FriendlyByteBuf writeNbt(Tag tag);
+    public static void writeNbt(ByteBuf output, Tag tag);
+    public CompoundTag readNbt();
+    public static CompoundTag readNbt(ByteBuf input);
+    public static Tag readNbt(ByteBuf input, NbtAccounter accounter);
+    public Tag readNbt(NbtAccounter accounter);
+    public String readUtf();
+    public String readUtf(int maxLength);
+    public FriendlyByteBuf writeUtf(String value);
+    public FriendlyByteBuf writeUtf(String value, int maxLength);
+    public Identifier readIdentifier();
+    public FriendlyByteBuf writeIdentifier(Identifier identifier);
+    public <T> ResourceKey<T> readResourceKey(ResourceKey<? extends Registry<T>> registry);
+    public void writeResourceKey(ResourceKey<?> key);
+    public <T> ResourceKey<? extends Registry<T>> readRegistryKey();
+    public BitSet readBitSet();
+    public void writeBitSet(BitSet bitSet);
+    public BitSet readFixedBitSet(int size);
+    public void writeFixedBitSet(BitSet bitSet, int size);
+    public static BitSet readFixedBitSet(ByteBuf input, int size);
+    public static void writeFixedBitSet(ByteBuf output, BitSet bitSet, int size);
+    public static int readContainerId(ByteBuf input);
+    public int readContainerId();
+    public static void writeContainerId(ByteBuf output, int id);
+    public void writeContainerId(int id);
+    public boolean isContiguous();
+    public int maxFastWritableBytes();
+    public int capacity();
+    public FriendlyByteBuf capacity(int newCapacity);
+    public int maxCapacity();
+    public ByteBufAllocator alloc();
+    public ByteOrder order();
+    public ByteBuf order(ByteOrder endianness);
+    public ByteBuf unwrap();
+    public boolean isDirect();
+    public boolean isReadOnly();
+    public ByteBuf asReadOnly();
+    public int readerIndex();
+    public FriendlyByteBuf readerIndex(int readerIndex);
+    public int writerIndex();
+    public FriendlyByteBuf writerIndex(int writerIndex);
+    public FriendlyByteBuf setIndex(int readerIndex, int writerIndex);
+    public int readableBytes();
+    public int writableBytes();
+    public int maxWritableBytes();
+    public boolean isReadable();
+    public boolean isReadable(int size);
+    public boolean isWritable();
+    public boolean isWritable(int size);
+    public FriendlyByteBuf clear();
+    public FriendlyByteBuf markReaderIndex();
+    public FriendlyByteBuf resetReaderIndex();
+    public FriendlyByteBuf markWriterIndex();
+    public FriendlyByteBuf resetWriterIndex();
+    public FriendlyByteBuf discardReadBytes();
+    public FriendlyByteBuf discardSomeReadBytes();
+    public FriendlyByteBuf ensureWritable(int minWritableBytes);
+    public int ensureWritable(int minWritableBytes, boolean force);
+    public boolean getBoolean(int index);
+    public byte getByte(int index);
+    public short getUnsignedByte(int index);
+    public short getShort(int index);
+    public short getShortLE(int index);
+    public int getUnsignedShort(int index);
+    public int getUnsignedShortLE(int index);
+    public int getMedium(int index);
+    public int getMediumLE(int index);
+    public int getUnsignedMedium(int index);
+    public int getUnsignedMediumLE(int index);
+    public int getInt(int index);
+    public int getIntLE(int index);
+    public long getUnsignedInt(int index);
+    public long getUnsignedIntLE(int index);
+    public long getLong(int index);
+    public long getLongLE(int index);
+    public char getChar(int index);
+    public float getFloat(int index);
+    public double getDouble(int index);
+    public FriendlyByteBuf getBytes(int index, ByteBuf dst);
+    public FriendlyByteBuf getBytes(int index, ByteBuf dst, int length);
+    public FriendlyByteBuf getBytes(int index, ByteBuf dst, int dstIndex, int length);
+    public FriendlyByteBuf getBytes(int index, byte[] dst);
+    public FriendlyByteBuf getBytes(int index, byte[] dst, int dstIndex, int length);
+    public FriendlyByteBuf getBytes(int index, ByteBuffer dst);
+    public FriendlyByteBuf getBytes(int index, OutputStream out, int length) throws IOException;
+    public int getBytes(int index, GatheringByteChannel out, int length) throws IOException;
+    public int getBytes(int index, FileChannel out, long position, int length) throws IOException;
+    public CharSequence getCharSequence(int index, int length, Charset charset);
+    public FriendlyByteBuf setBoolean(int index, boolean value);
+    public FriendlyByteBuf setByte(int index, int value);
+    public FriendlyByteBuf setShort(int index, int value);
+    public FriendlyByteBuf setShortLE(int index, int value);
+    public FriendlyByteBuf setMedium(int index, int value);
+    public FriendlyByteBuf setMediumLE(int index, int value);
+    public FriendlyByteBuf setInt(int index, int value);
+    public FriendlyByteBuf setIntLE(int index, int value);
+    public FriendlyByteBuf setLong(int index, long value);
+    public FriendlyByteBuf setLongLE(int index, long value);
+    public FriendlyByteBuf setChar(int index, int value);
+    public FriendlyByteBuf setFloat(int index, float value);
+    public FriendlyByteBuf setDouble(int index, double value);
+    public FriendlyByteBuf setBytes(int index, ByteBuf src);
+    public FriendlyByteBuf setBytes(int index, ByteBuf src, int length);
+    public FriendlyByteBuf setBytes(int index, ByteBuf src, int srcIndex, int length);
+    public FriendlyByteBuf setBytes(int index, byte[] src);
+    public FriendlyByteBuf setBytes(int index, byte[] src, int srcIndex, int length);
+    public FriendlyByteBuf setBytes(int index, ByteBuffer src);
+    public int setBytes(int index, InputStream in, int length) throws IOException;
+    public int setBytes(int index, ScatteringByteChannel in, int length) throws IOException;
+    public int setBytes(int index, FileChannel in, long position, int length) throws IOException;
+    public FriendlyByteBuf setZero(int index, int length);
+    public int setCharSequence(int index, CharSequence sequence, Charset charset);
+    public boolean readBoolean();
+    public byte readByte();
+    public short readUnsignedByte();
+    public short readShort();
+    public short readShortLE();
+    public int readUnsignedShort();
+    public int readUnsignedShortLE();
+    public int readMedium();
+    public int readMediumLE();
+    public int readUnsignedMedium();
+    public int readUnsignedMediumLE();
+    public int readInt();
+    public int readIntLE();
+    public long readUnsignedInt();
+    public long readUnsignedIntLE();
+    public long readLong();
+    public long readLongLE();
+    public char readChar();
+    public float readFloat();
+    public double readDouble();
+    public ByteBuf readBytes(int length);
+    public ByteBuf readSlice(int length);
+    public ByteBuf readRetainedSlice(int length);
+    public FriendlyByteBuf readBytes(ByteBuf dst);
+    public FriendlyByteBuf readBytes(ByteBuf dst, int length);
+    public FriendlyByteBuf readBytes(ByteBuf dst, int dstIndex, int length);
+    public FriendlyByteBuf readBytes(byte[] dst);
+    public FriendlyByteBuf readBytes(byte[] dst, int dstIndex, int length);
+    public FriendlyByteBuf readBytes(ByteBuffer dst);
+    public FriendlyByteBuf readBytes(OutputStream out, int length) throws IOException;
+    public int readBytes(GatheringByteChannel out, int length) throws IOException;
+    public CharSequence readCharSequence(int length, Charset charset);
+    public String readString(int length, Charset charset);
+    public int readBytes(FileChannel out, long position, int length) throws IOException;
+    public FriendlyByteBuf skipBytes(int length);
+    public FriendlyByteBuf writeBoolean(boolean value);
+    public FriendlyByteBuf writeByte(int value);
+    public FriendlyByteBuf writeShort(int value);
+    public FriendlyByteBuf writeShortLE(int value);
+    public FriendlyByteBuf writeMedium(int value);
+    public FriendlyByteBuf writeMediumLE(int value);
+    public FriendlyByteBuf writeInt(int value);
+    public FriendlyByteBuf writeIntLE(int value);
+    public FriendlyByteBuf writeLong(long value);
+    public FriendlyByteBuf writeLongLE(long value);
+    public FriendlyByteBuf writeChar(int value);
+    public FriendlyByteBuf writeFloat(float value);
+    public FriendlyByteBuf writeDouble(double value);
+    public FriendlyByteBuf writeBytes(ByteBuf src);
+    public FriendlyByteBuf writeBytes(ByteBuf src, int length);
+    public FriendlyByteBuf writeBytes(ByteBuf src, int srcIndex, int length);
+    public FriendlyByteBuf writeBytes(byte[] src);
+    public FriendlyByteBuf writeBytes(byte[] src, int srcIndex, int length);
+    public FriendlyByteBuf writeBytes(ByteBuffer src);
+    public int writeBytes(InputStream in, int length) throws IOException;
+    public int writeBytes(ScatteringByteChannel in, int length) throws IOException;
+    public int writeBytes(FileChannel in, long position, int length) throws IOException;
+    public FriendlyByteBuf writeZero(int length);
+    public int writeCharSequence(CharSequence sequence, Charset charset);
+    public int indexOf(int fromIndex, int toIndex, byte value);
+    public int bytesBefore(byte value);
+    public int bytesBefore(int length, byte value);
+    public int bytesBefore(int index, int length, byte value);
+    public int forEachByte(ByteProcessor processor);
+    public int forEachByte(int index, int length, ByteProcessor processor);
+    public int forEachByteDesc(ByteProcessor processor);
+    public int forEachByteDesc(int index, int length, ByteProcessor processor);
+    public ByteBuf copy();
+    public ByteBuf copy(int index, int length);
+    public ByteBuf slice();
+    public ByteBuf retainedSlice();
+    public ByteBuf slice(int index, int length);
+    public ByteBuf retainedSlice(int index, int length);
+    public ByteBuf duplicate();
+    public ByteBuf retainedDuplicate();
+    public int nioBufferCount();
+    public ByteBuffer nioBuffer();
+    public ByteBuffer nioBuffer(int index, int length);
+    public ByteBuffer internalNioBuffer(int index, int length);
+    public ByteBuffer[] nioBuffers();
+    public ByteBuffer[] nioBuffers(int index, int length);
+    public boolean hasArray();
+    public byte[] array();
+    public int arrayOffset();
+    public boolean hasMemoryAddress();
+    public long memoryAddress();
+    public String toString(Charset charset);
+    public String toString(int index, int length, Charset charset);
+    public int hashCode();
+    public boolean equals(Object obj);
+    public int compareTo(ByteBuf buffer);
+    public String toString();
+    public FriendlyByteBuf retain(int increment);
+    public FriendlyByteBuf retain();
+    public FriendlyByteBuf touch();
+    public FriendlyByteBuf touch(Object hint);
+    public int refCnt();
+    public boolean release();
+    public boolean release(int decrement);
+}
+//// HandlerNames.java
+public class HandlerNames {
+    public static final String DECOMPRESS = "decompress";
+    public static final String COMPRESS = "compress";
+    public static final String DECODER = "decoder";
+    public static final String ENCODER = "encoder";
+    public static final String INBOUND_CONFIG = "inbound_config";
+    public static final String OUTBOUND_CONFIG = "outbound_config";
+    public static final String SPLITTER = "splitter";
+    public static final String PREPENDER = "prepender";
+    public static final String DECRYPT = "decrypt";
+    public static final String ENCRYPT = "encrypt";
+    public static final String UNBUNDLER = "unbundler";
+    public static final String BUNDLER = "bundler";
+    public static final String PACKET_HANDLER = "packet_handler";
+    public static final String TIMEOUT = "timeout";
+    public static final String LEGACY_QUERY = "legacy_query";
+    public static final String LATENCY = "latency";
+}
+//// HashedPatchMap.java
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.TypedDataComponent;
+import net.minecraft.network.codec.StreamCodec;
+public record HashedPatchMap(Map<DataComponentType<?>, Integer> addedComponents, Set<DataComponentType<?>> removedComponents) {
+    public static final StreamCodec<RegistryFriendlyByteBuf, HashedPatchMap> STREAM_CODEC;
+    public static HashedPatchMap create(DataComponentPatch patch, HashGenerator hasher);
+    public boolean matches(DataComponentPatch patch, HashGenerator hasher);
+    public interface HashGenerator extends Function<TypedDataComponent<?>, Integer> {
+    }
+}
+//// HashedStack.java
+import net.minecraft.core.Holder;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+public interface HashedStack {
+    HashedStack EMPTY;
+    StreamCodec<RegistryFriendlyByteBuf, HashedStack> STREAM_CODEC;
+    boolean matches(ItemStack stack, HashedPatchMap.HashGenerator hasher);
+    static HashedStack create(ItemStack itemStack, HashedPatchMap.HashGenerator hasher);
+    public static record ActualItem(Holder<Item> item, int count, HashedPatchMap components) implements HashedStack {
+        public static final StreamCodec<RegistryFriendlyByteBuf, ActualItem> STREAM_CODEC;
+        public boolean matches(ItemStack itemStack, HashedPatchMap.HashGenerator hasher);
+    }
+}
+//// HiddenByteBuf.java
+import io.netty.buffer.ByteBuf;
+import io.netty.util.ReferenceCounted;
+public record HiddenByteBuf(ByteBuf contents) implements ReferenceCounted {
+    public HiddenByteBuf(ByteBuf contents);
+    public static Object pack(Object msg);
+    public static Object unpack(Object msg);
+    public int refCnt();
+    public HiddenByteBuf retain();
+    public HiddenByteBuf retain(int increment);
+    public HiddenByteBuf touch();
+    public HiddenByteBuf touch(Object hint);
+    public boolean release();
+    public boolean release(int decrement);
+}
+//// LocalFrameDecoder.java
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+public class LocalFrameDecoder extends ChannelInboundHandlerAdapter {
+    public void channelRead(ChannelHandlerContext ctx, Object msg);
+}
+//// LocalFrameEncoder.java
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
+import io.netty.channel.ChannelPromise;
+public class LocalFrameEncoder extends ChannelOutboundHandlerAdapter {
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise);
+}
+//// LpVec3.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.world.phys.Vec3;
+public class LpVec3 {
+    public static final double ABS_MAX_VALUE = 17179869183.0;
+    public static final double ABS_MIN_VALUE = 3.051944088384301e-05;
+    public static boolean hasContinuationBit(int in);
+    public static Vec3 read(ByteBuf input);
+    public static void write(ByteBuf output, Vec3 value);
+}
+//// MonitoredLocalFrameDecoder.java
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+public class MonitoredLocalFrameDecoder extends ChannelInboundHandlerAdapter {
+    public MonitoredLocalFrameDecoder(BandwidthDebugMonitor monitor);
+    public void channelRead(ChannelHandlerContext ctx, Object msg);
+}
+//// PacketBundlePacker.java
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToMessageDecoder;
+import java.util.List;
+import net.minecraft.network.protocol.BundlerInfo;
+import net.minecraft.network.protocol.Packet;
+public class PacketBundlePacker extends MessageToMessageDecoder<Packet<?>> {
+    public PacketBundlePacker(BundlerInfo bundlerInfo);
+    protected void decode(ChannelHandlerContext ctx, Packet<?> msg, List<Object> out) throws Exception;
+}
+//// PacketBundleUnpacker.java
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToMessageEncoder;
+import java.util.List;
+import net.minecraft.network.protocol.BundlerInfo;
+import net.minecraft.network.protocol.Packet;
+public class PacketBundleUnpacker extends MessageToMessageEncoder<Packet<?>> {
+    public PacketBundleUnpacker(BundlerInfo bundlerInfo);
+    protected void encode(ChannelHandlerContext ctx, Packet<?> msg, List<Object> out) throws Exception;
+}
+//// PacketDecoder.java
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.ByteToMessageDecoder;
+import java.util.List;
+public class PacketDecoder<T extends PacketListener> extends ByteToMessageDecoder implements ProtocolSwapHandler {
+    public PacketDecoder(ProtocolInfo<T> protocolInfo);
+    protected void decode(ChannelHandlerContext ctx, ByteBuf input, List<Object> out) throws Exception;
+}
+//// PacketEncoder.java
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToByteEncoder;
+import net.minecraft.network.protocol.Packet;
+public class PacketEncoder<T extends PacketListener> extends MessageToByteEncoder<Packet<T>> {
+    public PacketEncoder(ProtocolInfo<T> protocolInfo);
+    protected void encode(ChannelHandlerContext ctx, Packet<T> packet, ByteBuf output) throws Exception;
+}
+//// PacketListener.java
+import net.minecraft.CrashReport;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.ReportedException;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketFlow;
+public interface PacketListener {
+    PacketFlow flow();
+    ConnectionProtocol protocol();
+    void onDisconnect(DisconnectionDetails details);
+    default void onPacketError(Packet packet, Exception cause) throws ReportedException;
+    default DisconnectionDetails createDisconnectionInfo(Component reason, Throwable cause);
+    boolean isAcceptingMessages();
+    default boolean shouldHandleMessage(Packet<?> packet);
+    default void fillCrashReport(CrashReport crashReport);
+    default void fillListenerSpecificCrashDetails(CrashReport report, CrashReportCategory connectionDetails);
+}
+//// PacketProcessor.java
+import net.minecraft.network.protocol.Packet;
+public class PacketProcessor implements AutoCloseable {
+    public PacketProcessor(Thread runningThread);
+    public boolean isSameThread();
+    public <T extends PacketListener> void scheduleIfPossible(T listener, Packet<T> packet);
+    public void processQueuedPackets();
+    public void close();
+    static record ListenerAndPacket<T extends PacketListener>(T listener, Packet<T> packet) {
+        public void handle();
+    }
+}
+//// PacketSendListener.java
+import io.netty.channel.ChannelFutureListener;
+import java.util.function.Supplier;
+import net.minecraft.network.protocol.Packet;
+public class PacketSendListener {
+    public static ChannelFutureListener thenRun(Runnable runnable);
+    public static ChannelFutureListener exceptionallySend(Supplier< Packet<?>> handler);
+}
+//// ProtocolInfo.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.BundlerInfo;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.PacketType;
+public interface ProtocolInfo<T extends PacketListener> {
+    ConnectionProtocol id();
+    PacketFlow flow();
+    StreamCodec<ByteBuf, Packet<? super T>> codec();
+    BundlerInfo bundlerInfo();
+    public interface Details {
+        ConnectionProtocol id();
+        PacketFlow flow();
+        void listPackets(PacketVisitor output);
+        public interface PacketVisitor {
+            void accept(PacketType<?> type, int networkId);
+        }
+    }
+    public interface DetailsProvider {
+        Details details();
+    }
+}
+//// ProtocolSwapHandler.java
+import io.netty.channel.ChannelHandlerContext;
+import net.minecraft.network.protocol.Packet;
+public interface ProtocolSwapHandler {
+    static void handleInboundTerminalPacket(ChannelHandlerContext ctx, Packet<?> packet);
+    static void handleOutboundTerminalPacket(ChannelHandlerContext ctx, Packet<?> packet);
+}
+//// RateKickingConnection.java
+public class RateKickingConnection extends Connection {
+    public RateKickingConnection(int rateLimitPacketsPerSecond);
+    protected void tickSecond();
+}
+//// RegistryFriendlyByteBuf.java
+import io.netty.buffer.ByteBuf;
+import java.util.function.Function;
+import net.minecraft.core.RegistryAccess;
+public class RegistryFriendlyByteBuf extends FriendlyByteBuf {
+    public RegistryFriendlyByteBuf(ByteBuf source, RegistryAccess registryAccess);
+    public RegistryAccess registryAccess();
+    public static Function<ByteBuf, RegistryFriendlyByteBuf> decorator(RegistryAccess registryAccess);
+}
+//// ServerboundPacketListener.java
+import net.minecraft.network.protocol.PacketFlow;
+public interface ServerboundPacketListener extends PacketListener {
+    default PacketFlow flow();
+}
+//// SkipPacketDecoderException.java
+import io.netty.handler.codec.DecoderException;
+import net.minecraft.network.codec.IdDispatchCodec;
+public class SkipPacketDecoderException extends DecoderException implements IdDispatchCodec.DontDecorateException, SkipPacketException {
+    public SkipPacketDecoderException(String message);
+    public SkipPacketDecoderException(Throwable cause);
+}
+//// SkipPacketEncoderException.java
+import io.netty.handler.codec.EncoderException;
+import net.minecraft.network.codec.IdDispatchCodec;
+public class SkipPacketEncoderException extends EncoderException implements IdDispatchCodec.DontDecorateException, SkipPacketException {
+    public SkipPacketEncoderException(String message);
+    public SkipPacketEncoderException(Throwable cause);
+}
+//// SkipPacketException.java
+public interface SkipPacketException {
+}
+//// TickablePacketListener.java
+public interface TickablePacketListener extends PacketListener {
+    void tick();
+}
+//// UnconfiguredPipelineHandler.java
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
+import io.netty.channel.ChannelPromise;
+public class UnconfiguredPipelineHandler {
+    public static <T extends PacketListener> InboundConfigurationTask setupInboundProtocol(ProtocolInfo<T> protocolInfo);
+    public static <T extends PacketListener> OutboundConfigurationTask setupOutboundProtocol(ProtocolInfo<T> codecData);
+    public static class Inbound extends ChannelDuplexHandler {
+        public void channelRead(ChannelHandlerContext ctx, Object msg);
+        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception;
+    }
+    public static class Outbound extends ChannelOutboundHandlerAdapter {
+        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception;
+    }
+    public interface InboundConfigurationTask {
+        void run(ChannelHandlerContext ctx);
+        default InboundConfigurationTask andThen(InboundConfigurationTask otherTask);
+    }
+    public interface OutboundConfigurationTask {
+        void run(ChannelHandlerContext ctx);
+        default OutboundConfigurationTask andThen(OutboundConfigurationTask otherTask);
+    }
+}
+//// Utf8String.java
+import io.netty.buffer.ByteBuf;
+public class Utf8String {
+    public static String read(ByteBuf input, int maxLength);
+    public static void write(ByteBuf output, CharSequence value, int maxLength);
+}
+//// VarInt.java
+import io.netty.buffer.ByteBuf;
+public class VarInt {
+    public static final int MAX_VARINT_SIZE = 5;
+    public static int getByteSize(int value);
+    public static boolean hasContinuationBit(byte in);
+    public static int read(ByteBuf input);
+    public static ByteBuf write(ByteBuf output, int value);
+}
+//// VarLong.java
+import io.netty.buffer.ByteBuf;
+public class VarLong {
+    public static int getByteSize(long value);
+    public static boolean hasContinuationBit(byte in);
+    public static long read(ByteBuf input);
+    public static ByteBuf write(ByteBuf output, long value);
+}
+//// Varint21FrameDecoder.java
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.ByteToMessageDecoder;
+import java.util.List;
+public class Varint21FrameDecoder extends ByteToMessageDecoder {
+    public Varint21FrameDecoder(BandwidthDebugMonitor monitor);
+    protected void handlerRemoved0(ChannelHandlerContext ctx);
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out);
+}
+//// Varint21LengthFieldPrepender.java
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToByteEncoder;
+public class Varint21LengthFieldPrepender extends MessageToByteEncoder<ByteBuf> {
+    public static final int MAX_VARINT21_BYTES = 3;
+    protected void encode(ChannelHandlerContext ctx, ByteBuf msg, ByteBuf out);
+}

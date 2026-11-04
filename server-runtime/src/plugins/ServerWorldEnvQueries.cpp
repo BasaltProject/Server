@@ -1,7 +1,9 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
+#include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/entity/Raids.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/ServerWorldEnv.hpp>
@@ -14,6 +16,8 @@
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/poi/PoiManager.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/terrain/ProtoRegion.hpp>
+#include <basalt/server/world/terrain/decoration/PlacedFeatures.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
@@ -21,9 +25,13 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 
 namespace basalt::server::runtime::plugins {
 namespace {
+
+constexpr float kMinClockRate = 1.0E-5F;
+constexpr float kMaxClockRate = 1000.0F;
 
 namespace reg = server::registry;
 
@@ -99,6 +107,7 @@ std::vector<PluginRaid> ServerWorldEnv::raids() {
         for (const auto& [wave, ids] : raid.groups) {
             made.raiders.insert(made.raiders.end(), ids.begin(), ids.end());
         }
+        made.leaders.assign(raid.leaders.begin(), raid.leaders.end());
         out.push_back(std::move(made));
         return true;
     });
@@ -108,6 +117,45 @@ std::vector<PluginRaid> ServerWorldEnv::raids() {
 bool ServerWorldEnv::raidBar(const std::int32_t id, const std::string_view action, const std::string_view text,
                              const std::int32_t value) {
     return hooks_->raidBar && hooks_->raidBar(*world_, id, action, text, value);
+}
+
+server::plugins::PluginClock ServerWorldEnv::clock() {
+    const world::WorldClock& clock = world_->clock();
+    server::plugins::PluginClock out{.totalTicks = clock.totalTicks(), .rate = clock.rate(), .paused = clock.paused()};
+    for (const auto& [name, ticks] : world::WorldClock::timeMarkers()) {
+        out.markers.emplace_back(std::string{name}, ticks);
+    }
+    return out;
+}
+
+bool ServerWorldEnv::setClockRate(const float rate) {
+    if (!(rate >= kMinClockRate && rate <= kMaxClockRate)) {
+        return false;
+    }
+    world_->clock().setRate(rate);
+    if (hooks_->environment) {
+        hooks_->environment().syncTime(*world_);
+    }
+    return true;
+}
+
+std::int32_t ServerWorldEnv::moveToTimeMarker(const std::string_view marker) {
+    const std::optional<std::int32_t> ticks = world::WorldClock::markerTicks(marker);
+    if (!ticks.has_value()) {
+        return 0;
+    }
+    const std::int64_t target = world::WorldClock::timeOfNextMarker(world_->clock().totalTicks(), *ticks);
+    const bool moved = target != world_->clock().totalTicks();
+    world_->clock().setTotalTicks(target);
+    if (hooks_->environment) {
+        hooks_->environment().syncTime(*world_);
+    }
+    return moved ? 2 : 1;
+}
+
+std::int32_t ServerWorldEnv::raidControl(const std::int32_t id, const std::string_view action,
+                                         const std::array<std::int32_t, 4>& arguments, const std::int32_t value) {
+    return hooks_->raidControl ? hooks_->raidControl(*world_, id, action, arguments, value) : -1;
 }
 
 std::optional<std::vector<std::uint8_t>> ServerWorldEnv::raidValues(const std::int32_t id) {
@@ -239,6 +287,82 @@ ServerWorldEnv::placeTree(const std::string_view tree, const std::int32_t x, con
         for (const world::BlockChange& change : changes) {
             blocks->announceBlock(watchers(), change);
         }
+    }
+    return out;
+}
+
+std::optional<std::vector<server::plugins::PluginPlacedBlock>>
+ServerWorldEnv::placeFeature(const std::string_view feature, const std::int32_t x, const std::int32_t y,
+                             const std::int32_t z, const std::int64_t seed, const bool apply) {
+    namespace decoration = server::world::terrain::decoration;
+    const std::string text =
+        feature.find(':') == std::string_view::npos ? "minecraft:" + std::string{feature} : std::string{feature};
+    const auto id = wire::common::Identifier::parse(text);
+    if (!id.has_value()) {
+        return std::nullopt;
+    }
+    const decoration::placedFeatures::Placement* placement = decoration::placedFeatures::find(*id);
+    const decoration::placedFeatures::ContextualPlacement* contextual = decoration::placedFeatures::contextual(*id);
+    if (placement == nullptr && contextual == nullptr) {
+        return std::nullopt;
+    }
+    server::world::Chunk& chunk = world_->state().getOrGenerateChunk(x >> 4, z >> 4);
+    random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
+    std::array<server::world::Chunk*, 9> around{};
+    for (std::int32_t dx = -1; dx <= 1; ++dx) {
+        for (std::int32_t dz = -1; dz <= 1; ++dz) {
+            around[static_cast<std::size_t>(((dx + 1) * 3) + dz + 1)] =
+                world_->state().chunkIfLoaded((x >> 4) + dx, (z >> 4) + dz);
+        }
+    }
+    server::world::terrain::ProtoRegion region{x >> 4, z >> 4, around};
+    const server::world::Chunk::RegionScope regionScope{chunk, region};
+    std::vector<server::plugins::PluginPlacedBlock> out;
+    std::vector<world::BlockChange> changes;
+    {
+        const server::world::Chunk::BlockWriteObserverScope observing{
+            chunk, [&](const std::int32_t localX, const std::int32_t blockY, const std::int32_t localZ,
+                       const std::int32_t before, const std::int32_t after) {
+                if (before == after) {
+                    return;
+                }
+                const std::int32_t worldX = chunk.chunkX() * 16 + localX;
+                const std::int32_t worldZ = chunk.chunkZ() * 16 + localZ;
+                out.push_back({worldX, blockY, worldZ, before, after});
+                changes.push_back(world::BlockChange{.x = worldX, .y = blockY, .z = worldZ, .stateId = after});
+            }};
+        if (placement != nullptr) {
+            (*placement)(chunk, random, x, y, z);
+        } else {
+            const decoration::placedFeatures::FeatureContext built{
+                .seed = world_->metadata().seed,
+                .surface = world_->surfaceEnvironment(),
+                .blockStateAt = [this](std::int32_t bx, std::int32_t by, std::int32_t bz) {
+                    return static_cast<std::int32_t>(
+                        world_->state().blockState(bx, by, bz).value_or(server::registry::blocks::air().stateId));
+                }};
+            (*contextual)(chunk, random, x, y, z, built);
+        }
+    }
+    if (!apply) {
+        std::vector<world::BlockChange> undone;
+        for (auto written = out.rbegin(); written != out.rend(); ++written) {
+            world::growthSupport::set(world_->state(), written->x, written->y, written->z, written->before, undone);
+        }
+        return out;
+    }
+    if (BlockChangeBroadcaster* blocks = hooks_->blocks ? hooks_->blocks() : nullptr; blocks != nullptr) {
+        for (const world::BlockChange& change : changes) {
+            blocks->announceBlock(watchers(), change);
+        }
+    }
+    return out;
+}
+
+std::vector<std::string> ServerWorldEnv::featureIds() {
+    std::vector<std::string> out;
+    for (const wire::common::Identifier& id : server::world::terrain::decoration::placedFeatures::ids()) {
+        out.push_back(id.toString());
     }
     return out;
 }
@@ -414,6 +538,41 @@ void ServerWorldEnv::setWeatherTimes(const std::int32_t rain, const std::int32_t
     weather.rainTime = std::max(rain, 0);
     weather.thunderTime = std::max(thunder, 0);
     weather.clearWeatherTime = std::max(clear, 0);
+}
+
+std::int64_t ServerWorldEnv::randomSequence(const std::string_view id, const std::int32_t operation,
+                                            const std::int64_t argument) {
+    world::RandomSequences& sequences = world_->randomSequences();
+    if (operation == 8) {
+        return sequences.clear();
+    }
+    const auto name = wire::common::Identifier::parse(std::string{id});
+    if (!name.has_value()) {
+        return 0;
+    }
+    if (operation == 7) {
+        sequences.reset(*name);
+        return 0;
+    }
+    random::RandomSource& source = sequences.of(*name);
+    switch (operation) {
+    case 0:
+        return source.nextInt();
+    case 1:
+        return source.nextInt(static_cast<std::int32_t>(argument));
+    case 2:
+        return source.nextLong();
+    case 3:
+        return source.nextBoolean() ? 1 : 0;
+    case 4:
+        return std::bit_cast<std::int32_t>(source.nextFloat());
+    case 5:
+        return std::bit_cast<std::int64_t>(source.nextDouble());
+    case 6:
+        return std::bit_cast<std::int64_t>(source.nextGaussian());
+    default:
+        return 0;
+    }
 }
 
 std::int64_t ServerWorldEnv::inhabitedTime(const std::int32_t chunkX, const std::int32_t chunkZ) {

@@ -1,0 +1,100 @@
+//// ChainModifiers.java
+public record ChainModifiers(byte flags) {
+    public static final ChainModifiers DEFAULT;
+    public boolean isForked();
+    public ChainModifiers setForked();
+    public boolean isReturn();
+    public ChainModifiers setReturn();
+}
+//// CommandQueueEntry.java
+public record CommandQueueEntry<T>(Frame frame, EntryAction<T> action) {
+    public void execute(ExecutionContext<T> context);
+}
+//// CustomCommandExecutor.java
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.context.ContextChain;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.ExecutionCommandSource;
+public interface CustomCommandExecutor<T> {
+    void run(T sender, ContextChain<T> currentStep, ChainModifiers modifiers, ExecutionControl<T> output);
+    public interface CommandAdapter<T> extends CustomCommandExecutor<T>, Command<T> {
+        default int run(CommandContext<T> context) throws CommandSyntaxException;
+    }
+    public static abstract class WithErrorHandling<T extends ExecutionCommandSource<T>> implements CustomCommandExecutor<T> {
+        public final void run(T sender, ContextChain<T> currentStep, ChainModifiers modifiers, ExecutionControl<T> output);
+        protected void onError(CommandSyntaxException e, T sender, ChainModifiers modifiers, TraceCallbacks tracer);
+        protected abstract void runGuarded(T sender, ContextChain<T> currentStep, ChainModifiers modifiers, ExecutionControl<T> output) throws CommandSyntaxException;
+    }
+}
+//// CustomModifierExecutor.java
+import com.mojang.brigadier.RedirectModifier;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.context.ContextChain;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.Collection;
+import java.util.List;
+public interface CustomModifierExecutor<T> {
+    void apply(T originalSource, List<T> currentSources, ContextChain<T> currentStep, ChainModifiers modifiers, ExecutionControl<T> output);
+    public interface ModifierAdapter<T> extends CustomModifierExecutor<T>, RedirectModifier<T> {
+        default Collection<T> apply(CommandContext<T> context) throws CommandSyntaxException;
+    }
+}
+//// EntryAction.java
+public interface EntryAction<T> {
+    void execute(ExecutionContext<T> context, Frame frame);
+}
+//// ExecutionContext.java
+import com.mojang.brigadier.context.ContextChain;
+import net.minecraft.commands.CommandResultCallback;
+import net.minecraft.commands.ExecutionCommandSource;
+import net.minecraft.commands.functions.InstantiatedFunction;
+import net.minecraft.util.profiling.ProfilerFiller;
+public class ExecutionContext<T> implements AutoCloseable {
+    public ExecutionContext(int commandLimit, int forkLimit, ProfilerFiller profiler);
+    public static <T extends ExecutionCommandSource<T>> void queueInitialFunctionCall(ExecutionContext<T> context, InstantiatedFunction<T> function, T sender, CommandResultCallback functionReturn);
+    public static <T extends ExecutionCommandSource<T>> void queueInitialCommandExecution(ExecutionContext<T> context, String command, ContextChain<T> executionChain, T sender, CommandResultCallback commandReturn);
+    public void queueNext(CommandQueueEntry<T> entry);
+    public void discardAtDepthOrHigher(int depthToDiscard);
+    public Frame.FrameControl frameControlForDepth(int depthToDiscard);
+    public void runCommandQueue();
+    public void tracer(TraceCallbacks tracer);
+    public TraceCallbacks tracer();
+    public ProfilerFiller profiler();
+    public int forkLimit();
+    public void incrementCost();
+    public void close();
+}
+//// ExecutionControl.java
+import net.minecraft.commands.ExecutionCommandSource;
+public interface ExecutionControl<T> {
+    void queueNext(EntryAction<T> action);
+    void tracer(TraceCallbacks tracer);
+    TraceCallbacks tracer();
+    Frame currentFrame();
+    static <T extends ExecutionCommandSource<T>> ExecutionControl<T> create(ExecutionContext<T> context, Frame frame);
+}
+//// Frame.java
+import net.minecraft.commands.CommandResultCallback;
+public record Frame(int depth, CommandResultCallback returnValueConsumer, FrameControl frameControl) {
+    public void returnSuccess(int value);
+    public void returnFailure();
+    public void discard();
+    public interface FrameControl {
+        void discard();
+    }
+}
+//// TraceCallbacks.java
+import net.minecraft.resources.Identifier;
+public interface TraceCallbacks extends AutoCloseable {
+    void onCommand(int depth, String command);
+    void onReturn(int depth, String command, int result);
+    void onError(String message);
+    void onCall(int depth, Identifier function, int size);
+    void close();
+}
+//// UnboundEntryAction.java
+public interface UnboundEntryAction<T> {
+    void execute(T sender, ExecutionContext<T> context, Frame frame);
+    default EntryAction<T> bind(T sender);
+}

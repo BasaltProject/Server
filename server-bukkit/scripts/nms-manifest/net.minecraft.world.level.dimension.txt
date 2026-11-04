@@ -1,0 +1,91 @@
+//// BuiltinDimensionTypes.java
+import net.minecraft.resources.ResourceKey;
+public class BuiltinDimensionTypes {
+    public static final ResourceKey<DimensionType> OVERWORLD;
+    public static final ResourceKey<DimensionType> NETHER;
+    public static final ResourceKey<DimensionType> END;
+    public static final ResourceKey<DimensionType> OVERWORLD_CAVES;
+}
+//// DimensionDefaults.java
+public class DimensionDefaults {
+    public static final int CLOUD_THICKNESS = 4;
+    public static final int BLOCK_LIGHT_TINT = -10100;
+    public static final int NIGHT_VISION_COLOR = -6710887;
+    public static final float TURTLE_EGG_HATCH_CHANCE = 0.002F;
+    public static final int OVERWORLD_MIN_Y = -64;
+    public static final int OVERWORLD_LEVEL_HEIGHT = 384;
+    public static final int OVERWORLD_GENERATION_HEIGHT = 384;
+    public static final int OVERWORLD_LOGICAL_HEIGHT = 384;
+    public static final float OVERWORLD_CLOUD_HEIGHT = 192.33F;
+    public static final int OVERWORLD_CELL_SIZE_XZ = 4;
+    public static final int OVERWORLD_CELL_SIZE_Y = 8;
+    public static final int NETHER_CELL_SIZE_XZ = 4;
+    public static final int NETHER_CELL_SIZE_Y = 8;
+    public static final int END_CELL_SIZE_XZ = 8;
+    public static final int END_CELL_SIZE_Y = 4;
+    public static final int NETHER_MIN_Y = 0;
+    public static final int NETHER_LEVEL_HEIGHT = 256;
+    public static final int NETHER_GENERATION_HEIGHT = 128;
+    public static final int NETHER_LOGICAL_HEIGHT = 128;
+    public static final int END_MIN_Y = 0;
+    public static final int END_LEVEL_HEIGHT = 256;
+    public static final int END_GENERATION_HEIGHT = 128;
+    public static final int END_LOGICAL_HEIGHT = 256;
+    public static final int END_ISLAND_BASE_Y = 63;
+}
+//// DimensionType.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.nio.file.Path;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.attribute.EnvironmentAttributeMap;
+import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.level.CardinalLighting;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.timeline.Timeline;
+public record DimensionType(boolean hasFixedTime, boolean hasSkyLight, boolean hasCeiling, boolean hasEnderDragonFight, double coordinateScale, int minY, int height, int logicalHeight, HolderSet<Block> infiniburn, float ambientLight, MonsterSettings monsterSettings, Skybox skybox, CardinalLighting.Type cardinalLightType, EnvironmentAttributeMap attributes, HolderSet<Timeline> timelines, Optional<Holder<WorldClock>> defaultClock) {
+    public static final int BITS_FOR_Y;
+    public static final int MIN_HEIGHT = 16;
+    public static final int Y_SIZE;
+    public static final int MAX_Y;
+    public static final int MIN_Y;
+    public static final int WAY_ABOVE_MAX_Y;
+    public static final int WAY_BELOW_MIN_Y;
+    public static final Codec<DimensionType> DIRECT_CODEC;
+    public static final Codec<DimensionType> NETWORK_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<DimensionType>> STREAM_CODEC;
+    public static final float[] MOON_BRIGHTNESS_PER_PHASE;
+    public static final Codec<Holder<DimensionType>> CODEC;
+    public static double getTeleportationScale(DimensionType lastDimensionType, DimensionType newDimensionType);
+    public static Path getStorageFolder(ResourceKey<Level> name, Path baseFolder);
+    public IntProvider monsterSpawnLightTest();
+    public int monsterSpawnBlockLightLimit();
+    public boolean hasEndFlashes();
+    public static record MonsterSettings(IntProvider monsterSpawnLightTest, int monsterSpawnBlockLightLimit) {
+        public static final MapCodec<MonsterSettings> CODEC;
+    }
+    public static enum Skybox implements StringRepresentable {
+        NONE, OVERWORLD, END;
+        public static final Codec<Skybox> CODEC;
+        public String getSerializedName();
+    }
+}
+//// LevelStem.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+public record LevelStem(Holder<DimensionType> type, ChunkGenerator generator) {
+    public static final Codec<LevelStem> CODEC;
+    public static final ResourceKey<LevelStem> OVERWORLD;
+    public static final ResourceKey<LevelStem> NETHER;
+    public static final ResourceKey<LevelStem> END;
+}

@@ -1,9 +1,16 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.network.protocol.game;
 import io.netty.buffer.ByteBuf;
 import java.util.*;
 import net.minecraft.network.syncher.*;
 import org.basaltmc.bukkit.net.*;
-public final class ClientboundSetEntityDataPacket implements WirePacket {
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.network.syncher.SynchedEntityData;
+public final class ClientboundSetEntityDataPacket implements WirePacket, Packet<ClientGamePacketListener> {
     private final int id;
     private final List<SynchedEntityData.DataValue<?>> packedItems;
     // Preserve unknown serializer payloads verbatim, rather than dropping future metadata.
@@ -72,5 +79,13 @@ public final class ClientboundSetEntityDataPacket implements WirePacket {
     private static <T> SynchedEntityData.DataValue<T> readValue(
         int id, EntityDataSerializer<T> serializer, ByteBuf in) {
         return new SynchedEntityData.DataValue<>(id, serializer, serializer.read(in));
+    }
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundSetEntityDataPacket> STREAM_CODEC = StreamCodec.of((buf, packet) -> packet.write(buf), ClientboundSetEntityDataPacket::read);
+    public static final int EOF_MARKER = 255;
+    public PacketType<ClientboundSetEntityDataPacket> type() {
+        return GamePacketTypes.CLIENTBOUND_SET_ENTITY_DATA;
+    }
+    public void handle(ClientGamePacketListener listener) {
+        listener.handleSetEntityData(this);
     }
 }

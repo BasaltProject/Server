@@ -1,0 +1,268 @@
+//// AbstractPackMetadataResources.java
+import java.io.IOException;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.server.packs.resources.ResourceMetadata;
+public abstract class AbstractPackMetadataResources implements PackMetadataResources {
+    protected AbstractPackMetadataResources(PackLocationInfo location);
+    public <T> T getMetadataSection(MetadataSectionType<T> metadataSerializer) throws IOException;
+    public static ResourceMetadata loadMetadata(PackMetadataResources packResources) throws IOException;
+    public PackLocationInfo location();
+}
+//// DownloadCacheCleaner.java
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.util.Comparator;
+public class DownloadCacheCleaner {
+    public static void vacuumCacheDir(Path cacheDir, int maxFiles);
+    static record PathAndTime(Path path, FileTime modifiedTime) {
+        public static final Comparator<PathAndTime> NEWEST_FIRST;
+    }
+    static record PathAndPriority(Path path, int removalPriority) {
+        public static final Comparator<PathAndPriority> HIGHEST_PRIORITY_FIRST;
+    }
+}
+//// DownloadQueue.java
+import com.google.common.hash.HashCode;
+import com.google.common.hash.HashFunction;
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import java.io.IOException;
+import java.net.Proxy;
+import java.net.URL;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.util.HttpUtil;
+public class DownloadQueue implements AutoCloseable {
+    public DownloadQueue(Path cacheDir) throws IOException;
+    public CompletableFuture<BatchResult> downloadBatch(BatchConfig config, Map<UUID, DownloadRequest> requests);
+    public void close() throws IOException;
+    static record FileInfoEntry(String name, long size) {
+        public static final Codec<FileInfoEntry> CODEC;
+    }
+    static record LogEntry(UUID id, String url, Instant time, Optional<String> hash, Either<String, FileInfoEntry> errorOrFileInfo) {
+        public static final Codec<LogEntry> CODEC;
+    }
+    public static record BatchResult(Map<UUID, Path> downloaded, Set<UUID> failed) {
+        public BatchResult();
+    }
+    public static record DownloadRequest(URL url, HashCode hash) {
+    }
+    public static record BatchConfig(HashFunction hashFunction, int maxSize, Map<String, String> headers, Proxy proxy, HttpUtil.DownloadProgressListener listener) {
+    }
+}
+//// FeatureFlagsMetadataSection.java
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.world.flag.FeatureFlagSet;
+public record FeatureFlagsMetadataSection(FeatureFlagSet flags) {
+    public static final MetadataSectionType<FeatureFlagsMetadataSection> TYPE;
+}
+//// FilePackResources.java
+import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Path;
+import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.resources.IoSupplier;
+public class FilePackResources extends AbstractPackMetadataResources implements PackResources {
+    private FilePackResources(PackLocationInfo location, SharedZipFileAccess zipFileAccess, String prefix);
+    public IoSupplier<InputStream> getRootResource(String... path);
+    public IoSupplier<InputStream> getResource(PackType type, Identifier location);
+    public Set<String> getNamespaces(PackType type);
+    public static String extractNamespace(String prefix, String name);
+    public void close();
+    public void listResources(PackType type, String namespace, String directory, PackResources.ResourceOutput output);
+    static class SharedZipFileAccess implements AutoCloseable {
+        private SharedZipFileAccess(File file);
+        public void close();
+        protected void finalize() throws Throwable;
+    }
+    public static class FileResourcesSupplier implements Pack.ResourcesSupplier {
+        public FileResourcesSupplier(Path content);
+        public FileResourcesSupplier(File content);
+        public PackMetadataResources openMetadata(PackLocationInfo location);
+        public Stream<PackResources> openResources(PackLocationInfo location, Pack.Metadata metadata);
+    }
+}
+//// FixedPathPackResources.java
+import java.io.InputStream;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.server.packs.resources.IoSupplier;
+import net.minecraft.server.packs.resources.ResourceMetadata;
+public class FixedPathPackResources implements PackResources {
+    private FixedPathPackResources(PackLocationInfo location, ResourceMetadata metadata, Set<String> namespaces, List<Path> rootPaths, Map<PackType, List<Path>> pathsForType);
+    public IoSupplier<InputStream> getRootResource(String... path);
+    public void listRawPaths(PackType type, Identifier resource, Consumer<Path> output);
+    public void listResources(PackType type, String namespace, String directory, PackResources.ResourceOutput output);
+    public IoSupplier<InputStream> getResource(PackType type, Identifier location);
+    public Set<String> getNamespaces(PackType type);
+    public <T> T getMetadataSection(MetadataSectionType<T> metadataSerializer);
+    public PackLocationInfo location();
+    public void close();
+    public static class Builder {
+        public Builder();
+        public void pushRootPath(Path path);
+        public void pushPathForType(PackType packType, Path path);
+        public void setMetadata(ResourceMetadata metadata);
+        public void exposeNamespace(Collection<String> namespaces);
+        public FixedPathPackResources build(PackLocationInfo location);
+    }
+}
+//// OverlayMetadataSection.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.server.packs.metadata.pack.PackFormat;
+import net.minecraft.util.InclusiveRange;
+public record OverlayMetadataSection(List<OverlayEntry> overlays) {
+    public static final MetadataSectionType<OverlayMetadataSection> CLIENT_TYPE;
+    public static final MetadataSectionType<OverlayMetadataSection> SERVER_TYPE;
+    public static Codec<OverlayMetadataSection> codecForPackType(PackType packType);
+    public static MetadataSectionType<OverlayMetadataSection> forPackType(PackType packType);
+    public List<String> overlaysForVersion(PackFormat version);
+    public static record OverlayEntry(InclusiveRange<PackFormat> format, String overlay) {
+        public boolean isApplicable(PackFormat formatToTest);
+        static record IntermediateEntry(PackFormat.IntermediaryFormat format, String overlay) implements PackFormat.IntermediaryFormatHolder {
+            public String toString();
+        }
+    }
+}
+//// OverlayedPackResources.java
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Set;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.server.packs.resources.IoSupplier;
+public class OverlayedPackResources implements PackResources {
+    public OverlayedPackResources(PackResources primaryPackResources, List<PackResources> overlayPackResources);
+    public IoSupplier<InputStream> getRootResource(String... path);
+    public IoSupplier<InputStream> getResource(PackType type, Identifier location);
+    public void listResources(PackType type, String namespace, String directory, PackResources.ResourceOutput output);
+    public Set<String> getNamespaces(PackType type);
+    public <T> T getMetadataSection(MetadataSectionType<T> metadataSerializer) throws IOException;
+    public PackLocationInfo location();
+    public void close();
+}
+//// PackLocationInfo.java
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.repository.KnownPack;
+import net.minecraft.server.packs.repository.PackSource;
+public record PackLocationInfo(String id, Component title, PackSource source, Optional<KnownPack> knownPackInfo) {
+    public Component createChatLink(boolean enabled, Component description);
+}
+//// PackMetadataResources.java
+import java.io.IOException;
+import java.io.InputStream;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.server.packs.resources.IoSupplier;
+public interface PackMetadataResources extends AutoCloseable {
+    PackLocationInfo location();
+    IoSupplier<InputStream> getRootResource(String... path);
+    <T> T getMetadataSection(MetadataSectionType<T> metadataSerializer) throws IOException;
+    void close();
+}
+//// PackResources.java
+import java.io.InputStream;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.repository.KnownPack;
+import net.minecraft.server.packs.resources.IoSupplier;
+public interface PackResources extends PackMetadataResources {
+    String METADATA_EXTENSION;
+    String PACK_META;
+    IoSupplier<InputStream> getResource(PackType type, Identifier location);
+    void listResources(PackType type, String namespace, String directory, ResourceOutput output);
+    Set<String> getNamespaces(PackType type);
+    default String packId();
+    default Optional<KnownPack> knownPackInfo();
+    public interface Filter {
+        boolean isFiltered(Identifier resourceId);
+    }
+    public interface ResourceOutput extends BiConsumer<Identifier, IoSupplier<InputStream>> {
+    }
+}
+//// PackSelectionConfig.java
+import net.minecraft.server.packs.repository.Pack;
+public record PackSelectionConfig(boolean required, Pack.Position defaultPosition, boolean fixedPosition) {
+}
+//// PackType.java
+public enum PackType {
+    CLIENT_RESOURCES, SERVER_DATA;
+    public String getDirectory();
+}
+//// PathPackResources.java
+import java.io.InputStream;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.resources.IoSupplier;
+public class PathPackResources extends AbstractPackMetadataResources implements PackResources {
+    public PathPackResources(PackLocationInfo location, Path root);
+    public IoSupplier<InputStream> getRootResource(String... path);
+    public static boolean validatePath(Path path);
+    public IoSupplier<InputStream> getResource(PackType type, Identifier location);
+    public static IoSupplier<InputStream> getResource(Path topDir, Identifier location);
+    public void listResources(PackType type, String namespace, String directory, PackResources.ResourceOutput output);
+    public static void listResources(Path topPath, String namespace, String directory, PackResources.ResourceOutput output);
+    public static void listPath(String namespace, Path topDir, List<String> decomposedPrefixPath, PackResources.ResourceOutput output);
+    public Set<String> getNamespaces(PackType type);
+    public static Set<String> getNamespaces(Path rootDir);
+    public void close();
+    public static class PathResourcesSupplier implements Pack.ResourcesSupplier {
+        public PathResourcesSupplier(Path content);
+        public PackMetadataResources openMetadata(PackLocationInfo location);
+        public Stream<PackResources> openResources(PackLocationInfo location, Pack.Metadata metadata);
+    }
+}
+//// VanillaPackResources.java
+import java.nio.file.Path;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.resources.ResourceManager;
+public class VanillaPackResources {
+    public VanillaPackResources(FixedPathPackResources fullResources, List<PackResources> resourceLayers);
+    public void listRawPaths(PackType type, Identifier resource, Consumer<Path> output);
+    public PackResources fullResources();
+    public Pack.ResourcesSupplier asResourcesSupplier();
+    public ResourceManager asResourceManager();
+}
+//// VanillaPackResourcesBuilder.java
+import java.nio.file.Path;
+import java.util.function.Consumer;
+import net.minecraft.server.packs.resources.ResourceMetadata;
+public class VanillaPackResourcesBuilder {
+    public static Consumer<VanillaPackResourcesBuilder> developmentConfig;
+    public VanillaPackResourcesBuilder();
+    public VanillaPackResourcesBuilder pushJarResources();
+    public VanillaPackResourcesBuilder pushClasspathResources(PackType packType, Class<?> source);
+    public VanillaPackResourcesBuilder applyDevelopmentConfig();
+    public VanillaPackResourcesBuilder pushUniversalPath(Path path);
+    public VanillaPackResourcesBuilder pushAssetPath(PackType packType, Path path);
+    public VanillaPackResourcesBuilder setMetadata(ResourceMetadata metadata);
+    public VanillaPackResourcesBuilder exposeNamespace(String... namespaces);
+    public VanillaPackResourcesBuilder pushLayer();
+    public VanillaPackResources build(PackLocationInfo location);
+}

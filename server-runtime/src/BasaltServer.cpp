@@ -684,6 +684,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                            std::int32_t value) {
         return raids_ != nullptr && raids_->controlBar(world, id, action, text, value);
     };
+    model.raidControl = [this](world::LoadedWorld& world, std::int32_t id, std::string_view action,
+                               const std::array<std::int32_t, 4>& arguments, std::int32_t value) {
+        return raids_ != nullptr ? raids_->controlRaid(world, id, action, arguments, value) : -1;
+    };
     model.npcs = &npcs_;
     model.lootTables = &vanillaData_.lootTables;
     model.blockTags = &vanillaData_.blockTags;
@@ -761,10 +765,14 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         plugins::ServerAdvancements::Hooks{.advancements = [this] { return &vanillaData_.advancements; },
                                            .progress = [this] { return playerProgress_.get(); },
                                            .triggers = [this] { return advancementTriggers_.get(); },
-                                           .sessions = sessions});
+                                           .sessions = sessions,
+                                           .worldFor = model.worldFor,
+                                           .lootTables = &vanillaData_.lootTables});
     miscServices_.datapacks = std::make_unique<plugins::ServerDatapacks>(
         [this] { return options_.datapacks; },
-        [this](const std::vector<std::string>& selected) { return reloadData(selected); });
+        [this](const std::vector<std::string>& selected) { return reloadData(selected); },
+        [this] { return &functions_; }, &functionSchedule_,
+        [this] { return worldRegistry_->defaultWorld().gameTime(); });
     miscServices_.maps = std::make_unique<plugins::ServerMaps>(
         plugins::ServerMaps::Hooks{.storage = &mapStorage_,
                                    .sessions = sessions,
@@ -814,7 +822,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         },
         .serverIcon = [this] { return serverList_->iconFor(live_->current()->serverList.defaultProfile()); },
         .reloadCommands = [this] { return reloadCommandConfig(); },
-        .settings = &settings_});
+        .settings = &settings_,
+        .stopwatches = [this] { return stopwatches_.get(); }});
 
     plugins::ServerPluginServices::Parts parts;
     parts.players = pluginPlayers_.get();

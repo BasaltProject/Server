@@ -1,0 +1,211 @@
+//// BlockPositionSource.java
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+public record BlockPositionSource(BlockPos pos) implements PositionSource {
+    public static final MapCodec<BlockPositionSource> CODEC;
+    public static final StreamCodec<ByteBuf, BlockPositionSource> STREAM_CODEC;
+    public Optional<Vec3> getPosition(Level level);
+    public PositionSourceType<BlockPositionSource> getType();
+    public static class Type implements PositionSourceType<BlockPositionSource> {
+        public MapCodec<BlockPositionSource> codec();
+        public StreamCodec<ByteBuf, BlockPositionSource> streamCodec();
+    }
+}
+//// DynamicGameEventListener.java
+import net.minecraft.server.level.ServerLevel;
+public class DynamicGameEventListener<T extends GameEventListener> {
+    public DynamicGameEventListener(T listener);
+    public void add(ServerLevel level);
+    public T getListener();
+    public void remove(ServerLevel level);
+    public void move(ServerLevel level);
+}
+//// EntityPositionSource.java
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+public class EntityPositionSource implements PositionSource {
+    public static final MapCodec<EntityPositionSource> CODEC;
+    public static final StreamCodec<ByteBuf, EntityPositionSource> STREAM_CODEC;
+    public EntityPositionSource(Entity entity, float yOffset);
+    private EntityPositionSource(Either<Entity, Either<UUID, Integer>> entityOrUuidOrId, float yOffset);
+    public Optional<Vec3> getPosition(Level level);
+    public UUID getUuid();
+    public PositionSourceType<EntityPositionSource> getType();
+    public static class Type implements PositionSourceType<EntityPositionSource> {
+        public MapCodec<EntityPositionSource> codec();
+        public StreamCodec<ByteBuf, EntityPositionSource> streamCodec();
+    }
+}
+//// EuclideanGameEventListenerRegistry.java
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.Vec3;
+public class EuclideanGameEventListenerRegistry implements GameEventListenerRegistry {
+    public EuclideanGameEventListenerRegistry(ServerLevel level, int sectionY, OnEmptyAction onEmptyAction);
+    public boolean isEmpty();
+    public void register(GameEventListener listener);
+    public void unregister(GameEventListener listener);
+    public boolean visitInRangeListeners(Holder<GameEvent> event, Vec3 sourcePosition, GameEvent.Context context, GameEventListenerRegistry.ListenerVisitor action);
+    public interface OnEmptyAction {
+        void apply(int sectionY);
+    }
+}
+//// GameEvent.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+public record GameEvent(int notificationRadius) {
+    public static final Holder.Reference<GameEvent> BLOCK_ACTIVATE;
+    public static final Holder.Reference<GameEvent> BLOCK_ATTACH;
+    public static final Holder.Reference<GameEvent> BLOCK_CHANGE;
+    public static final Holder.Reference<GameEvent> BLOCK_CLOSE;
+    public static final Holder.Reference<GameEvent> BLOCK_DEACTIVATE;
+    public static final Holder.Reference<GameEvent> BLOCK_DESTROY;
+    public static final Holder.Reference<GameEvent> BLOCK_DETACH;
+    public static final Holder.Reference<GameEvent> BLOCK_OPEN;
+    public static final Holder.Reference<GameEvent> BLOCK_PLACE;
+    public static final Holder.Reference<GameEvent> BOUNCE;
+    public static final Holder.Reference<GameEvent> CONTAINER_CLOSE;
+    public static final Holder.Reference<GameEvent> CONTAINER_OPEN;
+    public static final Holder.Reference<GameEvent> DRINK;
+    public static final Holder.Reference<GameEvent> EAT;
+    public static final Holder.Reference<GameEvent> ELYTRA_GLIDE;
+    public static final Holder.Reference<GameEvent> ENTITY_DAMAGE;
+    public static final Holder.Reference<GameEvent> ENTITY_DIE;
+    public static final Holder.Reference<GameEvent> ENTITY_DISMOUNT;
+    public static final Holder.Reference<GameEvent> ENTITY_INTERACT;
+    public static final Holder.Reference<GameEvent> ENTITY_MOUNT;
+    public static final Holder.Reference<GameEvent> ENTITY_PLACE;
+    public static final Holder.Reference<GameEvent> ENTITY_ACTION;
+    public static final Holder.Reference<GameEvent> EQUIP;
+    public static final Holder.Reference<GameEvent> EXPLODE;
+    public static final Holder.Reference<GameEvent> FLAP;
+    public static final Holder.Reference<GameEvent> FLUID_PICKUP;
+    public static final Holder.Reference<GameEvent> FLUID_PLACE;
+    public static final Holder.Reference<GameEvent> HIT_GROUND;
+    public static final Holder.Reference<GameEvent> INSTRUMENT_PLAY;
+    public static final Holder.Reference<GameEvent> ITEM_INTERACT_FINISH;
+    public static final Holder.Reference<GameEvent> ITEM_INTERACT_START;
+    public static final Holder.Reference<GameEvent> JUKEBOX_PLAY;
+    public static final Holder.Reference<GameEvent> JUKEBOX_STOP_PLAY;
+    public static final Holder.Reference<GameEvent> LIGHTNING_STRIKE;
+    public static final Holder.Reference<GameEvent> NOTE_BLOCK_PLAY;
+    public static final Holder.Reference<GameEvent> PRIME_FUSE;
+    public static final Holder.Reference<GameEvent> PROJECTILE_LAND;
+    public static final Holder.Reference<GameEvent> PROJECTILE_SHOOT;
+    public static final Holder.Reference<GameEvent> SCULK_SENSOR_TENDRILS_CLICKING;
+    public static final Holder.Reference<GameEvent> SHEAR;
+    public static final Holder.Reference<GameEvent> SHRIEK;
+    public static final Holder.Reference<GameEvent> SPLASH;
+    public static final Holder.Reference<GameEvent> STEP;
+    public static final Holder.Reference<GameEvent> SWIM;
+    public static final Holder.Reference<GameEvent> TELEPORT;
+    public static final Holder.Reference<GameEvent> UNEQUIP;
+    public static final Holder.Reference<GameEvent> RESONATE_1;
+    public static final Holder.Reference<GameEvent> RESONATE_2;
+    public static final Holder.Reference<GameEvent> RESONATE_3;
+    public static final Holder.Reference<GameEvent> RESONATE_4;
+    public static final Holder.Reference<GameEvent> RESONATE_5;
+    public static final Holder.Reference<GameEvent> RESONATE_6;
+    public static final Holder.Reference<GameEvent> RESONATE_7;
+    public static final Holder.Reference<GameEvent> RESONATE_8;
+    public static final Holder.Reference<GameEvent> RESONATE_9;
+    public static final Holder.Reference<GameEvent> RESONATE_10;
+    public static final Holder.Reference<GameEvent> RESONATE_11;
+    public static final Holder.Reference<GameEvent> RESONATE_12;
+    public static final Holder.Reference<GameEvent> RESONATE_13;
+    public static final Holder.Reference<GameEvent> RESONATE_14;
+    public static final Holder.Reference<GameEvent> RESONATE_15;
+    public static final int DEFAULT_NOTIFICATION_RADIUS = 16;
+    public static final Codec<Holder<GameEvent>> CODEC;
+    public static Holder<GameEvent> bootstrap(Registry<GameEvent> registry);
+    public static record Context(Entity sourceEntity, BlockState affectedState) {
+        public static Context of(Entity sourceEntity);
+        public static Context of(BlockState state);
+        public static Context of(Entity sourceEntity, BlockState state);
+    }
+    public static final class ListenerInfo implements Comparable<ListenerInfo> {
+        public ListenerInfo(Holder<GameEvent> gameEvent, Vec3 source, Context context, GameEventListener recipient, Vec3 recipientPos);
+        public int compareTo(ListenerInfo other);
+        public Holder<GameEvent> gameEvent();
+        public Vec3 source();
+        public Context context();
+        public GameEventListener recipient();
+    }
+}
+//// GameEventDispatcher.java
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.Vec3;
+public class GameEventDispatcher {
+    public GameEventDispatcher(ServerLevel level);
+    public void post(Holder<GameEvent> gameEvent, Vec3 position, GameEvent.Context context);
+}
+//// GameEventListener.java
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.Vec3;
+public interface GameEventListener {
+    PositionSource getListenerSource();
+    int getListenerRadius();
+    boolean handleGameEvent(ServerLevel level, Holder<GameEvent> event, GameEvent.Context context, Vec3 sourcePosition);
+    default DeliveryMode getDeliveryMode();
+    public static enum DeliveryMode {
+        UNSPECIFIED, BY_DISTANCE;
+    }
+    public interface Provider<T extends GameEventListener> {
+        T getListener();
+    }
+}
+//// GameEventListenerRegistry.java
+import net.minecraft.core.Holder;
+import net.minecraft.world.phys.Vec3;
+public interface GameEventListenerRegistry {
+    GameEventListenerRegistry NOOP;
+    boolean isEmpty();
+    void register(GameEventListener listener);
+    void unregister(GameEventListener listener);
+    boolean visitInRangeListeners(Holder<GameEvent> event, Vec3 sourcePosition, GameEvent.Context context, ListenerVisitor action);
+    public interface ListenerVisitor {
+        void visit(GameEventListener listener, Vec3 position);
+    }
+}
+//// PositionSource.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+public interface PositionSource {
+    Codec<PositionSource> CODEC;
+    StreamCodec<RegistryFriendlyByteBuf, PositionSource> STREAM_CODEC;
+    Optional<Vec3> getPosition(Level level);
+    PositionSourceType<? extends PositionSource> getType();
+}
+//// PositionSourceType.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public interface PositionSourceType<T extends PositionSource> {
+    PositionSourceType<BlockPositionSource> BLOCK;
+    PositionSourceType<EntityPositionSource> ENTITY;
+    MapCodec<T> codec();
+    StreamCodec<? super RegistryFriendlyByteBuf, T> streamCodec();
+    static <S extends PositionSourceType<T>, T extends PositionSource> S register(String name, S serializer);
+}

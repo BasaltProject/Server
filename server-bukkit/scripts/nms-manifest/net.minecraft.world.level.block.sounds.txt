@@ -1,0 +1,26 @@
+//// AmbientDesertBlockSoundsPlayer.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
+public class AmbientDesertBlockSoundsPlayer {
+    public static void playAmbientSandSounds(Level level, BlockPos pos, RandomSource random);
+    public static void playAmbientDryGrassSounds(Level level, BlockPos pos, RandomSource random);
+    public static void playAmbientDeadBushSounds(Level level, BlockPos pos, RandomSource random);
+    public static boolean shouldPlayDesertDryVegetationBlockSounds(Level level, BlockPos belowPos);
+}
+//// AmbientLeavesBlockSoundPlayer.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+public record AmbientLeavesBlockSoundPlayer(Optional<Holder<SoundEvent>> ambientSound, int chance, Optional<TagKey<Block>> satisfyingBlocks, int nearbySatisfyingBlocksRequired, int nearbySameLeavesRequired) {
+    public static final Codec<AmbientLeavesBlockSoundPlayer> CODEC;
+    public static AmbientLeavesBlockSoundPlayer of(Holder<SoundEvent> ambientSound, TagKey<Block> satisfyingBlocks);
+    public static AmbientLeavesBlockSoundPlayer noAmbientSound();
+    public void playAmbientLeavesSounds(Level level, BlockPos pos, Block block, RandomSource random);
+}

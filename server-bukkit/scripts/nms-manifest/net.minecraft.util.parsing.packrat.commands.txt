@@ -1,0 +1,164 @@
+//// CommandArgumentParser.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+public interface CommandArgumentParser<T> {
+    T parseForCommands(StringReader reader) throws CommandSyntaxException;
+    CompletableFuture<Suggestions> parseForSuggestions(SuggestionsBuilder suggestionsBuilder);
+    default <S> CommandArgumentParser<S> mapResult(Function<T, S> mapper);
+    default <T, O> CommandArgumentParser<T> withCodec(DynamicOps<O> ops, CommandArgumentParser<O> valueParser, Codec<T> codec, DynamicCommandExceptionType exceptionType);
+}
+//// Grammar.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.util.parsing.packrat.Dictionary;
+import net.minecraft.util.parsing.packrat.NamedRule;
+import net.minecraft.util.parsing.packrat.ParseState;
+public record Grammar<T>(Dictionary<StringReader> rules, NamedRule<StringReader, T> top) implements CommandArgumentParser<T> {
+    public Optional<T> parse(ParseState<StringReader> state);
+    public T parseForCommands(StringReader reader) throws CommandSyntaxException;
+    public CompletableFuture<Suggestions> parseForSuggestions(SuggestionsBuilder suggestionsBuilder);
+}
+//// GreedyPatternParseRule.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.regex.Pattern;
+import net.minecraft.util.parsing.packrat.DelayedException;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.Rule;
+public final class GreedyPatternParseRule implements Rule<StringReader, String> {
+    public GreedyPatternParseRule(Pattern pattern, DelayedException<CommandSyntaxException> error);
+    public String parse(ParseState<StringReader> state);
+}
+//// GreedyPredicateParseRule.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.util.parsing.packrat.DelayedException;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.Rule;
+public abstract class GreedyPredicateParseRule implements Rule<StringReader, String> {
+    public GreedyPredicateParseRule(int minSize, DelayedException<CommandSyntaxException> error);
+    public GreedyPredicateParseRule(int minSize, int maxSize, DelayedException<CommandSyntaxException> error);
+    public String parse(ParseState<StringReader> state);
+    protected abstract boolean isAccepted(char c);
+}
+//// IdentifierParseRule.java
+import com.mojang.brigadier.StringReader;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.Rule;
+public class IdentifierParseRule implements Rule<StringReader, Identifier> {
+    public static final Rule<StringReader, Identifier> INSTANCE;
+    private IdentifierParseRule();
+    public Identifier parse(ParseState<StringReader> state);
+}
+//// NumberRunParseRule.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.util.parsing.packrat.DelayedException;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.Rule;
+public abstract class NumberRunParseRule implements Rule<StringReader, String> {
+    public NumberRunParseRule(DelayedException<CommandSyntaxException> noValueError, DelayedException<CommandSyntaxException> underscoreNotAllowedError);
+    public String parse(ParseState<StringReader> state);
+    protected abstract boolean isAccepted(char c);
+}
+//// ParserBasedArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.concurrent.CompletableFuture;
+public abstract class ParserBasedArgument<T> implements ArgumentType<T> {
+    public ParserBasedArgument(CommandArgumentParser<T> parser);
+    public T parse(StringReader reader) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+}
+//// ResourceLookupRule.java
+import com.mojang.brigadier.ImmutableStringReader;
+import com.mojang.brigadier.StringReader;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.parsing.packrat.NamedRule;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.Rule;
+public abstract class ResourceLookupRule<C, V> implements Rule<StringReader, V>, ResourceSuggestion {
+    protected final C context;
+    protected ResourceLookupRule(NamedRule<StringReader, Identifier> idParser, C context);
+    public V parse(ParseState<StringReader> state);
+    protected abstract V validateElement(ImmutableStringReader reader, Identifier id) throws Exception;
+}
+//// ResourceSuggestion.java
+import com.mojang.brigadier.StringReader;
+import java.util.stream.Stream;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.SuggestionSupplier;
+public interface ResourceSuggestion extends SuggestionSupplier<StringReader> {
+    Stream<Identifier> possibleResources();
+    default Stream<String> possibleValues(ParseState<StringReader> state);
+}
+//// StringReaderParserState.java
+import com.mojang.brigadier.StringReader;
+import net.minecraft.util.parsing.packrat.CachedParseState;
+import net.minecraft.util.parsing.packrat.ErrorCollector;
+public class StringReaderParserState extends CachedParseState<StringReader> {
+    public StringReaderParserState(ErrorCollector<StringReader> errorCollector, StringReader input);
+    public StringReader input();
+    public int mark();
+    public void restore(int mark);
+}
+//// StringReaderTerms.java
+import com.mojang.brigadier.StringReader;
+import it.unimi.dsi.fastutil.chars.CharList;
+import net.minecraft.util.parsing.packrat.Control;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.Scope;
+import net.minecraft.util.parsing.packrat.Term;
+public interface StringReaderTerms {
+    static Term<StringReader> word(String value);
+    static Term<StringReader> character(char value);
+    static Term<StringReader> characters(char v1, char v2);
+    static StringReader createReader(String contents, int cursor);
+    public static final class TerminalWord implements Term<StringReader> {
+        public TerminalWord(String value);
+        public boolean parse(ParseState<StringReader> state, Scope scope, Control control);
+        public String toString();
+    }
+    public static abstract class TerminalCharacters implements Term<StringReader> {
+        public TerminalCharacters(CharList values);
+        public boolean parse(ParseState<StringReader> state, Scope scope, Control control);
+        protected abstract boolean isAccepted(char value);
+    }
+}
+//// TagParseRule.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.DynamicOps;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.Rule;
+public class TagParseRule<T> implements Rule<StringReader, Dynamic<?>> {
+    public TagParseRule(DynamicOps<T> ops);
+    public Dynamic<T> parse(ParseState<StringReader> state);
+}
+//// UnquotedStringParseRule.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.util.parsing.packrat.DelayedException;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.Rule;
+public class UnquotedStringParseRule implements Rule<StringReader, String> {
+    public UnquotedStringParseRule(int minSize, DelayedException<CommandSyntaxException> error);
+    public String parse(ParseState<StringReader> state);
+}

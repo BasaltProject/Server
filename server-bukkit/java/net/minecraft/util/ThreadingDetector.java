@@ -1,6 +1,8 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.util;
 
 import java.util.concurrent.locks.ReentrantLock;
+import net.minecraft.ReportedException;
 
 public class ThreadingDetector {
     private final String name;
@@ -23,5 +25,8 @@ public class ThreadingDetector {
     @Override
     public String toString() {
         return name;
+    }
+    public static ReportedException makeThreadingException(String name, Thread threadThatFailedToAcquire) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.ThreadingDetector#makeThreadingException");
     }
 }

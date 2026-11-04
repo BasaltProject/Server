@@ -1,0 +1,947 @@
+//// AbstractCookingRecipe.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+public abstract class AbstractCookingRecipe extends SingleItemRecipe {
+    protected final CookingBookInfo bookInfo;
+    public AbstractCookingRecipe(Recipe.CommonInfo commonInfo, CookingBookInfo bookInfo, Ingredient ingredient, ItemStackTemplate result, float experience, int cookingTime);
+    public abstract RecipeSerializer<? extends AbstractCookingRecipe> getSerializer();
+    public abstract RecipeType<? extends AbstractCookingRecipe> getType();
+    public float experience();
+    public int cookingTime();
+    public CookingBookCategory category();
+    public String group();
+    protected abstract Item furnaceIcon();
+    public List<RecipeDisplay> display();
+    public static <T extends AbstractCookingRecipe> MapCodec<T> cookingMapCodec(Factory<T> factory);
+    public static <T extends AbstractCookingRecipe> StreamCodec<RegistryFriendlyByteBuf, T> cookingStreamCodec(Factory<T> factory);
+    public static record CookingBookInfo(CookingBookCategory category, String group) implements Recipe.BookInfo<CookingBookCategory> {
+        public static final MapCodec<CookingBookInfo> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, CookingBookInfo> STREAM_CODEC;
+    }
+    public interface Factory<T extends AbstractCookingRecipe> {
+        T create(Recipe.CommonInfo commonInfo, CookingBookInfo cbookInfotegory, Ingredient ingredient, ItemStackTemplate result, float experience, int cookingTime);
+    }
+}
+//// BannerDuplicateRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.NonNullList;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.level.Level;
+public class BannerDuplicateRecipe extends CustomRecipe {
+    public static final MapCodec<BannerDuplicateRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, BannerDuplicateRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<BannerDuplicateRecipe> SERIALIZER;
+    public BannerDuplicateRecipe(Ingredient banner, ItemStackTemplate result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public NonNullList<ItemStack> getRemainingItems(CraftingInput input);
+    public RecipeSerializer<BannerDuplicateRecipe> getSerializer();
+}
+//// BlastingRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+public class BlastingRecipe extends AbstractCookingRecipe {
+    public static final MapCodec<BlastingRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, BlastingRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<BlastingRecipe> SERIALIZER;
+    public BlastingRecipe(Recipe.CommonInfo commonInfo, AbstractCookingRecipe.CookingBookInfo bookInfo, Ingredient ingredient, ItemStackTemplate result, float experience, int cookingTime);
+    protected Item furnaceIcon();
+    public RecipeSerializer<BlastingRecipe> getSerializer();
+    public RecipeType<BlastingRecipe> getType();
+    public RecipeBookCategory recipeBookCategory();
+}
+//// BookCloningRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.core.NonNullList;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.level.Level;
+public class BookCloningRecipe extends CustomRecipe {
+    public static final MinMaxBounds.Ints ALLOWED_BOOK_GENERATION_RANGES;
+    public static final MinMaxBounds.Ints DEFAULT_BOOK_GENERATION_RANGES;
+    public static final MapCodec<BookCloningRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, BookCloningRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<BookCloningRecipe> SERIALIZER;
+    public BookCloningRecipe(Ingredient source, Ingredient material, MinMaxBounds.Ints allowedGenerations, ItemStackTemplate result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public NonNullList<ItemStack> getRemainingItems(CraftingInput input);
+    public RecipeSerializer<BookCloningRecipe> getSerializer();
+}
+//// BrewingInput.java
+import net.minecraft.world.item.ItemStack;
+public record BrewingInput(ItemStack input, ItemStack reagent) implements RecipeInput {
+    public ItemStack getItem(int index);
+    public int size();
+}
+//// BrewingRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.level.Level;
+public class BrewingRecipe implements Recipe<BrewingInput> {
+    public static final MapCodec<BrewingRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, BrewingRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<BrewingRecipe> SERIALIZER;
+    public BrewingRecipe(PotionIngredient input, PotionIngredient reagent, ItemStackTemplate output);
+    public PotionIngredient getInput();
+    public PotionIngredient getReagent();
+    public ItemStackTemplate getOutput();
+    public boolean matches(BrewingInput brewingInput, Level level);
+    public boolean matches(BrewingInput brewingInput);
+    public ItemStack assemble(BrewingInput input);
+    public RecipeType<BrewingRecipe> getType();
+    public PlacementInfo placementInfo();
+    public boolean isSpecial();
+    public boolean showNotification();
+    public String group();
+    public RecipeBookCategory recipeBookCategory();
+    public RecipeSerializer<BrewingRecipe> getSerializer();
+    public interface Factory<T extends BrewingRecipe> {
+        T create(Recipe.CommonInfo commonInfo, PotionIngredient input, PotionIngredient reagent, ItemStackTemplate output);
+    }
+}
+//// CampfireCookingRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+public class CampfireCookingRecipe extends AbstractCookingRecipe {
+    public static final MapCodec<CampfireCookingRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, CampfireCookingRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<CampfireCookingRecipe> SERIALIZER;
+    public CampfireCookingRecipe(Recipe.CommonInfo commonInfo, AbstractCookingRecipe.CookingBookInfo bookInfo, Ingredient ingredient, ItemStackTemplate result, float experience, int cookingTime);
+    protected Item furnaceIcon();
+    public RecipeSerializer<CampfireCookingRecipe> getSerializer();
+    public RecipeType<CampfireCookingRecipe> getType();
+    public RecipeBookCategory recipeBookCategory();
+}
+//// CookingBookCategory.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum CookingBookCategory implements StringRepresentable {
+    FOOD, BLOCKS, MISC;
+    public static final Codec<CookingBookCategory> CODEC;
+    public static final StreamCodec<ByteBuf, CookingBookCategory> STREAM_CODEC;
+    public String getSerializedName();
+}
+//// CraftingBookCategory.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.IntFunction;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum CraftingBookCategory implements StringRepresentable {
+    BUILDING, REDSTONE, EQUIPMENT, MISC;
+    public static final Codec<CraftingBookCategory> CODEC;
+    public static final IntFunction<CraftingBookCategory> BY_ID;
+    public static final StreamCodec<ByteBuf, CraftingBookCategory> STREAM_CODEC;
+    public String getSerializedName();
+}
+//// CraftingInput.java
+import java.util.List;
+import net.minecraft.world.entity.player.StackedItemContents;
+import net.minecraft.world.item.ItemStack;
+public class CraftingInput implements RecipeInput {
+    public static final CraftingInput EMPTY;
+    private CraftingInput(int width, int height, List<ItemStack> items);
+    public static CraftingInput of(int width, int height, List<ItemStack> items);
+    public static Positioned ofPositioned(int width, int height, List<ItemStack> items);
+    public ItemStack getItem(int index);
+    public ItemStack getItem(int x, int y);
+    public int size();
+    public boolean isEmpty();
+    public StackedItemContents stackedContents();
+    public List<ItemStack> items();
+    public int ingredientCount();
+    public int width();
+    public int height();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public static record Positioned(CraftingInput input, int left, int top) {
+        public static final Positioned EMPTY;
+    }
+}
+//// CraftingRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.NonNullList;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+public interface CraftingRecipe extends Recipe<CraftingInput> {
+    default RecipeType<CraftingRecipe> getType();
+    RecipeSerializer<? extends CraftingRecipe> getSerializer();
+    CraftingBookCategory category();
+    default NonNullList<ItemStack> getRemainingItems(CraftingInput input);
+    static NonNullList<ItemStack> defaultCraftingReminder(CraftingInput input);
+    default RecipeBookCategory recipeBookCategory();
+    public static record CraftingBookInfo(CraftingBookCategory category, String group) implements Recipe.BookInfo<CraftingBookCategory> {
+        public static final MapCodec<CraftingBookInfo> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, CraftingBookInfo> STREAM_CODEC;
+    }
+}
+//// CustomRecipe.java
+public abstract class CustomRecipe implements CraftingRecipe {
+    public boolean isSpecial();
+    public boolean showNotification();
+    public String group();
+    public CraftingBookCategory category();
+    public PlacementInfo placementInfo();
+    public abstract RecipeSerializer<? extends CustomRecipe> getSerializer();
+}
+//// DecoratedPotRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.level.Level;
+public class DecoratedPotRecipe extends CustomRecipe {
+    public static final MapCodec<DecoratedPotRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DecoratedPotRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<DecoratedPotRecipe> SERIALIZER;
+    public DecoratedPotRecipe(Ingredient wallPattern, ItemStackTemplate result);
+    public DecoratedPotRecipe(Ingredient backPattern, Ingredient leftPattern, Ingredient rightPattern, Ingredient frontPattern, ItemStackTemplate result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public RecipeSerializer<DecoratedPotRecipe> getSerializer();
+}
+//// DyeRecipe.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.level.Level;
+public class DyeRecipe extends NormalCraftingRecipe {
+    public static final MapCodec<DyeRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, DyeRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<DyeRecipe> SERIALIZER;
+    public DyeRecipe(Recipe.CommonInfo commonInfo, CraftingRecipe.CraftingBookInfo bookInfo, Ingredient target, Ingredient dye, ItemStackTemplate result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public RecipeSerializer<DyeRecipe> getSerializer();
+    protected PlacementInfo createPlacementInfo();
+    public List<RecipeDisplay> display();
+}
+//// ExtendedRecipeBookCategory.java
+public interface ExtendedRecipeBookCategory {
+}
+//// FireworkRocketRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.level.Level;
+public class FireworkRocketRecipe extends CustomRecipe {
+    public static final MapCodec<FireworkRocketRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, FireworkRocketRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<FireworkRocketRecipe> SERIALIZER;
+    public FireworkRocketRecipe(Ingredient shell, Ingredient fuel, Ingredient star, ItemStackTemplate result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public RecipeSerializer<FireworkRocketRecipe> getSerializer();
+}
+//// FireworkStarFadeRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.level.Level;
+public class FireworkStarFadeRecipe extends CustomRecipe {
+    public static final MapCodec<FireworkStarFadeRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, FireworkStarFadeRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<FireworkStarFadeRecipe> SERIALIZER;
+    public FireworkStarFadeRecipe(Ingredient target, Ingredient dye, ItemStackTemplate result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public RecipeSerializer<FireworkStarFadeRecipe> getSerializer();
+}
+//// FireworkStarRecipe.java
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.component.FireworkExplosion;
+import net.minecraft.world.level.Level;
+public class FireworkStarRecipe extends CustomRecipe {
+    public static final MapCodec<FireworkStarRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, FireworkStarRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<FireworkStarRecipe> SERIALIZER;
+    public FireworkStarRecipe(Map<FireworkExplosion.Shape, Ingredient> shapes, Ingredient trail, Ingredient twinkle, Ingredient fuel, Ingredient dye, ItemStackTemplate result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public RecipeSerializer<FireworkStarRecipe> getSerializer();
+}
+//// ImbueRecipe.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.level.Level;
+public class ImbueRecipe extends NormalCraftingRecipe {
+    public static final MapCodec<ImbueRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ImbueRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<ImbueRecipe> SERIALIZER;
+    public ImbueRecipe(Recipe.CommonInfo commonInfo, CraftingRecipe.CraftingBookInfo bookInfo, Ingredient source, Ingredient material, ItemStackTemplate result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public RecipeSerializer<ImbueRecipe> getSerializer();
+    protected PlacementInfo createPlacementInfo();
+    public List<RecipeDisplay> display();
+}
+//// Ingredient.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.player.StackedContents;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
+import net.minecraft.world.level.ItemLike;
+public final class Ingredient implements Predicate<ItemStack>, StackedContents.IngredientInfo<Holder<Item>> {
+    public static final StreamCodec<RegistryFriendlyByteBuf, Ingredient> CONTENTS_STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Optional<Ingredient>> OPTIONAL_CONTENTS_STREAM_CODEC;
+    public static final Codec<HolderSet<Item>> NON_AIR_HOLDER_SET_CODEC;
+    public static final Codec<Ingredient> CODEC;
+    private Ingredient(HolderSet<Item> values);
+    public static boolean testOptionalIngredient(Optional<Ingredient> ingredient, ItemStack stack);
+    public Stream<Holder<Item>> items();
+    public boolean isEmpty();
+    public boolean test(ItemStack input);
+    public boolean acceptsItem(Holder<Item> item);
+    public boolean equals(Object o);
+    public int hashCode();
+    public static Ingredient of(ItemLike itemLike);
+    public static Ingredient of(ItemLike... items);
+    public static Ingredient of(Stream<? extends ItemLike> stream);
+    public static Ingredient of(HolderSet<Item> tag);
+    public SlotDisplay display();
+    public static SlotDisplay optionalIngredientToDisplay(Optional<Ingredient> ingredient);
+    public Optional<Holder<Item>> getSingleItem();
+}
+//// MapExtendingRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public class MapExtendingRecipe extends CustomRecipe {
+    public static final MapCodec<MapExtendingRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, MapExtendingRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<MapExtendingRecipe> SERIALIZER;
+    public MapExtendingRecipe(Ingredient map, Ingredient material, TransmuteResult result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public RecipeSerializer<MapExtendingRecipe> getSerializer();
+}
+//// NormalCraftingRecipe.java
+public abstract class NormalCraftingRecipe implements CraftingRecipe {
+    protected final Recipe.CommonInfo commonInfo;
+    protected final CraftingRecipe.CraftingBookInfo bookInfo;
+    protected NormalCraftingRecipe(Recipe.CommonInfo commonInfo, CraftingRecipe.CraftingBookInfo bookInfo);
+    public abstract RecipeSerializer<? extends NormalCraftingRecipe> getSerializer();
+    public final String group();
+    public final CraftingBookCategory category();
+    public final boolean showNotification();
+    protected abstract PlacementInfo createPlacementInfo();
+    public final PlacementInfo placementInfo();
+}
+//// PlacementInfo.java
+import it.unimi.dsi.fastutil.ints.IntList;
+import java.util.List;
+import java.util.Optional;
+public class PlacementInfo {
+    public static final int EMPTY_SLOT = -1;
+    public static final PlacementInfo NOT_PLACEABLE;
+    private PlacementInfo(List<Ingredient> ingredients, IntList slotsToIngredientIndex);
+    public static PlacementInfo create(Ingredient ingredient);
+    public static PlacementInfo createFromOptionals(List<Optional<Ingredient>> ingredients);
+    public static PlacementInfo create(List<Ingredient> ingredients);
+    public IntList slotsToIngredientIndex();
+    public List<Ingredient> ingredients();
+    public boolean isImpossibleToPlace();
+}
+//// PotionIngredient.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.core.component.predicates.PotionsPredicate;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+public record PotionIngredient(Ingredient ingredient, Optional<PotionsPredicate> potions) implements Predicate<ItemStack> {
+    public static final MapCodec<PotionIngredient> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, PotionIngredient> STREAM_CODEC;
+    public boolean test(ItemStack input);
+    public static PotionIngredient of(Item item, PotionsPredicate potions);
+    public static PotionIngredient of(Item item);
+    public static boolean isPotionInput(ItemStack itemStack, RecipeAccess recipeAccess);
+}
+//// Recipe.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiFunction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.level.Level;
+public interface Recipe<T extends RecipeInput> {
+    Codec<Recipe<?>> DIRECT_CODEC;
+    Codec<ResourceKey<Recipe<?>>> KEY_CODEC;
+    StreamCodec<RegistryFriendlyByteBuf, Recipe<?>> STREAM_CODEC;
+    Codec<Holder<Recipe<?>>> CODEC;
+    Codec<HolderSet<Recipe<?>>> LIST_CODEC;
+    boolean matches(T input, Level level);
+    ItemStack assemble(T input);
+    default boolean isSpecial();
+    boolean showNotification();
+    String group();
+    RecipeSerializer<? extends Recipe<T>> getSerializer();
+    RecipeType<? extends Recipe<T>> getType();
+    PlacementInfo placementInfo();
+    default List<RecipeDisplay> display();
+    RecipeBookCategory recipeBookCategory();
+    public static record CommonInfo(boolean showNotification) {
+        public static final MapCodec<CommonInfo> MAP_CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, CommonInfo> STREAM_CODEC;
+    }
+    public interface BookInfo<CategoryType> {
+        CategoryType category();
+        String group();
+        static <CategoryType, SelfType extends BookInfo<CategoryType>> MapCodec<SelfType> mapCodec(Codec<CategoryType> categoryCodec, CategoryType defaultCategory, Constructor<CategoryType, SelfType> constructor);
+        static <CategoryType, SelfType extends BookInfo<CategoryType>> StreamCodec<RegistryFriendlyByteBuf, SelfType> streamCodec(StreamCodec<? super RegistryFriendlyByteBuf, CategoryType> categoryCodec, Constructor<CategoryType, SelfType> constructor);
+        public interface Constructor<CategoryType, SelfType extends BookInfo<CategoryType>> extends BiFunction<CategoryType, String, SelfType> {
+        }
+    }
+}
+//// RecipeAccess.java
+import net.minecraft.resources.ResourceKey;
+public interface RecipeAccess {
+    RecipePropertySet propertySet(ResourceKey<RecipePropertySet> id);
+    SelectableRecipe.SingleInputSet<StonecutterRecipe> stonecutterRecipes();
+}
+//// RecipeBookCategories.java
+import net.minecraft.core.Registry;
+public class RecipeBookCategories {
+    public static final RecipeBookCategory CRAFTING_BUILDING_BLOCKS;
+    public static final RecipeBookCategory CRAFTING_REDSTONE;
+    public static final RecipeBookCategory CRAFTING_EQUIPMENT;
+    public static final RecipeBookCategory CRAFTING_MISC;
+    public static final RecipeBookCategory FURNACE_FOOD;
+    public static final RecipeBookCategory FURNACE_BLOCKS;
+    public static final RecipeBookCategory FURNACE_MISC;
+    public static final RecipeBookCategory BLAST_FURNACE_BLOCKS;
+    public static final RecipeBookCategory BLAST_FURNACE_MISC;
+    public static final RecipeBookCategory SMOKER_FOOD;
+    public static final RecipeBookCategory STONECUTTER;
+    public static final RecipeBookCategory SMITHING;
+    public static final RecipeBookCategory CAMPFIRE;
+    public static RecipeBookCategory bootstrap(Registry<RecipeBookCategory> registry);
+}
+//// RecipeBookCategory.java
+public class RecipeBookCategory implements ExtendedRecipeBookCategory {
+}
+//// RecipeCache.java
+import java.util.Optional;
+import net.minecraft.core.NonNullList;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
+public class RecipeCache {
+    public RecipeCache(int capacity);
+    public Optional<RecipeHolder<CraftingRecipe>> get(ServerLevel level, CraftingInput input);
+    static record Entry(NonNullList<ItemStack> key, int width, int height, RecipeHolder<CraftingRecipe> value) {
+        public boolean matches(CraftingInput input);
+    }
+}
+//// RecipeHolder.java
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+public record RecipeHolder<T extends Recipe<?>>(ResourceKey<Recipe<?>> id, T value) {
+    public static final StreamCodec<RegistryFriendlyByteBuf, RecipeHolder<?>> STREAM_CODEC;
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+}
+//// RecipeInput.java
+import net.minecraft.world.item.ItemStack;
+public interface RecipeInput {
+    ItemStack getItem(int index);
+    int size();
+    default boolean isEmpty();
+}
+//// RecipeManager.java
+import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.item.crafting.display.RecipeDisplayEntry;
+import net.minecraft.world.item.crafting.display.RecipeDisplayId;
+import net.minecraft.world.level.Level;
+public class RecipeManager implements RecipeAccess {
+    public RecipeManager(HolderLookup.Provider registries);
+    public void finalizeRecipeLoading(FeatureFlagSet enabledFlags);
+    public <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeHolder<T>> getRecipeFor(RecipeType<T> type, I input, Level level, ResourceKey<Recipe<?>> recipeHint);
+    public <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeHolder<T>> getRecipeFor(RecipeType<T> type, I input, Level level, RecipeHolder<T> recipeHint);
+    public <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeHolder<T>> getRecipeFor(RecipeType<T> type, I input, Level level);
+    public Optional<RecipeHolder<?>> byKey(ResourceKey<Recipe<?>> recipeId);
+    public Map<ResourceKey<RecipePropertySet>, RecipePropertySet> getSynchronizedItemProperties();
+    public SelectableRecipe.SingleInputSet<StonecutterRecipe> getSynchronizedStonecutterRecipes();
+    public RecipePropertySet propertySet(ResourceKey<RecipePropertySet> id);
+    public SelectableRecipe.SingleInputSet<StonecutterRecipe> stonecutterRecipes();
+    public Collection<RecipeHolder<?>> getRecipes();
+    public Collection<RecipeHolder<?>> getLearnableRecipes();
+    public ServerDisplayInfo getRecipeFromDisplay(RecipeDisplayId id);
+    public void listDisplaysForRecipe(ResourceKey<Recipe<?>> id, Consumer<RecipeDisplayEntry> output);
+    public static <I extends RecipeInput, T extends Recipe<I>> CachedCheck<I, T> createCheck(RecipeType<T> type);
+    public static record ServerDisplayInfo(RecipeDisplayEntry display, RecipeHolder<?> parent) {
+    }
+    public static class IngredientCollector implements Consumer<Recipe<?>> {
+        protected IngredientCollector(ResourceKey<RecipePropertySet> key, IngredientExtractor extractor);
+        public void accept(Recipe<?> recipe);
+        public RecipePropertySet asPropertySet(FeatureFlagSet enabledFeatures);
+    }
+    public interface CachedCheck<I extends RecipeInput, T extends Recipe<I>> {
+        Optional<RecipeHolder<T>> getRecipeFor(I input, ServerLevel level);
+    }
+    public interface IngredientExtractor {
+        Optional<Ingredient> apply(Recipe<?> recipe);
+    }
+}
+//// RecipeMap.java
+import com.google.common.collect.Multimap;
+import java.util.Collection;
+import java.util.Map;
+import java.util.stream.Stream;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+public class RecipeMap {
+    public static final RecipeMap EMPTY;
+    private RecipeMap(Multimap<RecipeType<?>, RecipeHolder<?>> byType, Map<ResourceKey<Recipe<?>>, RecipeHolder<?>> byKey);
+    public static RecipeMap create(HolderLookup<Recipe<?>> recipes);
+    public <I extends RecipeInput, T extends Recipe<I>> Collection<RecipeHolder<T>> byType(RecipeType<T> type);
+    public Collection<RecipeHolder<?>> values();
+    public RecipeHolder<?> byKey(ResourceKey<Recipe<?>> recipeId);
+    public <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeHolder<T>> getRecipesFor(RecipeType<T> type, I container, Level level);
+}
+//// RecipePropertySet.java
+import java.util.Collection;
+import java.util.Set;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+public class RecipePropertySet {
+    public static final ResourceKey<? extends Registry<RecipePropertySet>> TYPE_KEY;
+    public static final ResourceKey<RecipePropertySet> SMITHING_BASE;
+    public static final ResourceKey<RecipePropertySet> SMITHING_TEMPLATE;
+    public static final ResourceKey<RecipePropertySet> SMITHING_ADDITION;
+    public static final ResourceKey<RecipePropertySet> FURNACE_INPUT;
+    public static final ResourceKey<RecipePropertySet> BLAST_FURNACE_INPUT;
+    public static final ResourceKey<RecipePropertySet> SMOKER_INPUT;
+    public static final ResourceKey<RecipePropertySet> CAMPFIRE_INPUT;
+    public static final ResourceKey<RecipePropertySet> BREWING_INPUTS;
+    public static final ResourceKey<RecipePropertySet> BREWING_REAGENTS;
+    public static final StreamCodec<RegistryFriendlyByteBuf, RecipePropertySet> STREAM_CODEC;
+    public static final RecipePropertySet EMPTY;
+    private RecipePropertySet(Set<Holder<Item>> items);
+    public boolean test(ItemStack itemStack);
+    public static RecipePropertySet create(Collection<Ingredient> ingredients);
+}
+//// RecipeSerializer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record RecipeSerializer<T extends Recipe<?>>(MapCodec<T> codec, StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
+    public RecipeSerializer(MapCodec<T> codec, StreamCodec<RegistryFriendlyByteBuf, T> streamCodec);
+    public StreamCodec<RegistryFriendlyByteBuf, T> streamCodec();
+}
+//// RecipeSerializers.java
+import net.minecraft.core.Registry;
+public class RecipeSerializers {
+    public static Object bootstrap(Registry<RecipeSerializer<?>> registry);
+}
+//// RecipeType.java
+public interface RecipeType<T extends Recipe<?>> {
+    RecipeType<CraftingRecipe> CRAFTING;
+    RecipeType<SmeltingRecipe> SMELTING;
+    RecipeType<BlastingRecipe> BLASTING;
+    RecipeType<SmokingRecipe> SMOKING;
+    RecipeType<CampfireCookingRecipe> CAMPFIRE_COOKING;
+    RecipeType<StonecutterRecipe> STONECUTTING;
+    RecipeType<SmithingRecipe> SMITHING;
+    RecipeType<BrewingRecipe> BREWING;
+    static <T extends Recipe<?>> RecipeType<T> register(String name);
+}
+//// RepairItemRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+public class RepairItemRecipe extends CustomRecipe {
+    public static final RepairItemRecipe INSTANCE;
+    public static final MapCodec<RepairItemRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, RepairItemRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<RepairItemRecipe> SERIALIZER;
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public RecipeSerializer<RepairItemRecipe> getSerializer();
+}
+//// SelectableRecipe.java
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
+public record SelectableRecipe<T extends Recipe<?>>(SlotDisplay optionDisplay, Optional<RecipeHolder<T>> recipe) {
+    public static <T extends Recipe<?>> StreamCodec<RegistryFriendlyByteBuf, SelectableRecipe<T>> noRecipeCodec();
+    public static record SingleInputEntry<T extends Recipe<?>>(Ingredient input, SelectableRecipe<T> recipe) {
+        public static <T extends Recipe<?>> StreamCodec<RegistryFriendlyByteBuf, SingleInputEntry<T>> noRecipeCodec();
+    }
+    public static record SingleInputSet<T extends Recipe<?>>(List<SingleInputEntry<T>> entries) {
+        public static <T extends Recipe<?>> SingleInputSet<T> empty();
+        public static <T extends Recipe<?>> StreamCodec<RegistryFriendlyByteBuf, SingleInputSet<T>> noRecipeCodec();
+        public boolean acceptsInput(ItemStack input);
+        public SingleInputSet<T> selectByInput(ItemStack input);
+        public boolean isEmpty();
+        public int size();
+    }
+}
+//// ShapedRecipe.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.level.Level;
+public class ShapedRecipe extends NormalCraftingRecipe {
+    public static final MapCodec<ShapedRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShapedRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<ShapedRecipe> SERIALIZER;
+    public ShapedRecipe(Recipe.CommonInfo commonInfo, CraftingRecipe.CraftingBookInfo bookInfo, ShapedRecipePattern pattern, ItemStackTemplate result);
+    public RecipeSerializer<ShapedRecipe> getSerializer();
+    public List<Optional<Ingredient>> getIngredients();
+    protected PlacementInfo createPlacementInfo();
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public int getWidth();
+    public int getHeight();
+    public List<RecipeDisplay> display();
+}
+//// ShapedRecipePattern.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public final class ShapedRecipePattern {
+    public static final char EMPTY_SLOT;
+    public static final MapCodec<ShapedRecipePattern> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShapedRecipePattern> STREAM_CODEC;
+    public ShapedRecipePattern(int width, int height, List<Optional<Ingredient>> ingredients, Optional<Data> data);
+    public static ShapedRecipePattern of(Map<Character, Ingredient> key, String... pattern);
+    public static ShapedRecipePattern of(Map<Character, Ingredient> key, List<String> pattern);
+    static String[] shrink(List<String> pattern);
+    public boolean matches(CraftingInput input);
+    public int width();
+    public int height();
+    public List<Optional<Ingredient>> ingredients();
+    public static record Data(Map<Character, Ingredient> key, List<String> pattern) {
+        public static final MapCodec<Data> MAP_CODEC;
+    }
+}
+//// ShapelessRecipe.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.level.Level;
+public class ShapelessRecipe extends NormalCraftingRecipe {
+    public static final MapCodec<ShapelessRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShapelessRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<ShapelessRecipe> SERIALIZER;
+    public ShapelessRecipe(Recipe.CommonInfo commonInfo, CraftingRecipe.CraftingBookInfo bookInfo, ItemStackTemplate result, List<Ingredient> ingredients);
+    public RecipeSerializer<ShapelessRecipe> getSerializer();
+    protected PlacementInfo createPlacementInfo();
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public List<RecipeDisplay> display();
+}
+//// ShieldDecorationRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.level.Level;
+public class ShieldDecorationRecipe extends CustomRecipe {
+    public static final MapCodec<ShieldDecorationRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShieldDecorationRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<ShieldDecorationRecipe> SERIALIZER;
+    public ShieldDecorationRecipe(Ingredient banner, Ingredient target, ItemStackTemplate result);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public RecipeSerializer<ShieldDecorationRecipe> getSerializer();
+}
+//// SimpleSmithingRecipe.java
+public abstract class SimpleSmithingRecipe implements SmithingRecipe {
+    protected final Recipe.CommonInfo commonInfo;
+    protected SimpleSmithingRecipe(Recipe.CommonInfo commonInfo);
+    public abstract RecipeSerializer<? extends SimpleSmithingRecipe> getSerializer();
+    public PlacementInfo placementInfo();
+    protected abstract PlacementInfo createPlacementInfo();
+    public String group();
+    public final boolean showNotification();
+}
+//// SingleItemRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.level.Level;
+public abstract class SingleItemRecipe implements Recipe<SingleRecipeInput> {
+    protected final Recipe.CommonInfo commonInfo;
+    public SingleItemRecipe(Recipe.CommonInfo commonInfo, Ingredient input, ItemStackTemplate result);
+    public abstract RecipeSerializer<? extends SingleItemRecipe> getSerializer();
+    public abstract RecipeType<? extends SingleItemRecipe> getType();
+    public boolean matches(SingleRecipeInput input, Level level);
+    public boolean showNotification();
+    public Ingredient input();
+    protected ItemStackTemplate result();
+    public PlacementInfo placementInfo();
+    public ItemStack assemble(SingleRecipeInput input);
+    public static <T extends SingleItemRecipe> MapCodec<T> simpleMapCodec(Factory<T> factory);
+    public static <T extends SingleItemRecipe> StreamCodec<RegistryFriendlyByteBuf, T> simpleStreamCodec(Factory<T> factory);
+    public interface Factory<T extends SingleItemRecipe> {
+        T create(Recipe.CommonInfo commonInfo, Ingredient ingredient, ItemStackTemplate result);
+    }
+}
+//// SingleRecipeInput.java
+import net.minecraft.world.item.ItemStack;
+public record SingleRecipeInput(ItemStack item) implements RecipeInput {
+    public ItemStack getItem(int index);
+    public int size();
+}
+//// SmeltingRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+public class SmeltingRecipe extends AbstractCookingRecipe {
+    public static final MapCodec<SmeltingRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, SmeltingRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<SmeltingRecipe> SERIALIZER;
+    public SmeltingRecipe(Recipe.CommonInfo commonInfo, AbstractCookingRecipe.CookingBookInfo bookInfo, Ingredient ingredient, ItemStackTemplate result, float experience, int cookingTime);
+    protected Item furnaceIcon();
+    public RecipeSerializer<SmeltingRecipe> getSerializer();
+    public RecipeType<SmeltingRecipe> getType();
+    public RecipeBookCategory recipeBookCategory();
+}
+//// SmithingRecipe.java
+import java.util.Optional;
+import net.minecraft.world.level.Level;
+public interface SmithingRecipe extends Recipe<SmithingRecipeInput> {
+    default RecipeType<SmithingRecipe> getType();
+    RecipeSerializer<? extends SmithingRecipe> getSerializer();
+    default boolean matches(SmithingRecipeInput input, Level level);
+    Optional<Ingredient> templateIngredient();
+    Ingredient baseIngredient();
+    Optional<Ingredient> additionIngredient();
+    default RecipeBookCategory recipeBookCategory();
+}
+//// SmithingRecipeInput.java
+import net.minecraft.world.item.ItemStack;
+public record SmithingRecipeInput(ItemStack template, ItemStack base, ItemStack addition) implements RecipeInput {
+    public ItemStack getItem(int index);
+    public int size();
+    public boolean isEmpty();
+}
+//// SmithingTransformRecipe.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+public class SmithingTransformRecipe extends SimpleSmithingRecipe {
+    public static final MapCodec<SmithingTransformRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, SmithingTransformRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<SmithingTransformRecipe> SERIALIZER;
+    public SmithingTransformRecipe(Recipe.CommonInfo commonInfo, Optional<Ingredient> template, Ingredient base, Optional<Ingredient> addition, ItemStackTemplate result);
+    public ItemStack assemble(SmithingRecipeInput input);
+    public Optional<Ingredient> templateIngredient();
+    public Ingredient baseIngredient();
+    public Optional<Ingredient> additionIngredient();
+    public RecipeSerializer<SmithingTransformRecipe> getSerializer();
+    protected PlacementInfo createPlacementInfo();
+    public List<RecipeDisplay> display();
+}
+//// SmithingTrimRecipe.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.item.equipment.trim.TrimPattern;
+public class SmithingTrimRecipe extends SimpleSmithingRecipe {
+    public static final MapCodec<SmithingTrimRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, SmithingTrimRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<SmithingTrimRecipe> SERIALIZER;
+    public SmithingTrimRecipe(Recipe.CommonInfo commonInfo, Ingredient template, Ingredient base, Ingredient addition, Holder<TrimPattern> pattern);
+    public ItemStack assemble(SmithingRecipeInput input);
+    public static ItemStack applyTrim(ItemStack baseItem, ItemStack materialItem, Holder<TrimPattern> pattern);
+    public Optional<Ingredient> templateIngredient();
+    public Ingredient baseIngredient();
+    public Optional<Ingredient> additionIngredient();
+    public RecipeSerializer<SmithingTrimRecipe> getSerializer();
+    protected PlacementInfo createPlacementInfo();
+    public List<RecipeDisplay> display();
+}
+//// SmokingRecipe.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+public class SmokingRecipe extends AbstractCookingRecipe {
+    public static final MapCodec<SmokingRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, SmokingRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<SmokingRecipe> SERIALIZER;
+    public SmokingRecipe(Recipe.CommonInfo commonInfo, AbstractCookingRecipe.CookingBookInfo bookInfo, Ingredient ingredient, ItemStackTemplate result, float experience, int cookingTime);
+    protected Item furnaceIcon();
+    public RecipeType<SmokingRecipe> getType();
+    public RecipeSerializer<SmokingRecipe> getSerializer();
+    public RecipeBookCategory recipeBookCategory();
+}
+//// StonecutterRecipe.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
+public class StonecutterRecipe extends SingleItemRecipe {
+    public static final MapCodec<StonecutterRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, StonecutterRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<StonecutterRecipe> SERIALIZER;
+    public StonecutterRecipe(Recipe.CommonInfo commonInfo, Ingredient ingredient, ItemStackTemplate result);
+    public RecipeType<StonecutterRecipe> getType();
+    public RecipeSerializer<StonecutterRecipe> getSerializer();
+    public String group();
+    public List<RecipeDisplay> display();
+    public SlotDisplay resultDisplay();
+    public RecipeBookCategory recipeBookCategory();
+}
+//// TransmuteRecipe.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.level.Level;
+public class TransmuteRecipe extends NormalCraftingRecipe {
+    public static final MinMaxBounds.Ints DEFAULT_MATERIAL_COUNT;
+    public static final MinMaxBounds.Ints FULL_RANGE_MATERIAL_COUNT;
+    public static final Codec<MinMaxBounds.Ints> MATERIAL_COUNT_BOUNDS;
+    public static final MapCodec<TransmuteRecipe> MAP_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, TransmuteRecipe> STREAM_CODEC;
+    public static final RecipeSerializer<TransmuteRecipe> SERIALIZER;
+    public TransmuteRecipe(Recipe.CommonInfo commonInfo, CraftingRecipe.CraftingBookInfo bookInfo, Ingredient input, Ingredient material, MinMaxBounds.Ints materialCount, TransmuteResult result, boolean addMaterialCountToResult);
+    public static ItemStack createWithOriginalComponents(ItemStackTemplate target, ItemStack input);
+    public static ItemStack createWithOriginalComponents(ItemStackTemplate target, ItemStack input, int extraCount);
+    public boolean matches(CraftingInput input, Level level);
+    public ItemStack assemble(CraftingInput input);
+    public List<RecipeDisplay> display();
+    public RecipeSerializer<TransmuteRecipe> getSerializer();
+    protected PlacementInfo createPlacementInfo();
+}
+//// TransmuteResult.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+public record TransmuteResult(Optional<Holder<Item>> item, int count, DataComponentPatch components) {
+    public static final MapCodec<TransmuteResult> MAP_CODEC;
+    public static final Codec<TransmuteResult> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, TransmuteResult> STREAM_CODEC;
+    public static final TransmuteResult KEEP_INPUT_ITEM;
+    public TransmuteResult(Holder<Item> item);
+    public TransmuteResult(Item item);
+    public static TransmuteResult fromTemplate(ItemStackTemplate template);
+    public ItemStackTemplate resolve(Holder<Item> inputItem);
+    public ItemStackTemplate resolve(Holder<Item> inputItem, int count);
+}

@@ -1,0 +1,277 @@
+//// CloseableResourceManager.java
+public interface CloseableResourceManager extends ResourceManager, AutoCloseable {
+    void close();
+}
+//// FallbackResourceManager.java
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackType;
+public class FallbackResourceManager implements ResourceManager {
+    public FallbackResourceManager(PackType type, String namespace);
+    public void push(PackResources pack);
+    public void push(PackResources pack, PackResources.Filter filter);
+    public void pushFilterOnly(String name, PackResources.Filter filter);
+    public Set<String> getNamespaces();
+    public Optional<Resource> getResource(Identifier location);
+    public List<Resource> getResourceStack(Identifier location);
+    public Map<Identifier, Resource> listResources(String directory, ResourceManager.Selector selector);
+    public Map<Identifier, List<Resource>> listResourceStacks(String directory, ResourceManager.Selector selector);
+    public Stream<PackResources> listPacks();
+    static class LeakedResourceWarningInputStream extends FilterInputStream {
+        public LeakedResourceWarningInputStream(InputStream wrapped, Identifier location, String name);
+        public void close() throws IOException;
+        protected void finalize() throws Throwable;
+    }
+    static record EntryStack(Identifier fileLocation, Identifier metadataLocation, List<ResourceWithSource> fileSources, Map<PackResources, IoSupplier<InputStream>> metaSources) {
+        public EntryStack(Identifier fileLocation);
+    }
+    static record PackEntry(String name, PackResources resources, PackResources. Filter filter) {
+        public void filterAll(Collection<Identifier> collection);
+        public boolean isFiltered(Identifier location);
+    }
+    static record ResourceWithSource(PackResources source, IoSupplier<InputStream> resource) {
+    }
+}
+//// IoSupplier.java
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Path;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+public interface IoSupplier<T> {
+    static IoSupplier<InputStream> create(Path path);
+    static IoSupplier<InputStream> create(ZipFile zipFile, ZipEntry entry);
+    T get() throws IOException;
+}
+//// MultiPackResourceManager.java
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackType;
+public class MultiPackResourceManager implements CloseableResourceManager {
+    public MultiPackResourceManager(PackType type, List<PackResources> packs);
+    public Set<String> getNamespaces();
+    public Optional<Resource> getResource(Identifier location);
+    public List<Resource> getResourceStack(Identifier location);
+    public Map<Identifier, Resource> listResources(String directory, ResourceManager.Selector selector);
+    public Map<Identifier, List<Resource>> listResourceStacks(String directory, ResourceManager.Selector selector);
+    public Stream<PackResources> listPacks();
+    public void close();
+}
+//// PreparableReloadListener.java
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+public interface PreparableReloadListener {
+    CompletableFuture<Void> reload(SharedState currentReload, Executor taskExecutor, PreparationBarrier preparationBarrier, Executor reloadExecutor);
+    default void prepareSharedState(SharedState currentReload);
+    default String getName();
+    public static final class StateKey<T> {
+    }
+    public static final class SharedState {
+        public SharedState(ResourceManager manager);
+        public ResourceManager resourceManager();
+        public <T> void set(StateKey<T> key, T value);
+        public <T> T get(StateKey<T> key);
+    }
+    public interface PreparationBarrier {
+        <T> CompletableFuture<T> wait(T t);
+    }
+}
+//// ProfiledReloadInstance.java
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicLong;
+import net.minecraft.util.Unit;
+public class ProfiledReloadInstance extends SimpleReloadInstance<State> {
+    public static ReloadInstance of(ResourceManager resourceManager, List<PreparableReloadListener> listeners, Executor taskExecutor, Executor mainThreadExecutor, CompletableFuture<Unit> initialTask);
+    private ProfiledReloadInstance(List<PreparableReloadListener> listeners);
+    protected CompletableFuture<List<State>> prepareTasks(Executor taskExecutor, Executor mainThreadExecutor, ResourceManager resourceManager, List<PreparableReloadListener> listeners, SimpleReloadInstance.StateFactory<State> stateFactory, CompletableFuture<?> initialTask);
+    public static record State(String name, AtomicLong preparationNanos, AtomicLong preparationCount, AtomicLong reloadNanos, AtomicLong reloadCount) {
+    }
+}
+//// ReloadInstance.java
+import java.util.concurrent.CompletableFuture;
+public interface ReloadInstance {
+    CompletableFuture<?> done();
+    float getActualProgress();
+    default boolean isDone();
+    default void checkExceptions();
+}
+//// ReloadableResourceManager.java
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.stream.Stream;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.util.Unit;
+public class ReloadableResourceManager implements AutoCloseable, ResourceManager {
+    public ReloadableResourceManager(PackType type);
+    public void close();
+    public void registerReloadListener(PreparableReloadListener listener);
+    public ReloadInstance createReload(Executor backgroundExecutor, Executor mainThreadExecutor, CompletableFuture<Unit> initialTask, List<PackResources> resourcePacks);
+    public Optional<Resource> getResource(Identifier location);
+    public Set<String> getNamespaces();
+    public List<Resource> getResourceStack(Identifier location);
+    public Map<Identifier, Resource> listResources(String directory, ResourceManager.Selector selector);
+    public Map<Identifier, List<Resource>> listResourceStacks(String directory, ResourceManager.Selector selector);
+    public Stream<PackResources> listPacks();
+}
+//// Resource.java
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Optional;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.repository.KnownPack;
+public class Resource {
+    public Resource(PackResources source, IoSupplier<InputStream> streamSupplier, IoSupplier<ResourceMetadata> metadataSupplier);
+    public Resource(PackResources source, IoSupplier<InputStream> streamSupplier);
+    public PackResources source();
+    public String sourcePackId();
+    public Optional<KnownPack> knownPackInfo();
+    public InputStream open() throws IOException;
+    public BufferedReader openAsReader() throws IOException;
+    public String readAllAsString() throws IOException;
+    public ResourceMetadata metadata() throws IOException;
+}
+//// ResourceFilterSection.java
+import java.util.List;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.util.IdentifierPattern;
+public class ResourceFilterSection {
+    public static final MetadataSectionType<ResourceFilterSection> TYPE;
+    public ResourceFilterSection(List<IdentifierPattern> blockList);
+    public boolean isNamespaceFiltered(String namespace);
+    public boolean isPathFiltered(String path);
+}
+//// ResourceManager.java
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackResources;
+public interface ResourceManager extends ResourceProvider {
+    Set<String> getNamespaces();
+    List<Resource> getResourceStack(Identifier location);
+    Map<Identifier, Resource> listResources(String directory, Selector selector);
+    Map<Identifier, List<Resource>> listResourceStacks(String directory, Selector selector);
+    Stream<PackResources> listPacks();
+    public static enum Empty implements ResourceManager {
+        INSTANCE;
+        public Set<String> getNamespaces();
+        public Optional<Resource> getResource(Identifier location);
+        public List<Resource> getResourceStack(Identifier location);
+        public Map<Identifier, Resource> listResources(String directory, Selector selector);
+        public Map<Identifier, List<Resource>> listResourceStacks(String directory, Selector selector);
+        public Stream<PackResources> listPacks();
+    }
+    public interface Selector {
+        boolean isIncluded(Identifier resourceId);
+    }
+}
+//// ResourceManagerReloadListener.java
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+public interface ResourceManagerReloadListener extends PreparableReloadListener {
+    default CompletableFuture<Void> reload(PreparableReloadListener.SharedState currentReload, Executor taskExecutor, PreparableReloadListener.PreparationBarrier preparationBarrier, Executor reloadExecutor);
+    void onResourceManagerReload(ResourceManager resourceManager);
+}
+//// ResourceMetadata.java
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
+public interface ResourceMetadata {
+    ResourceMetadata EMPTY;
+    IoSupplier<ResourceMetadata> EMPTY_SUPPLIER;
+    static ResourceMetadata fromJsonStream(InputStream inputStream) throws IOException;
+    <T> Optional<T> getSection(MetadataSectionType<T> serializer);
+    default <T> Optional<MetadataSectionType.WithValue<T>> getTypedSection(MetadataSectionType<T> type);
+    static <T> ResourceMetadata of(MetadataSectionType<T> k, T v);
+    static <T1, T2> ResourceMetadata of(MetadataSectionType<T1> k1, T1 v1, MetadataSectionType<T2> k2, T2 v2);
+    default List<MetadataSectionType.WithValue<?>> getTypedSections(Collection<MetadataSectionType<?>> types);
+    public static class MapBased implements ResourceMetadata {
+        private MapBased(Map<MetadataSectionType<?>, ?> values);
+        public <T> Optional<T> getSection(MetadataSectionType<T> serializer);
+    }
+}
+//// ResourceProvider.java
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.resources.Identifier;
+public interface ResourceProvider {
+    ResourceProvider EMPTY;
+    Optional<Resource> getResource(Identifier location);
+    default Resource getResourceOrThrow(Identifier location) throws FileNotFoundException;
+    default InputStream open(Identifier location) throws IOException;
+    default BufferedReader openAsReader(Identifier location) throws IOException;
+    static ResourceProvider fromMap(Map<Identifier, Resource> map);
+}
+//// SimpleJsonResourceReloadListener.java
+import com.google.gson.JsonElement;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import java.util.Map;
+import net.minecraft.resources.FileToIdConverter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.profiling.ProfilerFiller;
+public abstract class SimpleJsonResourceReloadListener<T> extends SimplePreparableReloadListener<Map<Identifier, T>> {
+    protected SimpleJsonResourceReloadListener(Codec<T> codec, FileToIdConverter lister);
+    private SimpleJsonResourceReloadListener(DynamicOps<JsonElement> ops, Codec<T> codec, FileToIdConverter lister);
+    protected Map<Identifier, T> prepare(ResourceManager manager, ProfilerFiller profiler);
+}
+//// SimplePreparableReloadListener.java
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import net.minecraft.util.profiling.ProfilerFiller;
+public abstract class SimplePreparableReloadListener<T> implements PreparableReloadListener {
+    public final CompletableFuture<Void> reload(PreparableReloadListener.SharedState currentReload, Executor taskExecutor, PreparableReloadListener.PreparationBarrier preparationBarrier, Executor reloadExecutor);
+    protected abstract T prepare(ResourceManager manager, ProfilerFiller profiler);
+    protected abstract void apply(T preparations, ResourceManager manager, ProfilerFiller profiler);
+}
+//// SimpleReloadInstance.java
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import net.minecraft.util.Unit;
+public class SimpleReloadInstance<S> implements ReloadInstance {
+    public static ReloadInstance of(ResourceManager resourceManager, List<PreparableReloadListener> listeners, Executor taskExecutor, Executor mainThreadExecutor, CompletableFuture<Unit> initialTask);
+    protected SimpleReloadInstance(List<PreparableReloadListener> listeners);
+    protected void startTasks(Executor taskExecutor, Executor mainThreadExecutor, ResourceManager resourceManager, List<PreparableReloadListener> listeners, StateFactory<S> stateFactory, CompletableFuture<?> initialTask);
+    protected CompletableFuture<List<S>> prepareTasks(Executor taskExecutor, Executor mainThreadExecutor, ResourceManager resourceManager, List<PreparableReloadListener> listeners, StateFactory<S> stateFactory, CompletableFuture<?> initialTask);
+    public CompletableFuture<?> done();
+    public float getActualProgress();
+    public static ReloadInstance create(ResourceManager resourceManager, List<PreparableReloadListener> listeners, Executor backgroundExecutor, Executor mainThreadExecutor, CompletableFuture<Unit> initialTask, boolean enableProfiling);
+    protected interface StateFactory<S> {
+        StateFactory<Void> SIMPLE;
+        CompletableFuture<S> create(PreparableReloadListener.SharedState sharedState, PreparableReloadListener.PreparationBarrier previousStep, PreparableReloadListener listener, Executor taskExecutor, Executor reloadExecutor);
+    }
+}

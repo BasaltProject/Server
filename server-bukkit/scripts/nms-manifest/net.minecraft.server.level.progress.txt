@@ -1,0 +1,49 @@
+//// ChunkLoadStatusView.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+public interface ChunkLoadStatusView {
+    void moveTo(ResourceKey<Level> dimension, ChunkPos centerChunk);
+    ChunkStatus get(int x, int z);
+    int radius();
+}
+//// LevelLoadListener.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+public interface LevelLoadListener {
+    static LevelLoadListener compose(LevelLoadListener first, LevelLoadListener second);
+    void start(Stage stage, int totalChunks);
+    void update(Stage stage, int currentChunks, int totalChunks);
+    void finish(Stage stage);
+    void updateFocus(ResourceKey<Level> dimension, ChunkPos chunkPos);
+    public static enum Stage {
+        START_SERVER, PREPARE_GLOBAL_SPAWN, LOAD_INITIAL_CHUNKS, LOAD_PLAYER_CHUNKS;
+    }
+}
+//// LevelLoadProgressTracker.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+public class LevelLoadProgressTracker implements LevelLoadListener {
+    public LevelLoadProgressTracker(boolean includePlayerChunks);
+    public void start(LevelLoadListener.Stage stage, int totalChunks);
+    public void update(LevelLoadListener.Stage stage, int currentChunks, int totalChunks);
+    public void finish(LevelLoadListener.Stage stage);
+    public float get();
+    public void updateFocus(ResourceKey<Level> dimension, ChunkPos chunkPos);
+}
+//// LoggingLevelLoadListener.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+public class LoggingLevelLoadListener implements LevelLoadListener {
+    public LoggingLevelLoadListener(boolean includePlayerChunks);
+    public static LoggingLevelLoadListener forDedicatedServer();
+    public static LoggingLevelLoadListener forSingleplayer();
+    public void start(LevelLoadListener.Stage stage, int totalChunks);
+    public void update(LevelLoadListener.Stage stage, int currentChunks, int totalChunks);
+    public void finish(LevelLoadListener.Stage stage);
+    public void updateFocus(ResourceKey<Level> dimension, ChunkPos chunkPos);
+}

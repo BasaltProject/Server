@@ -1,0 +1,52 @@
+//// ContextNbtProvider.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.nbt.Tag;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.LootContextArg;
+public class ContextNbtProvider implements NbtProvider {
+    public static final MapCodec<ContextNbtProvider> MAP_CODEC;
+    public static final Codec<ContextNbtProvider> INLINE_CODEC;
+    private ContextNbtProvider(LootContextArg<Tag> source);
+    public MapCodec<ContextNbtProvider> codec();
+    public Tag get(LootContext context);
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public static NbtProvider forContextEntity(LootContext.EntityTarget source);
+    static record BlockEntitySource(ContextKey<? extends BlockEntity> contextParam) implements LootContextArg.Getter<BlockEntity, Tag> {
+        public Tag get(BlockEntity blockEntity);
+    }
+    static record EntitySource(ContextKey<? extends Entity> contextParam) implements LootContextArg.Getter<Entity, Tag> {
+        public Tag get(Entity entity);
+    }
+}
+//// NbtProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.LootContextUser;
+public interface NbtProvider extends LootContextUser {
+    Tag get(LootContext context);
+    MapCodec<? extends NbtProvider> codec();
+}
+//// NbtProviders.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class NbtProviders {
+    public static final Codec<NbtProvider> CODEC;
+    public static MapCodec<? extends NbtProvider> bootstrap(Registry<MapCodec<? extends NbtProvider>> registry);
+}
+//// StorageNbtProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record StorageNbtProvider(Identifier id) implements NbtProvider {
+    public static final MapCodec<StorageNbtProvider> MAP_CODEC;
+    public MapCodec<StorageNbtProvider> codec();
+    public Tag get(LootContext context);
+}

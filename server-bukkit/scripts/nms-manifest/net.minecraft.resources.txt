@@ -1,0 +1,316 @@
+//// DelegatingOps.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.Encoder;
+import com.mojang.serialization.Lifecycle;
+import com.mojang.serialization.ListBuilder;
+import com.mojang.serialization.MapLike;
+import com.mojang.serialization.RecordBuilder;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+public abstract class DelegatingOps<T> implements DynamicOps<T> {
+    protected final DynamicOps<T> delegate;
+    protected DelegatingOps(DynamicOps<T> delegate);
+    public T empty();
+    public T emptyMap();
+    public T emptyList();
+    public <U> U convertTo(DynamicOps<U> outOps, T input);
+    public DataResult<Number> getNumberValue(T input);
+    public T createNumeric(Number i);
+    public T createByte(byte value);
+    public T createShort(short value);
+    public T createInt(int value);
+    public T createLong(long value);
+    public T createFloat(float value);
+    public T createDouble(double value);
+    public DataResult<Boolean> getBooleanValue(T input);
+    public T createBoolean(boolean value);
+    public DataResult<String> getStringValue(T input);
+    public T createString(String value);
+    public DataResult<T> mergeToList(T list, T value);
+    public DataResult<T> mergeToList(T list, List<T> values);
+    public DataResult<T> mergeToMap(T map, T key, T value);
+    public DataResult<T> mergeToMap(T map, MapLike<T> values);
+    public DataResult<T> mergeToMap(T map, Map<T, T> values);
+    public DataResult<T> mergeToPrimitive(T prefix, T value);
+    public DataResult<Stream<Pair<T, T>>> getMapValues(T input);
+    public DataResult<Consumer<BiConsumer<T, T>>> getMapEntries(T input);
+    public T createMap(Map<T, T> map);
+    public T createMap(Stream<Pair<T, T>> map);
+    public DataResult<MapLike<T>> getMap(T input);
+    public DataResult<Stream<T>> getStream(T input);
+    public DataResult<Consumer<Consumer<T>>> getList(T input);
+    public T createList(Stream<T> input);
+    public DataResult<ByteBuffer> getByteBuffer(T input);
+    public T createByteList(ByteBuffer input);
+    public DataResult<IntStream> getIntStream(T input);
+    public T createIntList(IntStream input);
+    public DataResult<LongStream> getLongStream(T input);
+    public T createLongList(LongStream input);
+    public T remove(T input, String key);
+    public boolean compressMaps();
+    public ListBuilder<T> listBuilder();
+    public RecordBuilder<T> mapBuilder();
+    protected class DelegateListBuilder implements ListBuilder<T> {
+        protected DelegateListBuilder(ListBuilder<T> original);
+        public DynamicOps<T> ops();
+        public DataResult<T> build(T prefix);
+        public ListBuilder<T> add(T value);
+        public ListBuilder<T> add(DataResult<T> value);
+        public <E> ListBuilder<T> add(E value, Encoder<E> encoder);
+        public <E> ListBuilder<T> addAll(Iterable<E> values, Encoder<E> encoder);
+        public ListBuilder<T> withErrorsFrom(DataResult<?> result);
+        public ListBuilder<T> mapError(UnaryOperator<String> onError);
+        public DataResult<T> build(DataResult<T> prefix);
+    }
+    protected class DelegateRecordBuilder implements RecordBuilder<T> {
+        protected DelegateRecordBuilder(RecordBuilder<T> original);
+        public DynamicOps<T> ops();
+        public RecordBuilder<T> add(T key, T value);
+        public RecordBuilder<T> add(T key, DataResult<T> value);
+        public RecordBuilder<T> add(DataResult<T> key, DataResult<T> value);
+        public RecordBuilder<T> add(String key, T value);
+        public RecordBuilder<T> add(String key, DataResult<T> value);
+        public <E> RecordBuilder<T> add(String key, E value, Encoder<E> encoder);
+        public RecordBuilder<T> withErrorsFrom(DataResult<?> result);
+        public RecordBuilder<T> setLifecycle(Lifecycle lifecycle);
+        public RecordBuilder<T> mapError(UnaryOperator<String> onError);
+        public DataResult<T> build(T prefix);
+        public DataResult<T> build(DataResult<T> prefix);
+    }
+}
+//// DependantName.java
+public interface DependantName<T, V> {
+    V get(ResourceKey<T> id);
+    static <T, V> DependantName<T, V> fixed(V value);
+}
+//// FileToIdConverter.java
+import java.util.List;
+import java.util.Map;
+import net.minecraft.core.Registry;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
+public record FileToIdConverter(String prefix, String extension) {
+    public static FileToIdConverter json(String prefix);
+    public static FileToIdConverter registry(ResourceKey<? extends Registry<?>> registry);
+    public Identifier idToFile(Identifier id);
+    public Identifier fileToId(Identifier file);
+    public boolean extensionMatches(Identifier id);
+    public boolean prefixMatches(Identifier id);
+    public boolean matches(Identifier id);
+    public Map<Identifier, Resource> listMatchingResources(ResourceManager manager);
+    public Map<Identifier, List<Resource>> listMatchingResourceStacks(ResourceManager manager);
+}
+//// Identifier.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import io.netty.buffer.ByteBuf;
+import java.nio.file.Path;
+import java.util.function.UnaryOperator;
+import net.minecraft.network.codec.StreamCodec;
+public final class Identifier implements Comparable<Identifier> {
+    public static final Codec<Identifier> CODEC;
+    public static final StreamCodec<ByteBuf, Identifier> STREAM_CODEC;
+    public static final SimpleCommandExceptionType ERROR_INVALID;
+    public static final char NAMESPACE_SEPARATOR;
+    public static final String DEFAULT_NAMESPACE = "minecraft";
+    public static final String REALMS_NAMESPACE = "realms";
+    public static final String ALLOWED_NAMESPACE_CHARACTERS = "[a-z0-9_.-]";
+    private Identifier(String namespace, String path);
+    public static Identifier fromNamespaceAndPath(String namespace, String path);
+    public static Identifier parse(String identifier);
+    public static Identifier withDefaultNamespace(String path);
+    public static Identifier tryParse(String identifier);
+    public static Identifier tryBuild(String namespace, String path);
+    public static Identifier bySeparator(String identifier, char separator);
+    public static Identifier tryBySeparator(String identifier, char separator);
+    public static DataResult<Identifier> read(String input);
+    public String getPath();
+    public String getNamespace();
+    public Identifier withPath(String newPath);
+    public Identifier withPath(UnaryOperator<String> modifier);
+    public Identifier withPrefix(String prefix);
+    public Identifier withSuffix(String suffix);
+    public String toString();
+    public boolean equals(Object o);
+    public int hashCode();
+    public int compareTo(Identifier o);
+    public Path resolveAgainst(Path root);
+    public String toDebugFileName();
+    public String toLanguageKey();
+    public String toShortLanguageKey();
+    public String toShortString();
+    public String toLanguageKey(String prefix);
+    public String toLanguageKey(String prefix, String suffix);
+    public static Identifier read(StringReader reader) throws CommandSyntaxException;
+    public static Identifier readNonEmpty(StringReader reader) throws CommandSyntaxException;
+    public static boolean isAllowedInIdentifier(char c);
+    public static boolean isValidPath(String path);
+    public static boolean isValidNamespace(String namespace);
+    public static boolean validPathChar(char c);
+}
+//// NetworkRegistryLoadTask.java
+import com.mojang.serialization.Lifecycle;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import net.minecraft.core.Registry;
+import net.minecraft.server.packs.resources.ResourceProvider;
+public class NetworkRegistryLoadTask<T> extends RegistryLoadTask<T> {
+    public NetworkRegistryLoadTask(RegistryDataLoader.RegistryData<T> data, Lifecycle lifecycle, Map<ResourceKey<?>, Exception> loadingErrors, Map<ResourceKey<? extends Registry<?>>, RegistryDataLoader.NetworkedRegistryData> entries, ResourceProvider knownDataSource);
+    public CompletableFuture<?> load(RegistryOps.RegistryInfoLookup context, Executor executor);
+}
+//// RegistryDataLoader.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.RegistrySynchronization;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.server.packs.resources.ResourceProvider;
+import net.minecraft.tags.TagNetworkSerialization;
+public class RegistryDataLoader {
+    public static final List<RegistryData<?>> WORLD_REGISTRIES;
+    public static final List<RegistryData<?>> DIMENSION_REGISTRIES;
+    public static final List<RegistryData<?>> RELOADABLE_REGISTRIES;
+    public static final List<RegistryData<?>> SYNCHRONIZED_REGISTRIES;
+    public static CompletableFuture<RegistryAccess.Frozen> load(ResourceManager resourceManager, List<HolderLookup.RegistryLookup<?>> contextRegistries, List<RegistryData<?>> registriesToLoad, Executor executor);
+    public static CompletableFuture<RegistryAccess.Frozen> load(Map<ResourceKey<? extends Registry<?>>, NetworkedRegistryData> entries, ResourceProvider knownDataSource, List<HolderLookup.RegistryLookup<?>> contextRegistries, List<RegistryData<?>> registriesToLoad, Executor executor);
+    public static record RegistryData<T>(ResourceKey<? extends Registry<T>> key, Codec<T> elementCodec, RegistryValidator<T> validator) {
+        private RegistryData(ResourceKey<? extends Registry<T>> key, Codec<T> elementCodec);
+        public void runWithArguments(BiConsumer<ResourceKey<? extends Registry<T>>, Codec<T>> output);
+    }
+    public static record NetworkedRegistryData(List<RegistrySynchronization.PackedRegistryEntry> elements, TagNetworkSerialization.NetworkPayload tags) {
+    }
+    interface LoaderFactory {
+        <T> RegistryLoadTask<T> create(RegistryData<T> data, Map<ResourceKey<?>, Exception> loadingErrors);
+    }
+}
+//// RegistryLoadTask.java
+import com.google.gson.JsonElement;
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Decoder;
+import com.mojang.serialization.Lifecycle;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistrationInfo;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.ConcurrentHolderGetter;
+import net.minecraft.nbt.Tag;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceProvider;
+import net.minecraft.tags.TagKey;
+public abstract class RegistryLoadTask<T> {
+    protected final RegistryDataLoader.RegistryData<T> data;
+    protected final ConcurrentHolderGetter<T> concurrentRegistrationGetter;
+    protected final Map<ResourceKey<?>, Exception> loadingErrors;
+    protected RegistryLoadTask(RegistryDataLoader.RegistryData<T> data, Lifecycle lifecycle, Map<ResourceKey<?>, Exception> loadingErrors);
+    protected ResourceKey<? extends Registry<T>> registryKey();
+    protected Registry<T> readOnlyRegistry();
+    public abstract CompletableFuture<?> load(RegistryOps.RegistryInfoLookup context, Executor executor);
+    protected void registerElements(Stream<PendingRegistration<T>> elements);
+    protected void registerTags(Map<TagKey<T>, List<Holder<T>>> pendingTags);
+    public boolean freezeRegistry(Map<ResourceKey<?>, Exception> loadingErrors);
+    public Optional<Registry<T>> validateRegistry(Map<ResourceKey<?>, Exception> loadingErrors);
+    protected static record PendingRegistration<T>(ResourceKey<T> key, Either<T, Exception> value, RegistrationInfo registrationInfo) {
+        public static <T> Either<T, Exception> loadFromResource(Decoder<T> elementDecoder, RegistryOps<JsonElement> ops, ResourceKey<T> elementKey, Resource thunk);
+        public static <T> Either<T, Exception> findAndLoadFromResource(Decoder<T> elementDecoder, RegistryOps<JsonElement> ops, ResourceKey<T> elementKey, FileToIdConverter converter, ResourceProvider resourceProvider);
+        public static <T> Either<T, Exception> loadFromNetwork(Decoder<T> elementDecoder, RegistryOps<Tag> ops, ResourceKey<T> elementKey, Tag contents);
+    }
+}
+//// RegistryOps.java
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+public class RegistryOps<T> extends DelegatingOps<T> {
+    public static <T> RegistryOps<T> create(DynamicOps<T> parent, HolderLookup.Provider lookupProvider);
+    public static <T> RegistryOps<T> create(DynamicOps<T> parent, RegistryInfoLookup lookupProvider);
+    public static <T> Dynamic<T> injectRegistryContext(Dynamic<T> dynamic, HolderLookup.Provider lookupProvider);
+    private RegistryOps(DynamicOps<T> parent, RegistryInfoLookup lookupProvider);
+    public <U> RegistryOps<U> withParent(DynamicOps<U> parent);
+    public <E> Optional<HolderGetter<E>> getter(ResourceKey<? extends Registry<? extends E>> registryKey);
+    public boolean equals(Object obj);
+    public int hashCode();
+    public static <E, O> RecordCodecBuilder<O, HolderGetter<E>> retrieveGetter(ResourceKey<? extends Registry<? extends E>> registryKey);
+    public static <E, O> RecordCodecBuilder<O, Holder.Reference<E>> retrieveElement(ResourceKey<E> key);
+    static final class HolderLookupAdapter implements RegistryInfoLookup {
+        public HolderLookupAdapter(HolderLookup.Provider lookupProvider);
+        public <E> Optional<HolderGetter<E>> lookup(ResourceKey<? extends Registry<? extends E>> registryKey);
+        public boolean equals(Object obj);
+        public int hashCode();
+    }
+    public interface RegistryInfoLookup {
+        <T> Optional<HolderGetter<T>> lookup(ResourceKey<? extends Registry<? extends T>> registryKey);
+    }
+}
+//// RegistryValidator.java
+import java.util.Map;
+import net.minecraft.core.Registry;
+public interface RegistryValidator<T> {
+    RegistryValidator<?> NONE;
+    RegistryValidator<?> NON_EMPTY;
+    static <T> RegistryValidator<T> none();
+    static <T> RegistryValidator<T> nonEmpty();
+    void validate(Registry<T> registry, Map<ResourceKey<?>, Exception> loadingErrors);
+}
+//// ResourceKey.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import java.util.function.UnaryOperator;
+import net.minecraft.core.Registry;
+import net.minecraft.network.codec.StreamCodec;
+public class ResourceKey<T> {
+    public static final StreamCodec<ByteBuf, ResourceKey<? extends Registry<?>>> REGISTRY_STREAM_CODEC;
+    public static <T> Codec<ResourceKey<T>> codec(ResourceKey<? extends Registry<T>> registryName);
+    public static <T> StreamCodec<ByteBuf, ResourceKey<T>> streamCodec(ResourceKey<? extends Registry<T>> registryName);
+    public static <T> ResourceKey<T> create(ResourceKey<? extends Registry<T>> registryName, Identifier location);
+    public static <T> ResourceKey<Registry<T>> createRegistryKey(Identifier identifier);
+    private ResourceKey(Identifier registryName, Identifier identifier);
+    public String toString();
+    public boolean isFor(ResourceKey<? extends Registry<?>> registry);
+    public <E> Optional<ResourceKey<E>> cast(ResourceKey<? extends Registry<E>> registry);
+    public <E> ResourceKey<E> dependent(ResourceKey<? extends Registry<E>> registryKey, String suffix);
+    public <E> ResourceKey<E> dependent(ResourceKey<? extends Registry<E>> registryKey, UnaryOperator<String> decoration);
+    public Identifier identifier();
+    public Identifier registry();
+    public ResourceKey<Registry<T>> registryKey();
+    static record InternKey(Identifier registry, Identifier identifier) {
+    }
+}
+//// ResourceManagerRegistryLoadTask.java
+import com.mojang.serialization.Lifecycle;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import net.minecraft.server.packs.resources.ResourceManager;
+public class ResourceManagerRegistryLoadTask<T> extends RegistryLoadTask<T> {
+    public ResourceManagerRegistryLoadTask(RegistryDataLoader.RegistryData<T> data, Lifecycle lifecycle, Map<ResourceKey<?>, Exception> loadingErrors, ResourceManager resourceManager);
+    public CompletableFuture<?> load(RegistryOps.RegistryInfoLookup context, Executor executor);
+}

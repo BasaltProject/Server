@@ -1,0 +1,228 @@
+//// AcaciaFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class AcaciaFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<AcaciaFoliagePlacer> CODEC;
+    public AcaciaFoliagePlacer(IntProvider radius, IntProvider offset);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// BlobFoliagePlacer.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class BlobFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<BlobFoliagePlacer> CODEC;
+    protected final int height;
+    protected static <P extends BlobFoliagePlacer> Products.P3<RecordCodecBuilder.Mu<P>, IntProvider, IntProvider, Integer> blobParts(RecordCodecBuilder.Instance<P> instance);
+    public BlobFoliagePlacer(IntProvider radius, IntProvider offset, int height);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// BushFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class BushFoliagePlacer extends BlobFoliagePlacer {
+    public static final MapCodec<BushFoliagePlacer> CODEC;
+    public BushFoliagePlacer(IntProvider radius, IntProvider offset, int height);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// CherryFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class CherryFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<CherryFoliagePlacer> CODEC;
+    public CherryFoliagePlacer(IntProvider radius, IntProvider offset, IntProvider height, float wideBottomLayerHoleChance, float cornerHoleChance, float hangingLeavesChance, float hangingLeavesExtensionChance);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// DarkOakFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class DarkOakFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<DarkOakFoliagePlacer> CODEC;
+    public DarkOakFoliagePlacer(IntProvider radius, IntProvider offset);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocationSigned(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// FancyFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class FancyFoliagePlacer extends BlobFoliagePlacer {
+    public static final MapCodec<FancyFoliagePlacer> CODEC;
+    public FancyFoliagePlacer(IntProvider radius, IntProvider offset, int height);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// FoliagePlacer.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public abstract class FoliagePlacer {
+    public static final Codec<FoliagePlacer> CODEC;
+    protected final IntProvider radius;
+    protected final IntProvider offset;
+    protected static <P extends FoliagePlacer> Products.P2<RecordCodecBuilder.Mu<P>, IntProvider, IntProvider> foliagePlacerParts(RecordCodecBuilder.Instance<P> instance);
+    public FoliagePlacer(IntProvider radius, IntProvider offset);
+    protected abstract FoliagePlacerType<?> type();
+    public void createFoliage(WorldGenLevel level, FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius);
+    protected abstract void createFoliage(WorldGenLevel level, FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public abstract int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    public int foliageRadius(RandomSource random, int trunkHeight);
+    protected abstract boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+    protected boolean shouldSkipLocationSigned(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+    protected void placeLeavesRow(WorldGenLevel level, FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, BlockPos origin, int currentRadius, int y, boolean doubleTrunk);
+    protected final void placeLeavesRowWithHangingLeavesBelow(WorldGenLevel level, FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, BlockPos origin, int currentRadius, int y, boolean doubleTrunk, float hangingLeavesChance, float hangingLeavesExtensionChance);
+    protected static boolean tryPlaceLeaf(WorldGenLevel level, FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, BlockPos pos);
+    public static record FoliageAttachment(BlockPos pos, int radiusOffsetXZ, int foliageHeightOffset, int sizeX, int sizeZ) {
+        public FoliageAttachment(BlockPos pos, int radiusOffsetXZ, boolean doubleTrunk);
+        public FoliageAttachment(BlockPos pos, int radiusOffsetXZ, int sizeX, int sizeZ);
+        public boolean doubleTrunk();
+    }
+    public interface FoliageSetter {
+        void set(BlockPos pos, BlockState state);
+        boolean isSet(BlockPos pos);
+    }
+}
+//// FoliagePlacerType.java
+import com.mojang.serialization.MapCodec;
+public class FoliagePlacerType<P extends FoliagePlacer> {
+    public static final FoliagePlacerType<BlobFoliagePlacer> BLOB_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<SpruceFoliagePlacer> SPRUCE_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<PineFoliagePlacer> PINE_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<AcaciaFoliagePlacer> ACACIA_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<BushFoliagePlacer> BUSH_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<FancyFoliagePlacer> FANCY_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<MegaJungleFoliagePlacer> MEGA_JUNGLE_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<MegaPineFoliagePlacer> MEGA_PINE_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<DarkOakFoliagePlacer> DARK_OAK_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<RandomSpreadFoliagePlacer> RANDOM_SPREAD_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<CherryFoliagePlacer> CHERRY_FOLIAGE_PLACER;
+    public static final FoliagePlacerType<PoplarFoliagePlacer> POPLAR_FOLIAGE_PLACER;
+    private FoliagePlacerType(MapCodec<P> codec);
+    public MapCodec<P> codec();
+}
+//// MegaJungleFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class MegaJungleFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<MegaJungleFoliagePlacer> CODEC;
+    protected final int height;
+    public MegaJungleFoliagePlacer(IntProvider radius, IntProvider offset, int height);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// MegaPineFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class MegaPineFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<MegaPineFoliagePlacer> CODEC;
+    public MegaPineFoliagePlacer(IntProvider radius, IntProvider offset, IntProvider crownHeight);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// PineFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class PineFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<PineFoliagePlacer> CODEC;
+    public PineFoliagePlacer(IntProvider radius, IntProvider offset, IntProvider height);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageRadius(RandomSource random, int trunkHeight);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// PoplarFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class PoplarFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<PoplarFoliagePlacer> CODEC;
+    public PoplarFoliagePlacer(IntProvider radius, IntProvider offset, IntProvider height, float sideHoleChance);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocationSigned(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// RandomSpreadFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class RandomSpreadFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<RandomSpreadFoliagePlacer> CODEC;
+    public RandomSpreadFoliagePlacer(IntProvider radius, IntProvider offset, IntProvider foliageHeight, int leafPlacementAttempts);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}
+//// SpruceFoliagePlacer.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+public class SpruceFoliagePlacer extends FoliagePlacer {
+    public static final MapCodec<SpruceFoliagePlacer> CODEC;
+    public SpruceFoliagePlacer(IntProvider radius, IntProvider offset, IntProvider trunkHeight);
+    protected FoliagePlacerType<?> type();
+    protected void createFoliage(WorldGenLevel level, FoliagePlacer.FoliageSetter foliageSetter, RandomSource random, TreeFeature tree, int treeHeight, FoliagePlacer.FoliageAttachment foliageAttachment, int foliageHeight, int leafRadius, int offset);
+    public int foliageHeight(RandomSource random, int treeHeight, TreeFeature tree);
+    protected boolean shouldSkipLocation(RandomSource random, int dx, int y, int dz, int currentRadius, boolean doubleTrunk);
+}

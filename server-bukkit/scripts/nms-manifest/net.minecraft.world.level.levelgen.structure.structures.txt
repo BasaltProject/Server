@@ -1,0 +1,1127 @@
+//// BuriedTreasurePieces.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+public class BuriedTreasurePieces {
+    public static class BuriedTreasurePiece extends StructurePiece {
+        public BuriedTreasurePiece(BlockPos offset);
+        public BuriedTreasurePiece(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+}
+//// BuriedTreasureStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class BuriedTreasureStructure extends Structure {
+    public static final MapCodec<BuriedTreasureStructure> CODEC;
+    public BuriedTreasureStructure(Structure.StructureSettings settings);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+}
+//// DesertPyramidPiece.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.ScatteredFeaturePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+public class DesertPyramidPiece extends ScatteredFeaturePiece {
+    public static final int WIDTH = 21;
+    public static final int DEPTH = 21;
+    public DesertPyramidPiece(RandomSource random, int west, int north);
+    public DesertPyramidPiece(CompoundTag tag);
+    protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+    public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    public List<BlockPos> getPotentialSuspiciousSandWorldPositions();
+    public BlockPos getRandomCollapsedRoofPos();
+}
+//// DesertPyramidStructure.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.SinglePieceStructure;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+import net.minecraft.world.level.levelgen.structure.pieces.PiecesContainer;
+public class DesertPyramidStructure extends SinglePieceStructure {
+    public static final MapCodec<DesertPyramidStructure> CODEC;
+    public DesertPyramidStructure(Structure.StructureSettings settings);
+    public void afterPlace(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, PiecesContainer pieces);
+    public StructureType<?> type();
+}
+//// EndCityPieces.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.TemplateStructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class EndCityPieces {
+    public static void startHouseTower(StructureTemplateManager structureTemplateManager, BlockPos origin, Rotation rotation, List<StructurePiece> pieces, RandomSource random);
+    public static class EndCityPiece extends TemplateStructurePiece {
+        public EndCityPiece(StructureTemplateManager structureTemplateManager, String templateName, BlockPos position, Rotation rotation, boolean overwrite);
+        public EndCityPiece(StructureTemplateManager structureTemplateManager, CompoundTag tag);
+        protected Identifier makeTemplateLocation();
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected void handleDataMarker(String markerId, BlockPos position, ServerLevelAccessor level, RandomSource random, BoundingBox chunkBB);
+    }
+    interface SectionGenerator {
+        void init();
+        boolean generate(StructureTemplateManager structureTemplateManager, int genDepth, EndCityPiece parent, BlockPos offset, List<StructurePiece> pieces, RandomSource random);
+    }
+}
+//// EndCityStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class EndCityStructure extends Structure {
+    public static final MapCodec<EndCityStructure> CODEC;
+    public EndCityStructure(Structure.StructureSettings settings);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+}
+//// IglooPieces.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.TemplateStructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class IglooPieces {
+    public static final int GENERATION_HEIGHT = 90;
+    public static void addPieces(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation, StructurePiecesBuilder builder, RandomSource random);
+    public static class IglooPiece extends TemplateStructurePiece {
+        public IglooPiece(StructureTemplateManager structureTemplateManager, Identifier templateLocation, BlockPos position, Rotation rotation, int depth);
+        public IglooPiece(StructureTemplateManager structureTemplateManager, CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected void handleDataMarker(String markerId, BlockPos position, ServerLevelAccessor level, RandomSource random, BoundingBox chunkBB);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+}
+//// IglooStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class IglooStructure extends Structure {
+    public static final MapCodec<IglooStructure> CODEC;
+    public IglooStructure(Structure.StructureSettings settings);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+}
+//// JigsawStructure.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+import net.minecraft.world.level.levelgen.structure.pools.DimensionPadding;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+import net.minecraft.world.level.levelgen.structure.pools.alias.PoolAliasBinding;
+import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
+public final class JigsawStructure extends Structure {
+    public static final DimensionPadding DEFAULT_DIMENSION_PADDING;
+    public static final LiquidSettings DEFAULT_LIQUID_SETTINGS;
+    public static final int MAX_TOTAL_STRUCTURE_RANGE = 128;
+    public static final int MIN_DEPTH = 0;
+    public static final int MAX_DEPTH = 20;
+    public static final MapCodec<JigsawStructure> CODEC;
+    public JigsawStructure(Structure.StructureSettings settings, Holder<StructureTemplatePool> startPool, Optional<Identifier> startJigsawName, int maxDepth, HeightProvider startHeight, boolean useExpansionHack, Optional<Heightmap.Types> projectStartToHeightmap, MaxDistance maxDistanceFromCenter, List<PoolAliasBinding> poolAliases, DimensionPadding dimensionPadding, LiquidSettings liquidSettings);
+    public JigsawStructure(Structure.StructureSettings settings, Holder<StructureTemplatePool> startPool, int maxDepth, HeightProvider startHeight, boolean useExpansionHack, Heightmap.Types projectStartToHeightmap);
+    public JigsawStructure(Structure.StructureSettings settings, Holder<StructureTemplatePool> startPool, int maxDepth, HeightProvider startHeight, boolean useExpansionHack);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+    public Holder<StructureTemplatePool> getStartPool();
+    public List<PoolAliasBinding> getPoolAliases();
+    public static record MaxDistance(int horizontal, int vertical) {
+        public static final Codec<MaxDistance> CODEC;
+        public MaxDistance(int value);
+    }
+}
+//// JungleTemplePiece.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.ScatteredFeaturePiece;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+public class JungleTemplePiece extends ScatteredFeaturePiece {
+    public static final int WIDTH = 12;
+    public static final int DEPTH = 15;
+    public JungleTemplePiece(RandomSource random, int west, int north);
+    public JungleTemplePiece(CompoundTag tag);
+    protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+    public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    static class MossStoneSelector extends StructurePiece.BlockSelector {
+        public void next(RandomSource random, int worldX, int worldY, int worldZ, boolean isEdge);
+    }
+}
+//// JungleTempleStructure.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.levelgen.structure.SinglePieceStructure;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class JungleTempleStructure extends SinglePieceStructure {
+    public static final MapCodec<JungleTempleStructure> CODEC;
+    public JungleTempleStructure(Structure.StructureSettings settings);
+    public StructureType<?> type();
+}
+//// MineshaftPieces.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class MineshaftPieces {
+    public static final int MAGIC_START_Y = 50;
+    static abstract class MineShaftPiece extends StructurePiece {
+        protected MineshaftStructure.Type type;
+        public MineShaftPiece(StructurePieceType pieceType, int genDepth, MineshaftStructure.Type type, BoundingBox boundingBox);
+        public MineShaftPiece(StructurePieceType type, CompoundTag tag);
+        protected boolean canBeReplaced(LevelReader level, int x, int y, int z, BoundingBox chunkBB);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected boolean isSupportingBox(BlockGetter level, BoundingBox chunkBB, int x0, int x1, int y1, int z0);
+        protected boolean isInInvalidLocation(LevelAccessor level, BoundingBox chunkBB);
+        protected void setPlanksBlock(WorldGenLevel level, BoundingBox chunkBB, BlockState planksBlock, int x, int y, int z);
+    }
+    public static class MineShaftRoom extends MineShaftPiece {
+        public MineShaftRoom(int genDepth, RandomSource random, int west, int north, MineshaftStructure.Type type);
+        public MineShaftRoom(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+        public void move(int dx, int dy, int dz);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+    }
+    public static class MineShaftCorridor extends MineShaftPiece {
+        public MineShaftCorridor(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public MineShaftCorridor(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction, MineshaftStructure.Type type);
+        public static BoundingBox findCorridorSize(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        protected boolean createChest(WorldGenLevel level, BoundingBox chunkBB, RandomSource random, int x, int y, int z, ResourceKey<LootTable> lootTable);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+        protected void fillColumnDown(WorldGenLevel level, BlockState columnState, int x, int startY, int z, BoundingBox chunkBB);
+        protected void fillPillarDownOrChainUp(WorldGenLevel level, BlockState pillarState, int x, int y, int z, BoundingBox chunkBB);
+    }
+    public static class MineShaftCrossing extends MineShaftPiece {
+        public MineShaftCrossing(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public MineShaftCrossing(int genDepth, BoundingBox boundingBox, Direction direction, MineshaftStructure.Type type);
+        public static BoundingBox findCrossing(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class MineShaftStairs extends MineShaftPiece {
+        public MineShaftStairs(int genDepth, BoundingBox boundingBox, Direction direction, MineshaftStructure.Type type);
+        public MineShaftStairs(CompoundTag tag);
+        public static BoundingBox findStairs(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+}
+//// MineshaftStructure.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class MineshaftStructure extends Structure {
+    public static final MapCodec<MineshaftStructure> CODEC;
+    public MineshaftStructure(Structure.StructureSettings settings, Type type);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+    public static enum Type implements StringRepresentable {
+        NORMAL, MESA;
+        public static final Codec<Type> CODEC;
+        public String getName();
+        public static Type byId(int id);
+        public BlockState getWoodState();
+        public BlockState getPlanksState();
+        public BlockState getFenceState();
+        public String getSerializedName();
+    }
+}
+//// NetherFortressPieces.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
+public class NetherFortressPieces {
+    public static final int MAGIC_START_Y = 64;
+    static class PieceWeight {
+        public final Class<? extends NetherBridgePiece> pieceClass;
+        public final int weight;
+        public int placeCount;
+        public final int maxPlaceCount;
+        public final boolean allowInRow;
+        public PieceWeight(Class<? extends NetherBridgePiece> pieceClass, int weight, int maxPlaceCount, boolean allowInRow);
+        public PieceWeight(Class<? extends NetherBridgePiece> pieceClass, int weight, int maxPlaceCount);
+        public boolean doPlace(int depth);
+        public boolean isValid();
+    }
+    static abstract class NetherBridgePiece extends StructurePiece {
+        protected NetherBridgePiece(StructurePieceType type, int genDepth, BoundingBox boundingBox);
+        public NetherBridgePiece(StructurePieceType type, CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected StructurePiece generateChildForward(StartPiece startPiece, StructurePiecesBuilder builder, RandomSource random, int xOff, int yOff, boolean isCastle);
+        protected StructurePiece generateChildLeft(StartPiece startPiece, StructurePiecesBuilder builder, RandomSource random, int yOff, int zOff, boolean isCastle);
+        protected StructurePiece generateChildRight(StartPiece startPiece, StructurePiecesBuilder builder, RandomSource random, int yOff, int zOff, boolean isCastle);
+        protected static boolean isOkBox(BoundingBox box);
+    }
+    public static class StartPiece extends BridgeCrossing {
+        public final List<StructurePiece> pendingChildren;
+        public StartPiece(RandomSource random, int west, int north);
+        public StartPiece(CompoundTag tag);
+    }
+    public static class BridgeStraight extends NetherBridgePiece {
+        public BridgeStraight(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public BridgeStraight(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static BridgeStraight createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class BridgeEndFiller extends NetherBridgePiece {
+        public BridgeEndFiller(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public BridgeEndFiller(CompoundTag tag);
+        public static BridgeEndFiller createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class BridgeCrossing extends NetherBridgePiece {
+        public BridgeCrossing(int genDepth, BoundingBox boundingBox, Direction direction);
+        protected BridgeCrossing(int west, int north, Direction direction);
+        protected BridgeCrossing(StructurePieceType type, CompoundTag tag);
+        public BridgeCrossing(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static BridgeCrossing createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class RoomCrossing extends NetherBridgePiece {
+        public RoomCrossing(int genDepth, BoundingBox boundingBox, Direction direction);
+        public RoomCrossing(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static RoomCrossing createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class StairsRoom extends NetherBridgePiece {
+        public StairsRoom(int genDepth, BoundingBox boundingBox, Direction direction);
+        public StairsRoom(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static StairsRoom createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, int genDepth, Direction direction);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class MonsterThrone extends NetherBridgePiece {
+        public MonsterThrone(int genDepth, BoundingBox boundingBox, Direction direction);
+        public MonsterThrone(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public static MonsterThrone createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, int genDepth, Direction direction);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class CastleEntrance extends NetherBridgePiece {
+        public CastleEntrance(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public CastleEntrance(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static CastleEntrance createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class CastleStalkRoom extends NetherBridgePiece {
+        public CastleStalkRoom(int genDepth, BoundingBox boundingBox, Direction direction);
+        public CastleStalkRoom(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static CastleStalkRoom createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class CastleSmallCorridorPiece extends NetherBridgePiece {
+        public CastleSmallCorridorPiece(int genDepth, BoundingBox boundingBox, Direction direction);
+        public CastleSmallCorridorPiece(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static CastleSmallCorridorPiece createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class CastleSmallCorridorCrossingPiece extends NetherBridgePiece {
+        public CastleSmallCorridorCrossingPiece(int genDepth, BoundingBox boundingBox, Direction direction);
+        public CastleSmallCorridorCrossingPiece(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static CastleSmallCorridorCrossingPiece createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class CastleSmallCorridorRightTurnPiece extends NetherBridgePiece {
+        public CastleSmallCorridorRightTurnPiece(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public CastleSmallCorridorRightTurnPiece(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static CastleSmallCorridorRightTurnPiece createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class CastleSmallCorridorLeftTurnPiece extends NetherBridgePiece {
+        public CastleSmallCorridorLeftTurnPiece(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public CastleSmallCorridorLeftTurnPiece(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static CastleSmallCorridorLeftTurnPiece createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class CastleCorridorStairsPiece extends NetherBridgePiece {
+        public CastleCorridorStairsPiece(int genDepth, BoundingBox boundingBox, Direction direction);
+        public CastleCorridorStairsPiece(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static CastleCorridorStairsPiece createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class CastleCorridorTBalconyPiece extends NetherBridgePiece {
+        public CastleCorridorTBalconyPiece(int genDepth, BoundingBox boundingBox, Direction direction);
+        public CastleCorridorTBalconyPiece(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static CastleCorridorTBalconyPiece createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+}
+//// NetherFortressStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.biome.MobSpawnSettings;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class NetherFortressStructure extends Structure {
+    public static final WeightedList<MobSpawnSettings.SpawnerData> FORTRESS_ENEMIES;
+    public static final MapCodec<NetherFortressStructure> CODEC;
+    public NetherFortressStructure(Structure.StructureSettings settings);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+}
+//// NetherFossilPieces.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.TemplateStructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class NetherFossilPieces {
+    public static void addPieces(StructureTemplateManager structureTemplateManager, StructurePiecesBuilder builder, RandomSource random, BlockPos position);
+    public static class NetherFossilPiece extends TemplateStructurePiece {
+        public NetherFossilPiece(StructureTemplateManager structureTemplateManager, Identifier templateLocation, BlockPos position, Rotation rotation);
+        public NetherFossilPiece(StructureTemplateManager structureTemplateManager, CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected void handleDataMarker(String markerId, BlockPos position, ServerLevelAccessor level, RandomSource random, BoundingBox chunkBB);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+}
+//// NetherFossilStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class NetherFossilStructure extends Structure {
+    public static final MapCodec<NetherFossilStructure> CODEC;
+    public final HeightProvider height;
+    public NetherFossilStructure(Structure.StructureSettings settings, HeightProvider height);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+}
+//// OceanMonumentPieces.java
+import java.util.Set;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
+public class OceanMonumentPieces {
+    private OceanMonumentPieces();
+    protected static abstract class OceanMonumentPiece extends StructurePiece {
+        protected static final BlockState BASE_GRAY;
+        protected static final BlockState BASE_LIGHT;
+        protected static final BlockState BASE_BLACK;
+        protected static final BlockState DOT_DECO_DATA;
+        protected static final BlockState LAMP_BLOCK;
+        protected static final boolean DO_FILL = true;
+        protected static final BlockState FILL_BLOCK;
+        protected static final Set<Block> FILL_KEEP;
+        protected static final int GRIDROOM_WIDTH = 8;
+        protected static final int GRIDROOM_DEPTH = 8;
+        protected static final int GRIDROOM_HEIGHT = 4;
+        protected static final int GRID_WIDTH = 5;
+        protected static final int GRID_DEPTH = 5;
+        protected static final int GRID_HEIGHT = 3;
+        protected static final int GRID_FLOOR_COUNT = 25;
+        protected static final int GRID_SIZE = 75;
+        protected static final int GRIDROOM_SOURCE_INDEX;
+        protected static final int GRIDROOM_TOP_CONNECT_INDEX;
+        protected static final int GRIDROOM_LEFTWING_CONNECT_INDEX;
+        protected static final int GRIDROOM_RIGHTWING_CONNECT_INDEX;
+        protected static final int LEFTWING_INDEX = 1001;
+        protected static final int RIGHTWING_INDEX = 1002;
+        protected static final int PENTHOUSE_INDEX = 1003;
+        protected RoomDefinition roomDefinition;
+        protected static int getRoomIndex(int roomX, int roomY, int roomZ);
+        public OceanMonumentPiece(StructurePieceType type, Direction orientation, int genDepth, BoundingBox boundingBox);
+        protected OceanMonumentPiece(StructurePieceType type, int genDepth, Direction orientation, RoomDefinition roomDefinition, int roomWidth, int roomHeight, int roomDepth);
+        public OceanMonumentPiece(StructurePieceType type, CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected void generateWaterBox(WorldGenLevel level, BoundingBox chunkBB, int x0, int y0, int z0, int x1, int y1, int z1);
+        protected void generateDefaultFloor(WorldGenLevel level, BoundingBox chunkBB, int xOff, int zOff, boolean downOpening);
+        protected void generateBoxOnFillOnly(WorldGenLevel level, BoundingBox chunkBB, int x0, int y0, int z0, int x1, int y1, int z1, BlockState targetBlock);
+        protected boolean chunkIntersects(BoundingBox chunkBB, int x0, int z0, int x1, int z1);
+        protected void spawnElder(WorldGenLevel level, BoundingBox chunkBB, int x, int y, int z);
+    }
+    public static class MonumentBuilding extends OceanMonumentPiece {
+        public static final int BIOME_RANGE_CHECK = 29;
+        public MonumentBuilding(RandomSource random, int west, int north, Direction direction);
+        public MonumentBuilding(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentEntryRoom extends OceanMonumentPiece {
+        public OceanMonumentEntryRoom(Direction orientation, RoomDefinition definition);
+        public OceanMonumentEntryRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentSimpleRoom extends OceanMonumentPiece {
+        public OceanMonumentSimpleRoom(Direction orientation, RoomDefinition definition, RandomSource random);
+        public OceanMonumentSimpleRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentSimpleTopRoom extends OceanMonumentPiece {
+        public OceanMonumentSimpleTopRoom(Direction orientation, RoomDefinition definition);
+        public OceanMonumentSimpleTopRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentDoubleYRoom extends OceanMonumentPiece {
+        public OceanMonumentDoubleYRoom(Direction orientation, RoomDefinition definition);
+        public OceanMonumentDoubleYRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentDoubleXRoom extends OceanMonumentPiece {
+        public OceanMonumentDoubleXRoom(Direction orientation, RoomDefinition definition);
+        public OceanMonumentDoubleXRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentDoubleZRoom extends OceanMonumentPiece {
+        public OceanMonumentDoubleZRoom(Direction orientation, RoomDefinition definition);
+        public OceanMonumentDoubleZRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentDoubleXYRoom extends OceanMonumentPiece {
+        public OceanMonumentDoubleXYRoom(Direction orientation, RoomDefinition definition);
+        public OceanMonumentDoubleXYRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentDoubleYZRoom extends OceanMonumentPiece {
+        public OceanMonumentDoubleYZRoom(Direction orientation, RoomDefinition definition);
+        public OceanMonumentDoubleYZRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentCoreRoom extends OceanMonumentPiece {
+        public OceanMonumentCoreRoom(Direction orientation, RoomDefinition definition);
+        public OceanMonumentCoreRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentWingRoom extends OceanMonumentPiece {
+        public OceanMonumentWingRoom(Direction orientation, BoundingBox boundingBox, int randomValue);
+        public OceanMonumentWingRoom(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class OceanMonumentPenthouse extends OceanMonumentPiece {
+        public OceanMonumentPenthouse(Direction orientation, BoundingBox boundingBox);
+        public OceanMonumentPenthouse(CompoundTag tag);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    static class RoomDefinition {
+        public RoomDefinition(int roomIndex);
+        public void setConnection(Direction direction, RoomDefinition definition);
+        public void updateOpenings();
+        public boolean findSource(int scanIndex);
+        public boolean isSpecial();
+        public int countOpenings();
+    }
+    static class FitSimpleRoom implements MonumentRoomFitter {
+        public boolean fits(RoomDefinition definition);
+        public OceanMonumentPiece create(Direction orientation, RoomDefinition definition, RandomSource random);
+    }
+    static class FitSimpleTopRoom implements MonumentRoomFitter {
+        public boolean fits(RoomDefinition definition);
+        public OceanMonumentPiece create(Direction orientation, RoomDefinition definition, RandomSource random);
+    }
+    static class FitDoubleYRoom implements MonumentRoomFitter {
+        public boolean fits(RoomDefinition definition);
+        public OceanMonumentPiece create(Direction orientation, RoomDefinition definition, RandomSource random);
+    }
+    static class FitDoubleXRoom implements MonumentRoomFitter {
+        public boolean fits(RoomDefinition definition);
+        public OceanMonumentPiece create(Direction orientation, RoomDefinition definition, RandomSource random);
+    }
+    static class FitDoubleZRoom implements MonumentRoomFitter {
+        public boolean fits(RoomDefinition definition);
+        public OceanMonumentPiece create(Direction orientation, RoomDefinition definition, RandomSource random);
+    }
+    static class FitDoubleXYRoom implements MonumentRoomFitter {
+        public boolean fits(RoomDefinition definition);
+        public OceanMonumentPiece create(Direction orientation, RoomDefinition definition, RandomSource random);
+    }
+    static class FitDoubleYZRoom implements MonumentRoomFitter {
+        public boolean fits(RoomDefinition definition);
+        public OceanMonumentPiece create(Direction orientation, RoomDefinition definition, RandomSource random);
+    }
+    interface MonumentRoomFitter {
+        boolean fits(RoomDefinition definition);
+        OceanMonumentPiece create(Direction orientation, RoomDefinition definition, RandomSource random);
+    }
+}
+//// OceanMonumentStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+import net.minecraft.world.level.levelgen.structure.pieces.PiecesContainer;
+public class OceanMonumentStructure extends Structure {
+    public static final MapCodec<OceanMonumentStructure> CODEC;
+    public OceanMonumentStructure(Structure.StructureSettings settings);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public static PiecesContainer regeneratePiecesAfterLoad(ChunkPos chunkPos, long seed, PiecesContainer savedPieces);
+    public StructureType<?> type();
+}
+//// OceanRuinPieces.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.TemplateStructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class OceanRuinPieces {
+    public static void addPieces(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation, StructurePiecesBuilder builder, RandomSource random, OceanRuinStructure structure);
+    public static class OceanRuinPiece extends TemplateStructurePiece {
+        public OceanRuinPiece(StructureTemplateManager structureTemplateManager, Identifier templateLocation, BlockPos position, Rotation rotation, float integrity, OceanRuinStructure.Type biomeType, boolean isLarge);
+        private OceanRuinPiece(StructureTemplateManager structureTemplateManager, CompoundTag tag, Rotation rotation, float integrity, OceanRuinStructure.Type biomeType, boolean isLarge);
+        public static OceanRuinPiece create(StructureTemplateManager structureTemplateManager, CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected void handleDataMarker(String markerId, BlockPos position, ServerLevelAccessor level, RandomSource random, BoundingBox chunkBB);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+}
+//// OceanRuinStructure.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class OceanRuinStructure extends Structure {
+    public static final MapCodec<OceanRuinStructure> CODEC;
+    public final Type biomeTemp;
+    public final float largeProbability;
+    public final float clusterProbability;
+    public OceanRuinStructure(Structure.StructureSettings settings, Type biomeTemp, float largeProbability, float clusterProbability);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+    public static enum Type implements StringRepresentable {
+        WARM, COLD;
+        public static final Codec<Type> CODEC;
+        public static final Codec<Type> LEGACY_CODEC;
+        public String getName();
+        public String getSerializedName();
+    }
+}
+//// RuinedPortalPiece.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.TemplateStructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class RuinedPortalPiece extends TemplateStructurePiece {
+    public RuinedPortalPiece(HolderLookup.Provider registries, StructureTemplateManager structureTemplateManager, BlockPos templatePosition, VerticalPlacement verticalPlacement, Properties properties, Identifier templateLocation, StructureTemplate template, Rotation rotation, Mirror mirror, BlockPos pivot);
+    public RuinedPortalPiece(StructurePieceSerializationContext context, CompoundTag tag);
+    protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+    public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    protected void handleDataMarker(String markerId, BlockPos pos, ServerLevelAccessor level, RandomSource random, BoundingBox chunkBB);
+    public static Heightmap.Types getHeightMapType(VerticalPlacement verticalPlacement);
+    public static record Properties(boolean cold, float mossiness, boolean airPocket, boolean overgrown, boolean vines, boolean replaceWithBlackstone) {
+        public static final Codec<Properties> CODEC;
+    }
+    public static enum VerticalPlacement implements StringRepresentable {
+        ON_LAND_SURFACE, PARTLY_BURIED, ON_OCEAN_FLOOR, IN_MOUNTAIN, UNDERGROUND, IN_NETHER;
+        public static final Codec<VerticalPlacement> CODEC;
+        public String getName();
+        public String getSerializedName();
+    }
+}
+//// RuinedPortalStructure.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class RuinedPortalStructure extends Structure {
+    public static final MapCodec<RuinedPortalStructure> CODEC;
+    public RuinedPortalStructure(Structure.StructureSettings settings, List<Setup> setups);
+    public RuinedPortalStructure(Structure.StructureSettings settings, Setup setup);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+    public static record Setup(RuinedPortalPiece.VerticalPlacement placement, float airPocketProbability, float mossiness, boolean overgrown, boolean vines, boolean canBeCold, boolean replaceWithBlackstone, float weight) {
+        public static final Codec<Setup> CODEC;
+    }
+}
+//// ShipwreckPieces.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.TemplateStructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class ShipwreckPieces {
+    public static ShipwreckPiece addRandomPiece(StructureTemplateManager structureTemplateManager, BlockPos position, Rotation rotation, StructurePiecesBuilder builder, RandomSource random, boolean isBeached);
+    public static class ShipwreckPiece extends TemplateStructurePiece {
+        public ShipwreckPiece(StructureTemplateManager structureTemplateManager, Identifier templateLocation, BlockPos position, Rotation rotation, boolean isBeached);
+        public ShipwreckPiece(StructureTemplateManager structureTemplateManager, CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected void handleDataMarker(String markerId, BlockPos position, ServerLevelAccessor level, RandomSource random, BoundingBox chunkBB);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+        public boolean isTooBigToFitInWorldGenRegion();
+        public int calculateBeachedPosition(int minY, RandomSource random);
+        public void adjustPositionHeight(int newHeight);
+    }
+}
+//// ShipwreckStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class ShipwreckStructure extends Structure {
+    public static final MapCodec<ShipwreckStructure> CODEC;
+    public final boolean isBeached;
+    public ShipwreckStructure(Structure.StructureSettings settings, boolean isBeached);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+}
+//// StrongholdPieces.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
+public class StrongholdPieces {
+    public static final int MAGIC_START_Y = 64;
+    public static void resetPieces();
+    static class PieceWeight {
+        public final Class<? extends StrongholdPiece> pieceClass;
+        public final int weight;
+        public int placeCount;
+        public final int maxPlaceCount;
+        public PieceWeight(Class<? extends StrongholdPiece> pieceClass, int weight, int maxPlaceCount);
+        public boolean doPlace(int depth);
+        public boolean isValid();
+    }
+    static abstract class StrongholdPiece extends StructurePiece {
+        protected SmallDoorType entryDoor;
+        protected StrongholdPiece(StructurePieceType type, int genDepth, BoundingBox boundingBox);
+        public StrongholdPiece(StructurePieceType type, CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected void generateSmallDoor(WorldGenLevel level, RandomSource random, BoundingBox chunkBB, SmallDoorType doorType, int footX, int footY, int footZ);
+        protected SmallDoorType randomSmallDoor(RandomSource random);
+        protected StructurePiece generateSmallDoorChildForward(StartPiece startPiece, StructurePiecesBuilder builder, RandomSource random, int xOff, int yOff);
+        protected StructurePiece generateSmallDoorChildLeft(StartPiece startPiece, StructurePiecesBuilder builder, RandomSource random, int yOff, int zOff);
+        protected StructurePiece generateSmallDoorChildRight(StartPiece startPiece, StructurePiecesBuilder builder, RandomSource random, int yOff, int zOff);
+        protected static boolean isOkBox(BoundingBox box);
+        protected static enum SmallDoorType {
+            OPENING, WOOD_DOOR, GRATES, IRON_DOOR;
+            public static final Codec<SmallDoorType> LEGACY_CODEC;
+        }
+    }
+    public static class FillerCorridor extends StrongholdPiece {
+        public FillerCorridor(int genDepth, BoundingBox boundingBox, Direction direction);
+        public FillerCorridor(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public static BoundingBox findPieceBox(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class StairsDown extends StrongholdPiece {
+        public StairsDown(StructurePieceType type, int genDepth, int west, int north, Direction direction);
+        public StairsDown(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public StairsDown(StructurePieceType type, CompoundTag tag);
+        public StairsDown(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static StairsDown createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class StartPiece extends StairsDown {
+        public PieceWeight previousPiece;
+        public PortalRoom portalRoomPiece;
+        public final List<StructurePiece> pendingChildren;
+        public StartPiece(RandomSource random, int west, int north);
+        public StartPiece(CompoundTag tag);
+        public BlockPos getLocatorPosition();
+    }
+    public static class Straight extends StrongholdPiece {
+        public Straight(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public Straight(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static Straight createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class ChestCorridor extends StrongholdPiece {
+        public ChestCorridor(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public ChestCorridor(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static ChestCorridor createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class StraightStairsDown extends StrongholdPiece {
+        public StraightStairsDown(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public StraightStairsDown(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static StraightStairsDown createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static abstract class Turn extends StrongholdPiece {
+        protected static final int WIDTH;
+        protected static final int HEIGHT;
+        protected static final int DEPTH;
+        protected Turn(StructurePieceType type, int genDepth, BoundingBox boundingBox);
+        public Turn(StructurePieceType type, CompoundTag tag);
+    }
+    public static class LeftTurn extends Turn {
+        public LeftTurn(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public LeftTurn(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static LeftTurn createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class RightTurn extends Turn {
+        public RightTurn(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public RightTurn(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static RightTurn createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class RoomCrossing extends StrongholdPiece {
+        protected static final int WIDTH;
+        protected static final int HEIGHT;
+        protected static final int DEPTH;
+        protected final int type;
+        public RoomCrossing(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public RoomCrossing(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static RoomCrossing createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class PrisonHall extends StrongholdPiece {
+        protected static final int WIDTH;
+        protected static final int HEIGHT;
+        protected static final int DEPTH;
+        public PrisonHall(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public PrisonHall(CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static PrisonHall createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class Library extends StrongholdPiece {
+        protected static final int WIDTH;
+        protected static final int HEIGHT;
+        protected static final int TALL_HEIGHT = 11;
+        protected static final int DEPTH;
+        public Library(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public Library(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public static Library createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class FiveCrossing extends StrongholdPiece {
+        protected static final int WIDTH;
+        protected static final int HEIGHT;
+        protected static final int DEPTH;
+        public FiveCrossing(int genDepth, RandomSource random, BoundingBox boundingBox, Direction direction);
+        public FiveCrossing(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static FiveCrossing createPiece(StructurePiecesBuilder builder, RandomSource random, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    public static class PortalRoom extends StrongholdPiece {
+        protected static final int WIDTH;
+        protected static final int HEIGHT;
+        protected static final int DEPTH;
+        public PortalRoom(int genDepth, BoundingBox boundingBox, Direction direction);
+        public PortalRoom(CompoundTag tag);
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        public void addChildren(StructurePiece startPiece, StructurePiecesBuilder builder, RandomSource random);
+        public static PortalRoom createPiece(StructurePiecesBuilder builder, int footX, int footY, int footZ, Direction direction, int genDepth);
+        public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+    }
+    static class SmoothStoneSelector extends StructurePiece.BlockSelector {
+        public void next(RandomSource random, int worldX, int worldY, int worldZ, boolean isEdge);
+    }
+}
+//// StrongholdStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class StrongholdStructure extends Structure {
+    public static final MapCodec<StrongholdStructure> CODEC;
+    public StrongholdStructure(Structure.StructureSettings settings);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+}
+//// SwampHutPiece.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.ScatteredFeaturePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+public class SwampHutPiece extends ScatteredFeaturePiece {
+    public SwampHutPiece(RandomSource random, int west, int north);
+    public SwampHutPiece(CompoundTag tag);
+    protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+    public void postProcess(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos);
+}
+//// SwampHutStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+public class SwampHutStructure extends Structure {
+    public static final MapCodec<SwampHutStructure> CODEC;
+    public SwampHutStructure(Structure.StructureSettings settings);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public StructureType<?> type();
+}
+//// WoodlandMansionPieces.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.TemplateStructurePiece;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public class WoodlandMansionPieces {
+    public static void generateMansion(StructureTemplateManager structureTemplateManager, BlockPos origin, Rotation rotation, List<WoodlandMansionPiece> pieces, RandomSource random);
+    public static class WoodlandMansionPiece extends TemplateStructurePiece {
+        public WoodlandMansionPiece(StructureTemplateManager structureTemplateManager, String templateName, BlockPos position, Rotation rotation);
+        public WoodlandMansionPiece(StructureTemplateManager structureTemplateManager, String templateName, BlockPos position, Rotation rotation, Mirror mirror);
+        public WoodlandMansionPiece(StructureTemplateManager structureTemplateManager, CompoundTag tag);
+        protected Identifier makeTemplateLocation();
+        protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag);
+        protected void handleDataMarker(String markerId, BlockPos position, ServerLevelAccessor level, RandomSource random, BoundingBox chunkBB);
+    }
+    static class PlacementData {
+        public Rotation rotation;
+        public BlockPos position;
+        public String wallType;
+    }
+    static class MansionPiecePlacer {
+        public MansionPiecePlacer(StructureTemplateManager structureTemplateManager, RandomSource random);
+        public void createMansion(BlockPos origin, Rotation rotation, List<WoodlandMansionPiece> pieces, MansionGrid mansion);
+    }
+    static class MansionGrid {
+        public MansionGrid(RandomSource random);
+        public static boolean isHouse(SimpleGrid grid, int x, int y);
+        public boolean isRoomId(SimpleGrid grid, int x, int y, int floor, int roomId);
+        public Direction get1x2RoomDirection(SimpleGrid grid, int x, int y, int floorNum, int roomId);
+        static record GridPos(int x, int y) {
+        }
+    }
+    static class SimpleGrid {
+        public SimpleGrid(int width, int height, int valueIfOutside);
+        public void set(int x, int y, int value);
+        public void set(int x0, int y0, int x1, int y1, int value);
+        public int get(int x, int y);
+        public void setif(int x, int y, int ifValue, int value);
+        public boolean edgesTo(int x, int y, int ifValue);
+    }
+    static abstract class FloorRoomCollection {
+        public abstract String get1x1(RandomSource random);
+        public abstract String get1x1Secret(RandomSource random);
+        public abstract String get1x2SideEntrance(RandomSource random, boolean isStairsRoom);
+        public abstract String get1x2FrontEntrance(RandomSource random, boolean isStairsRoom);
+        public abstract String get1x2Secret(RandomSource random);
+        public abstract String get2x2(RandomSource random);
+        public abstract String get2x2Secret(RandomSource random);
+    }
+    static class FirstFloorRoomCollection extends FloorRoomCollection {
+        public String get1x1(RandomSource random);
+        public String get1x1Secret(RandomSource random);
+        public String get1x2SideEntrance(RandomSource random, boolean isStairsRoom);
+        public String get1x2FrontEntrance(RandomSource random, boolean isStairsRoom);
+        public String get1x2Secret(RandomSource random);
+        public String get2x2(RandomSource random);
+        public String get2x2Secret(RandomSource random);
+    }
+    static class SecondFloorRoomCollection extends FloorRoomCollection {
+        public String get1x1(RandomSource random);
+        public String get1x1Secret(RandomSource random);
+        public String get1x2SideEntrance(RandomSource random, boolean isStairsRoom);
+        public String get1x2FrontEntrance(RandomSource random, boolean isStairsRoom);
+        public String get1x2Secret(RandomSource random);
+        public String get2x2(RandomSource random);
+        public String get2x2Secret(RandomSource random);
+    }
+    static class ThirdFloorRoomCollection extends SecondFloorRoomCollection {
+    }
+}
+//// WoodlandMansionStructure.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+import net.minecraft.world.level.levelgen.structure.pieces.PiecesContainer;
+public class WoodlandMansionStructure extends Structure {
+    public static final MapCodec<WoodlandMansionStructure> CODEC;
+    public WoodlandMansionStructure(Structure.StructureSettings settings);
+    public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext context);
+    public void afterPlace(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, PiecesContainer pieces);
+    public StructureType<?> type();
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -32,6 +33,16 @@ struct PluginAdvancement {
     std::int32_t experience = 0;
     std::vector<std::string> recipes;
     std::vector<std::string> loot;
+    /// The definition as written, empty when it was not read from JSON.
+    std::string json;
+};
+
+/// What a plugin knows about the event that fires a trigger.
+struct PluginTriggerFacts {
+    std::optional<std::array<std::int32_t, 3>> block;
+    std::string item;
+    std::int32_t count = 1;
+    std::optional<double> distance;
 };
 
 class PluginAdvancements {
@@ -63,6 +74,14 @@ public:
         static_cast<void>(uuid);
         static_cast<void>(id);
         static_cast<void>(criterion);
+        return false;
+    }
+
+    /// Fires a trigger for a player through the evaluation the server itself uses; whether anything listened.
+    virtual bool trigger(std::string_view uuid, std::string_view trigger, const PluginTriggerFacts& facts) {
+        static_cast<void>(uuid);
+        static_cast<void>(trigger);
+        static_cast<void>(facts);
         return false;
     }
 

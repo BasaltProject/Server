@@ -1,0 +1,10 @@
+//// JsonRpcApiSchema.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+public class JsonRpcApiSchema implements DataProvider {
+    public JsonRpcApiSchema(PackOutput packOutput);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public String getName();
+}

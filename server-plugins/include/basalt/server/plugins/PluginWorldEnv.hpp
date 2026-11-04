@@ -59,6 +59,13 @@ struct PluginStructureStart {
     std::vector<std::array<std::int32_t, 6>> pieces;
 };
 
+struct PluginClock {
+    std::int64_t totalTicks = 0;
+    float rate = 1.0F;
+    bool paused = false;
+    std::vector<std::pair<std::string, std::int32_t>> markers;
+};
+
 struct PluginRaid {
     std::int32_t id = 0;
     bool started = false;
@@ -71,6 +78,7 @@ struct PluginRaid {
     float totalHealth = 0.0F;
     std::vector<std::string> heroes;
     std::vector<std::int32_t> raiders;
+    std::vector<std::pair<std::int32_t, std::int32_t>> leaders;
     std::string barTitle;
     std::int32_t barColor = 2;
     std::int32_t barStyle = 2;
@@ -191,6 +199,16 @@ public:
         return false;
     }
 
+    /// Acts on a raid: "stop", "join", "set_leader", "remove_leader" or "create"; answers the raid id, or -1.
+    virtual std::int32_t raidControl(std::int32_t id, std::string_view action,
+                                     const std::array<std::int32_t, 4>& arguments, std::int32_t value) {
+        static_cast<void>(id);
+        static_cast<void>(action);
+        static_cast<void>(arguments);
+        static_cast<void>(value);
+        return -1;
+    }
+
     /// The values a plugin keeps on a raid, as a named compound; empty when there is none.
     [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> raidValues(std::int32_t id) {
         static_cast<void>(id);
@@ -293,6 +311,20 @@ public:
 
     [[nodiscard]] virtual std::vector<PluginRaid> raids() { return {}; }
 
+    [[nodiscard]] virtual PluginClock clock() { return {}; }
+
+    /// Sets the clock rate (0.00001 to 1000) and tells the clients; false when out of range.
+    virtual bool setClockRate(float rate) {
+        static_cast<void>(rate);
+        return false;
+    }
+
+    /// Moves the clock to the next time of a named marker: 0 no such marker, 1 not moved, 2 moved.
+    virtual std::int32_t moveToTimeMarker(std::string_view marker) {
+        static_cast<void>(marker);
+        return 0;
+    }
+
     /// Changes the omen level and the number of waves of a raid; false when there is no such raid.
     virtual bool setRaid(std::int32_t id, std::int32_t omenLevel, std::int32_t totalGroups) {
         static_cast<void>(id);
@@ -351,6 +383,24 @@ public:
         static_cast<void>(apply);
         return std::nullopt;
     }
+
+    /// Runs a world generator placed feature (`minecraft:ore_coal_upper`...) at the position; the blocks it wrote (put
+    /// back when `apply` is false), nullopt when unknown.
+    [[nodiscard]] virtual std::optional<std::vector<PluginPlacedBlock>> placeFeature(std::string_view feature,
+                                                                                     std::int32_t x, std::int32_t y,
+                                                                                     std::int32_t z, std::int64_t seed,
+                                                                                     bool apply = true) {
+        static_cast<void>(apply);
+        static_cast<void>(feature);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(seed);
+        return std::nullopt;
+    }
+
+    /// The ids `placeFeature` knows.
+    [[nodiscard]] virtual std::vector<std::string> featureIds() { return {}; }
 
     /// One random tick on the block, as the random tick speed gives; true when something changed.
     virtual bool randomTick(std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -414,6 +464,14 @@ public:
         static_cast<void>(rain);
         static_cast<void>(thunder);
         static_cast<void>(clear);
+    }
+
+    /// A draw from the world's named random sequence; the operations are listed in PluginRandomSequence.
+    virtual std::int64_t randomSequence(std::string_view id, std::int32_t operation, std::int64_t argument) {
+        static_cast<void>(id);
+        static_cast<void>(operation);
+        static_cast<void>(argument);
+        return 0;
     }
 
     /// How long players have stood in the chunk, in ticks; zero for a chunk that is not loaded.

@@ -1,0 +1,112 @@
+//// BiomeCheck.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.biome.Biome;
+public record BiomeCheck(HolderSet<Biome> requiredBiomes) implements SpawnCondition {
+    public static final MapCodec<BiomeCheck> MAP_CODEC;
+    public boolean test(SpawnContext context);
+    public MapCodec<BiomeCheck> codec();
+}
+//// ModelAndTexture.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.ClientAsset;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+public record ModelAndTexture<T>(T model, ClientAsset.ResourceTexture asset) {
+    public ModelAndTexture(T model, Identifier assetId);
+    public static <T> MapCodec<ModelAndTexture<T>> codec(Codec<T> modelCodec, T defaultModel);
+    public static <T> StreamCodec<RegistryFriendlyByteBuf, ModelAndTexture<T>> streamCodec(StreamCodec<? super RegistryFriendlyByteBuf, T> modelCodec);
+}
+//// MoonBrightnessCheck.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.advancements.predicates.MinMaxBounds;
+public record MoonBrightnessCheck(MinMaxBounds.Doubles range) implements SpawnCondition {
+    public static final MapCodec<MoonBrightnessCheck> MAP_CODEC;
+    public boolean test(SpawnContext context);
+    public MapCodec<MoonBrightnessCheck> codec();
+}
+//// PriorityProvider.java
+import com.mojang.serialization.Codec;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.util.RandomSource;
+public interface PriorityProvider<Context, Condition extends PriorityProvider.SelectorCondition<Context>> {
+    List<Selector<Context, Condition>> selectors();
+    static <C, T> Stream<T> select(Stream<T> entries, Function<T, PriorityProvider<C, ?>> extractor, C context);
+    static <C, T> Optional<T> pick(Stream<T> entries, Function<T, PriorityProvider<C, ?>> extractor, RandomSource randomSource, C context);
+    static <Context, Condition extends SelectorCondition<Context>> List<Selector<Context, Condition>> single(Condition check, int priority);
+    static <Context, Condition extends SelectorCondition<Context>> List<Selector<Context, Condition>> alwaysTrue(int priority);
+    public static record Selector<Context, Condition extends SelectorCondition<Context>>(Optional<Condition> condition, int priority) {
+        public Selector(Condition condition, int priority);
+        public Selector(int priority);
+        public static <Context, Condition extends SelectorCondition<Context>> Codec<Selector<Context, Condition>> codec(Codec<Condition> conditionCodec);
+    }
+    public interface SelectorCondition<C> extends Predicate<C> {
+        static <C> SelectorCondition<C> alwaysTrue();
+    }
+    public static record UnpackedEntry<C, T>(T entry, int priority, SelectorCondition<C> condition) {
+        public static final Comparator<UnpackedEntry<?, ?>> HIGHEST_PRIORITY_FIRST;
+    }
+}
+//// SpawnCondition.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+public interface SpawnCondition extends PriorityProvider.SelectorCondition<SpawnContext> {
+    Codec<SpawnCondition> CODEC;
+    MapCodec<? extends SpawnCondition> codec();
+}
+//// SpawnConditions.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class SpawnConditions {
+    public static MapCodec<? extends SpawnCondition> bootstrap(Registry<MapCodec<? extends SpawnCondition>> registry);
+}
+//// SpawnContext.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.world.attribute.EnvironmentAttributeReader;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.biome.Biome;
+public record SpawnContext(BlockPos pos, ServerLevelAccessor level, EnvironmentAttributeReader environmentAttributes, Holder<Biome> biome) {
+    public static SpawnContext create(ServerLevelAccessor level, BlockPos pos);
+}
+//// SpawnPrioritySelectors.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+public record SpawnPrioritySelectors(List<PriorityProvider.Selector<SpawnContext, SpawnCondition>> selectors) {
+    public static final SpawnPrioritySelectors EMPTY;
+    public static final Codec<SpawnPrioritySelectors> CODEC;
+    public static SpawnPrioritySelectors single(SpawnCondition condition, int priority);
+    public static SpawnPrioritySelectors fallback(int priority);
+}
+//// StructureCheck.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.levelgen.structure.Structure;
+public record StructureCheck(HolderSet<Structure> requiredStructures) implements SpawnCondition {
+    public static final MapCodec<StructureCheck> MAP_CODEC;
+    public boolean test(SpawnContext context);
+    public MapCodec<StructureCheck> codec();
+}
+//// VariantUtils.java
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class VariantUtils {
+    public static final String TAG_VARIANT = "variant";
+    public static <T> Holder<T> getDefaultOrAny(RegistryAccess registryAccess, ResourceKey<T> id);
+    public static <T> Holder<T> getAny(RegistryAccess registryAccess, ResourceKey<? extends Registry<T>> registryId);
+    public static <T> void writeVariant(ValueOutput output, Holder<T> holder);
+    public static <T> Optional<Holder<T>> readVariant(ValueInput input, ResourceKey<? extends Registry<T>> registryId);
+    public static <T extends PriorityProvider<SpawnContext, ?>> Optional<Holder.Reference<T>> selectVariantToSpawn(SpawnContext context, ResourceKey<Registry<T>> variantRegistry);
+}

@@ -1,0 +1,375 @@
+//// AllOfCondition.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+public class AllOfCondition extends CompositeLootItemCondition {
+    public static final MapCodec<AllOfCondition> MAP_CODEC;
+    private AllOfCondition(HolderSet<LootItemCondition> terms);
+    public static AllOfCondition allOf(HolderSet<LootItemCondition> terms);
+    public MapCodec<AllOfCondition> codec();
+    public static Builder allOf(LootItemCondition.Builder... terms);
+    public static class Builder extends CompositeLootItemCondition.Builder {
+        public Builder(LootItemCondition.Builder... terms);
+        public Builder and(LootItemCondition.Builder term);
+        protected LootItemCondition create(HolderSet<LootItemCondition> terms);
+    }
+}
+//// AnyOfCondition.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+public class AnyOfCondition extends CompositeLootItemCondition {
+    public static final MapCodec<AnyOfCondition> MAP_CODEC;
+    private AnyOfCondition(HolderSet<LootItemCondition> terms);
+    public MapCodec<AnyOfCondition> codec();
+    public static Builder anyOf(LootItemCondition.Builder... terms);
+    public static class Builder extends CompositeLootItemCondition.Builder {
+        public Builder(LootItemCondition.Builder... terms);
+        public Builder or(LootItemCondition.Builder term);
+        public Builder or(Holder<LootItemCondition> term);
+        protected LootItemCondition create(HolderSet<LootItemCondition> terms);
+    }
+}
+//// BonusLevelTableCondition.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Set;
+import net.minecraft.core.Holder;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record BonusLevelTableCondition(Holder<Enchantment> enchantment, List<Float> values) implements LootItemCondition {
+    public static final MapCodec<BonusLevelTableCondition> MAP_CODEC;
+    public MapCodec<BonusLevelTableCondition> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder bonusLevelFlatChance(Holder<Enchantment> enchantment, float... chances);
+}
+//// CompositeLootItemCondition.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public abstract class CompositeLootItemCondition implements LootItemCondition {
+    protected final HolderSet<LootItemCondition> terms;
+    protected CompositeLootItemCondition(HolderSet<LootItemCondition> terms, Predicate<LootContext> composedPredicate);
+    protected static List<Predicate<LootContext>> holdersToLazyPredicates(HolderSet<LootItemCondition> terms);
+    public abstract MapCodec<? extends CompositeLootItemCondition> codec();
+    protected static <T extends CompositeLootItemCondition> MapCodec<T> createCodec(Function<HolderSet<LootItemCondition>, T> factory);
+    public final boolean test(LootContext context);
+    public void validate(ValidationContext output);
+    public static abstract class Builder implements LootItemCondition.Builder {
+        protected Builder(LootItemCondition.Builder... terms);
+        public void addTerm(LootItemCondition.Builder term);
+        public void addTerm(Holder<LootItemCondition> term);
+        public LootItemCondition build();
+        protected abstract LootItemCondition create(HolderSet<LootItemCondition> terms);
+    }
+}
+//// ConditionUserBuilder.java
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import net.minecraft.core.Holder;
+public interface ConditionUserBuilder<T extends ConditionUserBuilder<T>> {
+    default T when(LootItemCondition.Builder builder);
+    T when(Holder<LootItemCondition> condition);
+    default <E> T when(Iterable<E> collection, Function<E, LootItemCondition.Builder> conditionProvider);
+    T unwrap();
+    static Optional<Holder<LootItemCondition>> buildCondition(List<Holder<LootItemCondition>> conditions);
+}
+//// DamageSourceCondition.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.Set;
+import net.minecraft.advancements.predicates.DamageSourcePredicate;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record DamageSourceCondition(Optional<DamageSourcePredicate> predicate) implements LootItemCondition {
+    public static final MapCodec<DamageSourceCondition> MAP_CODEC;
+    public MapCodec<DamageSourceCondition> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder hasDamageSource(DamageSourcePredicate.Builder builder);
+}
+//// EnchantmentActiveCheck.java
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record EnchantmentActiveCheck(boolean active) implements LootItemCondition {
+    public static final MapCodec<EnchantmentActiveCheck> MAP_CODEC;
+    public boolean test(LootContext lootContext);
+    public MapCodec<EnchantmentActiveCheck> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public static LootItemCondition.Builder enchantmentActiveCheck();
+    public static LootItemCondition.Builder enchantmentInactiveCheck();
+}
+//// EntityHasScoreCondition.java
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.storage.loot.IntRangePredicate;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public record EntityHasScoreCondition(Map<String, IntRangePredicate> scores, LootContext.EntityTarget entityTarget) implements LootItemCondition {
+    public static final MapCodec<EntityHasScoreCondition> MAP_CODEC;
+    public MapCodec<EntityHasScoreCondition> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public void validate(ValidationContext context);
+    public boolean test(LootContext context);
+    public static Builder hasScores(LootContext.EntityTarget target);
+    public static class Builder implements LootItemCondition.Builder {
+        public Builder(LootContext.EntityTarget entityTarget);
+        public Builder withScore(String score, IntRangePredicate bounds);
+        public LootItemCondition build();
+    }
+}
+//// EnvironmentAttributeCheck.java
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record EnvironmentAttributeCheck<Value>(EnvironmentAttribute<Value> attribute, Value value) implements LootItemCondition {
+    public static final MapCodec<EnvironmentAttributeCheck<?>> MAP_CODEC;
+    public MapCodec<EnvironmentAttributeCheck<Value>> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public boolean test(LootContext context);
+    public static <Value> LootItemCondition.Builder environmentAttribute(EnvironmentAttribute<Value> attribute, Value value);
+}
+//// ExplosionCondition.java
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.storage.loot.LootContext;
+public class ExplosionCondition implements LootItemCondition {
+    public static final MapCodec<ExplosionCondition> MAP_CODEC;
+    private ExplosionCondition();
+    public MapCodec<ExplosionCondition> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder survivesExplosion();
+}
+//// FloatValueCheck.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.FloatRangePredicate;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+public record FloatValueCheck(Holder<ContextFloatProvider> value, FloatRangePredicate range) implements LootItemCondition {
+    public static final MapCodec<FloatValueCheck> MAP_CODEC;
+    public MapCodec<FloatValueCheck> codec();
+    public void validate(ValidationContext context);
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder hasValue(Holder<ContextFloatProvider> value, FloatRangePredicate range);
+}
+//// IntValueCheck.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.IntRangePredicate;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+public record IntValueCheck(Holder<ContextIntProvider> value, IntRangePredicate range) implements LootItemCondition {
+    public static final MapCodec<IntValueCheck> MAP_CODEC;
+    public MapCodec<IntValueCheck> codec();
+    public void validate(ValidationContext context);
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder hasValue(Holder<ContextIntProvider> value, IntRangePredicate range);
+}
+//// InvertedLootItemCondition.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public record InvertedLootItemCondition(Holder<LootItemCondition> term) implements LootItemCondition {
+    public static final MapCodec<InvertedLootItemCondition> MAP_CODEC;
+    public MapCodec<InvertedLootItemCondition> codec();
+    public boolean test(LootContext context);
+    public void validate(ValidationContext output);
+    public static LootItemCondition.Builder invert(LootItemCondition.Builder term);
+    public static LootItemCondition.Builder invert(Holder<LootItemCondition> term);
+}
+//// LocationCheck.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.Set;
+import net.minecraft.advancements.predicates.LocationPredicate;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record LocationCheck(Optional<LocationPredicate> predicate, Vec3i offset) implements LootItemCondition {
+    public static final MapCodec<LocationCheck> MAP_CODEC;
+    public MapCodec<LocationCheck> codec();
+    public boolean test(LootContext context);
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public static LootItemCondition.Builder checkLocation(LocationPredicate.Builder predicate);
+    public static LootItemCondition.Builder checkLocation(LocationPredicate.Builder predicate, Vec3i offset);
+    public static LootItemCondition.Builder checkLocation(LocationPredicate.Builder predicate, Direction direction);
+}
+//// LootItemCondition.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.function.Predicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.LootContextUser;
+public interface LootItemCondition extends LootContextUser, Predicate<LootContext> {
+    Codec<LootItemCondition> DIRECT_CODEC;
+    Codec<Holder<LootItemCondition>> CODEC;
+    Codec<HolderSet<LootItemCondition>> LIST_CODEC;
+    MapCodec<? extends LootItemCondition> codec();
+    public interface Builder {
+        LootItemCondition build();
+        default Builder invert();
+        default AnyOfCondition.Builder or(Builder other);
+        default AllOfCondition.Builder and(Builder other);
+    }
+}
+//// LootItemConditionTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class LootItemConditionTypes {
+    public static MapCodec<? extends LootItemCondition> bootstrap(Registry<MapCodec<? extends LootItemCondition>> registry);
+}
+//// LootItemEntityPropertyCondition.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.Set;
+import net.minecraft.advancements.predicates.entity.EntityPredicate;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record LootItemEntityPropertyCondition(Optional<EntityPredicate> predicate, LootContext.EntityTarget entityTarget) implements LootItemCondition {
+    public static final MapCodec<LootItemEntityPropertyCondition> MAP_CODEC;
+    public MapCodec<LootItemEntityPropertyCondition> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder entityPresent(LootContext.EntityTarget target);
+    public static LootItemCondition.Builder hasProperties(LootContext.EntityTarget target, EntityPredicate.Builder predicate);
+    public static LootItemCondition.Builder hasProperties(LootContext.EntityTarget target, EntityPredicate predicate);
+}
+//// LootItemKilledByPlayerCondition.java
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.storage.loot.LootContext;
+public class LootItemKilledByPlayerCondition implements LootItemCondition {
+    public static final MapCodec<LootItemKilledByPlayerCondition> MAP_CODEC;
+    private LootItemKilledByPlayerCondition();
+    public MapCodec<LootItemKilledByPlayerCondition> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder killedByPlayer();
+}
+//// LootItemRandomChanceCondition.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+public record LootItemRandomChanceCondition(Holder<ContextFloatProvider> chance) implements LootItemCondition {
+    public static final MapCodec<LootItemRandomChanceCondition> MAP_CODEC;
+    public MapCodec<LootItemRandomChanceCondition> codec();
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder randomChance(float probability);
+    public static LootItemCondition.Builder randomChance(Holder<ContextFloatProvider> probability);
+}
+//// LootItemRandomChanceWithEnchantedBonusCondition.java
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record LootItemRandomChanceWithEnchantedBonusCondition(float unenchantedChance, LevelBasedValue enchantedChance, Holder<Enchantment> enchantment) implements LootItemCondition {
+    public static final MapCodec<LootItemRandomChanceWithEnchantedBonusCondition> MAP_CODEC;
+    public MapCodec<LootItemRandomChanceWithEnchantedBonusCondition> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder randomChanceAndLootingBoost(HolderGetter<Enchantment> enchantments, float chance, float perEnchantmentLevel);
+}
+//// LootPredicates.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class LootPredicates {
+    public static final ResourceKey<LootItemCondition> TOOL_CAN_SILK_TOUCH;
+    public static final ResourceKey<LootItemCondition> TOOL_CAN_SHEAR;
+    public static final ResourceKey<LootItemCondition> FAST_FURNACE;
+    public static void bootstrap(BootstrapContext<LootItemCondition> context);
+}
+//// MatchBlock.java
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.advancements.predicates.BlockPredicate;
+import net.minecraft.advancements.predicates.StatePropertiesPredicate;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record MatchBlock(BlockPredicate predicate) implements LootItemCondition {
+    public static final MapCodec<MatchBlock> MAP_CODEC;
+    public MapCodec<MatchBlock> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder blockMatches(BlockPredicate.Builder predicate);
+    public static LootItemCondition.Builder blockMatches(HolderGetter<Block> lookup, Block block);
+    public static LootItemCondition.Builder blockMatches(HolderGetter<Block> lookup, Block block, StatePropertiesPredicate.Builder properties);
+}
+//// MatchTool.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.Set;
+import net.minecraft.advancements.predicates.ItemPredicate;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record MatchTool(Optional<ItemPredicate> predicate) implements LootItemCondition {
+    public static final MapCodec<MatchTool> MAP_CODEC;
+    public MapCodec<MatchTool> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public boolean test(LootContext context);
+    public static LootItemCondition.Builder toolMatches(ItemPredicate.Builder predicate);
+}
+//// TimeCheck.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.level.storage.loot.IntRangePredicate;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public record TimeCheck(Holder<WorldClock> clock, Optional<Long> period, IntRangePredicate value) implements LootItemCondition {
+    public static final MapCodec<TimeCheck> MAP_CODEC;
+    public MapCodec<TimeCheck> codec();
+    public void validate(ValidationContext context);
+    public boolean test(LootContext context);
+    public static Builder time(Holder<WorldClock> clock, IntRangePredicate value);
+    public static class Builder implements LootItemCondition.Builder {
+        public Builder(Holder<WorldClock> clock, IntRangePredicate value);
+        public Builder setPeriod(long period);
+        public TimeCheck build();
+    }
+}
+//// WeatherCheck.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.world.level.storage.loot.LootContext;
+public record WeatherCheck(Optional<Boolean> isRaining, Optional<Boolean> isThundering) implements LootItemCondition {
+    public static final MapCodec<WeatherCheck> MAP_CODEC;
+    public MapCodec<WeatherCheck> codec();
+    public boolean test(LootContext context);
+    public static Builder weather();
+    public static class Builder implements LootItemCondition.Builder {
+        public Builder setRaining(boolean raining);
+        public Builder setThundering(boolean thundering);
+        public WeatherCheck build();
+    }
+}

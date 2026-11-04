@@ -1,0 +1,189 @@
+//// ComponentPredicateParser.java
+import com.mojang.brigadier.ImmutableStringReader;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.Dynamic;
+import java.util.List;
+import java.util.stream.Stream;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.parsing.packrat.NamedRule;
+import net.minecraft.util.parsing.packrat.commands.Grammar;
+import net.minecraft.util.parsing.packrat.commands.ResourceLookupRule;
+public class ComponentPredicateParser {
+    public static <T, C, P> Grammar<List<T>> createGrammar(Context<T, C, P> context);
+    static class ElementLookupRule<T, C, P> extends ResourceLookupRule<Context<T, C, P>, T> {
+        private ElementLookupRule(NamedRule<StringReader, Identifier> idParser, Context<T, C, P> context);
+        protected T validateElement(ImmutableStringReader reader, Identifier id) throws Exception;
+        public Stream<Identifier> possibleResources();
+    }
+    static class TagLookupRule<T, C, P> extends ResourceLookupRule<Context<T, C, P>, T> {
+        private TagLookupRule(NamedRule<StringReader, Identifier> idParser, Context<T, C, P> context);
+        protected T validateElement(ImmutableStringReader reader, Identifier id) throws Exception;
+        public Stream<Identifier> possibleResources();
+    }
+    static class ComponentLookupRule<T, C, P> extends ResourceLookupRule<Context<T, C, P>, C> {
+        private ComponentLookupRule(NamedRule<StringReader, Identifier> idParser, Context<T, C, P> context);
+        protected C validateElement(ImmutableStringReader reader, Identifier id) throws Exception;
+        public Stream<Identifier> possibleResources();
+    }
+    static class PredicateLookupRule<T, C, P> extends ResourceLookupRule<Context<T, C, P>, P> {
+        private PredicateLookupRule(NamedRule<StringReader, Identifier> idParser, Context<T, C, P> context);
+        protected P validateElement(ImmutableStringReader reader, Identifier id) throws Exception;
+        public Stream<Identifier> possibleResources();
+    }
+    public interface Context<T, C, P> {
+        T forElementType(ImmutableStringReader reader, Identifier id) throws CommandSyntaxException;
+        Stream<Identifier> listElementTypes();
+        T forTagType(ImmutableStringReader reader, Identifier id) throws CommandSyntaxException;
+        Stream<Identifier> listTagTypes();
+        C lookupComponentType(ImmutableStringReader reader, Identifier id) throws CommandSyntaxException;
+        Stream<Identifier> listComponentTypes();
+        T createComponentTest(ImmutableStringReader reader, C componentType, Dynamic<?> value) throws CommandSyntaxException;
+        T createComponentTest(ImmutableStringReader reader, C componentType);
+        P lookupPredicateType(ImmutableStringReader reader, Identifier id) throws CommandSyntaxException;
+        Stream<Identifier> listPredicateTypes();
+        T createPredicateTest(ImmutableStringReader reader, P predicateType, Dynamic<?> value) throws CommandSyntaxException;
+        T negate(T value);
+        T anyOf(List<T> alternatives);
+    }
+}
+//// FunctionArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.datafixers.util.Either;
+import com.mojang.datafixers.util.Pair;
+import java.util.Collection;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.functions.CommandFunction;
+import net.minecraft.resources.Identifier;
+public class FunctionArgument implements ArgumentType<Result> {
+    public static FunctionArgument functions();
+    public Result parse(StringReader reader) throws CommandSyntaxException;
+    public static Collection<CommandFunction<CommandSourceStack>> getFunctions(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Pair<Identifier, Either<CommandFunction<CommandSourceStack>, Collection<CommandFunction<CommandSourceStack>>>> getFunctionOrTag(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public static Pair<Identifier, Collection<CommandFunction<CommandSourceStack>>> getFunctionCollection(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public Collection<String> getExamples();
+    public interface Result {
+        Collection<CommandFunction<CommandSourceStack>> create(CommandContext<CommandSourceStack> context) throws CommandSyntaxException;
+        Pair<Identifier, Either<CommandFunction<CommandSourceStack>, Collection<CommandFunction<CommandSourceStack>>>> unwrap(CommandContext<CommandSourceStack> context) throws CommandSyntaxException;
+        Pair<Identifier, Collection<CommandFunction<CommandSourceStack>>> unwrapToCollection(CommandContext<CommandSourceStack> context) throws CommandSyntaxException;
+    }
+}
+//// ItemArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+public class ItemArgument implements ArgumentType<ItemInput> {
+    public ItemArgument(CommandBuildContext context);
+    public static ItemArgument item(CommandBuildContext context);
+    public ItemInput parse(StringReader reader) throws CommandSyntaxException;
+    public static <S> ItemInput getItem(CommandContext<S> context, String name);
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// ItemInput.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+public record ItemInput(Holder<Item> item, DataComponentPatch components) {
+    public ItemStack createItemStack(int count) throws CommandSyntaxException;
+}
+//// ItemParser.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.Item;
+public class ItemParser {
+    public static final char SYNTAX_START_COMPONENTS;
+    public static final char SYNTAX_END_COMPONENTS;
+    public static final char SYNTAX_COMPONENT_SEPARATOR;
+    public static final char SYNTAX_COMPONENT_ASSIGNMENT;
+    public static final char SYNTAX_REMOVED_COMPONENT;
+    public ItemParser(HolderLookup.Provider registries);
+    public ItemInput parse(StringReader reader) throws CommandSyntaxException;
+    public void parse(StringReader reader, Visitor visitor) throws CommandSyntaxException;
+    public CompletableFuture<Suggestions> fillSuggestions(SuggestionsBuilder builder);
+    class State {
+        private State(StringReader reader, Visitor visitor);
+        public void parse() throws CommandSyntaxException;
+        public static DataComponentType<?> readComponentType(StringReader reader) throws CommandSyntaxException;
+    }
+    static class SuggestionsVisitor implements Visitor {
+        private SuggestionsVisitor();
+        public void visitSuggestions(Function<SuggestionsBuilder, CompletableFuture<Suggestions>> suggestions);
+        public CompletableFuture<Suggestions> resolveSuggestions(SuggestionsBuilder builder, StringReader reader);
+    }
+    public interface Visitor {
+        default void visitItem(Holder<Item> item);
+        default <T> void visitComponent(DataComponentType<T> type, T value);
+        default <T> void visitRemovedComponent(DataComponentType<T> type);
+        default void visitSuggestions(Function<SuggestionsBuilder, CompletableFuture<Suggestions>> suggestions);
+    }
+}
+//// ItemPredicateArgument.java
+import com.mojang.brigadier.ImmutableStringReader;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.Decoder;
+import com.mojang.serialization.Dynamic;
+import java.util.Collection;
+import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.predicates.DataComponentPredicate;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.parsing.packrat.commands.ParserBasedArgument;
+import net.minecraft.world.item.ItemStack;
+public class ItemPredicateArgument extends ParserBasedArgument<Result> {
+    public ItemPredicateArgument(CommandBuildContext registries);
+    public static ItemPredicateArgument itemPredicate(CommandBuildContext context);
+    public static Result getItemPredicate(CommandContext<CommandSourceStack> context, String name);
+    public Collection<String> getExamples();
+    static record ComponentWrapper(Identifier id, Predicate<ItemStack> presenceChecker, Decoder<? extends Predicate<ItemStack>> valueChecker) {
+        public static <T> ComponentWrapper create(ImmutableStringReader reader, Identifier id, DataComponentType<T> type) throws CommandSyntaxException;
+        public Predicate<ItemStack> decode(ImmutableStringReader reader, Dynamic<?> value) throws CommandSyntaxException;
+    }
+    static record PredicateWrapper(Identifier id, Decoder<? extends Predicate<ItemStack>> type) {
+        public PredicateWrapper(Holder.Reference<DataComponentPredicate.Type<?>> holder);
+        public Predicate<ItemStack> decode(ImmutableStringReader reader, Dynamic<?> value) throws CommandSyntaxException;
+    }
+    static class Context implements ComponentPredicateParser.Context<Predicate<ItemStack>, ComponentWrapper, PredicateWrapper> {
+        private Context(HolderLookup.Provider registries);
+        public Predicate<ItemStack> forElementType(ImmutableStringReader reader, Identifier id) throws CommandSyntaxException;
+        public Predicate<ItemStack> forTagType(ImmutableStringReader reader, Identifier id) throws CommandSyntaxException;
+        public ComponentWrapper lookupComponentType(ImmutableStringReader reader, Identifier componentId) throws CommandSyntaxException;
+        public Predicate<ItemStack> createComponentTest(ImmutableStringReader reader, ComponentWrapper componentType, Dynamic<?> value) throws CommandSyntaxException;
+        public Predicate<ItemStack> createComponentTest(ImmutableStringReader reader, ComponentWrapper componentType);
+        public PredicateWrapper lookupPredicateType(ImmutableStringReader reader, Identifier componentId) throws CommandSyntaxException;
+        public Predicate<ItemStack> createPredicateTest(ImmutableStringReader reader, PredicateWrapper predicateType, Dynamic<?> value) throws CommandSyntaxException;
+        public Stream<Identifier> listElementTypes();
+        public Stream<Identifier> listTagTypes();
+        public Stream<Identifier> listComponentTypes();
+        public Stream<Identifier> listPredicateTypes();
+        public Predicate<ItemStack> negate(Predicate<ItemStack> value);
+        public Predicate<ItemStack> anyOf(List<Predicate<ItemStack>> alternatives);
+    }
+    public interface Result extends Predicate<ItemStack> {
+    }
+}

@@ -1,0 +1,21 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.chat.contents.objects;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.world.item.component.ResolvableProfile;
+public record PlayerSprite(ResolvableProfile player, boolean hat) implements ObjectInfo {
+    public static final MapCodec<PlayerSprite> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+        ResolvableProfile.CODEC.fieldOf("player").forGetter(PlayerSprite::player),
+        Codec.BOOL.optionalFieldOf("hat", true).forGetter(PlayerSprite::hat)).apply(i, PlayerSprite::new));
+    public FontDescription fontDescription() {
+        return new FontDescription.PlayerSprite(player, hat);
+    }
+    public String defaultFallback() {
+        return player.name().map(name -> "[" + name + " head]").orElse("[unknown player head]");
+    }
+    public MapCodec<PlayerSprite> codec() {
+        return MAP_CODEC;
+    }
+}

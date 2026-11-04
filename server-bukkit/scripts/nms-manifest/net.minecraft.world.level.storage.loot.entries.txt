@@ -1,0 +1,339 @@
+//// AlternativesEntry.java
+import com.mojang.serialization.MapCodec;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import net.minecraft.core.Holder;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class AlternativesEntry extends CompositeEntryBase {
+    public static final MapCodec<AlternativesEntry> MAP_CODEC;
+    public static final ProblemReporter.Problem UNREACHABLE_PROBLEM;
+    public AlternativesEntry(List<LootPoolEntryContainer> children, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public MapCodec<AlternativesEntry> codec();
+    protected ComposableEntryContainer compose(List<? extends ComposableEntryContainer> entries);
+    public void validate(ValidationContext context);
+    public static Builder alternatives(LootPoolEntryContainer.Builder<?>... entries);
+    public static <E> Builder alternatives(Collection<E> items, Function<E, LootPoolEntryContainer.Builder<?>> provider);
+    public static class Builder extends CompositeEntryBase.Builder<AlternativesEntry, Builder> {
+        public Builder(LootPoolEntryContainer.Builder<?>... entries);
+        protected Builder getThis();
+        public Builder otherwise(LootPoolEntryContainer.Builder<?> other);
+        public LootPoolEntryContainer build();
+    }
+}
+//// ComposableEntryContainer.java
+import java.util.function.Consumer;
+import net.minecraft.world.level.storage.loot.LootContext;
+public interface ComposableEntryContainer {
+    ComposableEntryContainer ALWAYS_FALSE;
+    ComposableEntryContainer ALWAYS_TRUE;
+    boolean expand(LootContext context, Consumer<LootPoolEntry> output);
+    default ComposableEntryContainer and(ComposableEntryContainer other);
+    default ComposableEntryContainer or(ComposableEntryContainer other);
+}
+//// CompositeEntryBase.java
+import com.google.common.collect.ImmutableList;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public abstract class CompositeEntryBase extends LootPoolEntryContainer {
+    public static final ProblemReporter.Problem NO_CHILDREN_PROBLEM;
+    protected final List<LootPoolEntryContainer> children;
+    protected CompositeEntryBase(List<LootPoolEntryContainer> children, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public abstract MapCodec<? extends CompositeEntryBase> codec();
+    public void validate(ValidationContext context);
+    protected abstract ComposableEntryContainer compose(List<? extends ComposableEntryContainer> entries);
+    public final boolean expandRaw(LootContext context, Consumer<LootPoolEntry> output);
+    public static <T extends CompositeEntryBase> MapCodec<T> createCodec(CompositeEntryConstructor<T> constructor);
+    public static abstract class Builder<T extends CompositeEntryBase, B extends Builder<T, B>> extends LootPoolEntryContainer.Builder<B> {
+        public Builder(LootPoolEntryContainer.Builder<?>... entries);
+        protected ImmutableList.Builder<LootPoolEntryContainer> addEntry(LootPoolEntryContainer.Builder<?> entry);
+        protected T build(CompositeEntryConstructor<T> constructor);
+    }
+    public interface CompositeEntryConstructor<T extends CompositeEntryBase> {
+        T create(List<LootPoolEntryContainer> children, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    }
+}
+//// DynamicLoot.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class DynamicLoot extends SingleEntryContainerBase {
+    public static final MapCodec<DynamicLoot> MAP_CODEC;
+    private DynamicLoot(Identifier name, int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public MapCodec<DynamicLoot> codec();
+    public void createItemStack(Consumer<ItemStack> output, LootContext context);
+    public static UniformContainerBase.Builder<?> dynamicEntry(Identifier name);
+}
+//// EmptyLootItem.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class EmptyLootItem extends SingleEntryContainerBase {
+    public static final MapCodec<EmptyLootItem> MAP_CODEC;
+    private EmptyLootItem(int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public MapCodec<EmptyLootItem> codec();
+    public void createItemStack(Consumer<ItemStack> output, LootContext context);
+    public static UniformContainerBase.Builder<?> emptyItem();
+}
+//// EntryGroup.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class EntryGroup extends CompositeEntryBase {
+    public static final MapCodec<EntryGroup> MAP_CODEC;
+    public EntryGroup(List<LootPoolEntryContainer> children, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public MapCodec<EntryGroup> codec();
+    protected ComposableEntryContainer compose(List<? extends ComposableEntryContainer> entries);
+    public static Builder list(LootPoolEntryContainer.Builder<?>... entries);
+    public static class Builder extends CompositeEntryBase.Builder<EntryGroup, Builder> {
+        public Builder(LootPoolEntryContainer.Builder<?>... entries);
+        protected Builder getThis();
+        public Builder append(LootPoolEntryContainer.Builder<?> other);
+        public LootPoolEntryContainer build();
+    }
+}
+//// ExpandableContainerBase.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public abstract class ExpandableContainerBase extends UniformContainerBase {
+    protected final boolean expand;
+    protected static <T extends ExpandableContainerBase> Products.P5<RecordCodecBuilder.Mu<T>, Boolean, Integer, Integer, Optional<Holder<LootItemCondition>>, Optional<Holder<LootItemFunction>>> expandableFields(RecordCodecBuilder.Instance<T> i);
+    protected ExpandableContainerBase(boolean expand, int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public abstract MapCodec<? extends ExpandableContainerBase> codec();
+    public final boolean expandRaw(LootContext context, Consumer<LootPoolEntry> output);
+    protected abstract boolean addExpandedEntries(Consumer<LootPoolEntry> output);
+    protected abstract boolean addUnexpandedEntry(Consumer<LootPoolEntry> output);
+}
+//// LootItem.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class LootItem extends SingleEntryContainerBase {
+    public static final MapCodec<LootItem> MAP_CODEC;
+    private LootItem(Holder<Item> item, int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public MapCodec<LootItem> codec();
+    public void createItemStack(Consumer<ItemStack> output, LootContext context);
+    public static UniformContainerBase.Builder<?> lootTableItem(ItemLike item);
+}
+//// LootPoolEntries.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class LootPoolEntries {
+    public static final Codec<LootPoolEntryContainer> CODEC;
+    public static MapCodec<? extends LootPoolEntryContainer> bootstrap(Registry<MapCodec<? extends LootPoolEntryContainer>> registry);
+}
+//// LootPoolEntry.java
+import java.util.function.Consumer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+public interface LootPoolEntry {
+    int getWeight(float luck);
+    void createItemStack(Consumer<ItemStack> output, LootContext context);
+}
+//// LootPoolEntryContainer.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.functions.FunctionUserBuilder;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.ConditionUserBuilder;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public abstract class LootPoolEntryContainer implements ComposableEntryContainer, Validatable {
+    protected final Optional<Holder<LootItemCondition>> condition;
+    protected final Optional<Holder<LootItemFunction>> modifier;
+    protected LootPoolEntryContainer(Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    protected static <T extends LootPoolEntryContainer> Products.P2<RecordCodecBuilder.Mu<T>, Optional<Holder<LootItemCondition>>, Optional<Holder<LootItemFunction>>> commonFields(RecordCodecBuilder.Instance<T> i);
+    public void validate(ValidationContext output);
+    protected abstract boolean expandRaw(LootContext context, Consumer<LootPoolEntry> output);
+    public final boolean expand(LootContext context, Consumer<LootPoolEntry> output);
+    public abstract MapCodec<? extends LootPoolEntryContainer> codec();
+    public static abstract class Builder<T extends Builder<T>> implements ConditionUserBuilder<T>, FunctionUserBuilder<T> {
+        protected abstract T getThis();
+        public T when(Holder<LootItemCondition> condition);
+        public T apply(Holder<LootItemFunction> function);
+        public final T unwrap();
+        protected Optional<Holder<LootItemCondition>> getCondition();
+        protected Optional<Holder<LootItemFunction>> getModifier();
+        public AlternativesEntry.Builder otherwise(Builder<?> other);
+        public EntryGroup.Builder append(Builder<?> other);
+        public SequentialEntry.Builder then(Builder<?> other);
+        public abstract LootPoolEntryContainer build();
+    }
+}
+//// NestedLootTable.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class NestedLootTable extends ExpandableContainerBase {
+    public static final MapCodec<NestedLootTable> MAP_CODEC;
+    private NestedLootTable(HolderSet<LootTable> value, boolean expand, int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public MapCodec<NestedLootTable> codec();
+    protected boolean addExpandedEntries(Consumer<LootPoolEntry> output);
+    protected boolean addUnexpandedEntry(Consumer<LootPoolEntry> output);
+    public void validate(ValidationContext context);
+    public static UniformContainerBase.Builder<?> lootTableReference(Holder<LootTable> table);
+    public static UniformContainerBase.Builder<?> inlineLootTable(LootTable table);
+}
+//// SequentialEntry.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class SequentialEntry extends CompositeEntryBase {
+    public static final MapCodec<SequentialEntry> MAP_CODEC;
+    public SequentialEntry(List<LootPoolEntryContainer> children, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public MapCodec<SequentialEntry> codec();
+    protected ComposableEntryContainer compose(List<? extends ComposableEntryContainer> entries);
+    public static Builder sequential(LootPoolEntryContainer.Builder<?>... entries);
+    public static class Builder extends CompositeEntryBase.Builder<SequentialEntry, Builder> {
+        public Builder(LootPoolEntryContainer.Builder<?>... entries);
+        protected Builder getThis();
+        public Builder then(LootPoolEntryContainer.Builder<?> other);
+        public LootPoolEntryContainer build();
+    }
+}
+//// SingleEntryContainerBase.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public abstract class SingleEntryContainerBase extends UniformContainerBase {
+    protected SingleEntryContainerBase(int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public abstract MapCodec<? extends SingleEntryContainerBase> codec();
+    protected abstract void createItemStack(Consumer<ItemStack> output, LootContext context);
+    public final boolean expandRaw(LootContext context, Consumer<LootPoolEntry> output);
+}
+//// SlotLoot.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.slot.SlotSource;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class SlotLoot extends SingleEntryContainerBase {
+    public static final MapCodec<SlotLoot> MAP_CODEC;
+    private SlotLoot(Holder<SlotSource> slotSource, int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public MapCodec<SlotLoot> codec();
+    public void createItemStack(Consumer<ItemStack> output, LootContext context);
+    public void validate(ValidationContext context);
+}
+//// TagEntry.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public class TagEntry extends ExpandableContainerBase {
+    public static final MapCodec<TagEntry> MAP_CODEC;
+    private TagEntry(HolderSet<Item> tag, boolean expand, int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public MapCodec<TagEntry> codec();
+    protected boolean addExpandedEntries(Consumer<LootPoolEntry> output);
+    protected boolean addUnexpandedEntry(Consumer<LootPoolEntry> output);
+    public static UniformContainerBase.Builder<?> tagContents(HolderSet<Item> tag);
+    public static UniformContainerBase.Builder<?> expandTag(HolderSet<Item> tag);
+}
+//// UniformContainerBase.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.functions.FunctionUserBuilder;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public abstract class UniformContainerBase extends LootPoolEntryContainer {
+    public static final int DEFAULT_WEIGHT = 1;
+    public static final int DEFAULT_QUALITY = 0;
+    protected final int weight;
+    protected final int quality;
+    protected UniformContainerBase(int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    public abstract MapCodec<? extends UniformContainerBase> codec();
+    protected static <T extends UniformContainerBase> Products.P4<RecordCodecBuilder.Mu<T>, Integer, Integer, Optional<Holder<LootItemCondition>>, Optional<Holder<LootItemFunction>>> uniformFields(RecordCodecBuilder.Instance<T> i);
+    public void validate(ValidationContext context);
+    public static Builder<?> simpleBuilder(EntryConstructor constructor);
+    public static abstract class Builder<T extends Builder<T>> extends LootPoolEntryContainer.Builder<T> implements FunctionUserBuilder<T> {
+        protected int weight;
+        protected int quality;
+        public T setWeight(int weight);
+        public T setQuality(int quality);
+    }
+    protected abstract class EntryBase implements LootPoolEntry {
+        protected EntryBase();
+        public int getWeight(float luck);
+    }
+    static class DummyBuilder extends Builder<DummyBuilder> {
+        public DummyBuilder(EntryConstructor constructor);
+        protected DummyBuilder getThis();
+        public LootPoolEntryContainer build();
+    }
+    public interface EntryConstructor {
+        UniformContainerBase build(int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier);
+    }
+}

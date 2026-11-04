@@ -28,6 +28,8 @@ public final class WorldNatives {
     public static native void setWeather(String world, boolean raining, boolean thundering);
     public static native void setSpawn(String world, int x, int y, int z);
     public static native boolean setDifficulty(String world, String difficulty);
+    public static native boolean difficultyLocked(String world);
+    public static native void setDifficultyLocked(String world, boolean locked);
     public static native String gameRule(String world, String rule);
     public static native boolean setGameRule(String world, String rule, String value);
     public static native String[] gameRules(String world);
@@ -68,6 +70,7 @@ public final class WorldNatives {
     public static native int updateNeighbors(String world, int[] positions, int effects);
     public static native int applyChanges(String world, int[] positions, int[] states, int effects);
     public static native int useItemOn(String world, int x, int y, int z, int face, String item, float yaw, float pitch);
+    public static native boolean hasTick(String world, int x, int y, int z);
     public static native boolean scheduleTick(String world, int x, int y, int z, int delay, boolean fluid);
     public static native int validState(String world, int x, int y, int z, int state);
     public static native int settleBlocks(String world, int[] positions, int[] previous, int effects);

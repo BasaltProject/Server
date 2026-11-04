@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.nbt;
 
 import java.io.DataOutput;
@@ -82,5 +83,28 @@ public final class ByteTag implements NumericTag {
     @Override
     public String toString() {
         return value + "b";
+    }
+    public static final TagType<ByteTag> TYPE = org.basaltmc.bukkit.facade.NbtSupport.type("BYTE", "TAG_Byte",
+        (in, acc) -> {
+            acc.accountBytes(9);
+            return ByteTag.valueOf(in.readByte());
+        });
+    public static final ByteTag ONE = new ByteTag((byte) 1);
+    public static ByteTag valueOf(boolean data) {
+        return data ? ONE : ZERO;
+    }
+    public int sizeInBytes() {
+        return 9;
+    }
+    public TagType<ByteTag> getType() {
+        return TYPE;
+    }
+    public void accept(TagVisitor visitor) {
+        visitor.visitByte(this);
+    }
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor) {
+        return visitor.visit(value);
+    }
+    static class Cache {
     }
 }

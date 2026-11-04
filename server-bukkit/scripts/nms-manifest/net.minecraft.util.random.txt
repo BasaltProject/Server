@@ -1,0 +1,72 @@
+//// Weighted.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.Function;
+import net.minecraft.network.codec.StreamCodec;
+public record Weighted<T>(T value, int weight) {
+    public static <E> Codec<Weighted<E>> codec(Codec<E> elementCodec);
+    public static <E> Codec<Weighted<E>> codec(MapCodec<E> elementCodec);
+    public static <B extends ByteBuf, T> StreamCodec<B, Weighted<T>> streamCodec(StreamCodec<B, T> valueCodec);
+    public <U> Weighted<U> map(Function<T, U> function);
+}
+//// WeightedList.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.RandomSource;
+public final class WeightedList<E> {
+    private WeightedList(List<? extends Weighted<E>> items);
+    public static <E> WeightedList<E> of();
+    public static <E> WeightedList<E> of(E value);
+    public static <E> WeightedList<E> of(E... items);
+    public static <E> WeightedList<E> of(Weighted<E>... items);
+    public static <E> WeightedList<E> of(List<Weighted<E>> items);
+    public static <E> Builder<E> builder();
+    public boolean isEmpty();
+    public <T> WeightedList<T> map(Function<E, T> mapper);
+    public Optional<E> getRandom(RandomSource random);
+    public E getRandomOrThrow(RandomSource random);
+    public List<Weighted<E>> unwrap();
+    public static <E> Codec<WeightedList<E>> codec(Codec<E> elementCodec);
+    public static <E> Codec<WeightedList<E>> codec(MapCodec<E> elementCodec);
+    public static <E> Codec<WeightedList<E>> nonEmptyCodec(Codec<E> elementCodec);
+    public static <E> Codec<WeightedList<E>> nonEmptyCodec(MapCodec<E> elementCodec);
+    public static <E, B extends ByteBuf> StreamCodec<B, WeightedList<E>> streamCodec(StreamCodec<B, E> elementCodec);
+    public boolean contains(E value);
+    public boolean equals(Object obj);
+    public int hashCode();
+    public static class Builder<E> {
+        public Builder<E> add(E item);
+        public Builder<E> add(E item, int weight);
+        public Builder<E> addAll(WeightedList<E> other);
+        public WeightedList<E> build();
+    }
+    static class Flat<E> implements Selector<E> {
+        private Flat(List<Weighted<E>> entries, int totalWeight);
+        public E get(int selection);
+    }
+    static class Compact<E> implements Selector<E> {
+        private Compact(List<Weighted<E>> entries);
+        public E get(int selection);
+    }
+    interface Selector<E> {
+        E get(int selection);
+    }
+}
+//// WeightedRandom.java
+import java.util.List;
+import java.util.Optional;
+import java.util.function.ToIntFunction;
+import net.minecraft.util.RandomSource;
+public class WeightedRandom {
+    private WeightedRandom();
+    public static <T> int getTotalWeight(List<T> items, ToIntFunction<T> weightGetter);
+    public static <T> Optional<T> getRandomItem(RandomSource random, List<T> items, int totalWeight, ToIntFunction<T> weightGetter);
+    public static <T> Optional<T> getWeightedItem(List<T> items, int index, ToIntFunction<T> weightGetter);
+    public static <T> Optional<T> getRandomItem(RandomSource random, List<T> items, ToIntFunction<T> weightGetter);
+}

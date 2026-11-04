@@ -1,11 +1,18 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.nbt;
 
+import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.MapCodec;
+import java.util.Collection;
+import java.util.function.BiConsumer;
 
 public final class CompoundTag implements Tag {
     public static final com.mojang.serialization.Codec<CompoundTag> CODEC =
@@ -16,9 +23,11 @@ public final class CompoundTag implements Tag {
                 : com.mojang.serialization.DataResult.error(() -> "Not a compound tag: " + converted);
         }, compound -> new com.mojang.serialization.Dynamic<>(NbtOps.INSTANCE, compound));
 
-    private final Map<String, Tag> tags = new LinkedHashMap<>();
+    private final Map<String, Tag> tags;
 
-    public CompoundTag() {}
+    public CompoundTag() {
+        this(new LinkedHashMap<>());
+    }
 
     public Set<String> keySet() {
         return tags.keySet();
@@ -236,13 +245,143 @@ public final class CompoundTag implements Tag {
 
     @Override
     public String toString() {
-        StringBuilder text = new StringBuilder("{");
-        for (Map.Entry<String, Tag> entry : tags.entrySet()) {
-            if (text.length() > 1) {
-                text.append(',');
+        return new StringTagVisitor().visit(this);
+    }
+    public static final TagType<CompoundTag> TYPE = new TagType<>() {
+        @Override
+        public CompoundTag load(DataInput input, NbtAccounter accounter) throws IOException {
+            accounter.pushDepth();
+            try {
+                accounter.accountBytes(48);
+                CompoundTag result = new CompoundTag();
+                byte id;
+                while ((id = input.readByte()) != TAG_END) {
+                    String key = input.readUTF();
+                    accounter.accountBytes(28 + 2 * key.length());
+                    accounter.accountBytes(36);
+                    result.tags.put(key, TagTypes.getType(id).load(input, accounter));
+                }
+                return result;
+            } finally {
+                accounter.popDepth();
             }
-            text.append(entry.getKey()).append(':').append(entry.getValue());
         }
-        return text.append('}').toString();
+
+        @Override
+        public StreamTagVisitor.ValueResult parse(DataInput input, StreamTagVisitor output, NbtAccounter accounter)
+            throws IOException {
+            return load(input, accounter).accept(output);
+        }
+
+        @Override
+        public void skip(DataInput input, int count, NbtAccounter accounter) throws IOException {
+            for (int i = 0; i < count; i++) {
+                skip(input, accounter);
+            }
+        }
+
+        @Override
+        public void skip(DataInput input, NbtAccounter accounter) throws IOException {
+            load(input, accounter);
+        }
+
+        @Override
+        public String getName() {
+            return "COMPOUND";
+        }
+
+        @Override
+        public String getPrettyName() {
+            return "TAG_Compound";
+        }
+    };
+    CompoundTag(Map<String, Tag> tags) {
+        this.tags = tags;
+    }
+    public int sizeInBytes() {
+        int size = 48;
+        for (Map.Entry<String, Tag> entry : tags.entrySet()) {
+            size += 28 + 2 * entry.getKey().length() + 36 + entry.getValue().sizeInBytes();
+        }
+        return size;
+    }
+    public Collection<Tag> values() {
+        return tags.values();
+    }
+    public void forEach(BiConsumer<String, Tag> consumer) {
+        tags.forEach(consumer);
+    }
+    public TagType<CompoundTag> getType() {
+        return TYPE;
+    }
+    CompoundTag shallowCopy() {
+        return new CompoundTag(new LinkedHashMap<>(tags));
+    }
+    public Optional<CompoundTag> asCompound() {
+        return Optional.of(this);
+    }
+    public void accept(TagVisitor visitor) {
+        visitor.visitCompound(this);
+    }
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor) {
+        for (Map.Entry<String, Tag> entry : tags.entrySet()) {
+            Tag tag = entry.getValue();
+            StreamTagVisitor.EntryResult entryResult = visitor.visitEntry(tag.getType(), entry.getKey());
+            switch (entryResult) {
+                case HALT:
+                    return StreamTagVisitor.ValueResult.HALT;
+                case BREAK:
+                    return visitor.visitContainerEnd();
+                case SKIP:
+                    break;
+                default:
+                    StreamTagVisitor.ValueResult result = tag.accept(visitor);
+                    switch (result) {
+                        case HALT:
+                            return StreamTagVisitor.ValueResult.HALT;
+                        case BREAK:
+                            return visitor.visitContainerEnd();
+                        default:
+                            break;
+                    }
+            }
+        }
+        return visitor.visitContainerEnd();
+    }
+    public <T> void store(String name, Codec<T> codec, T value) {
+        store(name, codec, NbtOps.INSTANCE, value);
+    }
+    public <T> void storeNullable(String name, Codec<T> codec, T value) {
+        storeNullable(name, codec, NbtOps.INSTANCE, value);
+    }
+    public <T> void store(String name, Codec<T> codec, DynamicOps<Tag> ops, T value) {
+        tags.put(name, codec.encodeStart(ops, value).getOrThrow());
+    }
+    public <T> void storeNullable(String name, Codec<T> codec, DynamicOps<Tag> ops, T value) {
+        if (value != null) {
+            store(name, codec, ops, value);
+        }
+    }
+    public <T> void store(MapCodec<T> codec, T value) {
+        store(codec, NbtOps.INSTANCE, value);
+    }
+    public <T> void store(MapCodec<T> codec, DynamicOps<Tag> ops, T value) {
+        Tag encoded = codec.encoder().encodeStart(ops, value).getOrThrow();
+        if (encoded instanceof CompoundTag compound) {
+            merge(compound);
+        }
+    }
+    public <T> Optional<T> read(String name, Codec<T> codec) {
+        return read(name, codec, NbtOps.INSTANCE);
+    }
+    public <T> Optional<T> read(String name, Codec<T> codec, DynamicOps<Tag> ops) {
+        Tag tag = tags.get(name);
+        return tag == null ? Optional.empty() : codec.parse(ops, tag).result();
+    }
+    public <T> Optional<T> read(MapCodec<T> codec) {
+        return read(codec, NbtOps.INSTANCE);
+    }
+    public <T> Optional<T> read(MapCodec<T> codec, DynamicOps<Tag> ops) {
+        return codec.decoder().parse(ops, this).result();
     }
 }

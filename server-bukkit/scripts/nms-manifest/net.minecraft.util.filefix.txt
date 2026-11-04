@@ -1,0 +1,96 @@
+//// AbortedFileFixException.java
+import java.util.List;
+import net.minecraft.CrashReport;
+import net.minecraft.util.filefix.virtualfilesystem.FileMove;
+public final class AbortedFileFixException extends FileFixException {
+    public AbortedFileFixException(Exception cause, List<FileMove> notRevertedMoves, FileSystemCapabilities fileSystemCapabilities);
+    public AbortedFileFixException(Exception cause);
+    public List<FileMove> notRevertedMoves();
+    protected CrashReport createCrashReport();
+}
+//// AtomicMoveNotSupportedFileFixException.java
+public class AtomicMoveNotSupportedFileFixException extends FileFixException {
+    public AtomicMoveNotSupportedFileFixException(FileSystemCapabilities fileSystemCapabilities);
+}
+//// CanceledFileFixException.java
+public class CanceledFileFixException extends FileFixException {
+    public CanceledFileFixException();
+}
+//// FailedCleanupFileFixException.java
+import net.minecraft.CrashReport;
+public final class FailedCleanupFileFixException extends FileFixException {
+    public FailedCleanupFileFixException(Exception cause, String newWorldFolderName, FileSystemCapabilities fileSystemCapabilities);
+    protected CrashReport createCrashReport();
+    public String newWorldFolderName();
+}
+//// FileFix.java
+import com.mojang.datafixers.schemas.Schema;
+import java.io.IOException;
+import java.nio.file.Path;
+import net.minecraft.util.filefix.operations.FileFixOperation;
+import net.minecraft.util.filefix.operations.ModifyContent;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+public abstract class FileFix {
+    public FileFix(Schema schema);
+    public final Schema getSchema();
+    public final int getVersion();
+    public void addFileFixOperation(FileFixOperation fileFixOperation);
+    public void addFileContentFix(ModifyContent.FileAccessFunction fileAccessFunction);
+    public int countFileOperations();
+    public void runFixOperations(Path baseFolder, UpgradeProgress upgradeProgress) throws IOException;
+    public abstract void makeFixer();
+}
+//// FileFixException.java
+import net.minecraft.CrashReport;
+import net.minecraft.ReportedException;
+public class FileFixException extends RuntimeException {
+    protected final FileSystemCapabilities fileSystemCapabilities;
+    public FileFixException(Exception cause, FileSystemCapabilities fileSystemCapabilities);
+    protected CrashReport createCrashReport();
+    public ReportedException makeReportedException();
+}
+//// FileFixUtil.java
+import java.io.IOException;
+import java.nio.file.Path;
+public class FileFixUtil {
+    public static final String NAMESPACE_PATTERN = "([a-z0-9_.-]+)";
+    public static void moveFile(Path baseDirectory, String from, String to) throws IOException;
+    public static void deleteFileOrEmptyDirectory(Path baseDirectory, String file) throws IOException;
+}
+//// FileFixerUpper.java
+import com.mojang.datafixers.DataFixerBuilder;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.Dynamic;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.function.BiFunction;
+import net.minecraft.util.filefix.virtualfilesystem.FileMove;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+import net.minecraft.world.level.storage.LevelStorageSource;
+public class FileFixerUpper {
+    public FileFixerUpper(DataFixerBuilder.Result dataFixer, List<FileFix> fileFixes, int latestFileFixerVersion);
+    public static int worldVersionToFileFixerVersion(int levelDataVersion);
+    public boolean requiresFileFixing(int levelDataVersion);
+    public Dynamic<?> fix(LevelStorageSource.LevelStorageAccess worldAccess, Dynamic<?> levelDataTag, UpgradeProgress upgradeProgress) throws FileFixException;
+    public Dynamic<?> fix(LevelStorageSource.LevelStorageAccess worldAccess, Dynamic<?> levelDataTag, UpgradeProgress upgradeProgress, int toVersion) throws FileFixException;
+    public void applyFileFixers(UpgradeProgress upgradeProgress, int loadedVersion, int toVersion, Path basePath) throws IOException;
+    protected static void swapInFixedWorld(LevelStorageSource.LevelStorageAccess worldAccess, List<FileMove> moves, Path fileFixDirectory, Path tempWorld, UpgradeProgress upgradeProgress) throws FileFixException;
+    public static FileSystemCapabilities detectFileSystemCapabilities(Path dir) throws IOException;
+    public static record UpgradeInProgress(List<FileMove> moves) {
+        public static Codec<UpgradeInProgress> codec(Path fromDirectory, Path toDirectory);
+    }
+    public static class Builder {
+        public final List<FileFix> fileFixes;
+        public Builder(int currentVersion);
+        public void addFixer(FileFix fileFix);
+        public Schema addSchema(DataFixerBuilder fixerUpper, int version, BiFunction<Integer, Schema, Schema> factory);
+        public FileFixerUpper build(DataFixerBuilder.Result dataFixer);
+    }
+}
+//// FileSystemCapabilities.java
+import java.nio.file.CopyOption;
+public record FileSystemCapabilities(boolean atomicMove, boolean hardLinks) {
+    public CopyOption[] getMoveOptions();
+}

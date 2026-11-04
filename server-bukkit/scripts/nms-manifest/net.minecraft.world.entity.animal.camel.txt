@@ -1,0 +1,192 @@
+//// Camel.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.AnimationState;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.Brain;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.control.BodyRotationControl;
+import net.minecraft.world.entity.ai.control.LookControl;
+import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.animal.equine.AbstractHorse;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.equipment.Equippable;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+public class Camel extends AbstractHorse {
+    public static final float BABY_SCALE = 0.6F;
+    public static final int DASH_COOLDOWN_TICKS = 55;
+    public static final int MAX_HEAD_Y_ROT = 30;
+    public static final EntityDataAccessor<Boolean> DASH;
+    public static final EntityDataAccessor<Long> LAST_POSE_CHANGE_TICK;
+    public final AnimationState sitAnimationState;
+    public final AnimationState sitPoseAnimationState;
+    public final AnimationState sitUpAnimationState;
+    public final AnimationState idleAnimationState;
+    public final AnimationState dashAnimationState;
+    public Camel(EntityType<? extends Camel> type, Level level);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public static AttributeSupplier.Builder createAttributes();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData);
+    public static boolean checkCamelSpawnRules(EntityType<Camel> type, LevelAccessor level, EntitySpawnReason spawnReason, BlockPos pos, RandomSource random);
+    protected Brain<Camel> makeBrain(Brain.Packed packedBrain);
+    public Brain<Camel> getBrain();
+    protected void registerGoals();
+    public EntityDimensions getDefaultDimensions(Pose pose);
+    protected void customServerAiStep(ServerLevel level);
+    public void tick();
+    protected void updateWalkAnimation(float distance);
+    public void travel(Vec3 input);
+    protected void tickRidden(Player controller, Vec3 riddenInput);
+    public boolean refuseToMove();
+    protected float getRiddenSpeed(Player controller);
+    protected Vec2 getRiddenRotation(LivingEntity controller);
+    protected Vec3 getRiddenInput(Player controller, Vec3 selfInput);
+    public boolean canJump();
+    public void onPlayerJump(int jumpAmount);
+    public boolean canSprint();
+    protected void executeRidersJump(float amount, Vec3 input);
+    public boolean isDashing();
+    public void setDashing(boolean isDashing);
+    public void handleStartJump(int jumpScale);
+    protected SoundEvent getDashingSound();
+    protected SoundEvent getDashReadySound();
+    public void handleStopJump();
+    public int getJumpCooldown();
+    protected SoundEvent getAmbientSound();
+    protected SoundEvent getDeathSound();
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected void playStepSound(BlockPos pos, BlockState blockState);
+    public boolean isFood(ItemStack itemStack);
+    public InteractionResult mobInteract(Player player, InteractionHand hand);
+    public void onElasticLeashPull();
+    public Vec3[] getQuadLeashOffsets();
+    public boolean canCamelChangePose();
+    protected boolean handleEating(Player player, ItemStack itemStack);
+    protected boolean canPerformRearing();
+    public boolean canMate(Animal partner);
+    public Camel getBreedOffspring(ServerLevel level, AgeableMob partner);
+    protected SoundEvent getEatingSound();
+    protected void actuallyHurt(ServerLevel level, DamageSource source, float dmg);
+    protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale);
+    public float getAgeScale();
+    public Vec3 getLeashOffset(float partialTicks);
+    public int getMaxHeadYRot();
+    protected boolean canAddPassenger(Entity passenger);
+    public boolean isCamelSitting();
+    public boolean isCamelVisuallySitting();
+    public boolean isInPoseTransition();
+    public void sitDown();
+    public void standUp();
+    protected SoundEvent getStandUpSound();
+    protected SoundEvent getSitDownSound();
+    public void standUpInstantly();
+    public void resetLastPoseChangeTick(long syncedPoseTickTime);
+    public long getPoseTime();
+    protected Holder<SoundEvent> getEquipSound(EquipmentSlot slot, ItemStack stack, Equippable equippable);
+    protected Holder.Reference<SoundEvent> getSaddleSound();
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    public boolean isTamed();
+    public void openCustomInventoryScreen(Player player);
+    protected BodyRotationControl createBodyControl();
+    class CamelBodyRotationControl extends BodyRotationControl {
+        public CamelBodyRotationControl(Camel camel);
+        public void clientTick();
+    }
+    class CamelLookControl extends LookControl {
+        private CamelLookControl();
+        public void tick();
+    }
+    static class CamelMoveControl<T extends Camel> extends MoveControl<T> {
+        public CamelMoveControl(T camel);
+        public void tick();
+    }
+}
+//// CamelAi.java
+import java.util.List;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.ai.ActivityData;
+import net.minecraft.world.entity.ai.behavior.AnimalPanic;
+import net.minecraft.world.entity.ai.behavior.Behavior;
+public class CamelAi {
+    protected static void initMemories(Camel body, RandomSource random);
+    protected static List<ActivityData<Camel>> getActivities();
+    public static void updateActivity(Camel body);
+    public static class CamelPanic extends AnimalPanic<Camel> {
+        public CamelPanic(float speedMultiplier);
+        protected boolean checkExtraStartConditions(ServerLevel level, Camel body);
+        protected void start(ServerLevel level, Camel camel, long timestamp);
+    }
+    public static class RandomSitting extends Behavior<Camel> {
+        public RandomSitting(int minimalPoseTimeSec);
+        protected boolean checkExtraStartConditions(ServerLevel level, Camel body);
+        protected void start(ServerLevel level, Camel body, long timestamp);
+    }
+}
+//// CamelHusk.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+public class CamelHusk extends Camel {
+    public CamelHusk(EntityType<? extends Camel> type, Level level);
+    public boolean removeWhenFarAway(double distSqr);
+    public boolean isMobControlled();
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    public boolean canBeLeashed();
+    public boolean isFood(ItemStack itemStack);
+    protected SoundEvent getAmbientSound();
+    public boolean canMate(Animal partner);
+    public Camel getBreedOffspring(ServerLevel level, AgeableMob partner);
+    public boolean canFallInLove();
+    public boolean canBeABaby();
+    protected SoundEvent getDeathSound();
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected void playStepSound(BlockPos pos, BlockState blockState);
+    protected SoundEvent getDashingSound();
+    protected SoundEvent getDashReadySound();
+    protected SoundEvent getEatingSound();
+    protected SoundEvent getStandUpSound();
+    protected SoundEvent getSitDownSound();
+    protected Holder.Reference<SoundEvent> getSaddleSound();
+    public float chargeSpeedModifier();
+}

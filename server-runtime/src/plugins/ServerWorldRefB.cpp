@@ -77,6 +77,12 @@ std::int32_t LoadedWorldRef::useItemOn(std::int32_t x, std::int32_t y, std::int3
                                    itemUse::Click{.x = x, .y = y, .z = z, .face = face, .yaw = yaw, .pitch = pitch});
 }
 
+bool LoadedWorldRef::hasScheduledTick(std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> here = world_->state().blockState(x, y, z);
+    const Identifier* block = here.has_value() ? reg::blockStateDefinitions::blockOf(*here) : nullptr;
+    return block != nullptr && world_->state().hasScheduledBlockTick(x, y, z, *block);
+}
+
 bool LoadedWorldRef::scheduleTick(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t delay, bool fluid) {
     const std::optional<std::int32_t> here = world_->state().blockState(x, y, z);
     if (!here.has_value()) {

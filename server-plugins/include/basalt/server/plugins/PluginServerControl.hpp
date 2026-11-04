@@ -38,6 +38,15 @@ public:
 
     [[nodiscard]] static PluginServerControl& unavailable();
 
+    [[nodiscard]] virtual std::vector<std::string> stopwatchIds() { return {}; }
+
+    /// create, restart and remove answer 1 on success; elapsed answers the seconds the stopwatch has run.
+    virtual std::optional<double> stopwatch(std::string_view operation, std::string_view id) {
+        static_cast<void>(operation);
+        static_cast<void>(id);
+        return std::nullopt;
+    }
+
     [[nodiscard]] virtual float tickRate() { return 20.0F; }
 
     /// Ticks per second over the last minute, five minutes and fifteen minutes, then the mean tick in milliseconds.

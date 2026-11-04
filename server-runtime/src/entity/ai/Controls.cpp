@@ -156,6 +156,12 @@ bool canReach(world::WorldState& world, ServerEntity& mob, double x, double y, d
     return path.has_value() && !path->empty();
 }
 
+std::vector<std::array<std::int32_t, 3>> findPath(world::WorldState& world, ServerEntity& mob, double x, double y,
+                                                  double z) {
+    std::optional<std::vector<std::array<std::int32_t, 3>>> path = pathFor(world, mob, x, y, z);
+    return path.has_value() ? std::move(*path) : std::vector<std::array<std::int32_t, 3>>{};
+}
+
 bool follow(ServerEntity& mob, std::vector<std::array<std::int32_t, 3>> nodes, const std::array<double, 3>& target,
             double speedModifier) {
     return start(mob, std::move(nodes), target, speedModifier);

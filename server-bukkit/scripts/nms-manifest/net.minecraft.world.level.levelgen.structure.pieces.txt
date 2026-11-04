@@ -1,0 +1,109 @@
+//// PiecesContainer.java
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+public record PiecesContainer(List<StructurePiece> pieces) {
+    public PiecesContainer(List<StructurePiece> pieces);
+    public boolean isEmpty();
+    public boolean isInsidePiece(BlockPos startPos);
+    public Tag save(StructurePieceSerializationContext context);
+    public static PiecesContainer load(ListTag children, StructurePieceSerializationContext context);
+    public BoundingBox calculateBoundingBox();
+}
+//// StructurePieceSerializationContext.java
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public record StructurePieceSerializationContext(ResourceManager resourceManager, RegistryAccess registryAccess, StructureTemplateManager structureTemplateManager) {
+    public static StructurePieceSerializationContext fromLevel(ServerLevel level);
+}
+//// StructurePieceType.java
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public interface StructurePieceType {
+    StructurePieceType MINE_SHAFT_CORRIDOR;
+    StructurePieceType MINE_SHAFT_CROSSING;
+    StructurePieceType MINE_SHAFT_ROOM;
+    StructurePieceType MINE_SHAFT_STAIRS;
+    StructurePieceType NETHER_FORTRESS_BRIDGE_CROSSING;
+    StructurePieceType NETHER_FORTRESS_BRIDGE_END_FILLER;
+    StructurePieceType NETHER_FORTRESS_BRIDGE_STRAIGHT;
+    StructurePieceType NETHER_FORTRESS_CASTLE_CORRIDOR_STAIRS;
+    StructurePieceType NETHER_FORTRESS_CASTLE_CORRIDOR_T_BALCONY;
+    StructurePieceType NETHER_FORTRESS_CASTLE_ENTRANCE;
+    StructurePieceType NETHER_FORTRESS_CASTLE_SMALL_CORRIDOR_CROSSING;
+    StructurePieceType NETHER_FORTRESS_CASTLE_SMALL_CORRIDOR_LEFT_TURN;
+    StructurePieceType NETHER_FORTRESS_CASTLE_SMALL_CORRIDOR;
+    StructurePieceType NETHER_FORTRESS_CASTLE_SMALL_CORRIDOR_RIGHT_TURN;
+    StructurePieceType NETHER_FORTRESS_CASTLE_STALK_ROOM;
+    StructurePieceType NETHER_FORTRESS_MONSTER_THRONE;
+    StructurePieceType NETHER_FORTRESS_ROOM_CROSSING;
+    StructurePieceType NETHER_FORTRESS_STAIRS_ROOM;
+    StructurePieceType NETHER_FORTRESS_START;
+    StructurePieceType STRONGHOLD_CHEST_CORRIDOR;
+    StructurePieceType STRONGHOLD_FILLER_CORRIDOR;
+    StructurePieceType STRONGHOLD_FIVE_CROSSING;
+    StructurePieceType STRONGHOLD_LEFT_TURN;
+    StructurePieceType STRONGHOLD_LIBRARY;
+    StructurePieceType STRONGHOLD_PORTAL_ROOM;
+    StructurePieceType STRONGHOLD_PRISON_HALL;
+    StructurePieceType STRONGHOLD_RIGHT_TURN;
+    StructurePieceType STRONGHOLD_ROOM_CROSSING;
+    StructurePieceType STRONGHOLD_STAIRS_DOWN;
+    StructurePieceType STRONGHOLD_START;
+    StructurePieceType STRONGHOLD_STRAIGHT;
+    StructurePieceType STRONGHOLD_STRAIGHT_STAIRS_DOWN;
+    StructurePieceType JUNGLE_PYRAMID_PIECE;
+    StructurePieceType OCEAN_RUIN;
+    StructurePieceType IGLOO;
+    StructurePieceType RUINED_PORTAL;
+    StructurePieceType SWAMPLAND_HUT;
+    StructurePieceType DESERT_PYRAMID_PIECE;
+    StructurePieceType OCEAN_MONUMENT_BUILDING;
+    StructurePieceType OCEAN_MONUMENT_CORE_ROOM;
+    StructurePieceType OCEAN_MONUMENT_DOUBLE_X_ROOM;
+    StructurePieceType OCEAN_MONUMENT_DOUBLE_XY_ROOM;
+    StructurePieceType OCEAN_MONUMENT_DOUBLE_Y_ROOM;
+    StructurePieceType OCEAN_MONUMENT_DOUBLE_YZ_ROOM;
+    StructurePieceType OCEAN_MONUMENT_DOUBLE_Z_ROOM;
+    StructurePieceType OCEAN_MONUMENT_ENTRY_ROOM;
+    StructurePieceType OCEAN_MONUMENT_PENTHOUSE;
+    StructurePieceType OCEAN_MONUMENT_SIMPLE_ROOM;
+    StructurePieceType OCEAN_MONUMENT_SIMPLE_TOP_ROOM;
+    StructurePieceType OCEAN_MONUMENT_WING_ROOM;
+    StructurePieceType END_CITY_PIECE;
+    StructurePieceType WOODLAND_MANSION_PIECE;
+    StructurePieceType BURIED_TREASURE_PIECE;
+    StructurePieceType SHIPWRECK_PIECE;
+    StructurePieceType NETHER_FOSSIL;
+    StructurePieceType JIGSAW;
+    StructurePiece load(StructurePieceSerializationContext context, CompoundTag tag);
+    public interface ContextlessType extends StructurePieceType {
+        StructurePiece load(CompoundTag tag);
+        default StructurePiece load(StructurePieceSerializationContext context, CompoundTag tag);
+    }
+    public interface StructureTemplateType extends StructurePieceType {
+        StructurePiece load(StructureTemplateManager structureTemplateManager, CompoundTag tag);
+        default StructurePiece load(StructurePieceSerializationContext context, CompoundTag tag);
+    }
+}
+//// StructurePiecesBuilder.java
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+public class StructurePiecesBuilder {
+    public void addPiece(StructurePiece piece);
+    public StructurePiece findCollisionPiece(BoundingBox box);
+    public void offsetPiecesVertically(int dy);
+    public int moveBelowSeaLevel(int seaLevel, int minY, RandomSource random, int offset);
+    public void moveInsideHeights(RandomSource random, int lowestAllowed, int highestAllowed);
+    public PiecesContainer build();
+    public void clear();
+    public boolean isEmpty();
+    public BoundingBox getBoundingBox();
+}

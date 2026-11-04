@@ -1,0 +1,220 @@
+//// BendingTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class BendingTrunkPlacer extends TrunkPlacer {
+    public static final MapCodec<BendingTrunkPlacer> CODEC;
+    public BendingTrunkPlacer(int baseHeight, int heightRandA, int heightRandB, int minHeightForLeaves, IntProvider bendLength);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+}
+//// CherryTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class CherryTrunkPlacer extends TrunkPlacer {
+    public static final MapCodec<CherryTrunkPlacer> CODEC;
+    public CherryTrunkPlacer(int baseHeight, int heightRandA, int heightRandB, IntProvider branchCount, IntProvider branchHorizontalLength, UniformInt branchStartOffsetFromTop, IntProvider branchEndOffsetFromTop);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+}
+//// DarkOakTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class DarkOakTrunkPlacer extends TrunkPlacer {
+    public static final MapCodec<DarkOakTrunkPlacer> CODEC;
+    public DarkOakTrunkPlacer(int baseHeight, int heightRandA, int heightRandB);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+}
+//// FancyTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class FancyTrunkPlacer extends TrunkPlacer {
+    public static final MapCodec<FancyTrunkPlacer> CODEC;
+    public FancyTrunkPlacer(int baseHeight, int heightRandA, int heightRandB);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+    static class FoliageCoords {
+        public FoliageCoords(BlockPos pos, int branchBase);
+        public int getBranchBase();
+    }
+}
+//// ForkingTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class ForkingTrunkPlacer extends TrunkPlacer {
+    public static final MapCodec<ForkingTrunkPlacer> CODEC;
+    public ForkingTrunkPlacer(int baseHeight, int heightRandA, int heightRandB);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+}
+//// GiantTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class GiantTrunkPlacer extends TrunkPlacer {
+    public static final MapCodec<GiantTrunkPlacer> CODEC;
+    public GiantTrunkPlacer(int baseHeight, int heightRandA, int heightRandB);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+}
+//// MegaJungleTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class MegaJungleTrunkPlacer extends GiantTrunkPlacer {
+    public static final MapCodec<MegaJungleTrunkPlacer> CODEC;
+    public MegaJungleTrunkPlacer(int baseHeight, int heightRandA, int heightRandB);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+}
+//// PoplarTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class PoplarTrunkPlacer extends TrunkPlacer {
+    public static final MapCodec<PoplarTrunkPlacer> CODEC;
+    public PoplarTrunkPlacer(int baseHeight, int heightRandA, int heightRandB, IntProvider trunkHeightAboveBranches, IntProvider branchAmount);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+}
+//// StraightTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class StraightTrunkPlacer extends TrunkPlacer {
+    public static final MapCodec<StraightTrunkPlacer> CODEC;
+    public StraightTrunkPlacer(int baseHeight, int heightRandA, int heightRandB);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+}
+//// TrunkPlacer.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public abstract class TrunkPlacer {
+    public static final Codec<TrunkPlacer> CODEC;
+    public static final int MAX_HEIGHT = 80;
+    protected final int baseHeight;
+    protected final int heightRandA;
+    protected final int heightRandB;
+    protected static <P extends TrunkPlacer> Products.P3<RecordCodecBuilder.Mu<P>, Integer, Integer, Integer> trunkPlacerParts(RecordCodecBuilder.Instance<P> instance);
+    public TrunkPlacer(int baseHeight, int heightRandA, int heightRandB);
+    protected abstract TrunkPlacerType<?> type();
+    public abstract List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+    public int getBaseHeight();
+    public int getTreeHeight(RandomSource random);
+    protected static void placeBelowTrunkBlock(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, BlockPos pos, TreeFeature tree);
+    protected boolean placeLog(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, BlockPos pos, TreeFeature tree);
+    protected boolean placeLog(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, BlockPos pos, TreeFeature tree, Function<BlockState, BlockState> stateModifier);
+    protected void placeLogIfFree(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, BlockPos.MutableBlockPos pos, TreeFeature tree);
+    protected boolean validTreePos(WorldGenLevel level, BlockPos pos);
+    public boolean isFree(WorldGenLevel level, BlockPos pos);
+}
+//// TrunkPlacerType.java
+import com.mojang.serialization.MapCodec;
+public class TrunkPlacerType<P extends TrunkPlacer> {
+    public static final TrunkPlacerType<StraightTrunkPlacer> STRAIGHT_TRUNK_PLACER;
+    public static final TrunkPlacerType<ForkingTrunkPlacer> FORKING_TRUNK_PLACER;
+    public static final TrunkPlacerType<GiantTrunkPlacer> GIANT_TRUNK_PLACER;
+    public static final TrunkPlacerType<MegaJungleTrunkPlacer> MEGA_JUNGLE_TRUNK_PLACER;
+    public static final TrunkPlacerType<DarkOakTrunkPlacer> DARK_OAK_TRUNK_PLACER;
+    public static final TrunkPlacerType<FancyTrunkPlacer> FANCY_TRUNK_PLACER;
+    public static final TrunkPlacerType<BendingTrunkPlacer> BENDING_TRUNK_PLACER;
+    public static final TrunkPlacerType<UpwardsBranchingTrunkPlacer> UPWARDS_BRANCHING_TRUNK_PLACER;
+    public static final TrunkPlacerType<CherryTrunkPlacer> CHERRY_TRUNK_PLACER;
+    public static final TrunkPlacerType<PoplarTrunkPlacer> POPLAR_TRUNK_PLACER;
+    private TrunkPlacerType(MapCodec<P> codec);
+    public MapCodec<P> codec();
+}
+//// UpwardsBranchingTrunkPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderSet;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+public class UpwardsBranchingTrunkPlacer extends TrunkPlacer {
+    public static final MapCodec<UpwardsBranchingTrunkPlacer> CODEC;
+    public UpwardsBranchingTrunkPlacer(int baseHeight, int heightRandA, int heightRandB, IntProvider extraBranchSteps, float placeBranchPerLogProbability, IntProvider extraBranchLength, HolderSet<Block> canGrowThrough);
+    protected TrunkPlacerType<?> type();
+    public List<FoliagePlacer.FoliageAttachment> placeTrunk(WorldGenLevel level, BiConsumer<BlockPos, BlockState> trunkSetter, RandomSource random, int treeHeight, BlockPos origin, TreeFeature tree);
+    protected boolean validTreePos(WorldGenLevel level, BlockPos pos);
+}

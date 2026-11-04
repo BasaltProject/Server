@@ -1,0 +1,258 @@
+//// ChunkIOErrorReporter.java
+import net.minecraft.ReportedException;
+import net.minecraft.world.level.ChunkPos;
+public interface ChunkIOErrorReporter {
+    void reportChunkLoadFailure(Throwable throwable, RegionStorageInfo storageInfo, ChunkPos pos);
+    void reportChunkSaveFailure(Throwable throwable, RegionStorageInfo storageInfo, ChunkPos pos);
+    static ReportedException createMisplacedChunkReport(ChunkPos storedPos, ChunkPos requestedPos);
+    default void reportMisplacedChunk(ChunkPos storedPos, ChunkPos requestedPos, RegionStorageInfo storageInfo);
+}
+//// ChunkScanAccess.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.nbt.StreamTagVisitor;
+import net.minecraft.world.level.ChunkPos;
+public interface ChunkScanAccess {
+    CompletableFuture<Void> scanChunk(ChunkPos pos, StreamTagVisitor visitor);
+}
+//// EntityStorage.java
+import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.entity.ChunkEntities;
+import net.minecraft.world.level.entity.EntityPersistentStorage;
+public class EntityStorage implements EntityPersistentStorage<Entity> {
+    public EntityStorage(SimpleRegionStorage simpleRegionStorage, ServerLevel level, Executor mainThreadExecutor);
+    public CompletableFuture<ChunkEntities<Entity>> loadEntities(ChunkPos pos);
+    public void storeEntities(ChunkEntities<Entity> chunk);
+    public void flush(boolean flushStorage);
+    public void close() throws IOException;
+}
+//// IOWorker.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.StreamTagVisitor;
+import net.minecraft.world.level.ChunkPos;
+public class IOWorker implements AutoCloseable, ChunkScanAccess {
+    public static final Supplier<CompoundTag> STORE_EMPTY;
+    protected IOWorker(RegionStorageInfo info, Path dir, boolean sync);
+    public boolean isOldChunkAround(ChunkPos pos, int range);
+    public CompletableFuture<Void> store(ChunkPos pos, CompoundTag value);
+    public CompletableFuture<Void> store(ChunkPos pos, Supplier<CompoundTag> supplier);
+    public CompletableFuture<Optional<CompoundTag>> loadAsync(ChunkPos pos);
+    public CompletableFuture<Void> synchronize(boolean flush);
+    public CompletableFuture<Void> scanChunk(ChunkPos pos, StreamTagVisitor visitor);
+    public void close() throws IOException;
+    public RegionStorageInfo storageInfo();
+    static enum Priority {
+        FOREGROUND, BACKGROUND, SHUTDOWN;
+    }
+    static class PendingStore {
+        public PendingStore(CompoundTag data);
+    }
+    interface ThrowingSupplier<T> {
+        T get() throws Exception;
+    }
+}
+//// RecreatingSimpleRegionStorage.java
+import com.mojang.datafixers.DataFixer;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.ChunkPos;
+public class RecreatingSimpleRegionStorage extends SimpleRegionStorage {
+    public RecreatingSimpleRegionStorage(RegionStorageInfo readInfo, Path readFolder, RegionStorageInfo writeInfo, Path writeFolder, DataFixer fixerUpper, boolean syncWrites, DataFixTypes dataFixType);
+    public CompletableFuture<Void> write(ChunkPos pos, Supplier<CompoundTag> supplier);
+    public void close() throws IOException;
+}
+//// RegionBitmap.java
+import it.unimi.dsi.fastutil.ints.IntSet;
+public class RegionBitmap {
+    public void force(int position, int size);
+    public void free(int position, int size);
+    public int allocate(int size);
+    public IntSet getUsed();
+}
+//// RegionFile.java
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.file.Path;
+import net.minecraft.world.level.ChunkPos;
+public class RegionFile implements AutoCloseable {
+    protected static final int SECTOR_INTS = 1024;
+    protected final RegionBitmap usedSectors;
+    public RegionFile(RegionStorageInfo info, Path path, Path externalFileDir, boolean sync) throws IOException;
+    public RegionFile(RegionStorageInfo info, Path path, Path externalFileDir, RegionFileVersion version, boolean sync) throws IOException;
+    public Path getPath();
+    public DataInputStream getChunkDataInputStream(ChunkPos pos) throws IOException;
+    public boolean doesChunkExist(ChunkPos pos);
+    public DataOutputStream getChunkDataOutputStream(ChunkPos pos) throws IOException;
+    public void flush() throws IOException;
+    public void clear(ChunkPos pos) throws IOException;
+    protected void write(ChunkPos pos, ByteBuffer data) throws IOException;
+    public boolean hasChunk(ChunkPos pos);
+    public void close() throws IOException;
+    class ChunkBuffer extends ByteArrayOutputStream {
+        public ChunkBuffer(ChunkPos pos);
+        public void close() throws IOException;
+    }
+    interface CommitOp {
+        void run() throws IOException;
+    }
+}
+//// RegionFileStorage.java
+import java.io.IOException;
+import java.nio.file.Path;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.StreamTagVisitor;
+import net.minecraft.world.level.ChunkPos;
+public final class RegionFileStorage implements AutoCloseable {
+    public static final String ANVIL_EXTENSION = ".mca";
+    public RegionFileStorage(RegionStorageInfo info, Path folder, boolean sync);
+    public CompoundTag read(ChunkPos pos) throws IOException;
+    public void scanChunk(ChunkPos pos, StreamTagVisitor scanner) throws IOException;
+    public void write(ChunkPos pos, CompoundTag value) throws IOException;
+    public void close() throws IOException;
+    public void flush() throws IOException;
+    public RegionStorageInfo info();
+}
+//// RegionFileVersion.java
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+public class RegionFileVersion {
+    public static final RegionFileVersion VERSION_GZIP;
+    public static final RegionFileVersion VERSION_DEFLATE;
+    public static final RegionFileVersion VERSION_NONE;
+    public static final RegionFileVersion VERSION_LZ4;
+    public static final RegionFileVersion VERSION_CUSTOM;
+    public static final RegionFileVersion DEFAULT;
+    private RegionFileVersion(int id, String optionName, StreamWrapper<InputStream> inputWrapper, StreamWrapper<OutputStream> outputWrapper);
+    public static RegionFileVersion fromId(int id);
+    public static void configure(String optionName);
+    public static RegionFileVersion getSelected();
+    public static boolean isValidVersion(int version);
+    public int getId();
+    public OutputStream wrap(OutputStream is) throws IOException;
+    public InputStream wrap(InputStream is) throws IOException;
+    interface StreamWrapper<O> {
+        O wrap(O stream) throws IOException;
+    }
+}
+//// RegionStorageInfo.java
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+public record RegionStorageInfo(String level, ResourceKey<Level> dimension, String type) {
+    public RegionStorageInfo withTypeSuffix(String suffix);
+}
+//// SectionStorage.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import java.io.IOException;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+public class SectionStorage<R, P> implements AutoCloseable {
+    protected final LevelHeightAccessor levelHeightAccessor;
+    public SectionStorage(SimpleRegionStorage simpleRegionStorage, Codec<P> codec, Function<R, P> packer, BiFunction<P, Runnable, R> unpacker, Function<Runnable, R> factory, RegistryAccess registryAccess, ChunkIOErrorReporter errorReporter, LevelHeightAccessor levelHeightAccessor);
+    protected void tick(BooleanSupplier haveTime);
+    public void flushAll();
+    public boolean hasWork();
+    protected Optional<R> get(long sectionPos);
+    protected Optional<R> getOrLoad(long sectionPos);
+    protected boolean outsideStoredRange(long sectionPos);
+    protected R getOrCreate(long sectionPos);
+    public CompletableFuture<?> prefetch(ChunkPos chunkPos);
+    protected void onSectionLoad(long sectionPos);
+    protected void setDirty(long sectionPos);
+    public void flush(ChunkPos chunkPos);
+    public void close() throws IOException;
+    static record PackedChunk<T>(Int2ObjectMap<T> sectionsByY, boolean versionChanged) {
+        public static <T> PackedChunk<T> parse(Codec<T> codec, DynamicOps<Tag> ops, Tag tag, SimpleRegionStorage simpleRegionStorage, LevelHeightAccessor levelHeightAccessor);
+    }
+}
+//// SerializableChunkData.java
+import it.unimi.dsi.fastutil.shorts.ShortList;
+import java.util.List;
+import java.util.Map;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtException;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainerFactory;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.chunk.UpgradeData;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.BelowZeroRetrogen;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.blending.BlendingData;
+public record SerializableChunkData(PalettedContainerFactory containerFactory, ChunkPos chunkPos, int minSectionY, long lastUpdateTime, long inhabitedTime, ChunkStatus chunkStatus, BlendingData. Packed blendingData, BelowZeroRetrogen belowZeroRetrogen, UpgradeData upgradeData, Map<Heightmap.Types, long[]> heightmaps, ChunkAccess.PackedTicks packedTicks, ShortList[] postProcessingSections, boolean lightCorrect, List<SectionData> sectionData, List<CompoundTag> entities, List<CompoundTag> blockEntities, CompoundTag structureData) {
+    public static final String X_POS_TAG = "xPos";
+    public static final String Z_POS_TAG = "zPos";
+    public static final String HEIGHTMAPS_TAG = "Heightmaps";
+    public static final String IS_LIGHT_ON_TAG = "isLightOn";
+    public static final String SECTIONS_TAG = "sections";
+    public static final String BLOCK_LIGHT_TAG = "BlockLight";
+    public static final String SKY_LIGHT_TAG = "SkyLight";
+    public static SerializableChunkData parse(LevelHeightAccessor levelHeight, PalettedContainerFactory containerFactory, CompoundTag chunkData);
+    public ProtoChunk read(ServerLevel level, PoiManager poiManager, RegionStorageInfo regionInfo, ChunkPos pos);
+    public static SerializableChunkData copyOf(ServerLevel level, ChunkAccess chunk);
+    public CompoundTag write();
+    public static ChunkStatus getChunkStatusFromTag(CompoundTag tag);
+    public static record SectionData(int y, LevelChunkSection chunkSection, DataLayer blockLight, DataLayer skyLight) {
+    }
+    public static class ChunkReadException extends NbtException {
+        public ChunkReadException(String message);
+    }
+}
+//// SimpleRegionStorage.java
+import com.mojang.datafixers.DataFixer;
+import com.mojang.serialization.Dynamic;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.ChunkPos;
+public class SimpleRegionStorage implements AutoCloseable {
+    public SimpleRegionStorage(RegionStorageInfo info, Path folder, DataFixer fixerUpper, boolean syncWrites, DataFixTypes dataFixType);
+    public boolean isOldChunkAround(ChunkPos pos, int range);
+    public CompletableFuture<Optional<CompoundTag>> read(ChunkPos pos);
+    public CompletableFuture<Void> write(ChunkPos pos, CompoundTag value);
+    public CompletableFuture<Void> write(ChunkPos pos, Supplier<CompoundTag> supplier);
+    public CompoundTag upgradeChunkTag(CompoundTag chunkTag, int defaultVersion, CompoundTag dataFixContextTag, int targetVersion);
+    public CompoundTag upgradeChunkTag(CompoundTag chunkTag, int defaultVersion);
+    public Dynamic<Tag> upgradeChunkTag(Dynamic<Tag> chunkTag, int defaultVersion);
+    public static void injectDatafixingContext(CompoundTag chunkTag, CompoundTag contextTag);
+    public CompletableFuture<Void> synchronize(boolean flush);
+    public void close() throws IOException;
+    public ChunkScanAccess chunkScanner();
+    public RegionStorageInfo storageInfo();
+}

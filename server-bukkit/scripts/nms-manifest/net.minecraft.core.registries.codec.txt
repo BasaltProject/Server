@@ -1,0 +1,60 @@
+//// HolderSetCodec.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public class HolderSetCodec<E> implements Codec<HolderSet<E>> {
+    public static <E> Codec<HolderSet<E>> create(ResourceKey<? extends Registry<E>> registryKey, Codec<Holder<E>> elementCodec, boolean alwaysUseList);
+    private HolderSetCodec(ResourceKey<? extends Registry<E>> registryKey, Codec<Holder<E>> elementCodec, boolean alwaysUseList);
+    public <T> DataResult<Pair<HolderSet<E>, T>> decode(DynamicOps<T> ops, T input);
+    public <T> DataResult<T> encode(HolderSet<E> input, DynamicOps<T> ops, T prefix);
+}
+//// RegistryCodecs.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public class RegistryCodecs {
+    public static <E> Codec<Holder<E>> holder(ResourceKey<? extends Registry<E>> registryKey);
+    public static <E> Codec<Holder<E>> holder(ResourceKey<? extends Registry<E>> registryKey, Codec<E> elementCodec);
+    public static <E> Codec<Holder<E>> holder(ResourceKey<? extends Registry<E>> registryKey, Codec<E> elementCodec, boolean allowInline);
+    public static <E> Codec<HolderSet<E>> holderSet(ResourceKey<? extends Registry<E>> registryKey, Codec<E> elementCodec);
+    public static <E> Codec<HolderSet<E>> holderSet(ResourceKey<? extends Registry<E>> registryKey, Codec<E> elementCodec, boolean alwaysUseList);
+    public static <E> Codec<HolderSet<E>> holderSet(ResourceKey<? extends Registry<E>> registryKey);
+    public static <E> Codec<HolderSet<E>> holderSet(ResourceKey<? extends Registry<E>> registryKey, boolean alwaysUseList);
+}
+//// RegistryFileCodec.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public final class RegistryFileCodec<E> implements Codec<Holder<E>> {
+    public static <E> Codec<Holder<E>> create(ResourceKey<? extends Registry<E>> registryKey, Codec<E> elementCodec, boolean allowInline);
+    private RegistryFileCodec(ResourceKey<? extends Registry<E>> registryKey, Codec<E> elementCodec, boolean allowInline);
+    public <T> DataResult<T> encode(Holder<E> input, DynamicOps<T> ops, T prefix);
+    public <T> DataResult<Pair<Holder<E>, T>> decode(DynamicOps<T> ops, T input);
+    public String toString();
+}
+//// RegistryFixedCodec.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public final class RegistryFixedCodec<E> implements Codec<Holder<E>> {
+    public static <E> Codec<Holder<E>> create(ResourceKey<? extends Registry<E>> registryKey);
+    private RegistryFixedCodec(ResourceKey<? extends Registry<E>> registryKey);
+    public <T> DataResult<T> encode(Holder<E> input, DynamicOps<T> ops, T prefix);
+    public <T> DataResult<Pair<Holder<E>, T>> decode(DynamicOps<T> ops, T input);
+    public String toString();
+}

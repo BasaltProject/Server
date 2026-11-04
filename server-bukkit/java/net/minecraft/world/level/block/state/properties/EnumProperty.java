@@ -1,11 +1,13 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.block.state.properties;
 
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.util.StringRepresentable;
 import org.basaltmc.bukkit.facade.PropertyPool;
+import java.util.function.Predicate;
 
-public final class EnumProperty<T extends Comparable<T> & StringRepresentable> extends Property<T> {
+public final class EnumProperty<T extends Enum<T> & StringRepresentable> extends Property<T> {
     private final List<T> values;
 
     public EnumProperty(String name, Class<T> clazz, List<T> values) {
@@ -14,10 +16,11 @@ public final class EnumProperty<T extends Comparable<T> & StringRepresentable> e
     }
 
     @SafeVarargs
-    public static <T extends Comparable<T> & StringRepresentable> EnumProperty<T> create(String name, Class<T> clazz,
+    public static <T extends Enum<T> & StringRepresentable> EnumProperty<T> create(String name, Class<T> clazz,
             T... values) {
         List<T> list = List.of(values);
-        return PropertyPool.intern("enum:" + name + ":" + list, () -> new EnumProperty<>(name, clazz, list));
+        List<String> names = list.stream().map(StringRepresentable::getSerializedName).toList();
+        return PropertyPool.intern("enum:" + name + ":" + names, () -> new EnumProperty<>(name, clazz, list));
     }
 
     @Override
@@ -43,5 +46,14 @@ public final class EnumProperty<T extends Comparable<T> & StringRepresentable> e
     @Override
     public Class<T> getValueClass() {
         return super.getValueClass();
+    }
+    public boolean equals(Object o) {
+        return o instanceof EnumProperty<?> other && super.equals(o) && values.equals(other.values);
+    }
+    public int generateHashCode() {
+        return 31 * super.generateHashCode() + values.hashCode();
+    }
+    public static <T extends Enum<T> & StringRepresentable> EnumProperty<T> create(String name, Class<T> clazz) {
+        return create(name, clazz, clazz.getEnumConstants());
     }
 }

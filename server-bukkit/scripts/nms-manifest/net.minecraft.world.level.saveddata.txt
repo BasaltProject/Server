@@ -1,0 +1,46 @@
+//// SavedData.java
+public abstract class SavedData {
+    public void setDirty();
+    public void setDirty(boolean dirty);
+    public boolean isDirty();
+}
+//// SavedDataType.java
+import com.mojang.serialization.Codec;
+import java.util.function.Supplier;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.datafix.DataFixTypes;
+public record SavedDataType<T extends SavedData>(Identifier id, Supplier<T> constructor, Codec<T> codec, DataFixTypes dataFixType) {
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+}
+//// WanderingTraderData.java
+import com.mojang.serialization.Codec;
+public class WanderingTraderData extends SavedData {
+    public static final Codec<WanderingTraderData> CODEC;
+    public static final SavedDataType<WanderingTraderData> TYPE;
+    public WanderingTraderData();
+    public WanderingTraderData(int spawnDelay, int spawnChance);
+    public int spawnDelay();
+    public void setSpawnDelay(int spawnDelay);
+    public int spawnChance();
+    public void setSpawnChance(int spawnChance);
+}
+//// WeatherData.java
+import com.mojang.serialization.Codec;
+public final class WeatherData extends SavedData {
+    public static final Codec<WeatherData> CODEC;
+    public static final SavedDataType<WeatherData> TYPE;
+    public WeatherData();
+    public WeatherData(int clearWeatherTime, int rainTime, int thunderTime, boolean raining, boolean thundering);
+    public int getClearWeatherTime();
+    public void setClearWeatherTime(int clearWeatherTime);
+    public boolean isThundering();
+    public void setThundering(boolean thundering);
+    public int getThunderTime();
+    public void setThunderTime(int thunderTime);
+    public boolean isRaining();
+    public void setRaining(boolean raining);
+    public int getRainTime();
+    public void setRainTime(int rainTime);
+}

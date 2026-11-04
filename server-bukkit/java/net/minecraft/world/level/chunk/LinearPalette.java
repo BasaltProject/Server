@@ -1,7 +1,10 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.chunk;
 
 import java.util.List;
 import java.util.function.Predicate;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
 
 public class LinearPalette<T> implements Palette<T> {
     private final T[] values;
@@ -70,5 +73,24 @@ public class LinearPalette<T> implements Palette<T> {
     @Override
     public Palette<T> copy() {
         return new LinearPalette<>(values.clone(), bits, size);
+    }
+    public void read(FriendlyByteBuf buffer, IdMap<T> globalMap) {
+        size = buffer.readVarInt();
+        for (int i = 0; i < size; i++) {
+            values[i] = globalMap.byIdOrThrow(buffer.readVarInt());
+        }
+    }
+    public void write(FriendlyByteBuf buffer, IdMap<T> globalMap) {
+        buffer.writeVarInt(size);
+        for (int i = 0; i < size; i++) {
+            buffer.writeVarInt(globalMap.getId(values[i]));
+        }
+    }
+    public int getSerializedSize(IdMap<T> globalMap) {
+        int total = Palette.varIntSize(size);
+        for (int i = 0; i < size; i++) {
+            total += Palette.varIntSize(globalMap.getId(values[i]));
+        }
+        return total;
     }
 }

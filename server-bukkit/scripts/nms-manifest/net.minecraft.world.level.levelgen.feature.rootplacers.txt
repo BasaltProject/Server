@@ -1,0 +1,78 @@
+//// AboveRootPlacement.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public record AboveRootPlacement(Holder<BlockStateProvider> aboveRootProvider, float aboveRootPlacementChance) {
+    public static final Codec<AboveRootPlacement> CODEC;
+}
+//// MangroveRootPlacement.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public record MangroveRootPlacement(HolderSet<Block> canGrowThrough, HolderSet<Block> muddyRootsIn, Holder<BlockStateProvider> muddyRootsProvider, int maxRootWidth, int maxRootLength, float randomSkewChance) {
+    public static final Codec<MangroveRootPlacement> CODEC;
+}
+//// MangroveRootPlacer.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.LevelSimulatedReader;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public class MangroveRootPlacer extends RootPlacer {
+    public static final int ROOT_WIDTH_LIMIT = 8;
+    public static final int ROOT_LENGTH_LIMIT = 15;
+    public static final MapCodec<MangroveRootPlacer> CODEC;
+    public MangroveRootPlacer(IntProvider trunkOffsetY, Holder<BlockStateProvider> rootProvider, Optional<AboveRootPlacement> aboveRootPlacement, MangroveRootPlacement mangroveRootPlacement);
+    public boolean placeRoots(WorldGenLevel level, BiConsumer<BlockPos, BlockState> rootSetter, RandomSource random, BlockPos origin, BlockPos trunkOrigin, TreeFeature tree);
+    protected List<BlockPos> potentialRootPositions(BlockPos pos, Direction prevDir, RandomSource random, BlockPos rootOrigin);
+    protected boolean canPlaceRoot(LevelSimulatedReader level, BlockPos pos);
+    protected void placeRoot(WorldGenLevel level, BiConsumer<BlockPos, BlockState> rootSetter, RandomSource random, BlockPos pos, TreeFeature tree);
+    protected RootPlacerType<?> type();
+}
+//// RootPlacer.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.LevelSimulatedReader;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public abstract class RootPlacer {
+    public static final Codec<RootPlacer> CODEC;
+    protected final IntProvider trunkOffsetY;
+    protected final Holder<BlockStateProvider> rootProvider;
+    protected final Optional<AboveRootPlacement> aboveRootPlacement;
+    protected static <P extends RootPlacer> Products.P3<RecordCodecBuilder.Mu<P>, IntProvider, Holder<BlockStateProvider>, Optional<AboveRootPlacement>> rootPlacerParts(RecordCodecBuilder.Instance<P> instance);
+    public RootPlacer(IntProvider trunkOffsetY, Holder<BlockStateProvider> rootProvider, Optional<AboveRootPlacement> aboveRootPlacement);
+    protected abstract RootPlacerType<?> type();
+    public abstract boolean placeRoots(WorldGenLevel level, BiConsumer<BlockPos, BlockState> rootSetter, RandomSource random, BlockPos origin, BlockPos trunkOrigin, TreeFeature tree);
+    protected boolean canPlaceRoot(LevelSimulatedReader level, BlockPos pos);
+    protected void placeRoot(WorldGenLevel level, BiConsumer<BlockPos, BlockState> rootSetter, RandomSource random, BlockPos pos, TreeFeature tree);
+    protected BlockState getPotentiallyWaterloggedState(LevelSimulatedReader level, BlockPos pos, BlockState state);
+    public BlockPos getTrunkOrigin(BlockPos origin, RandomSource random);
+}
+//// RootPlacerType.java
+import com.mojang.serialization.MapCodec;
+public class RootPlacerType<P extends RootPlacer> {
+    public static final RootPlacerType<MangroveRootPlacer> MANGROVE_ROOT_PLACER;
+    private RootPlacerType(MapCodec<P> codec);
+    public MapCodec<P> codec();
+}

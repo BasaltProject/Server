@@ -1,0 +1,7 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.util;
+import net.minecraft.network.chat.Style;
+@FunctionalInterface
+public interface FormattedCharSink {
+    boolean accept(int position, Style style, int codepoint);
+}

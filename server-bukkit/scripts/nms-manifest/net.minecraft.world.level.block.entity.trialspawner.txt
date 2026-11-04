@@ -1,0 +1,209 @@
+//// PlayerDetector.java
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.phys.AABB;
+public interface PlayerDetector {
+    PlayerDetector NO_CREATIVE_PLAYERS;
+    PlayerDetector INCLUDING_CREATIVE_PLAYERS;
+    PlayerDetector SHEEP;
+    List<UUID> detect(ServerLevel level, EntitySelector selector, BlockPos spawnerPos, double requiredPlayerRange, boolean requireLineOfSight);
+    public interface EntitySelector {
+        EntitySelector SELECT_FROM_LEVEL;
+        List<? extends Player> getPlayers(ServerLevel level, Predicate<? super Player> selector);
+        <T extends Entity> List<T> getEntities(ServerLevel level, EntityTypeTest<Entity, T> type, AABB bb, Predicate<? super T> selector);
+        static EntitySelector onlySelectPlayer(Player player);
+        static EntitySelector onlySelectPlayers(List<Player> players);
+    }
+}
+//// TrialSpawner.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.component.TypedEntityData;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.loot.LootTable;
+public final class TrialSpawner {
+    public static final int DETECT_PLAYER_SPAWN_BUFFER = 40;
+    public TrialSpawner(FullConfig config, StateAccessor stateAccessor, PlayerDetector playerDetector, PlayerDetector.EntitySelector entitySelector);
+    public TrialSpawnerConfig activeConfig();
+    public TrialSpawnerConfig normalConfig();
+    public TrialSpawnerConfig ominousConfig();
+    public void load(ValueInput input);
+    public void store(ValueOutput output);
+    public void applyOminous(ServerLevel level, BlockPos spawnerPos);
+    public void removeOminous(ServerLevel level, BlockPos spawnerPos);
+    public boolean isOminous();
+    public int getTargetCooldownLength();
+    public int getRequiredPlayerRange();
+    public TrialSpawnerState getState();
+    public TrialSpawnerStateData getStateData();
+    public void setState(Level level, TrialSpawnerState state);
+    public void markUpdated();
+    public PlayerDetector getPlayerDetector();
+    public PlayerDetector.EntitySelector getEntitySelector();
+    public boolean canSpawnInLevel(ServerLevel level);
+    public Optional<UUID> spawnMob(ServerLevel level, BlockPos spawnerPos);
+    public void ejectReward(ServerLevel level, BlockPos pos, ResourceKey<LootTable> ejectingLootTable);
+    public void tickClient(Level level, BlockPos spawnerPos, boolean isOminous);
+    public void tickServer(ServerLevel serverLevel, BlockPos spawnerPos, boolean isOminous);
+    public static void addSpawnParticles(Level level, BlockPos pos, RandomSource random, SimpleParticleType particleType);
+    public static void addBecomeOminousParticles(Level level, BlockPos pos, RandomSource random);
+    public static void addDetectPlayerParticles(Level level, BlockPos pos, RandomSource random, int data, ParticleOptions type);
+    public static void addEjectItemParticles(Level level, BlockPos pos, RandomSource random);
+    public void overrideEntityToSpawn(EntityType<?> type, Level level);
+    public void overrideEntityToSpawn(TypedEntityData<EntityType<?>> entityData, Level level);
+    public void setPlayerDetector(PlayerDetector playerDetector);
+    public void overridePeacefulAndMobSpawnRule();
+    public static enum FlameParticle {
+        NORMAL, OMINOUS;
+        public final SimpleParticleType particleType;
+        public static FlameParticle decode(int data);
+        public int encode();
+    }
+    public static record FullConfig(Holder<TrialSpawnerConfig> normal, Holder<TrialSpawnerConfig> ominous, int targetCooldownLength, int requiredPlayerRange) {
+        public static final MapCodec<FullConfig> MAP_CODEC;
+        public static final FullConfig DEFAULT;
+        public FullConfig overrideEntity(EntityType<?> type);
+        public FullConfig overrideEntityData(TypedEntityData<EntityType<?>> entityData);
+    }
+    public interface StateAccessor {
+        void setState(Level level, TrialSpawnerState state);
+        TrialSpawnerState getState();
+        void markUpdated();
+    }
+}
+//// TrialSpawnerConfig.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.component.TypedEntityData;
+import net.minecraft.world.level.SpawnData;
+import net.minecraft.world.level.storage.loot.LootTable;
+public record TrialSpawnerConfig(int spawnRange, float totalMobs, float simultaneousMobs, float totalMobsAddedPerPlayer, float simultaneousMobsAddedPerPlayer, int ticksBetweenSpawn, WeightedList<SpawnData> spawnPotentialsDefinition, WeightedList<ResourceKey<LootTable>> lootTablesToEject, ResourceKey<LootTable> itemsToDropWhenOminous) {
+    public static final TrialSpawnerConfig DEFAULT;
+    public static final Codec<TrialSpawnerConfig> DIRECT_CODEC;
+    public static final Codec<Holder<TrialSpawnerConfig>> CODEC;
+    public int calculateTargetTotalMobs(int additionalPlayers);
+    public int calculateTargetSimultaneousMobs(int additionalPlayers);
+    public long ticksBetweenItemSpawners();
+    public static Builder builder();
+    public TrialSpawnerConfig withSpawning(EntityType<?> type);
+    public TrialSpawnerConfig withSpawning(TypedEntityData<EntityType<?>> entityData);
+    public static class Builder {
+        public Builder();
+        public Builder spawnRange(int spawnRange);
+        public Builder totalMobs(float totalMobs);
+        public Builder simultaneousMobs(float simultaneousMobs);
+        public Builder totalMobsAddedPerPlayer(float totalMobsAddedPerPlayer);
+        public Builder simultaneousMobsAddedPerPlayer(float simultaneousMobsAddedPerPlayer);
+        public Builder ticksBetweenSpawn(int ticksBetweenSpawn);
+        public Builder spawnPotentialsDefinition(WeightedList<SpawnData> spawnPotentialsDefinition);
+        public Builder lootTablesToEject(WeightedList<ResourceKey<LootTable>> lootTablesToEject);
+        public Builder itemsToDropWhenOminous(ResourceKey<LootTable> itemsToDropWhenOminous);
+        public TrialSpawnerConfig build();
+    }
+}
+//// TrialSpawnerConfigs.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class TrialSpawnerConfigs {
+    public static void bootstrap(BootstrapContext<TrialSpawnerConfig> context);
+    static record Keys(ResourceKey<TrialSpawnerConfig> normal, ResourceKey<TrialSpawnerConfig> ominous) {
+        public static Keys of(String id);
+    }
+}
+//// TrialSpawnerState.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.Level;
+public enum TrialSpawnerState implements StringRepresentable {
+    INACTIVE, WAITING_FOR_PLAYERS, ACTIVE, WAITING_FOR_REWARD_EJECTION, EJECTING_REWARD, COOLDOWN;
+    TrialSpawnerState tickAndGetNext(BlockPos spawnerPos, TrialSpawner trialSpawner, ServerLevel serverLevel);
+    public int lightLevel();
+    public double spinningMobSpeed();
+    public boolean hasSpinningMob();
+    public boolean isCapableOfSpawning();
+    public void emitParticles(Level level, BlockPos blockPos, boolean isOminous);
+    public String getSerializedName();
+    static class LightLevel {
+    }
+    static class SpinningMob {
+    }
+    interface ParticleEmission {
+        ParticleEmission NONE;
+        ParticleEmission SMALL_FLAMES;
+        ParticleEmission FLAMES_AND_SMOKE;
+        ParticleEmission SMOKE_INSIDE_AND_TOP_FACE;
+        void emit(Level level, RandomSource random, BlockPos blockPos, boolean isOminous);
+    }
+}
+//// TrialSpawnerStateData.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.SpawnData;
+import net.minecraft.world.level.storage.loot.LootTable;
+public class TrialSpawnerStateData {
+    final Set<UUID> detectedPlayers;
+    final Set<UUID> currentMobs;
+    long cooldownEndsAt;
+    long nextMobSpawnsAt;
+    int totalMobsSpawned;
+    Optional<SpawnData> nextSpawnData;
+    Optional<ResourceKey<LootTable>> ejectingLootTable;
+    double spin;
+    double oSpin;
+    public Packed pack();
+    public void apply(Packed packed);
+    public void reset();
+    public void resetStatistics();
+    public boolean hasMobToSpawn(TrialSpawner trialSpawner, RandomSource random);
+    public boolean hasFinishedSpawningAllMobs(TrialSpawnerConfig config, int additionalPlayers);
+    public boolean haveAllCurrentMobsDied();
+    public boolean isReadyToSpawnNextMob(ServerLevel serverLevel, TrialSpawnerConfig config, int additionalPlayers);
+    public int countAdditionalPlayers(BlockPos pos);
+    public void tryDetectPlayers(ServerLevel level, BlockPos pos, TrialSpawner trialSpawner);
+    public void resetAfterBecomingOminous(TrialSpawner trialSpawner, ServerLevel level);
+    public boolean isReadyToOpenShutter(ServerLevel serverLevel, float delayBeforeOpen, int targetCooldownLength);
+    public boolean isReadyToEjectItems(ServerLevel serverLevel, float timeBetweenEjections, int targetCooldownLength);
+    public boolean isCooldownFinished(ServerLevel serverLevel);
+    protected SpawnData getOrCreateNextSpawnData(TrialSpawner trialSpawner, RandomSource random);
+    public Entity getOrCreateDisplayEntity(TrialSpawner trialSpawner, Level level, TrialSpawnerState state);
+    public CompoundTag getUpdateTag(TrialSpawnerState state);
+    public double getSpin();
+    public double getOSpin();
+    public WeightedList<ItemStack> getDispensingItems(ServerLevel level, TrialSpawnerConfig config, BlockPos pos);
+    public static record Packed(Set<UUID> detectedPlayers, Set<UUID> currentMobs, long cooldownEndsAt, long nextMobSpawnsAt, int totalMobsSpawned, Optional<SpawnData> nextSpawnData, Optional<ResourceKey<LootTable>> ejectingLootTable) {
+        public static final MapCodec<Packed> MAP_CODEC;
+    }
+}

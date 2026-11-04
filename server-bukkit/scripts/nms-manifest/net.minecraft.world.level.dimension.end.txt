@@ -1,0 +1,48 @@
+//// DragonRespawnStage.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+public enum DragonRespawnStage implements StringRepresentable {
+    START, PREPARING_TO_SUMMON_PILLARS, SUMMONING_PILLARS, SUMMONING_DRAGON, END;
+    public static final Codec<DragonRespawnStage> CODEC;
+    public String getSerializedName();
+    public abstract void tick(ServerLevel level, EnderDragonFight fight, List<EndCrystal> crystals, int time);
+}
+//// EnderDragonFight.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EntityReference;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public class EnderDragonFight extends SavedData {
+    public static final int TIME_BETWEEN_PLAYER_SCANS = 20;
+    public static final int ARENA_TICKET_LEVEL = 9;
+    public static final int DRAGON_SPAWN_Y = 128;
+    public static final Codec<EnderDragonFight> CODEC;
+    public static final SavedDataType<EnderDragonFight> TYPE;
+    public static EnderDragonFight createDefault();
+    public EnderDragonFight(boolean needsStateScanning, boolean dragonKilled, boolean previouslyKilled, Optional<DragonRespawnStage> respawnStage, int respawnTime, Optional<UUID> dragonUUID, Optional<BlockPos> exitPortalLocation, List<Integer> gateways, List<EntityReference<EndCrystal>> respawnCrystals);
+    public static BlockPos getPodiumLocation(BlockPos offset);
+    public void init(ServerLevel level, long seed, BlockPos origin);
+    public void skipArenaLoadedCheck();
+    public void tick();
+    protected void setRespawnStage(DragonRespawnStage stage);
+    public void setDragonKilled(EnderDragon dragon);
+    public void removeAllGateways();
+    public void updateDragon(EnderDragon dragon);
+    public int aliveCrystals();
+    public void onCrystalDestroyed(EndCrystal crystal, DamageSource source);
+    public boolean hasPreviouslyKilledDragon();
+    public void tryRespawn();
+    public void resetSpikeCrystals();
+    public UUID dragonUUID();
+}

@@ -1,0 +1,467 @@
+//// ConditionalEffect.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public record ConditionalEffect<T>(T effect, Optional<Holder<LootItemCondition>> requirements) implements Validatable {
+    public static <T> Codec<ConditionalEffect<T>> codec(Codec<T> effectCodec);
+    public boolean matches(LootContext context);
+    public void validate(ValidationContext context);
+}
+//// Enchantable.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record Enchantable(int value) {
+    public static final Codec<Enchantable> CODEC;
+    public static final StreamCodec<ByteBuf, Enchantable> STREAM_CODEC;
+}
+//// EnchantedItemInUse.java
+import java.util.function.Consumer;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+public record EnchantedItemInUse(ItemStack itemStack, EquipmentSlot inSlot, LivingEntity owner, Consumer<ItemStack> onBreak) {
+    public EnchantedItemInUse(ItemStack itemStack, EquipmentSlot inSlot, LivingEntity owner);
+}
+//// Enchantment.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.Unit;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.effects.EnchantmentAttributeEffect;
+import net.minecraft.world.item.enchantment.effects.EnchantmentEntityEffect;
+import net.minecraft.world.item.enchantment.effects.EnchantmentValueEffect;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.phys.Vec3;
+import org.apache.commons.lang3.mutable.MutableFloat;
+public record Enchantment(Component description, EnchantmentDefinition definition, HolderSet<Enchantment> exclusiveSet, DataComponentMap effects) {
+    public static final int MAX_LEVEL = 255;
+    public static final Codec<Enchantment> DIRECT_CODEC;
+    public static final Codec<Holder<Enchantment>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<Enchantment>> STREAM_CODEC;
+    public static Cost constantCost(int base);
+    public static Cost dynamicCost(int base, int perLevel);
+    public static EnchantmentDefinition definition(HolderSet<Item> supportedItems, HolderSet<Item> primaryItems, int weight, int maxLevel, Cost minCost, Cost maxCost, int anvilCost, EquipmentSlotGroup... slots);
+    public static EnchantmentDefinition definition(HolderSet<Item> supportedItems, int weight, int maxLevel, Cost minCost, Cost maxCost, int anvilCost, EquipmentSlotGroup... slots);
+    public Map<EquipmentSlot, ItemStack> getSlotItems(LivingEntity entity);
+    public HolderSet<Item> getSupportedItems();
+    public boolean matchingSlot(EquipmentSlot slot);
+    public boolean isPrimaryItem(ItemStack item);
+    public boolean isSupportedItem(ItemStack item);
+    public int getWeight();
+    public int getAnvilCost();
+    public int getMinLevel();
+    public int getMaxLevel();
+    public int getMinCost(int level);
+    public int getMaxCost(int level);
+    public String toString();
+    public static boolean areCompatible(Holder<Enchantment> enchantment, Holder<Enchantment> other);
+    public static Component getFullname(Holder<Enchantment> enchantment, int level);
+    public boolean canEnchant(ItemStack itemStack);
+    public <T> List<T> getEffects(DataComponentType<List<T>> type);
+    public boolean isImmuneToDamage(ServerLevel serverLevel, int enchantmentLevel, Entity victim, DamageSource source);
+    public void modifyDamageProtection(ServerLevel serverLevel, int enchantmentLevel, ItemStack item, Entity victim, DamageSource source, MutableFloat protection);
+    public void modifyDurabilityChange(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, MutableFloat change);
+    public void modifyAmmoCount(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, MutableFloat change);
+    public void modifyPiercingCount(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, MutableFloat count);
+    public void modifyBlockExperience(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, MutableFloat count);
+    public void modifyMobExperience(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, Entity killer, MutableFloat experience);
+    public void modifyDurabilityToRepairFromXp(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, MutableFloat change);
+    public void modifyTridentReturnToOwnerAcceleration(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, Entity trident, MutableFloat count);
+    public void modifyTridentSpinAttackStrength(RandomSource random, int enchantmentLevel, MutableFloat strength);
+    public void modifyFishingTimeReduction(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, Entity fisher, MutableFloat timeReduction);
+    public void modifyFishingLuckBonus(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, Entity fisher, MutableFloat luck);
+    public void modifyDamage(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, Entity victim, DamageSource damageSource, MutableFloat amount);
+    public void modifyFallBasedDamage(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, Entity victim, DamageSource damageSource, MutableFloat amount);
+    public void modifyKnockback(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, Entity victim, DamageSource damageSource, MutableFloat amount);
+    public void modifyArmorEffectivness(ServerLevel serverLevel, int enchantmentLevel, ItemStack itemStack, Entity victim, DamageSource damageSource, MutableFloat amount);
+    public void doPostAttack(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, EnchantmentTarget forTarget, Entity victim, DamageSource damageSource);
+    public static void doPostAttack(TargetedConditionalEffect<EnchantmentEntityEffect> effect, ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity victim, DamageSource damageSource);
+    public void doPostPiercingAttack(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity user);
+    public void modifyProjectileCount(ServerLevel serverLevel, int enchantmentLevel, ItemStack weapon, Entity shooter, MutableFloat count);
+    public void modifyProjectileSpread(ServerLevel serverLevel, int enchantmentLevel, ItemStack weapon, Entity shooter, MutableFloat angle);
+    public void modifyCrossbowChargeTime(RandomSource random, int enchantmentLevel, MutableFloat time);
+    public void modifyUnfilteredValue(DataComponentType<EnchantmentValueEffect> component, RandomSource random, int enchantmentLevel, MutableFloat value);
+    public void tick(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity entity);
+    public void onProjectileSpawned(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse weapon, Entity projectile);
+    public void onHitBlock(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse weapon, Entity projectile, Vec3 position, BlockState hitBlock);
+    public static LootContext damageContext(ServerLevel serverLevel, int enchantmentLevel, Entity victim, DamageSource source);
+    public void runLocationChangedEffects(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, LivingEntity entity);
+    public void stopLocationBasedEffects(int enchantmentLevel, EnchantedItemInUse item, LivingEntity entity);
+    public static Builder enchantment(EnchantmentDefinition definition);
+    public static record Cost(int base, int perLevelAboveFirst) {
+        public static final Codec<Cost> CODEC;
+        public int calculate(int level);
+    }
+    public static record EnchantmentDefinition(HolderSet<Item> supportedItems, Optional<HolderSet<Item>> primaryItems, int weight, int maxLevel, Cost minCost, Cost maxCost, int anvilCost, List<EquipmentSlotGroup> slots) {
+        public static final MapCodec<EnchantmentDefinition> CODEC;
+    }
+    public static class Builder {
+        public Builder(EnchantmentDefinition definition);
+        public Builder exclusiveWith(HolderSet<Enchantment> set);
+        public <E> Builder withEffect(DataComponentType<List<ConditionalEffect<E>>> type, E effect, LootItemCondition.Builder condition);
+        public <E> Builder withEffect(DataComponentType<List<ConditionalEffect<E>>> type, E effect);
+        public <E> Builder withEffect(DataComponentType<List<TargetedConditionalEffect<E>>> type, EnchantmentTarget enchanted, EnchantmentTarget affected, E effect, LootItemCondition.Builder condition);
+        public <E> Builder withEffect(DataComponentType<List<TargetedConditionalEffect<E>>> type, EnchantmentTarget enchanted, EnchantmentTarget affected, E effect);
+        public Builder withEffect(DataComponentType<List<EnchantmentAttributeEffect>> type, EnchantmentAttributeEffect effect);
+        public <E> Builder withSpecialEffect(DataComponentType<E> type, E effect);
+        public Builder withEffect(DataComponentType<Unit> type);
+        public Enchantment build(Identifier descriptionKey);
+    }
+    interface FloatAction<T> {
+        float apply(T effect, float value);
+        default GenericAction<T> asGeneric(MutableFloat v);
+    }
+    interface GenericAction<T> {
+        void apply(T effect);
+    }
+}
+//// EnchantmentEffectComponents.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.Unit;
+import net.minecraft.world.item.CrossbowItem;
+import net.minecraft.world.item.enchantment.effects.DamageImmunity;
+import net.minecraft.world.item.enchantment.effects.EnchantmentAttributeEffect;
+import net.minecraft.world.item.enchantment.effects.EnchantmentEntityEffect;
+import net.minecraft.world.item.enchantment.effects.EnchantmentLocationBasedEffect;
+import net.minecraft.world.item.enchantment.effects.EnchantmentValueEffect;
+public interface EnchantmentEffectComponents {
+    Codec<DataComponentType<?>> COMPONENT_CODEC;
+    Codec<DataComponentMap> CODEC;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> DAMAGE_PROTECTION;
+    DataComponentType<List<ConditionalEffect<DamageImmunity>>> DAMAGE_IMMUNITY;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> DAMAGE;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> SMASH_DAMAGE_PER_FALLEN_BLOCK;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> KNOCKBACK;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> ARMOR_EFFECTIVENESS;
+    DataComponentType<List<TargetedConditionalEffect<EnchantmentEntityEffect>>> POST_ATTACK;
+    DataComponentType<List<ConditionalEffect<EnchantmentEntityEffect>>> POST_PIERCING_ATTACK;
+    DataComponentType<List<ConditionalEffect<EnchantmentEntityEffect>>> HIT_BLOCK;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> ITEM_DAMAGE;
+    DataComponentType<List<TargetedConditionalEffect<EnchantmentValueEffect>>> EQUIPMENT_DROPS;
+    DataComponentType<List<ConditionalEffect<EnchantmentLocationBasedEffect>>> LOCATION_CHANGED;
+    DataComponentType<List<ConditionalEffect<EnchantmentEntityEffect>>> TICK;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> AMMO_USE;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> PROJECTILE_PIERCING;
+    DataComponentType<List<ConditionalEffect<EnchantmentEntityEffect>>> PROJECTILE_SPAWNED;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> PROJECTILE_SPREAD;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> PROJECTILE_COUNT;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> TRIDENT_RETURN_ACCELERATION;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> FISHING_TIME_REDUCTION;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> FISHING_LUCK_BONUS;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> BLOCK_EXPERIENCE;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> MOB_EXPERIENCE;
+    DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> REPAIR_WITH_XP;
+    DataComponentType<List<EnchantmentAttributeEffect>> ATTRIBUTES;
+    DataComponentType<EnchantmentValueEffect> CROSSBOW_CHARGE_TIME;
+    DataComponentType<List<CrossbowItem.ChargingSounds>> CROSSBOW_CHARGING_SOUNDS;
+    DataComponentType<List<Holder<SoundEvent>>> TRIDENT_SOUND;
+    DataComponentType<Unit> PREVENT_EQUIPMENT_DROP;
+    DataComponentType<Unit> PREVENT_ARMOR_CHANGE;
+    DataComponentType<EnchantmentValueEffect> TRIDENT_SPIN_ATTACK_STRENGTH;
+    static DataComponentType<?> bootstrap(Registry<DataComponentType<?>> registry);
+}
+//// EnchantmentHelper.java
+import com.mojang.datafixers.util.Pair;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.providers.EnchantmentProvider;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+public class EnchantmentHelper {
+    public static int getItemEnchantmentLevel(Holder<Enchantment> enchantment, ItemInstance piece);
+    public static ItemEnchantments updateEnchantments(ItemStack itemStack, Consumer<ItemEnchantments.Mutable> consumer);
+    public static boolean canStoreEnchantments(ItemStack itemStack);
+    public static void setEnchantments(ItemStack itemStack, ItemEnchantments enchantments);
+    public static ItemEnchantments getEnchantmentsForCrafting(ItemStack itemStack);
+    public static boolean hasAnyEnchantments(ItemStack itemStack);
+    public static int processDurabilityChange(ServerLevel serverLevel, ItemStack itemStack, int amount);
+    public static int processAmmoUse(ServerLevel serverLevel, ItemStack weapon, ItemStack ammo, int amount);
+    public static int processBlockExperience(ServerLevel serverLevel, ItemStack itemStack, int amount);
+    public static int processMobExperience(ServerLevel serverLevel, Entity killer, Entity killed, int amount);
+    public static ItemStack createBook(EnchantmentInstance enchant);
+    public static boolean isImmuneToDamage(ServerLevel serverLevel, LivingEntity victim, DamageSource source);
+    public static float getDamageProtection(ServerLevel serverLevel, LivingEntity victim, DamageSource source);
+    public static float modifyDamage(ServerLevel serverLevel, ItemStack itemStack, Entity victim, DamageSource damageSource, float damage);
+    public static float modifyFallBasedDamage(ServerLevel serverLevel, ItemStack itemStack, Entity victim, DamageSource damageSource, float damage);
+    public static float modifyArmorEffectiveness(ServerLevel serverLevel, ItemStack itemStack, Entity victim, DamageSource damageSource, float armorFraction);
+    public static float modifyKnockback(ServerLevel serverLevel, ItemStack itemStack, Entity victim, DamageSource damageSource, float knockback);
+    public static void doPostAttackEffects(ServerLevel serverLevel, Entity victim, DamageSource damageSource);
+    public static void doPostPiercingAttackEffects(ServerLevel serverLevel, LivingEntity user);
+    public static void doPostAttackEffectsWithItemSource(ServerLevel serverLevel, Entity victim, DamageSource damageSource, ItemStack source);
+    public static void doPostAttackEffectsWithItemSourceOnBreak(ServerLevel serverLevel, Entity victim, DamageSource damageSource, ItemStack source, Consumer<ItemStack> attackerlessOnBreak);
+    public static void runLocationChangedEffects(ServerLevel serverLevel, LivingEntity entity);
+    public static void runLocationChangedEffects(ServerLevel serverLevel, ItemStack stack, LivingEntity entity, EquipmentSlot slot);
+    public static void stopLocationBasedEffects(LivingEntity entity);
+    public static void stopLocationBasedEffects(ItemStack stack, LivingEntity entity, EquipmentSlot slot);
+    public static void tickEffects(ServerLevel serverLevel, LivingEntity entity);
+    public static int getEnchantmentLevel(Holder<Enchantment> enchantment, LivingEntity entity);
+    public static int processProjectileCount(ServerLevel serverLevel, ItemStack weapon, Entity shooter, int count);
+    public static float processProjectileSpread(ServerLevel serverLevel, ItemStack weapon, Entity shooter, float angle);
+    public static int getPiercingCount(ServerLevel serverLevel, ItemStack weapon, ItemStack ammo);
+    public static void onProjectileSpawned(ServerLevel serverLevel, ItemStack weapon, Projectile projectileEntity, Consumer<ItemStack> onBreak);
+    public static void onHitBlock(ServerLevel serverLevel, ItemStack weapon, LivingEntity owner, Entity entity, EquipmentSlot slot, Vec3 hitLocation, BlockState hitBlock, Consumer<ItemStack> onBreak);
+    public static int modifyDurabilityToRepairFromXp(ServerLevel serverLevel, ItemStack item, int durability);
+    public static float processEquipmentDropChance(ServerLevel serverLevel, LivingEntity entity, DamageSource killingBlow, float chance);
+    public static void forEachModifier(ItemStack itemStack, EquipmentSlotGroup slot, BiConsumer<Holder<Attribute>, AttributeModifier> consumer);
+    public static void forEachModifier(ItemStack itemStack, EquipmentSlot slot, BiConsumer<Holder<Attribute>, AttributeModifier> consumer);
+    public static int getFishingLuckBonus(ServerLevel serverLevel, ItemStack rod, Entity fisher);
+    public static float getFishingTimeReduction(ServerLevel serverLevel, ItemStack rod, Entity fisher);
+    public static int getTridentReturnToOwnerAcceleration(ServerLevel serverLevel, ItemStack weapon, Entity trident);
+    public static float modifyCrossbowChargingTime(ItemStack crossbow, LivingEntity holder, float time);
+    public static float getTridentSpinAttackStrength(ItemStack trident, LivingEntity holder);
+    public static boolean hasTag(ItemStack item, TagKey<Enchantment> tag);
+    public static boolean has(ItemStack item, DataComponentType<?> effectType);
+    public static <T> Optional<T> pickHighestLevel(ItemStack itemStack, DataComponentType<List<T>> componentType);
+    public static <T> Pair<T, Integer> getHighestLevel(ItemStack item, DataComponentType<T> effectType);
+    public static Optional<EnchantedItemInUse> getRandomItemWith(DataComponentType<?> componentType, LivingEntity source, Predicate<ItemStack> predicate);
+    public static int getEnchantmentCost(RandomSource random, int slot, int bookcases, ItemStack itemStack);
+    public static ItemStack enchantItem(RandomSource random, ItemStack itemStack, int enchantmentCost, RegistryAccess registryAccess, Optional<? extends HolderSet<Enchantment>> set);
+    public static ItemStack enchantItem(RandomSource random, ItemStack itemStack, int enchantmentCost, Stream<Holder<Enchantment>> source);
+    public static List<EnchantmentInstance> selectEnchantment(RandomSource random, ItemStack itemStack, int enchantmentCost, Stream<Holder<Enchantment>> source);
+    public static void filterCompatibleEnchantments(List<EnchantmentInstance> enchants, EnchantmentInstance target);
+    public static boolean isEnchantmentCompatible(Collection<Holder<Enchantment>> enchants, Holder<Enchantment> target);
+    public static List<EnchantmentInstance> getAvailableEnchantmentResults(int value, ItemStack itemStack, Stream<Holder<Enchantment>> source);
+    public static void enchantItemFromProvider(ItemStack itemStack, RegistryAccess registryAccess, ResourceKey<EnchantmentProvider> providerKey, DifficultyInstance difficulty, RandomSource random);
+    interface EnchantmentInSlotVisitor {
+        void accept(Holder<Enchantment> enchantment, int level, EnchantedItemInUse item);
+    }
+    interface EnchantmentVisitor {
+        void accept(Holder<Enchantment> enchantment, int level);
+    }
+}
+//// EnchantmentInstance.java
+import net.minecraft.core.Holder;
+public record EnchantmentInstance(Holder<Enchantment> enchantment, int level) {
+    public int weight();
+}
+//// EnchantmentTarget.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum EnchantmentTarget implements StringRepresentable {
+    ATTACKER, DAMAGING_ENTITY, VICTIM;
+    public static final Codec<EnchantmentTarget> CODEC;
+    public static final Codec<EnchantmentTarget> NON_DAMAGE_CODEC;
+    public String getSerializedName();
+}
+//// Enchantments.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class Enchantments {
+    public static final ResourceKey<Enchantment> PROTECTION;
+    public static final ResourceKey<Enchantment> FIRE_PROTECTION;
+    public static final ResourceKey<Enchantment> FEATHER_FALLING;
+    public static final ResourceKey<Enchantment> BLAST_PROTECTION;
+    public static final ResourceKey<Enchantment> PROJECTILE_PROTECTION;
+    public static final ResourceKey<Enchantment> RESPIRATION;
+    public static final ResourceKey<Enchantment> AQUA_AFFINITY;
+    public static final ResourceKey<Enchantment> THORNS;
+    public static final ResourceKey<Enchantment> DEPTH_STRIDER;
+    public static final ResourceKey<Enchantment> FROST_WALKER;
+    public static final ResourceKey<Enchantment> BINDING_CURSE;
+    public static final ResourceKey<Enchantment> SOUL_SPEED;
+    public static final ResourceKey<Enchantment> SWIFT_SNEAK;
+    public static final ResourceKey<Enchantment> SHARPNESS;
+    public static final ResourceKey<Enchantment> SMITE;
+    public static final ResourceKey<Enchantment> BANE_OF_ARTHROPODS;
+    public static final ResourceKey<Enchantment> KNOCKBACK;
+    public static final ResourceKey<Enchantment> FIRE_ASPECT;
+    public static final ResourceKey<Enchantment> LOOTING;
+    public static final ResourceKey<Enchantment> SWEEPING_EDGE;
+    public static final ResourceKey<Enchantment> EFFICIENCY;
+    public static final ResourceKey<Enchantment> SILK_TOUCH;
+    public static final ResourceKey<Enchantment> UNBREAKING;
+    public static final ResourceKey<Enchantment> FORTUNE;
+    public static final ResourceKey<Enchantment> POWER;
+    public static final ResourceKey<Enchantment> PUNCH;
+    public static final ResourceKey<Enchantment> FLAME;
+    public static final ResourceKey<Enchantment> INFINITY;
+    public static final ResourceKey<Enchantment> LUCK_OF_THE_SEA;
+    public static final ResourceKey<Enchantment> LURE;
+    public static final ResourceKey<Enchantment> LOYALTY;
+    public static final ResourceKey<Enchantment> IMPALING;
+    public static final ResourceKey<Enchantment> RIPTIDE;
+    public static final ResourceKey<Enchantment> CHANNELING;
+    public static final ResourceKey<Enchantment> MULTISHOT;
+    public static final ResourceKey<Enchantment> QUICK_CHARGE;
+    public static final ResourceKey<Enchantment> PIERCING;
+    public static final ResourceKey<Enchantment> DENSITY;
+    public static final ResourceKey<Enchantment> BREACH;
+    public static final ResourceKey<Enchantment> WIND_BURST;
+    public static final ResourceKey<Enchantment> LUNGE;
+    public static final ResourceKey<Enchantment> MENDING;
+    public static final ResourceKey<Enchantment> VANISHING_CURSE;
+    public static void bootstrap(BootstrapContext<Enchantment> context);
+}
+//// ItemEnchantments.java
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipProvider;
+public class ItemEnchantments implements TooltipProvider {
+    public static final ItemEnchantments EMPTY;
+    public static final Codec<ItemEnchantments> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ItemEnchantments> STREAM_CODEC;
+    private ItemEnchantments(Object2IntOpenHashMap<Holder<Enchantment>> enchantments);
+    public int getLevel(Holder<Enchantment> enchantment);
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+    public Set<Holder<Enchantment>> keySet();
+    public Set<Object2IntMap.Entry<Holder<Enchantment>>> entrySet();
+    public int size();
+    public boolean isEmpty();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+    public static class Mutable {
+        public Mutable(ItemEnchantments enchantments);
+        public void set(Holder<Enchantment> enchantment, int level);
+        public void upgrade(Holder<Enchantment> enchantment, int level);
+        public void removeIf(Predicate<Holder<Enchantment>> predicate);
+        public int getLevel(Holder<Enchantment> enchantment);
+        public Set<Holder<Enchantment>> keySet();
+        public ItemEnchantments toImmutable();
+    }
+}
+//// LevelBasedValue.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.Registry;
+public interface LevelBasedValue {
+    Codec<LevelBasedValue> DISPATCH_CODEC;
+    Codec<LevelBasedValue> CODEC;
+    static MapCodec<? extends LevelBasedValue> bootstrap(Registry<MapCodec<? extends LevelBasedValue>> registry);
+    static Constant constant(float value);
+    static Linear perLevel(float base, float perLevelAboveFirst);
+    static Linear perLevel(float perLevel);
+    static Lookup lookup(List<Float> values, LevelBasedValue fallback);
+    float calculate(int level);
+    MapCodec<? extends LevelBasedValue> codec();
+    public static record Constant(float value) implements LevelBasedValue {
+        public static final Codec<Constant> CODEC;
+        public static final MapCodec<Constant> TYPED_CODEC;
+        public float calculate(int level);
+        public MapCodec<Constant> codec();
+    }
+    public static record Lookup(List<Float> values, LevelBasedValue fallback) implements LevelBasedValue {
+        public static final MapCodec<Lookup> CODEC;
+        public float calculate(int level);
+        public MapCodec<Lookup> codec();
+    }
+    public static record Linear(float base, float perLevelAboveFirst) implements LevelBasedValue {
+        public static final MapCodec<Linear> CODEC;
+        public float calculate(int level);
+        public MapCodec<Linear> codec();
+    }
+    public static record Clamped(LevelBasedValue value, float min, float max) implements LevelBasedValue {
+        public static final MapCodec<Clamped> CODEC;
+        public float calculate(int level);
+        public MapCodec<Clamped> codec();
+    }
+    public static record Fraction(LevelBasedValue numerator, LevelBasedValue denominator) implements LevelBasedValue {
+        public static final MapCodec<Fraction> CODEC;
+        public float calculate(int level);
+        public MapCodec<Fraction> codec();
+    }
+    public static record Exponent(LevelBasedValue base, LevelBasedValue power) implements LevelBasedValue {
+        public static final MapCodec<Exponent> CODEC;
+        public float calculate(int level);
+        public MapCodec<Exponent> codec();
+    }
+    public static record LevelsSquared(float added) implements LevelBasedValue {
+        public static final MapCodec<LevelsSquared> CODEC;
+        public float calculate(int level);
+        public MapCodec<LevelsSquared> codec();
+    }
+}
+//// Repairable.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+public record Repairable(HolderSet<Item> items) {
+    public static final Codec<Repairable> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Repairable> STREAM_CODEC;
+    public boolean isValidRepairItem(ItemStack repairItemStack);
+}
+//// TargetedConditionalEffect.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.Validatable;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+public record TargetedConditionalEffect<T>(EnchantmentTarget enchanted, EnchantmentTarget affected, T effect, Optional<Holder<LootItemCondition>> requirements) implements Validatable {
+    public static <S> Codec<TargetedConditionalEffect<S>> codec(Codec<S> effectCodec);
+    public static <S> Codec<TargetedConditionalEffect<S>> equipmentDropsCodec(Codec<S> effectCodec);
+    public boolean matches(LootContext context);
+    public void validate(ValidationContext context);
+}

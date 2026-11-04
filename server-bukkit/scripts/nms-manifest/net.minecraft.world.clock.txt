@@ -1,0 +1,110 @@
+//// ClockInstance.java
+public interface ClockInstance {
+    long totalTicks();
+    float partialTick();
+    float rate();
+    boolean isPaused();
+}
+//// ClockManager.java
+import net.minecraft.core.Holder;
+public interface ClockManager {
+    ClockInstance getInstance(Holder<WorldClock> definition);
+}
+//// ClockNetworkState.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record ClockNetworkState(long totalTicks, float partialTick, float rate) {
+    public static final StreamCodec<ByteBuf, ClockNetworkState> STREAM_CODEC;
+}
+//// ClockState.java
+import com.mojang.serialization.Codec;
+public record ClockState(long totalTicks, float partialTick, float rate, boolean paused) {
+    public static final Codec<ClockState> CODEC;
+}
+//// ClockTimeMarker.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+public record ClockTimeMarker(Holder<WorldClock> clock, int ticks, Optional<Integer> periodTicks, boolean showInCommands) {
+    public static final Codec<ResourceKey<ClockTimeMarker>> KEY_CODEC;
+    public long getRepetitionCount(long totalTicks);
+    public long resolveTimeToMoveTo(long totalTicks);
+    public boolean occursAt(long totalTicks);
+}
+//// ClockTimeMarkers.java
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+public interface ClockTimeMarkers {
+    ResourceKey<? extends Registry<ClockTimeMarker>> ROOT_ID;
+    ResourceKey<ClockTimeMarker> DAY;
+    ResourceKey<ClockTimeMarker> NOON;
+    ResourceKey<ClockTimeMarker> NIGHT;
+    ResourceKey<ClockTimeMarker> MIDNIGHT;
+    ResourceKey<ClockTimeMarker> WAKE_UP_FROM_SLEEP;
+    ResourceKey<ClockTimeMarker> ROLL_VILLAGE_SIEGE;
+    static ResourceKey<ClockTimeMarker> createKey(String name);
+}
+//// PackedClockStates.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.core.Holder;
+public record PackedClockStates(Map<Holder<WorldClock>, ClockState> clocks) {
+    public static final PackedClockStates EMPTY;
+    public static final Codec<PackedClockStates> CODEC;
+}
+//// ServerClockManager.java
+import java.util.stream.Stream;
+import net.minecraft.core.Holder;
+import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public class ServerClockManager extends SavedData implements ClockManager {
+    public static final SavedDataType<ServerClockManager> TYPE;
+    private ServerClockManager(PackedClockStates packedClockStates);
+    public void init(MinecraftServer server);
+    public PackedClockStates packState();
+    public void tick();
+    public ServerClockInstance getInstance(Holder<WorldClock> definition);
+    public void setTotalTicks(Holder<WorldClock> clock, long totalTicks);
+    public MoveResult moveToTimeMarker(Holder<WorldClock> clock, ResourceKey<ClockTimeMarker> timeMarkerId);
+    public void addTicks(Holder<WorldClock> clock, int ticks);
+    public void setPaused(Holder<WorldClock> clock, boolean paused);
+    public void setRate(Holder<WorldClock> clock, float rate);
+    public ClientboundSetTimePacket createFullSyncPacket();
+    public boolean isAtTimeMarker(Holder<WorldClock> clock, ResourceKey<ClockTimeMarker> timeMarkerId);
+    public Stream<ResourceKey<ClockTimeMarker>> commandTimeMarkersForClock(Holder<WorldClock> clock);
+    public static enum MoveResult {
+        NO_TIME_MARKER_FOUND, NOT_MOVED, MOVED;
+    }
+    public static class ServerClockInstance implements ClockInstance {
+        public void loadFrom(ClockState state);
+        public void tick();
+        public long totalTicks();
+        public float partialTick();
+        public float rate();
+        public boolean isPaused();
+        public ClockState packState();
+        public ClockNetworkState packNetworkState(MinecraftServer server);
+    }
+}
+//// WorldClock.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record WorldClock() {
+    public static final Codec<Holder<WorldClock>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<WorldClock>> STREAM_CODEC;
+    public static final Codec<WorldClock> DIRECT_CODEC;
+}
+//// WorldClocks.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public interface WorldClocks {
+    ResourceKey<WorldClock> OVERWORLD;
+    ResourceKey<WorldClock> THE_END;
+    static void bootstrap(BootstrapContext<WorldClock> context);
+}

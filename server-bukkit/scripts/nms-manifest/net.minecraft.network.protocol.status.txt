@@ -1,0 +1,74 @@
+//// ClientStatusPacketListener.java
+import net.minecraft.network.ClientboundPacketListener;
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.ping.ClientPongPacketListener;
+public interface ClientStatusPacketListener extends ClientboundPacketListener, ClientPongPacketListener {
+    default ConnectionProtocol protocol();
+    void handleStatusResponse(ClientboundStatusResponsePacket packet);
+}
+//// ClientboundStatusResponsePacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundStatusResponsePacket(ServerStatus status) implements Packet<ClientStatusPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundStatusResponsePacket> STREAM_CODEC;
+    public PacketType<ClientboundStatusResponsePacket> type();
+    public void handle(ClientStatusPacketListener listener);
+}
+//// ServerStatus.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.players.NameAndId;
+public record ServerStatus(Component description, Optional<Players> players, Optional<Version> version, Optional<Favicon> favicon, boolean enforcesSecureChat) {
+    public static final Codec<ServerStatus> CODEC;
+    public static record Players(int max, int online, List<NameAndId> sample) {
+        public static final Codec<Players> CODEC;
+    }
+    public static record Version(String name, int protocol) {
+        public static final Codec<Version> CODEC;
+        public static Version current();
+    }
+    public static record Favicon(byte[] iconBytes) {
+        public static final Codec<Favicon> CODEC;
+    }
+}
+//// ServerStatusPacketListener.java
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.game.ServerPacketListener;
+import net.minecraft.network.protocol.ping.ServerPingPacketListener;
+public interface ServerStatusPacketListener extends ServerPacketListener, ServerPingPacketListener {
+    default ConnectionProtocol protocol();
+    void handleStatusRequest(ServerboundStatusRequestPacket packet);
+}
+//// ServerboundStatusRequestPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ServerboundStatusRequestPacket implements Packet<ServerStatusPacketListener> {
+    public static final ServerboundStatusRequestPacket INSTANCE;
+    public static final StreamCodec<ByteBuf, ServerboundStatusRequestPacket> STREAM_CODEC;
+    private ServerboundStatusRequestPacket();
+    public PacketType<ServerboundStatusRequestPacket> type();
+    public void handle(ServerStatusPacketListener listener);
+}
+//// StatusPacketTypes.java
+import net.minecraft.network.protocol.PacketType;
+public class StatusPacketTypes {
+    public static final PacketType<ClientboundStatusResponsePacket> CLIENTBOUND_STATUS_RESPONSE;
+    public static final PacketType<ServerboundStatusRequestPacket> SERVERBOUND_STATUS_REQUEST;
+}
+//// StatusProtocols.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.ProtocolInfo;
+import net.minecraft.network.protocol.SimpleUnboundProtocol;
+public class StatusProtocols {
+    public static final SimpleUnboundProtocol<ServerStatusPacketListener, ByteBuf> SERVERBOUND_TEMPLATE;
+    public static final ProtocolInfo<ServerStatusPacketListener> SERVERBOUND;
+    public static final SimpleUnboundProtocol<ClientStatusPacketListener, FriendlyByteBuf> CLIENTBOUND_TEMPLATE;
+    public static final ProtocolInfo<ClientStatusPacketListener> CLIENTBOUND;
+}

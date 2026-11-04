@@ -1,0 +1,82 @@
+//// JoinWorldTask.java
+import java.util.function.Consumer;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.network.ConfigurationTask;
+public class JoinWorldTask implements ConfigurationTask {
+    public static final ConfigurationTask.Type TYPE;
+    public void start(Consumer<Packet<?>> connection);
+    public ConfigurationTask.Type type();
+}
+//// PrepareSpawnTask.java
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import net.minecraft.network.Connection;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.CommonListenerCookie;
+import net.minecraft.server.network.ConfigurationTask;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+public class PrepareSpawnTask implements ConfigurationTask {
+    public static final ConfigurationTask.Type TYPE;
+    public static final int PREPARE_CHUNK_RADIUS = 3;
+    public PrepareSpawnTask(MinecraftServer server, NameAndId nameAndId);
+    public void start(Consumer<Packet<?>> connection);
+    public boolean tick();
+    public ServerPlayer spawnPlayer(Connection connection, CommonListenerCookie cookie);
+    public void keepAlive();
+    public void close();
+    public ConfigurationTask.Type type();
+    final class Preparing implements State {
+        private Preparing(ServerLevel spawnLevel, CompletableFuture<Vec3> spawnPosition, Vec2 spawnAngle);
+        public void cancel();
+        public Ready tick();
+    }
+    final class Ready implements State {
+        private Ready(ServerLevel spawnLevel, Vec3 spawnPosition, Vec2 spawnAngle);
+        public void keepAlive();
+        public ServerPlayer spawn(Connection connection, CommonListenerCookie cookie);
+    }
+    interface State {
+    }
+}
+//// ServerCodeOfConductConfigurationTask.java
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.network.ConfigurationTask;
+public class ServerCodeOfConductConfigurationTask implements ConfigurationTask {
+    public static final ConfigurationTask.Type TYPE;
+    public ServerCodeOfConductConfigurationTask(Supplier<String> codeOfConduct);
+    public void start(Consumer<Packet<?>> connection);
+    public ConfigurationTask.Type type();
+}
+//// ServerResourcePackConfigurationTask.java
+import java.util.function.Consumer;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ConfigurationTask;
+public class ServerResourcePackConfigurationTask implements ConfigurationTask {
+    public static final ConfigurationTask.Type TYPE;
+    public ServerResourcePackConfigurationTask(MinecraftServer.ServerResourcePackInfo info);
+    public void start(Consumer<Packet<?>> connection);
+    public ConfigurationTask.Type type();
+}
+//// SynchronizeRegistriesTask.java
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.LayeredRegistryAccess;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.RegistryLayer;
+import net.minecraft.server.network.ConfigurationTask;
+import net.minecraft.server.packs.repository.KnownPack;
+public class SynchronizeRegistriesTask implements ConfigurationTask {
+    public static final ConfigurationTask.Type TYPE;
+    public SynchronizeRegistriesTask(List<KnownPack> knownPacks, LayeredRegistryAccess<RegistryLayer> registries);
+    public void start(Consumer<Packet<?>> connection);
+    public void handleResponse(List<KnownPack> acceptedPacks, Consumer<Packet<?>> connection);
+    public ConfigurationTask.Type type();
+}

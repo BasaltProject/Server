@@ -1,0 +1,3458 @@
+//// AbstractInterpolationHandler.java
+import net.minecraft.core.PositionAndRotation;
+import net.minecraft.world.phys.Vec3;
+public abstract class AbstractInterpolationHandler implements InterpolationHandler {
+    protected final Entity entity;
+    protected int interpolationSteps;
+    protected final PositionAndRotation.Mutable lastPositionAndRotation;
+    public AbstractInterpolationHandler(Entity entity, int interpolationSteps);
+    protected abstract PositionAndRotation.Mutable interpolationData();
+    protected abstract void startInterpolating(PositionPath position, float yRot, float xRot);
+    protected abstract void doInterpolate();
+    public PositionAndRotation target();
+    public boolean interpolateTo(PositionPath position, float yRot, float xRot, boolean hasRotation);
+    protected void interpolateTo(PositionPath position, float yRot, float xRot);
+    public void applyPredictedMovement(Vec3 delta);
+    public void interpolate();
+}
+//// AgeableMob.java
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public abstract class AgeableMob extends PathfinderMob {
+    public static final int BABY_START_AGE = -24000;
+    public static final int AGE_LOCK_COOLDOWN_TICKS = 40;
+    public static final float AGE_LOCK_DOWNWARDS_MOVING_PARTICLE_Y_OFFSET = 0.2F;
+    protected static final int DEFAULT_AGE = 0;
+    protected static final int DEFAULT_FORCED_AGE = 0;
+    protected int age;
+    protected int forcedAge;
+    protected int forcedAgeTimer;
+    protected int ageLockParticleTimer;
+    protected AgeableMob(EntityType<? extends AgeableMob> type, Level level);
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData);
+    public abstract AgeableMob getBreedOffspring(ServerLevel level, AgeableMob partner);
+    protected InteractionResult mobInteract(Player player, InteractionHand hand);
+    public static boolean canUseGoldenDandelion(ItemStack itemInHand, boolean isBaby, int cooldown, Mob mob);
+    public static void setAgeLocked(Mob mob, Supplier<Boolean> isAgedLocked, Player player, ItemStack itemInHand, Consumer<Mob> setAgeLockData);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public boolean canBreed();
+    public int getAge();
+    public void ageUp(int seconds, boolean forced);
+    public void ageUp(int seconds);
+    public void setAge(int newAge);
+    protected void setAgeLocked(boolean locked);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected boolean canBeABaby();
+    protected void readAdditionalSaveData(ValueInput input);
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    public void aiStep();
+    public boolean canAgeUp();
+    public static int makeAgeLockedParticle(Level level, Mob mob, int ageLockParticleTimer, boolean isAgeLocked);
+    protected void ageBoundaryReached();
+    protected int getBabyStartAge();
+    public final boolean isBaby();
+    public final void setBaby(boolean baby);
+    public static int getSpeedUpSecondsWhenFeeding(int ticksUntilAdult);
+    public int getForcedAge();
+    public int getForcedAgeTimer();
+    public boolean isAgeLocked();
+    public static class AgeableMobGroupData implements SpawnGroupData {
+        public AgeableMobGroupData(boolean shouldSpawnBaby, float babySpawnChance);
+        public AgeableMobGroupData(boolean shouldSpawnBaby);
+        public AgeableMobGroupData(float babySpawnChance);
+        public int getGroupSize();
+        public void increaseGroupSizeByOne();
+        public boolean isShouldSpawnBaby();
+        public float getBabySpawnChance();
+    }
+}
+//// AnimationState.java
+import java.util.function.Consumer;
+public class AnimationState {
+    public void start(int tickCount);
+    public void startIfStopped(int tickCount);
+    public void animateWhen(boolean condition, int tickCount);
+    public void stop();
+    public void ifStarted(Consumer<AnimationState> timer);
+    public void fastForward(int ticks, float timeScale);
+    public long getTimeInMillis(float ageInTicks);
+    public boolean isStarted();
+    public void copyFrom(AnimationState state);
+}
+//// AreaEffectCloud.java
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class AreaEffectCloud extends Entity implements TraceableEntity {
+    public static final float DEFAULT_WIDTH = 6.0F;
+    public static final float HEIGHT = 0.5F;
+    public static final int INFINITE_DURATION = -1;
+    public static final int DEFAULT_LINGERING_DURATION = 600;
+    public AreaEffectCloud(EntityType<? extends AreaEffectCloud> type, Level level);
+    public AreaEffectCloud(Level level, double x, double y, double z);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public void setRadius(float radius);
+    public void refreshDimensions();
+    public float getRadius();
+    public void setPotionContents(PotionContents contents);
+    public void setCustomParticle(ParticleOptions customParticle);
+    public void setPotionDurationScale(float scale);
+    public void addEffect(MobEffectInstance effect);
+    public ParticleOptions getParticle();
+    protected void setWaiting(boolean waiting);
+    public boolean isWaiting();
+    public int getDuration();
+    public void setDuration(int duration);
+    public void tick();
+    public float getRadiusOnUse();
+    public void setRadiusOnUse(float radiusOnUse);
+    public float getRadiusPerTick();
+    public void setRadiusPerTick(float radiusPerTick);
+    public int getDurationOnUse();
+    public void setDurationOnUse(int durationOnUse);
+    public int getWaitTime();
+    public void setWaitTime(int waitTime);
+    public void setOwner(LivingEntity owner);
+    public LivingEntity getOwner();
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    public PushReaction getPistonPushReaction();
+    public EntityDimensions getDimensions(Pose pose);
+    public final boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public <T> T get(DataComponentType<? extends T> type);
+    protected void applyImplicitComponents(DataComponentGetter components);
+    protected <T> boolean applyImplicitComponent(DataComponentType<T> type, T value);
+}
+//// Attackable.java
+public interface Attackable {
+    LivingEntity getLastAttacker();
+}
+//// Avatar.java
+import java.util.Map;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.entity.player.PlayerModelPart;
+import net.minecraft.world.item.component.ResolvableProfile;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+public abstract class Avatar extends LivingEntity {
+    public static final HumanoidArm DEFAULT_MAIN_HAND;
+    public static final int DEFAULT_MODEL_CUSTOMIZATION = 0;
+    public static final float DEFAULT_EYE_HEIGHT = 1.62F;
+    public static final Vec3 DEFAULT_VEHICLE_ATTACHMENT;
+    public static final float SWIMMING_BB_HEIGHT = 0.6F;
+    protected static final EntityDimensions STANDING_DIMENSIONS;
+    protected static final Map<Pose, EntityDimensions> POSES;
+    protected static final EntityDataAccessor<HumanoidArm> DATA_PLAYER_MAIN_HAND;
+    protected static final EntityDataAccessor<Byte> DATA_PLAYER_MODE_CUSTOMISATION;
+    protected Avatar(EntityType<? extends LivingEntity> type, Level level);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public HumanoidArm getMainArm();
+    public void setMainArm(HumanoidArm mainArm);
+    public boolean isModelPartShown(PlayerModelPart part);
+    public EntityDimensions getDefaultDimensions(Pose pose);
+    public abstract ResolvableProfile getProfile();
+}
+//// Bucketable.java
+import java.util.Optional;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+public interface Bucketable {
+    boolean fromBucket();
+    void setFromBucket(boolean fromBucket);
+    void saveToBucketTag(ItemStack bucket);
+    void loadFromBucketTag(CompoundTag tag);
+    ItemStack getBucketItemStack();
+    SoundEvent getPickupSound();
+    static void saveDefaultDataToBucketTag(Mob entity, ItemStack bucket);
+    static void loadDefaultDataFromBucketTag(Mob entity, CompoundTag tag);
+    static <T extends LivingEntity & Bucketable> Optional<InteractionResult> bucketMobPickup(Player player, InteractionHand hand, T pickupEntity);
+    default boolean canBePickedUpWithBucket(ItemStack itemStack);
+}
+//// ContainerUser.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.entity.ContainerOpenersCounter;
+public interface ContainerUser {
+    boolean hasContainerOpen(ContainerOpenersCounter container, BlockPos blockPos);
+    double getContainerInteractionRange();
+    default LivingEntity getLivingEntity();
+}
+//// ConversionParams.java
+import net.minecraft.world.scores.PlayerTeam;
+public record ConversionParams(ConversionType type, boolean keepEquipment, boolean preserveCanPickUpLoot, PlayerTeam team) {
+    public static ConversionParams single(Mob mob, boolean keepEquipment, boolean preserveCanPickUpLoot);
+    public interface AfterConversion<T extends Mob> {
+        void finalizeConversion(T mob);
+    }
+}
+//// ConversionTracker.java
+import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class ConversionTracker<M extends Mob> {
+    public ConversionTracker(M mob, EntityDataAccessor<Boolean> conversionId, Supplier<EntityType<? extends M>> convertsTo, Supplier< Integer> conversionSound, BooleanSupplier isAfflicted, String afflictionTimeTag, int totalAfflictionTime, String conversionTimeTag, int totalConversionTime, BiConsumer<M, ServerLevel> postConversionStep);
+    public void tick();
+    public boolean isConverting();
+    public void addAdditionalSaveData(ValueOutput output);
+    public void readAdditionalSaveData(ValueInput input);
+    public void startConversion(int time);
+    public void setAfflictionTime(int afflictionTime);
+    public void setConversionTime(int conversionTime);
+}
+//// ConversionType.java
+public enum ConversionType {
+    SINGLE, SPLIT_ON_DEATH;
+    public boolean shouldDiscardAfterConversion();
+    public abstract void convert(Mob from, Mob to, ConversionParams params);
+}
+//// Crackiness.java
+import net.minecraft.world.item.ItemStack;
+public class Crackiness {
+    public static final Crackiness GOLEM;
+    public static final Crackiness WOLF_ARMOR;
+    private Crackiness(float fractionLow, float fractionMedium, float fractionHigh);
+    public Level byFraction(float fraction);
+    public Level byDamage(ItemStack item);
+    public Level byDamage(int damage, int maxDamage);
+    public static enum Level {
+        NONE, LOW, MEDIUM, HIGH;
+    }
+}
+//// Display.java
+import com.mojang.math.Transformation;
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.IntFunction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.AABB;
+public abstract class Display extends Entity {
+    public static final int NO_BRIGHTNESS_OVERRIDE = -1;
+    public static final String TAG_POS_ROT_INTERPOLATION_DURATION = "teleport_duration";
+    public static final String TAG_TRANSFORMATION_INTERPOLATION_DURATION = "interpolation_duration";
+    public static final String TAG_TRANSFORMATION_START_INTERPOLATION = "start_interpolation";
+    public static final String TAG_TRANSFORMATION = "transformation";
+    public static final String TAG_BILLBOARD = "billboard";
+    public static final String TAG_BRIGHTNESS = "brightness";
+    public static final String TAG_VIEW_RANGE = "view_range";
+    public static final String TAG_SHADOW_RADIUS = "shadow_radius";
+    public static final String TAG_SHADOW_STRENGTH = "shadow_strength";
+    public static final String TAG_WIDTH = "width";
+    public static final String TAG_HEIGHT = "height";
+    public static final String TAG_GLOW_COLOR_OVERRIDE = "glow_color_override";
+    protected boolean updateRenderState;
+    public Display(EntityType<?> type, Level level);
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    public final boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public void tick();
+    protected InterpolationHandler createInterpolationHandler();
+    protected abstract void updateRenderSubState(boolean shouldInterpolate, float progress);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public AABB getInterpolatedBoundingBox(float partialTicks);
+    public boolean affectedByCulling();
+    public PushReaction getPistonPushReaction();
+    public boolean isIgnoringBlockTriggers();
+    public RenderState renderState();
+    public float calculateInterpolationProgress(float partialTickTime);
+    public void setPos(double x, double y, double z);
+    public boolean shouldRenderAtSqrDistance(double distanceSqr);
+    public int getTeamColor();
+    public static enum BillboardConstraints implements StringRepresentable {
+        FIXED, VERTICAL, HORIZONTAL, CENTER;
+        public static final Codec<BillboardConstraints> CODEC;
+        public static final IntFunction<BillboardConstraints> BY_ID;
+        public String getSerializedName();
+    }
+    public static record RenderState(GenericInterpolator<Transformation> transformation, BillboardConstraints billboardConstraints, int brightnessOverride, FloatInterpolator shadowRadius, FloatInterpolator shadowStrength, int glowColorOverride) {
+    }
+    public static class ItemDisplay extends Display {
+        public ItemDisplay(EntityType<?> type, Level level);
+        protected void defineSynchedData(SynchedEntityData.Builder entityData);
+        public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+        protected void readAdditionalSaveData(ValueInput input);
+        protected void addAdditionalSaveData(ValueOutput output);
+        public SlotAccess getSlot(int slot);
+        public ItemRenderState itemRenderState();
+        protected void updateRenderSubState(boolean shouldInterpolate, float progress);
+        public static record ItemRenderState(ItemStack itemStack, ItemDisplayContext itemTransform) {
+        }
+    }
+    public static class BlockDisplay extends Display {
+        public static final String TAG_BLOCK_STATE = "block_state";
+        public BlockDisplay(EntityType<?> type, Level level);
+        protected void defineSynchedData(SynchedEntityData.Builder entityData);
+        public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+        protected void readAdditionalSaveData(ValueInput input);
+        protected void addAdditionalSaveData(ValueOutput output);
+        public BlockRenderState blockRenderState();
+        protected void updateRenderSubState(boolean shouldInterpolate, float progress);
+        public static record BlockRenderState(BlockState blockState) {
+        }
+    }
+    public static class TextDisplay extends Display {
+        public static final String TAG_TEXT = "text";
+        public static final byte FLAG_SHADOW = (byte) 1;
+        public static final byte FLAG_SEE_THROUGH = (byte) 2;
+        public static final byte FLAG_USE_DEFAULT_BACKGROUND = (byte) 4;
+        public static final byte FLAG_ALIGN_LEFT = (byte) 8;
+        public static final byte FLAG_ALIGN_RIGHT = (byte) 16;
+        public static final int INITIAL_BACKGROUND = 1073741824;
+        public TextDisplay(EntityType<?> type, Level level);
+        protected void defineSynchedData(SynchedEntityData.Builder entityData);
+        public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+        protected void readAdditionalSaveData(ValueInput input);
+        protected void addAdditionalSaveData(ValueOutput output);
+        protected void updateRenderSubState(boolean shouldInterpolate, float progress);
+        public TextRenderState textRenderState();
+        public CachedInfo cacheDisplay(LineSplitter splitter);
+        public static Align getAlign(byte flags);
+        public static enum Align implements StringRepresentable {
+            CENTER, LEFT, RIGHT;
+            public static final Codec<Align> CODEC;
+            public String getSerializedName();
+        }
+        public static record CachedLine(FormattedCharSequence contents, int width) {
+        }
+        public static record CachedInfo(List<CachedLine> lines, int width) {
+        }
+        public static record TextRenderState(Component text, int lineWidth, IntInterpolator textOpacity, IntInterpolator backgroundColor, byte flags) {
+        }
+        public interface LineSplitter {
+            CachedInfo split(Component input, int width);
+        }
+    }
+    public interface GenericInterpolator<T> {
+        static <T> GenericInterpolator<T> constant(T value);
+        T get(float progress);
+    }
+    static record TransformationInterpolator(Transformation previous, Transformation current) implements GenericInterpolator<Transformation> {
+        public Transformation get(float progress);
+    }
+    public interface IntInterpolator {
+        static IntInterpolator constant(int value);
+        int get(float progress);
+    }
+    static record LinearIntInterpolator(int previous, int current) implements IntInterpolator {
+        public int get(float progress);
+    }
+    static record ColorInterpolator(int previous, int current) implements IntInterpolator {
+        public int get(float progress);
+    }
+    public interface FloatInterpolator {
+        static FloatInterpolator constant(float value);
+        float get(float progress);
+    }
+    static record LinearFloatInterpolator(float previous, float current) implements FloatInterpolator {
+        public float get(float progress);
+    }
+}
+//// DropChances.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+public record DropChances(Map<EquipmentSlot, Float> byEquipment) {
+    public static final float DEFAULT_EQUIPMENT_DROP_CHANCE = 0.085F;
+    public static final float PRESERVE_ITEM_DROP_CHANCE_THRESHOLD = 1.0F;
+    public static final int PRESERVE_ITEM_DROP_CHANCE = 2;
+    public static final DropChances DEFAULT;
+    public static final Codec<DropChances> CODEC;
+    public DropChances withGuaranteedDrop(EquipmentSlot slot);
+    public DropChances withEquipmentChance(EquipmentSlot slot, float chance);
+    public float byEquipment(EquipmentSlot slot);
+    public boolean isPreserved(EquipmentSlot slot);
+}
+//// ElytraAnimationState.java
+public class ElytraAnimationState {
+    public ElytraAnimationState(LivingEntity entity);
+    public void tick();
+    public float getRotX(float partialTicks);
+    public float getRotY(float partialTicks);
+    public float getRotZ(float partialTicks);
+}
+//// Entity.java
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.PositionAndRotation;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.VecDeltaCodec;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SyncedDataHolder;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.BlockUtil;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.debug.DebugValueSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.Nameable;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageSources;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.projectile.ProjectileDeflection;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Explosion;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Portal;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.entity.EntityAccess;
+import net.minecraft.world.level.entity.EntityInLevelCallback;
+import net.minecraft.world.level.gameevent.DynamicGameEventListener;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.portal.TeleportTransition;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.scores.PlayerTeam;
+import net.minecraft.world.scores.ScoreHolder;
+import net.minecraft.world.scores.Team;
+import org.joml.Quaternionf;
+public abstract class Entity implements Nameable, EntityAccess, ScoreHolder, SyncedDataHolder, DataComponentGetter, ItemOwner, SlotProvider, DebugValueSource, TypedInstance<EntityType<?>> {
+    public static final String TAG_ID = "id";
+    public static final String TAG_UUID = "UUID";
+    public static final String TAG_PASSENGERS = "Passengers";
+    public static final String TAG_DATA = "data";
+    public static final String TAG_POS = "Pos";
+    public static final String TAG_MOTION = "Motion";
+    public static final String TAG_ROTATION = "Rotation";
+    public static final String TAG_PORTAL_COOLDOWN = "PortalCooldown";
+    public static final String TAG_NO_GRAVITY = "NoGravity";
+    public static final String TAG_AIR = "Air";
+    public static final String TAG_ON_GROUND = "OnGround";
+    public static final String TAG_FALL_DISTANCE = "fall_distance";
+    public static final String TAG_FIRE = "Fire";
+    public static final String TAG_SILENT = "Silent";
+    public static final String TAG_GLOWING = "Glowing";
+    public static final String TAG_INVULNERABLE = "Invulnerable";
+    public static final String TAG_INVULNERABLE_TIME = "invulnerable_time";
+    public static final String TAG_CUSTOM_NAME = "CustomName";
+    public static final int INVALID_ENTITY_ID = 0;
+    public static final int CONTENTS_SLOT_INDEX = 0;
+    public static final int BOARDING_COOLDOWN = 60;
+    public static final int TOTAL_AIR_SUPPLY = 300;
+    public static final int MAX_ENTITY_TAG_COUNT = 1024;
+    public static final double DEFAULT_NAME_TAG_DISTANCE = 64.0;
+    public static final double DEFAULT_BELOW_NAME_DISTANCE = 10.0;
+    public static final double MAX_NAME_TAG_DISTANCE = 512.0;
+    public static final float DELTA_AFFECTED_BY_BLOCKS_BELOW_0_2 = 0.2F;
+    public static final double DELTA_AFFECTED_BY_BLOCKS_BELOW_0_5 = 0.500001;
+    public static final double DELTA_AFFECTED_BY_BLOCKS_BELOW_1_0 = 0.999999;
+    public static final int BASE_TICKS_REQUIRED_TO_FREEZE = 140;
+    public static final int FREEZE_HURT_FREQUENCY = 40;
+    public static final int BASE_SAFE_FALL_DISTANCE = 3;
+    public boolean blocksBuilding;
+    protected int boardingCooldown;
+    public double xo;
+    public double yo;
+    public double zo;
+    public float yRotO;
+    public float xRotO;
+    public boolean horizontalCollision;
+    public boolean verticalCollision;
+    public boolean verticalCollisionBelow;
+    public boolean minorHorizontalCollision;
+    protected Vec3 stuckSpeedMultiplier;
+    public static final float DEFAULT_BB_WIDTH = 0.6F;
+    public static final float DEFAULT_BB_HEIGHT = 1.8F;
+    public float moveDist;
+    public float flyDist;
+    public double fallDistance;
+    public double xOld;
+    public double yOld;
+    public double zOld;
+    public boolean noPhysics;
+    protected final RandomSource random;
+    public int tickCount;
+    protected boolean wasTouchingWater;
+    protected boolean wasEyeInWater;
+    protected boolean firstTick;
+    protected final SynchedEntityData entityData;
+    protected static final EntityDataAccessor<Byte> DATA_SHARED_FLAGS_ID;
+    protected static final int FLAG_ONFIRE = 0;
+    protected static final int FLAG_GLOWING = 6;
+    protected static final int FLAG_FALL_FLYING = 7;
+    protected static final EntityDataAccessor<Pose> DATA_POSE;
+    public boolean needsSync;
+    public boolean syncPosition;
+    public boolean syncVelocity;
+    public PortalProcessor portalProcess;
+    protected UUID uuid;
+    protected String stringUUID;
+    public boolean isInPowderSnow;
+    public boolean wasInPowderSnow;
+    public Optional<BlockPos> mainSupportingBlockPos;
+    public static final int MAX_MOVEMENTS_HANDELED_PER_TICK = 100;
+    protected final InsideBlockEffectApplier.StepBasedCollector insideEffectCollector;
+    protected final InterpolationHandler interpolationHandler;
+    public Entity(EntityType<?> type, Level level);
+    public boolean isColliding(BlockPos pos, BlockState state);
+    public int getTeamColor();
+    public boolean isSpectator();
+    public boolean canInteractWithLevel();
+    public final void unRide();
+    public void syncPacketPositionCodec(double x, double y, double z);
+    public VecDeltaCodec getPositionCodec();
+    public EntityType<?> getType();
+    public Holder<EntityType<?>> typeHolder();
+    public boolean getRequiresPrecisePosition();
+    public void setRequiresPrecisePosition(boolean requiresPrecisePosition);
+    public int getId();
+    public void setId(int id);
+    public Set<String> entityTags();
+    public boolean addTag(String tag);
+    public boolean removeTag(String tag);
+    public void kill(ServerLevel level);
+    public final void discard();
+    protected abstract void defineSynchedData(SynchedEntityData.Builder entityData);
+    public SynchedEntityData getEntityData();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public void remove(RemovalReason reason);
+    public void onClientRemoval();
+    public void onRemoval(RemovalReason reason);
+    public void setPose(Pose pose);
+    public Pose getPose();
+    public boolean hasPose(Pose pose);
+    public boolean closerThan(Entity other, double distance);
+    public boolean closerThan(Entity other, double distanceXZ, double distanceY);
+    protected void setRot(float yRot, float xRot);
+    public final void setPos(Vec3 pos);
+    public void setPos(double x, double y, double z);
+    protected final AABB makeBoundingBox();
+    protected AABB makeBoundingBox(Vec3 position);
+    protected void reapplyPosition();
+    public void turn(double xo, double yo);
+    public void updateDataBeforeSync();
+    public void tick();
+    public final void commonTick();
+    public void baseTick();
+    protected void computeSpeed();
+    public void setSharedFlagOnFire(boolean value);
+    public void checkBelowWorld();
+    public void setPortalCooldown();
+    public void setPortalCooldown(int portalCooldown);
+    public int getPortalCooldown();
+    public boolean isOnPortalCooldown();
+    protected void processPortalCooldown();
+    public void lavaIgnite();
+    public void lavaHurt();
+    protected boolean shouldPlayLavaHurtSound();
+    public final void igniteForSeconds(float numberOfSeconds);
+    public void igniteForTicks(int numberOfTicks);
+    public void setRemainingFireTicks(int remainingTicks);
+    public int getRemainingFireTicks();
+    public void clearFire();
+    protected void onBelowWorld();
+    public boolean isFree(double xa, double ya, double za);
+    public void setOnGround(boolean onGround);
+    public void setOnGroundWithMovement(boolean onGround, Vec3 movement);
+    public void setOnGroundWithMovement(boolean onGround, boolean horizontalCollision, Vec3 movement);
+    public boolean isSupportedBy(BlockPos pos);
+    protected void checkSupportingBlock(boolean onGround, Vec3 movement);
+    public boolean onGround();
+    public void move(MoverType moverType, Vec3 delta);
+    public void recordMovement(MoverType moverType, Vec3 movement);
+    protected double getEntityBounciness();
+    protected double getEffectiveGravity();
+    protected boolean omnidirectionalAirMover();
+    protected void applyEffectsFromBlocks();
+    protected void applyEffectsFromBlocksForLastMovements();
+    public void removeLatestMovementRecording();
+    protected void clearMovementThisTick();
+    public boolean hasMovedHorizontallyRecently();
+    public void applyEffectsFromBlocks(Vec3 from, Vec3 to);
+    protected boolean isAffectedByBlocks();
+    protected boolean isHorizontalCollisionMinor(Vec3 movement);
+    protected void playEntityOnFireExtinguishedSound();
+    public void extinguishFire();
+    protected void processFlappingMovement();
+    public BlockPos getOnPosLegacy();
+    public BlockPos getBlockPosBelowThatAffectsMyMovement();
+    public BlockPos getOnPos();
+    protected BlockPos getOnPos(float offset);
+    protected float getBlockJumpFactor();
+    protected float getBlockSpeedFactor();
+    protected Vec3 maybeBackOffFromEdge(Vec3 delta, MoverType moverType);
+    protected Vec3 limitPistonMovement(Vec3 vec);
+    public double getAvailableSpaceBelow(double maxDistance);
+    public static Vec3 collideBoundingBox(Entity source, Vec3 movement, AABB boundingBox, Level level, List<VoxelShape> entityColliders);
+    public static Vec3 collideBoundingBox(CollisionContext source, Vec3 movement, AABB boundingBox, Level level, List<VoxelShape> entityColliders);
+    public static List<VoxelShape> collectAllColliders(Entity source, Level level, AABB boundingBox);
+    protected float nextStep();
+    protected SoundEvent getSwimSound();
+    protected SoundEvent getSwimSplashSound();
+    protected SoundEvent getSwimHighSpeedSplashSound();
+    public boolean collidedWithFluid(FluidState fluidState, BlockPos blockPos, Vec3 from, Vec3 to);
+    public boolean collidedWithShapeMovingFrom(Vec3 from, Vec3 to, List<AABB> aabbs);
+    protected void onInsideBlock(BlockState state);
+    public BlockPos adjustSpawnLocation(ServerLevel level, BlockPos spawnSuggestion);
+    public void gameEvent(Holder<GameEvent> event, Entity sourceEntity);
+    public void gameEvent(Holder<GameEvent> event);
+    protected void waterSwimSound();
+    protected BlockPos getPrimaryStepSoundBlockPos(BlockPos affectingPos);
+    protected void playCombinationStepSounds(BlockState primaryStepSound, BlockState secondaryStepSound);
+    protected void playMuffledStepSound(BlockState blockState);
+    protected void playStepSound(BlockPos pos, BlockState blockState);
+    protected void playSwimSound(float volume);
+    protected void onFlap();
+    protected boolean isFlapping();
+    public void playSound(SoundEvent sound, float volume, float pitch);
+    public void playSound(SoundEvent sound);
+    public boolean isSilent();
+    public void setSilent(boolean silent);
+    public boolean isNoGravity();
+    public void setNoGravity(boolean noGravity);
+    protected double getDefaultGravity();
+    public final double getGravity();
+    protected void applyGravity();
+    protected float getAirDrag();
+    protected MovementEmission getMovementEmission();
+    public boolean dampensVibrations();
+    public final void doCheckFallDamage(double xa, double ya, double za, boolean onGround);
+    protected void checkFallDamage(double ya, boolean onGround, BlockState onState, BlockPos pos);
+    public boolean fireImmune();
+    public boolean causeFallDamage(double fallDistance, float damageModifier, DamageSource damageSource);
+    protected void propagateFallToPassengers(double fallDistance, float damageModifier, DamageSource damageSource);
+    public boolean isInWater();
+    public boolean isInWaterOrRain();
+    public boolean isInLiquid();
+    public boolean isInFloatableFluid();
+    public boolean isUnderWater();
+    public boolean isInShallowWater();
+    public boolean isInClouds();
+    public void updateSwimming();
+    protected boolean updateFluidInteraction();
+    protected void doWaterSplashEffect();
+    protected BlockState getBlockStateOnLegacy();
+    public BlockState getBlockStateOn();
+    public boolean canSpawnSprintParticle();
+    protected void spawnSprintParticle();
+    public boolean isEyeInFluid(TagKey<Fluid> type);
+    public boolean isInLava();
+    public void moveRelative(float speed, Vec3 input);
+    protected static Vec3 getInputVector(Vec3 input, float speed, float yRot);
+    public float getLightLevelDependentMagicValue();
+    public void absSnapTo(double x, double y, double z, float yRot, float xRot);
+    public void absSnapRotationTo(float yRot, float xRot);
+    public void absSnapTo(double x, double y, double z);
+    public void snapTo(Vec3 pos);
+    public void snapTo(double x, double y, double z);
+    public void snapTo(BlockPos spawnPos, float yRot, float xRot);
+    public void snapTo(Vec3 spawnPos, float yRot, float xRot);
+    public void snapTo(double x, double y, double z, float yRot, float xRot);
+    public final void setOldPosAndRot();
+    public final void setOldPosAndRot(Vec3 position, float yRot, float xRot);
+    protected void setOldPos();
+    public void setOldRot();
+    public final Vec3 oldPosition();
+    public float distanceTo(Entity entity);
+    public double distanceToSqr(double x2, double y2, double z2);
+    public double distanceToSqr(Entity entity);
+    public double distanceToSqr(Vec3 pos);
+    public void playerTouch(Player player);
+    public void push(Entity entity);
+    public void push(Vec3 impulse);
+    public void pushFromExplosion(Vec3 impulse);
+    public void push(double xa, double ya, double za);
+    protected void markHurt();
+    public final void hurt(DamageSource source, float damage);
+    public final boolean hurtOrSimulate(DamageSource source, float damage);
+    public abstract boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public boolean hurtClient(DamageSource source);
+    public final Vec3 getViewVector(float a);
+    public Direction getNearestViewDirection();
+    public float getViewXRot(float a);
+    public float getViewYRot(float a);
+    public float getXRot(float partialTicks);
+    public float getYRot(float partialTicks);
+    public static Vec3 calculateViewVector(float xRot, float yRot);
+    public static Quaternionf calculateViewQuaternion(float xRot, float yRot);
+    public final Vec3 getUpVector(float a);
+    protected static Vec3 calculateUpVector(float xRot, float yRot);
+    public final Vec3 getEyePosition();
+    public final Vec3 getEyePosition(float partialTickTime);
+    public Vec3 getLightProbePosition(float partialTickTime);
+    public final Vec3 getPosition(float partialTickTime);
+    public HitResult pick(double range, float a, boolean withLiquids);
+    public boolean canBeHitByProjectile();
+    public boolean isPickable();
+    public boolean canBePickedFromInside();
+    public boolean isPushable();
+    public void awardKillScore(Entity victim, DamageSource killingBlow);
+    public boolean shouldRender(double camX, double camY, double camZ);
+    public boolean shouldRenderAtSqrDistance(double distance);
+    public boolean saveAsPassenger(ValueOutput output);
+    public boolean save(ValueOutput output);
+    public void saveWithoutId(ValueOutput output);
+    public void load(ValueInput input);
+    public void postDataManipulated();
+    protected boolean repositionEntityAfterLoad();
+    protected final String getEncodeId();
+    protected abstract void readAdditionalSaveData(ValueInput input);
+    protected abstract void addAdditionalSaveData(ValueOutput output);
+    public ItemEntity spawnAtLocation(ServerLevel level, ItemLike resource);
+    public ItemEntity spawnAtLocation(ServerLevel level, ItemStack itemStack);
+    public ItemEntity spawnAtLocation(ServerLevel level, ItemStack itemStack, Vec3 offset);
+    public ItemEntity spawnAtLocation(ServerLevel level, ItemStack itemStack, float offset);
+    public boolean isAlive();
+    public boolean isInWall();
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    public boolean shearOffAllLeashConnections(Player player);
+    public boolean dropAllLeashConnections(Player player);
+    public boolean canCollideWith(Entity entity);
+    public boolean canBeCollidedWith(Entity other);
+    public void rideTick();
+    public final void positionRider(Entity passenger);
+    protected void positionRider(Entity passenger, MoveFunction moveFunction);
+    public void onPassengerTurned(Entity passenger);
+    public Vec3 getVehicleAttachmentPoint(Entity vehicle);
+    public Vec3 getPassengerRidingPosition(Entity passenger);
+    protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale);
+    protected static Vec3 getDefaultPassengerAttachmentPoint(Entity vehicle, Entity passenger, EntityAttachments attachments);
+    public final boolean startRiding(Entity entity);
+    public boolean showVehicleHealth();
+    public boolean startRiding(Entity entityToRide, boolean force, boolean sendEventAndTriggers);
+    protected boolean canRide(Entity vehicle);
+    public void ejectPassengers();
+    public final boolean doTeamsAllowDamage(Entity other);
+    public void removeVehicle();
+    public void stopRiding();
+    protected void addPassenger(Entity passenger);
+    protected void removePassenger(Entity passenger);
+    protected boolean canAddPassenger(Entity passenger);
+    protected boolean couldAcceptPassenger();
+    public final boolean isInterpolating();
+    public final void moveOrInterpolateTo(PositionPath position, float yRot, float xRot);
+    public final void moveOrInterpolateTo(Vec3 position, float yRot, float xRot);
+    public final void moveOrInterpolateTo(float yRot, float xRot);
+    public final void moveOrInterpolateTo(PositionPath position);
+    public final void moveOrInterpolateTo(PositionPath position, float yRot, float xRot, boolean hasRotation);
+    public void onInterpolationStart(InterpolationHandler interpolation);
+    protected InterpolationHandler createInterpolationHandler();
+    public final InterpolationHandler getInterpolation();
+    public void lerpHeadTo(float yRot, int steps);
+    public float getPickRadius();
+    public Vec3 getLookAngle();
+    public Quaternionf getLookQuaternion();
+    public Vec3 getHeadLookAngle();
+    public Vec3 getHandHoldingItemAngle(Item item);
+    public Vec2 getRotationVector();
+    public Vec3 getForward();
+    public void setAsInsidePortal(Portal portal, BlockPos pos);
+    protected void handlePortal();
+    public void teleportToPortalDestination(ServerLevel level, TeleportTransition teleportTransition);
+    public int getDimensionChangingDelay();
+    public void lerpMotion(Vec3 movement);
+    public void handleDamageEvent(DamageSource source);
+    public void handleEntityEvent(byte id);
+    public void animateHurt(float direction);
+    public boolean isOnFire();
+    public boolean isPassenger();
+    public boolean isVehicle();
+    public boolean dismountsUnderwater();
+    public boolean canControlVehicle();
+    public void setShiftKeyDown(boolean shiftKeyDown);
+    public boolean isShiftKeyDown();
+    public boolean isSteppingCarefully();
+    public boolean isSuppressingBounce();
+    public boolean isDiscrete();
+    public boolean isDescending();
+    public boolean isCrouching();
+    public boolean isSprinting();
+    public void setSprinting(boolean isSprinting);
+    public boolean isSwimming();
+    public boolean isVisuallySwimming();
+    public boolean isVisuallyCrawling();
+    public void setSwimming(boolean swimming);
+    public final boolean hasGlowingTag();
+    public final void setGlowingTag(boolean value);
+    public boolean isCurrentlyGlowing();
+    public boolean isInvisible();
+    public boolean isInvisibleTo(Player player);
+    public boolean isOnRails();
+    public void updateDynamicGameEventListener(BiConsumer<DynamicGameEventListener<?>, ServerLevel> action);
+    public PlayerTeam getTeam();
+    public final boolean isAlliedTo(Entity other);
+    protected boolean considersEntityAsAlly(Entity other);
+    public boolean isAlliedTo(Team other);
+    public void setInvisible(boolean invisible);
+    protected boolean getSharedFlag(int flag);
+    protected void setSharedFlag(int flag, boolean value);
+    public int getMaxAirSupply();
+    public int getAirSupply();
+    public void setAirSupply(int supply);
+    public void clearFreeze();
+    public int getTicksFrozen();
+    public void setTicksFrozen(int ticks);
+    public float getPercentFrozen();
+    public boolean isFullyFrozen();
+    public int getTicksRequiredToFreeze();
+    public void thunderHit(ServerLevel level, LightningBolt lightningBolt);
+    public void onAboveBubbleColumn(boolean dragDown, BlockPos pos);
+    protected static void handleOnAboveBubbleColumn(Entity entity, boolean dragDown, BlockPos pos);
+    protected static void sendBubbleColumnParticles(Level level, BlockPos pos);
+    public void onInsideBubbleColumn(boolean dragDown);
+    protected static void handleOnInsideBubbleColumn(Entity entity, boolean dragDown);
+    public boolean killedEntity(ServerLevel level, LivingEntity entity, DamageSource source);
+    public boolean projectileReceivesSideEffectsOnHit(boolean wasHurt);
+    public void checkFallDistanceAccumulation();
+    public void resetFallDistance();
+    protected void moveTowardsClosestSpace(double x, double y, double z);
+    public void makeStuckInBlock(BlockState blockState, Vec3 speedMultiplier);
+    public Component getName();
+    protected Component getTypeName();
+    public boolean is(Entity other);
+    public float getYHeadRot();
+    public void setYHeadRot(float yHeadRot);
+    public void setYBodyRot(float yBodyRot);
+    public boolean isAttackable();
+    public boolean skipAttackInteraction(Entity source);
+    public String toString();
+    protected final boolean isInvulnerableToBase(DamageSource source);
+    public boolean isInvulnerable();
+    public boolean isPermanentlyInvulnerable();
+    public boolean isTemporarilyInvulnerable();
+    public boolean isInvulnerableToPiercingWeapon();
+    public void setPermanentlyInvulnerable(boolean permanentlyInvulnerable);
+    public void copyPosition(Entity target);
+    public void restoreFrom(Entity oldEntity);
+    public Entity teleport(TeleportTransition transition);
+    protected void teleportSpectators(TeleportTransition transition, ServerLevel oldLevel);
+    public void teleportSetPosition(PositionMoveRotation destination, Set<Relative> relatives);
+    public void teleportSetPosition(PositionMoveRotation currentValues, PositionMoveRotation destination, Set<Relative> relatives);
+    public void forceSetRotation(float yRot, boolean relativeY, float xRot, boolean relativeX);
+    public void placePortalTicket(BlockPos ticketPosition);
+    protected void removeAfterChangingDimensions();
+    public Vec3 getRelativePortalPosition(Direction.Axis axis, BlockUtil.FoundRectangle portalArea);
+    public boolean canUsePortal(boolean ignorePassenger);
+    public boolean canTeleport(Level from, Level to);
+    public float getBlockExplosionResistance(Explosion explosion, BlockGetter level, BlockPos pos, BlockState block, FluidState fluid, float resistance);
+    public boolean shouldBlockExplode(Explosion explosion, BlockGetter level, BlockPos pos, BlockState state, float power);
+    public int getMaxFallDistance();
+    public boolean isIgnoringBlockTriggers();
+    public void fillCrashReportCategory(CrashReportCategory category);
+    public boolean displayFireAnimation();
+    public void setUUID(UUID uuid);
+    public UUID getUUID();
+    public String getStringUUID();
+    public String getScoreboardName();
+    public boolean isPushedByFluid();
+    public static double getViewScale();
+    public static void setViewScale(double viewScale);
+    public Component getDisplayName();
+    public void setCustomName(Component name);
+    public Component getCustomName();
+    public boolean hasCustomName();
+    public void setCustomNameVisible(boolean visible);
+    public boolean isCustomNameVisible();
+    public Component belowNameDisplay();
+    public boolean teleportTo(ServerLevel level, double x, double y, double z, Set<Relative> relatives, float newYRot, float newXRot, boolean resetCamera);
+    public void dismountTo(double x, double y, double z);
+    public void teleportTo(double x, double y, double z);
+    public void teleportRelative(double dx, double dy, double dz);
+    public boolean shouldShowName();
+    public void onSyncedDataUpdated(List<SynchedEntityData.DataValue<?>> updatedItems);
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    protected void fixupDimensions();
+    public void refreshDimensions();
+    public boolean fudgePositionAfterSizeChange(EntityDimensions previousDimensions);
+    public Direction getDirection();
+    public Direction getMotionDirection();
+    protected HoverEvent createHoverEvent();
+    public boolean broadcastToPlayer(ServerPlayer player);
+    public final AABB getBoundingBox();
+    public AABB getInterpolatedBoundingBox(float partialTicks);
+    public final void setBoundingBox(AABB bb);
+    public final float getEyeHeight(Pose pose);
+    public final float getEyeHeight();
+    public SlotAccess getSlot(int slot);
+    public boolean ignoreExplosion(Explosion explosion);
+    public void startSeenByPlayer(ServerPlayer player);
+    public void stopSeenByPlayer(ServerPlayer player);
+    public float rotate(Rotation rotation);
+    public float mirror(Mirror mirror);
+    public ProjectileDeflection deflection(Projectile projectile);
+    public LivingEntity getControllingPassenger();
+    public final boolean hasControllingPassenger();
+    public final List<Entity> getPassengers();
+    public Entity getFirstPassenger();
+    public boolean hasPassenger(Entity entity);
+    public boolean hasPassenger(Predicate<Entity> test);
+    public Stream<Entity> getSelfAndPassengers();
+    public Stream<Entity> getPassengersAndSelf();
+    public Iterable<Entity> getIndirectPassengers();
+    public int countPlayerPassengers();
+    public boolean hasExactlyOnePlayerPassenger();
+    public Entity getRootVehicle();
+    public boolean isPassengerOfSameVehicle(Entity other);
+    public boolean hasIndirectPassenger(Entity entity);
+    public final boolean isLocalInstanceAuthoritative();
+    protected boolean isLocalClientAuthoritative();
+    public boolean isClientAuthoritative();
+    public MoveSimulationType getMoveSimulationType();
+    public final boolean canSimulateMovement();
+    public boolean isEffectiveAi();
+    protected static Vec3 getCollisionHorizontalEscapeVector(double colliderWidth, double collidingWidth, float directionDegrees);
+    public Vec3 getDismountLocationForPassenger(LivingEntity passenger);
+    public Entity getVehicle();
+    public Entity getControlledVehicle();
+    public PushReaction getPistonPushReaction();
+    public SoundSource getSoundSource();
+    protected int getFireImmuneTicks();
+    public CommandSourceStack createCommandSourceStackForNameResolution(ServerLevel level);
+    public void lookAt(EntityAnchorArgument.Anchor anchor, Vec3 pos);
+    public float getPreciseBodyRotation(float partial);
+    public boolean touchingUnloadedChunk();
+    public double getFluidHeight(TagKey<Fluid> type);
+    public double getFluidJumpThreshold();
+    public final float getBbWidth();
+    public final float getBbHeight();
+    public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity serverEntity);
+    public EntityDimensions getDimensions(Pose pose);
+    public final EntityAttachments getAttachments();
+    public Vec3 position();
+    public Vec3 trackingPosition();
+    public BlockPos blockPosition();
+    public BlockState getInBlockState();
+    public ChunkPos chunkPosition();
+    public Vec3 getDeltaMovement();
+    public void setDeltaMovement(Vec3 deltaMovement);
+    public void addDeltaMovement(Vec3 momentum);
+    public void setDeltaMovement(double xd, double yd, double zd);
+    public final int getBlockX();
+    public final double getX();
+    public double getX(double progress);
+    public double getRandomX(double spread);
+    public final int getBlockY();
+    public final double getY();
+    public double getY(double progress);
+    public double getRandomY(double spread);
+    public double getRandomY();
+    public double getEyeY();
+    public final int getBlockZ();
+    public final double getZ();
+    public double getZ(double progress);
+    public double getRandomZ(double spread);
+    public final void setPosRaw(double x, double y, double z);
+    public void checkDespawn();
+    public Vec3[] getQuadLeashHolderOffsets();
+    public boolean supportQuadLeashAsHolder();
+    public void notifyLeashHolder(Leashable entity);
+    public void notifyLeasheeRemoved(Leashable entity);
+    public Vec3 getRopeHoldPosition(float partialTickTime);
+    public void recreateFromPacket(ClientboundAddEntityPacket packet);
+    public ItemStack getPickResult();
+    public void setIsInPowderSnow(boolean isInPowderSnow);
+    public boolean canFreeze();
+    public boolean isFreezing();
+    public float getYRot();
+    public float getVisualRotationYInDegrees();
+    public void setYRot(float yRot);
+    public float getXRot();
+    public void setXRot(float xRot);
+    public PositionAndRotation storePositionAndRotation();
+    public PositionAndRotation getClientPositionAndRotation();
+    public Vec3 getClientPosition();
+    public boolean canSprint();
+    public float maxUpStep();
+    public void onExplosionHit(Entity explosionCausedBy);
+    public final boolean isRemoved();
+    public RemovalReason getRemovalReason();
+    public final void setRemoved(RemovalReason reason);
+    protected void unsetRemoved();
+    public void setLevelCallback(EntityInLevelCallback levelCallback);
+    public boolean shouldBeSaved();
+    public boolean isAlwaysTicking();
+    public boolean mayInteract(ServerLevel level, BlockPos pos);
+    public boolean isFlyingVehicle();
+    public Level level();
+    protected void setLevel(Level level);
+    public DamageSources damageSources();
+    public RegistryAccess registryAccess();
+    protected void lerpPositionAndRotationStep(int stepsToTarget, double targetX, double targetY, double targetZ, double targetYRot, double targetXRot);
+    public RandomSource getRandom();
+    public Vec3 getKnownMovement();
+    public Vec3 getKnownSpeed();
+    public ItemStack getWeaponItem();
+    public Optional<ResourceKey<LootTable>> getLootTable();
+    protected void applyImplicitComponents(DataComponentGetter components);
+    public final void applyComponentsFromItemStack(ItemStack stack);
+    public <T> T get(DataComponentType<? extends T> type);
+    protected static <T> T castComponentValue(DataComponentType<T> type, Object value);
+    public <T> void setComponent(DataComponentType<T> type, T value);
+    protected <T> boolean applyImplicitComponent(DataComponentType<T> type, T value);
+    protected <T> boolean applyImplicitComponentIfPresent(DataComponentGetter components, DataComponentType<T> type);
+    public ProblemReporter.PathElement problemPath();
+    public void registerDebugValues(ServerLevel level, DebugValueSource.Registration registration);
+    public AABB getFluidInteractionBox();
+    public void setInvulnerableTime(int invulnerableTime);
+    public int getInvulnerableTime();
+    protected AABB modifyPassengerFluidInteractionBox(AABB passengerBox);
+    static record Movement(Vec3 from, Vec3 to, Optional<Vec3> axisDependentOriginalMovement) {
+        public Movement(Vec3 from, Vec3 to, Vec3 axisDependentOriginalMovement);
+        public Movement(Vec3 from, Vec3 to);
+    }
+    public static enum MovementEmission {
+        NONE, SOUNDS, EVENTS, ALL;
+        public boolean emitsAnything();
+        public boolean emitsEvents();
+        public boolean emitsSounds();
+    }
+    public static enum RemovalReason {
+        KILLED, DISCARDED, UNLOADED_TO_CHUNK, UNLOADED_WITH_PLAYER, CHANGED_DIMENSION;
+        public boolean shouldDestroy();
+        public boolean shouldSave();
+    }
+    static record EntityPathElement(Entity entity) implements ProblemReporter.PathElement {
+        public String get();
+    }
+    public @interface Flags {
+    }
+    public interface MoveFunction {
+        void accept(Entity target, double x, double y, double z);
+    }
+}
+//// EntityAttachment.java
+import java.util.List;
+import net.minecraft.world.phys.Vec3;
+public enum EntityAttachment {
+    PASSENGER, VEHICLE, NAME_TAG, WARDEN_CHEST;
+    public List<Vec3> createFallbackPoints(float width, float height);
+    public interface Fallback {
+        List<Vec3> ZERO;
+        Fallback AT_FEET;
+        Fallback AT_HEIGHT;
+        Fallback AT_CENTER;
+        List<Vec3> create(float width, float height);
+    }
+}
+//// EntityAttachments.java
+import java.util.List;
+import java.util.Map;
+import net.minecraft.world.phys.Vec3;
+public class EntityAttachments {
+    private EntityAttachments(Map<EntityAttachment, List<Vec3>> attachments);
+    public static EntityAttachments createDefault(float width, float height);
+    public static Builder builder();
+    public EntityAttachments scale(float x, float y, float z);
+    public Vec3 getNullable(EntityAttachment attachment, int index, float rotY);
+    public Vec3 get(EntityAttachment attachment, int index, float rotY);
+    public Vec3 getAverage(EntityAttachment attachment);
+    public Vec3 getClamped(EntityAttachment attachment, int index, float rotY);
+    public static class Builder {
+        private Builder();
+        public Builder attach(EntityAttachment attachment, float x, float y, float z);
+        public Builder attach(EntityAttachment attachment, Vec3 point);
+        public EntityAttachments build(float width, float height);
+    }
+}
+//// EntityDimensions.java
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public record EntityDimensions(float width, float height, float eyeHeight, EntityAttachments attachments, boolean fixed) {
+    private EntityDimensions(float width, float height, boolean fixed);
+    public AABB makeBoundingBox(Vec3 pos);
+    public AABB makeBoundingBox(double x, double y, double z);
+    public EntityDimensions scale(float scaleFactor);
+    public EntityDimensions scale(float widthScaleFactor, float heightScaleFactor);
+    public static EntityDimensions scalable(float width, float height);
+    public static EntityDimensions fixed(float width, float height);
+    public EntityDimensions withEyeHeight(float eyeHeight);
+    public EntityDimensions withAttachments(EntityAttachments.Builder attachments);
+}
+//// EntityEquipment.java
+import com.mojang.serialization.Codec;
+import java.util.EnumMap;
+import net.minecraft.world.item.ItemStack;
+public class EntityEquipment {
+    public static final Codec<EntityEquipment> CODEC;
+    private EntityEquipment(EnumMap<EquipmentSlot, ItemStack> items);
+    public EntityEquipment();
+    public ItemStack set(EquipmentSlot slot, ItemStack itemStack);
+    public ItemStack get(EquipmentSlot slot);
+    public boolean isEmpty();
+    public void tick(Entity owner);
+    public void setAll(EntityEquipment equipment);
+    public void dropAll(LivingEntity dropper);
+    public void clear();
+}
+//// EntityEvent.java
+public class EntityEvent {
+    public static final byte JUMP = (byte) 1;
+    public static final byte KINETIC_HIT = (byte) 2;
+    public static final byte DEATH = (byte) 3;
+    public static final byte START_ATTACKING = (byte) 4;
+    public static final byte STOP_ATTACKING = (byte) 5;
+    public static final byte TAMING_FAILED = (byte) 6;
+    public static final byte TAMING_SUCCEEDED = (byte) 7;
+    public static final byte SHAKE_WETNESS = (byte) 8;
+    public static final byte USE_ITEM_COMPLETE = (byte) 9;
+    public static final byte EAT_GRASS = (byte) 10;
+    public static final byte OFFER_FLOWER = (byte) 11;
+    public static final byte LOVE_HEARTS = (byte) 12;
+    public static final byte VILLAGER_ANGRY = (byte) 13;
+    public static final byte VILLAGER_HAPPY = (byte) 14;
+    public static final byte WITCH_HAT_MAGIC = (byte) 15;
+    public static final byte ZOMBIE_CONVERTING = (byte) 16;
+    public static final byte FIREWORKS_EXPLODE = (byte) 17;
+    public static final byte IN_LOVE_HEARTS = (byte) 18;
+    public static final byte SQUID_ANIM_SYNCH = (byte) 19;
+    public static final byte SILVERFISH_MERGE_ANIM = (byte) 20;
+    public static final byte GUARDIAN_ATTACK_SOUND = (byte) 21;
+    public static final byte REDUCED_DEBUG_INFO = (byte) 22;
+    public static final byte FULL_DEBUG_INFO = (byte) 23;
+    public static final byte PERMISSION_LEVEL_ALL = (byte) 24;
+    public static final byte PERMISSION_LEVEL_MODERATORS = (byte) 25;
+    public static final byte PERMISSION_LEVEL_GAMEMASTERS = (byte) 26;
+    public static final byte PERMISSION_LEVEL_ADMINS = (byte) 27;
+    public static final byte PERMISSION_LEVEL_OWNERS = (byte) 28;
+    public static final byte FISHING_ROD_REEL_IN = (byte) 31;
+    public static final byte ARMORSTAND_WOBBLE = (byte) 32;
+    public static final byte STOP_OFFER_FLOWER = (byte) 34;
+    public static final byte PROTECTED_FROM_DEATH = (byte) 35;
+    public static final byte DOLPHIN_LOOKING_FOR_TREASURE = (byte) 38;
+    public static final byte RAVAGER_STUNNED = (byte) 39;
+    public static final byte TRUSTING_FAILED = (byte) 40;
+    public static final byte TRUSTING_SUCCEEDED = (byte) 41;
+    public static final byte VILLAGER_SWEAT = (byte) 42;
+    public static final byte FOX_EAT = (byte) 45;
+    public static final byte TELEPORT = (byte) 46;
+    public static final byte MAINHAND_BREAK = (byte) 47;
+    public static final byte OFFHAND_BREAK = (byte) 48;
+    public static final byte HEAD_BREAK = (byte) 49;
+    public static final byte CHEST_BREAK = (byte) 50;
+    public static final byte LEGS_BREAK = (byte) 51;
+    public static final byte FEET_BREAK = (byte) 52;
+    public static final byte HONEY_SLIDE = (byte) 53;
+    public static final byte HONEY_JUMP = (byte) 54;
+    public static final byte SWAP_HANDS = (byte) 55;
+    public static final byte CANCEL_SHAKE_WETNESS = (byte) 56;
+    public static final byte START_RAM = (byte) 58;
+    public static final byte END_RAM = (byte) 59;
+    public static final byte POOF = (byte) 60;
+    public static final byte TENDRILS_SHIVER = (byte) 61;
+    public static final byte SONIC_CHARGE = (byte) 62;
+    public static final byte SNIFFER_DIGGING_SOUND = (byte) 63;
+    public static final byte ARMADILLO_PEEK = (byte) 64;
+    public static final byte BODY_BREAK = (byte) 65;
+    public static final byte SHAKE = (byte) 66;
+    public static final byte DROWN_PARTICLES = (byte) 67;
+    public static final byte SADDLE_BREAK = (byte) 68;
+    public static final byte RAVAGER_ROARED = (byte) 69;
+    public static final byte TNT_PRIME = (byte) 70;
+    public static final byte BOAT_SINK = (byte) 71;
+    public static final byte BOAT_LAUNCH = (byte) 72;
+    public @interface Value {
+    }
+}
+//// EntityFluidInteraction.java
+import java.util.Set;
+import net.minecraft.core.Holder;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.phys.Vec3;
+public class EntityFluidInteraction {
+    public EntityFluidInteraction(Set<TagKey<Fluid>> fluidsWithCurrent);
+    public boolean update(Entity entity, boolean ignoreCurrent);
+    public void applyCurrentTo(TagKey<Fluid> fluid, Entity entity, double scale);
+    public double getFluidHeight(TagKey<Fluid> fluid);
+    public boolean isInFluid(TagKey<Fluid> fluid);
+    public boolean isEyeInFluid(TagKey<Fluid> fluid);
+    static class Tracker {
+        public Tracker(Holder<Fluid> fluidType);
+        public boolean reset();
+    }
+    static class CurrentAccumulator {
+        private CurrentAccumulator();
+        public void reset();
+        public void accumulate(Vec3 flow);
+        public void applyTo(Entity entity, double scale);
+    }
+}
+//// EntityProcessor.java
+public interface EntityProcessor {
+    EntityProcessor NOP;
+    Entity process(Entity input);
+}
+//// EntityReference.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.UUID;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.entity.UUIDLookup;
+import net.minecraft.world.level.entity.UniquelyIdentifyable;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public final class EntityReference<StoredEntityType extends UniquelyIdentifyable> {
+    public static <Type extends UniquelyIdentifyable> Codec<EntityReference<Type>> codec();
+    public static <Type extends UniquelyIdentifyable> StreamCodec<ByteBuf, EntityReference<Type>> streamCodec();
+    private EntityReference(StoredEntityType entity);
+    private EntityReference(UUID uuid);
+    public static <T extends UniquelyIdentifyable> EntityReference<T> of(T entity);
+    public static <T extends UniquelyIdentifyable> EntityReference<T> of(UUID uuid);
+    public UUID getUUID();
+    public StoredEntityType getEntity(UUIDLookup<? extends UniquelyIdentifyable> lookup, Class<StoredEntityType> clazz);
+    public StoredEntityType getEntity(Level level, Class<StoredEntityType> clazz);
+    public boolean matches(StoredEntityType entity);
+    public void store(ValueOutput output, String key);
+    public static void store(EntityReference<?> reference, ValueOutput output, String key);
+    public static <StoredEntityType extends UniquelyIdentifyable> StoredEntityType get(EntityReference<StoredEntityType> reference, Level level, Class<StoredEntityType> clazz);
+    public static Entity getEntity(EntityReference<Entity> reference, Level level);
+    public static LivingEntity getLivingEntity(EntityReference<LivingEntity> reference, Level level);
+    public static Player getPlayer(EntityReference<Player> reference, Level level);
+    public static <StoredEntityType extends UniquelyIdentifyable> EntityReference<StoredEntityType> read(ValueInput input, String key);
+    public static <StoredEntityType extends UniquelyIdentifyable> EntityReference<StoredEntityType> readWithOldOwnerConversion(ValueInput input, String key, Level level);
+    public boolean equals(Object obj);
+    public int hashCode();
+}
+//// EntitySelector.java
+import java.util.function.Predicate;
+public final class EntitySelector {
+    public static final Predicate<Entity> ENTITY_STILL_ALIVE;
+    public static final Predicate<Entity> LIVING_ENTITY_STILL_ALIVE;
+    public static final Predicate<Entity> ENTITY_NOT_BEING_RIDDEN;
+    public static final Predicate<Entity> CONTAINER_ENTITY_SELECTOR;
+    public static final Predicate<Entity> NO_CREATIVE_OR_SPECTATOR;
+    public static final Predicate<Entity> NO_SPECTATORS;
+    public static final Predicate<Entity> CAN_BE_COLLIDED_WITH;
+    public static final Predicate<Entity> CAN_BE_PICKED;
+    private EntitySelector();
+    public static Predicate<Entity> withinDistance(double centerX, double centerY, double centerZ, double distance);
+    public static Predicate<Entity> pushableBy(Entity entity);
+    public static Predicate<Entity> notRiding(Entity entity);
+}
+//// EntitySpawnReason.java
+public enum EntitySpawnReason {
+    NATURAL, CHUNK_GENERATION, SPAWNER, STRUCTURE, BREEDING, MOB_SUMMONED, JOCKEY, EVENT, CONVERSION, REINFORCEMENT, TRIGGERED, BUCKET, SPAWN_ITEM_USE, COMMAND, DISPENSER, PATROL, TRIAL_SPAWNER, LOAD, DIMENSION_TRAVEL;
+    public static boolean isSpawner(EntitySpawnReason reason);
+    public static boolean ignoresLightRequirements(EntitySpawnReason reason);
+}
+//// EntitySpawnRequest.java
+public record EntitySpawnRequest(EntitySpawnReason reason, boolean ignoreChecks) {
+}
+//// EntityType.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.flag.FeatureElement;
+import net.minecraft.world.flag.FeatureFlag;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.TypedEntityData;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public class EntityType<T extends Entity> implements EntityTypeTest<Entity, T>, FeatureElement {
+    public static final Codec<EntityType<?>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, EntityType<?>> STREAM_CODEC;
+    public static final int NO_UPDATE_INTERVAL = 2147483647;
+    public static Identifier getKey(EntityType<?> type);
+    public EntityType(EntityFactory<T> factory, MobCategory category, boolean serialize, boolean summon, boolean fireImmune, boolean canSpawnFarFromPlayer, TagKey<Block> immuneTo, EntityDimensions dimensions, float spawnDimensionsScale, int clientTrackingRange, int updateInterval, String descriptionId, Optional<ResourceKey<LootTable>> lootTable, FeatureFlagSet requiredFeatures, boolean allowedInPeaceful, boolean trackDeltas);
+    public T spawn(ServerLevel level, ItemStack itemStack, LivingEntity user, BlockPos spawnPos, EntitySpawnReason spawnReason, boolean tryMoveDown, boolean movedUp);
+    public static <T extends Entity> PostSpawnProcessor<T> createDefaultStackConfig(Level level, ItemStack itemStack, LivingEntity user);
+    public static <T extends Entity> PostSpawnProcessor<T> appendDefaultStackConfig(PostSpawnProcessor<T> initialConfig, Level level, ItemStack itemStack, LivingEntity user);
+    public static <T extends Entity> PostSpawnProcessor<T> appendComponentsConfig(PostSpawnProcessor<T> initialConfig, ItemStack itemStack);
+    public static <T extends Entity> PostSpawnProcessor<T> appendCustomEntityStackConfig(PostSpawnProcessor<T> initialConfig, Level level, ItemStack itemStack, LivingEntity user);
+    public T spawn(ServerLevel level, BlockPos spawnPos, EntitySpawnReason spawnReason);
+    public T spawn(ServerLevel level, PostSpawnProcessor<T> postSpawnConfig, BlockPos spawnPos, EntitySpawnReason spawnReason, boolean tryMoveDown, boolean movedUp);
+    public T create(ServerLevel level, PostSpawnProcessor<T> postSpawnConfig, BlockPos spawnPos, EntitySpawnReason spawnReason, boolean tryMoveDown, boolean movedUp);
+    protected static double getYOffset(LevelReader level, BlockPos spawnPos, boolean movedUp, AABB entityBox);
+    public static void updateCustomEntityTag(Level level, LivingEntity user, Entity entity, TypedEntityData<EntityType<?>> entityData);
+    public boolean canSerialize();
+    public boolean canSummon();
+    public boolean fireImmune();
+    public boolean canSpawnFarFromPlayer();
+    public MobCategory getCategory();
+    public String getDescriptionId();
+    public Component getDescription();
+    public String toString();
+    public String toShortString();
+    public Optional<ResourceKey<LootTable>> getDefaultLootTable();
+    public float getWidth();
+    public float getHeight();
+    public FeatureFlagSet requiredFeatures();
+    public boolean canSpawn(Level level);
+    public T create(Level level, EntitySpawnReason reason);
+    public T create(Level level, EntitySpawnRequest request);
+    public static Optional<Entity> create(ValueInput input, Level level, EntitySpawnRequest request);
+    public static Optional<Entity> create(EntityType<?> type, ValueInput input, Level level, EntitySpawnReason reason);
+    public AABB getSpawnAABB(Vec3 at);
+    public AABB getSpawnAABB(double x, double y, double z);
+    public boolean isBlockDangerous(BlockState state);
+    public EntityDimensions getDimensions();
+    public static Optional<EntityType<?>> by(ValueInput input);
+    public static Entity loadEntityRecursive(CompoundTag tag, Level level, EntitySpawnRequest request, EntityProcessor postLoad);
+    public static Entity loadEntityRecursive(EntityType<?> type, CompoundTag tag, Level level, EntitySpawnReason reason, EntityProcessor postLoad);
+    public static Entity loadEntityRecursive(ValueInput input, Level level, EntitySpawnReason reason, EntityProcessor postLoad);
+    public static Entity loadEntityRecursive(ValueInput input, Level level, EntitySpawnRequest request, EntityProcessor postLoad);
+    public static Entity loadEntityRecursive(EntityType<?> type, ValueInput input, Level level, EntitySpawnReason reason, EntityProcessor postLoad);
+    public static Stream<Entity> loadEntitiesRecursive(ValueInput.ValueInputList entities, Level level, EntitySpawnReason reason);
+    public int clientTrackingRange();
+    public int updateInterval();
+    public boolean hasUpdateInterval();
+    public boolean trackDeltas();
+    public T tryCast(Entity entity);
+    public Class<? extends Entity> getBaseClass();
+    public Holder.Reference<EntityType<?>> builtInRegistryHolder();
+    public boolean isAllowedInPeaceful();
+    public boolean onlyOpCanSetNbt();
+    public static class Builder<T extends Entity> {
+        private Builder(EntityFactory<T> factory, MobCategory category);
+        public static <T extends Entity> Builder<T> of(EntityFactory<T> factory, MobCategory category);
+        public static <T extends Entity> Builder<T> createNothing(MobCategory category);
+        public Builder<T> sized(float width, float height);
+        public Builder<T> spawnDimensionsScale(float scale);
+        public Builder<T> eyeHeight(float eyeHeight);
+        public Builder<T> passengerAttachments(float... offsetYs);
+        public Builder<T> passengerAttachments(Vec3... points);
+        public Builder<T> vehicleAttachment(Vec3 point);
+        public Builder<T> ridingOffset(float ridingOffset);
+        public Builder<T> nameTagOffset(float nameTagOffset);
+        public Builder<T> attach(EntityAttachment attachment, float x, float y, float z);
+        public Builder<T> attach(EntityAttachment attachment, Vec3 point);
+        public Builder<T> noSummon();
+        public Builder<T> noSave();
+        public Builder<T> fireImmune();
+        public Builder<T> immuneTo(TagKey<Block> tag);
+        public Builder<T> canSpawnFarFromPlayer();
+        public Builder<T> clientTrackingRange(int clientChunkRange);
+        public Builder<T> updateInterval(int updateInterval);
+        public Builder<T> noUpdateInterval();
+        public Builder<T> requiredFeatures(FeatureFlag... flags);
+        public Builder<T> noLootTable();
+        public Builder<T> notInPeaceful();
+        public Builder<T> dontTrackDeltas();
+        public EntityType<T> build(ResourceKey<EntityType<?>> name);
+    }
+    public interface EntityFactory<T extends Entity> {
+        T create(EntityType<T> entityType, Level level);
+    }
+}
+//// EntityTypeIds.java
+import net.minecraft.resources.ResourceKey;
+public class EntityTypeIds {
+    public static final ResourceKey<EntityType<?>> ACACIA_BOAT;
+    public static final ResourceKey<EntityType<?>> ACACIA_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> ALLAY;
+    public static final ResourceKey<EntityType<?>> AREA_EFFECT_CLOUD;
+    public static final ResourceKey<EntityType<?>> ARMADILLO;
+    public static final ResourceKey<EntityType<?>> ARMOR_STAND;
+    public static final ResourceKey<EntityType<?>> ARROW;
+    public static final ResourceKey<EntityType<?>> AXOLOTL;
+    public static final ResourceKey<EntityType<?>> BAMBOO_CHEST_RAFT;
+    public static final ResourceKey<EntityType<?>> BAMBOO_RAFT;
+    public static final ResourceKey<EntityType<?>> BAT;
+    public static final ResourceKey<EntityType<?>> BEE;
+    public static final ResourceKey<EntityType<?>> BIRCH_BOAT;
+    public static final ResourceKey<EntityType<?>> BIRCH_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> BLAZE;
+    public static final ResourceKey<EntityType<?>> BLOCK_DISPLAY;
+    public static final ResourceKey<EntityType<?>> BOGGED;
+    public static final ResourceKey<EntityType<?>> BREEZE;
+    public static final ResourceKey<EntityType<?>> BREEZE_WIND_CHARGE;
+    public static final ResourceKey<EntityType<?>> CAMEL;
+    public static final ResourceKey<EntityType<?>> CAMEL_HUSK;
+    public static final ResourceKey<EntityType<?>> CAT;
+    public static final ResourceKey<EntityType<?>> CAVE_SPIDER;
+    public static final ResourceKey<EntityType<?>> CHERRY_BOAT;
+    public static final ResourceKey<EntityType<?>> CHERRY_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> CHEST_MINECART;
+    public static final ResourceKey<EntityType<?>> CHICKEN;
+    public static final ResourceKey<EntityType<?>> COD;
+    public static final ResourceKey<EntityType<?>> COPPER_GOLEM;
+    public static final ResourceKey<EntityType<?>> COMMAND_BLOCK_MINECART;
+    public static final ResourceKey<EntityType<?>> COW;
+    public static final ResourceKey<EntityType<?>> CREAKING;
+    public static final ResourceKey<EntityType<?>> CREEPER;
+    public static final ResourceKey<EntityType<?>> CUSHION;
+    public static final ResourceKey<EntityType<?>> DARK_OAK_BOAT;
+    public static final ResourceKey<EntityType<?>> DARK_OAK_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> DOLPHIN;
+    public static final ResourceKey<EntityType<?>> DONKEY;
+    public static final ResourceKey<EntityType<?>> DRAGON_FIREBALL;
+    public static final ResourceKey<EntityType<?>> DROWNED;
+    public static final ResourceKey<EntityType<?>> EGG;
+    public static final ResourceKey<EntityType<?>> ELDER_GUARDIAN;
+    public static final ResourceKey<EntityType<?>> ENDERMAN;
+    public static final ResourceKey<EntityType<?>> ENDERMITE;
+    public static final ResourceKey<EntityType<?>> ENDER_DRAGON;
+    public static final ResourceKey<EntityType<?>> ENDER_PEARL;
+    public static final ResourceKey<EntityType<?>> END_CRYSTAL;
+    public static final ResourceKey<EntityType<?>> EVOKER;
+    public static final ResourceKey<EntityType<?>> EVOKER_FANGS;
+    public static final ResourceKey<EntityType<?>> EXPERIENCE_BOTTLE;
+    public static final ResourceKey<EntityType<?>> EXPERIENCE_ORB;
+    public static final ResourceKey<EntityType<?>> EYE_OF_ENDER;
+    public static final ResourceKey<EntityType<?>> FALLING_BLOCK;
+    public static final ResourceKey<EntityType<?>> FIREBALL;
+    public static final ResourceKey<EntityType<?>> FIREWORK_ROCKET;
+    public static final ResourceKey<EntityType<?>> FOX;
+    public static final ResourceKey<EntityType<?>> FROG;
+    public static final ResourceKey<EntityType<?>> FURNACE_MINECART;
+    public static final ResourceKey<EntityType<?>> GHAST;
+    public static final ResourceKey<EntityType<?>> HAPPY_GHAST;
+    public static final ResourceKey<EntityType<?>> GIANT;
+    public static final ResourceKey<EntityType<?>> GLOW_ITEM_FRAME;
+    public static final ResourceKey<EntityType<?>> GLOW_SQUID;
+    public static final ResourceKey<EntityType<?>> GOAT;
+    public static final ResourceKey<EntityType<?>> GUARDIAN;
+    public static final ResourceKey<EntityType<?>> HOGLIN;
+    public static final ResourceKey<EntityType<?>> HOPPER_MINECART;
+    public static final ResourceKey<EntityType<?>> HORSE;
+    public static final ResourceKey<EntityType<?>> HUSK;
+    public static final ResourceKey<EntityType<?>> ILLUSIONER;
+    public static final ResourceKey<EntityType<?>> INTERACTION;
+    public static final ResourceKey<EntityType<?>> IRON_GOLEM;
+    public static final ResourceKey<EntityType<?>> ITEM;
+    public static final ResourceKey<EntityType<?>> ITEM_DISPLAY;
+    public static final ResourceKey<EntityType<?>> ITEM_FRAME;
+    public static final ResourceKey<EntityType<?>> JUNGLE_BOAT;
+    public static final ResourceKey<EntityType<?>> JUNGLE_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> LEASH_KNOT;
+    public static final ResourceKey<EntityType<?>> LIGHTNING_BOLT;
+    public static final ResourceKey<EntityType<?>> LLAMA;
+    public static final ResourceKey<EntityType<?>> LLAMA_SPIT;
+    public static final ResourceKey<EntityType<?>> MAGMA_CUBE;
+    public static final ResourceKey<EntityType<?>> MANGROVE_BOAT;
+    public static final ResourceKey<EntityType<?>> MANGROVE_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> MANNEQUIN;
+    public static final ResourceKey<EntityType<?>> MARKER;
+    public static final ResourceKey<EntityType<?>> MINECART;
+    public static final ResourceKey<EntityType<?>> MOOSHROOM;
+    public static final ResourceKey<EntityType<?>> MULE;
+    public static final ResourceKey<EntityType<?>> NAUTILUS;
+    public static final ResourceKey<EntityType<?>> OAK_BOAT;
+    public static final ResourceKey<EntityType<?>> OAK_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> OCELOT;
+    public static final ResourceKey<EntityType<?>> OMINOUS_ITEM_SPAWNER;
+    public static final ResourceKey<EntityType<?>> PAINTING;
+    public static final ResourceKey<EntityType<?>> PALE_OAK_BOAT;
+    public static final ResourceKey<EntityType<?>> PALE_OAK_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> PANDA;
+    public static final ResourceKey<EntityType<?>> PARCHED;
+    public static final ResourceKey<EntityType<?>> PARROT;
+    public static final ResourceKey<EntityType<?>> PHANTOM;
+    public static final ResourceKey<EntityType<?>> PIG;
+    public static final ResourceKey<EntityType<?>> PIGLIN;
+    public static final ResourceKey<EntityType<?>> PIGLIN_BRUTE;
+    public static final ResourceKey<EntityType<?>> PILLAGER;
+    public static final ResourceKey<EntityType<?>> POLAR_BEAR;
+    public static final ResourceKey<EntityType<?>> POPLAR_BOAT;
+    public static final ResourceKey<EntityType<?>> POPLAR_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> SPLASH_POTION;
+    public static final ResourceKey<EntityType<?>> LINGERING_POTION;
+    public static final ResourceKey<EntityType<?>> PUFFERFISH;
+    public static final ResourceKey<EntityType<?>> RABBIT;
+    public static final ResourceKey<EntityType<?>> RAVAGER;
+    public static final ResourceKey<EntityType<?>> SALMON;
+    public static final ResourceKey<EntityType<?>> SHEEP;
+    public static final ResourceKey<EntityType<?>> SHULKER;
+    public static final ResourceKey<EntityType<?>> SHULKER_BULLET;
+    public static final ResourceKey<EntityType<?>> SILVERFISH;
+    public static final ResourceKey<EntityType<?>> SKELETON;
+    public static final ResourceKey<EntityType<?>> SKELETON_HORSE;
+    public static final ResourceKey<EntityType<?>> SLIME;
+    public static final ResourceKey<EntityType<?>> SMALL_FIREBALL;
+    public static final ResourceKey<EntityType<?>> SNIFFER;
+    public static final ResourceKey<EntityType<?>> SNOWBALL;
+    public static final ResourceKey<EntityType<?>> SNOW_GOLEM;
+    public static final ResourceKey<EntityType<?>> SPAWNER_MINECART;
+    public static final ResourceKey<EntityType<?>> SPECTRAL_ARROW;
+    public static final ResourceKey<EntityType<?>> SPIDER;
+    public static final ResourceKey<EntityType<?>> SPRUCE_BOAT;
+    public static final ResourceKey<EntityType<?>> SPRUCE_CHEST_BOAT;
+    public static final ResourceKey<EntityType<?>> SQUID;
+    public static final ResourceKey<EntityType<?>> STRAY;
+    public static final ResourceKey<EntityType<?>> STRIDER;
+    public static final ResourceKey<EntityType<?>> SULFUR_CUBE;
+    public static final ResourceKey<EntityType<?>> TADPOLE;
+    public static final ResourceKey<EntityType<?>> TEXT_DISPLAY;
+    public static final ResourceKey<EntityType<?>> TNT;
+    public static final ResourceKey<EntityType<?>> TNT_MINECART;
+    public static final ResourceKey<EntityType<?>> TRADER_LLAMA;
+    public static final ResourceKey<EntityType<?>> TRIDENT;
+    public static final ResourceKey<EntityType<?>> TROPICAL_FISH;
+    public static final ResourceKey<EntityType<?>> TURTLE;
+    public static final ResourceKey<EntityType<?>> VEX;
+    public static final ResourceKey<EntityType<?>> VILLAGER;
+    public static final ResourceKey<EntityType<?>> VINDICATOR;
+    public static final ResourceKey<EntityType<?>> WANDERING_TRADER;
+    public static final ResourceKey<EntityType<?>> WARDEN;
+    public static final ResourceKey<EntityType<?>> WIND_CHARGE;
+    public static final ResourceKey<EntityType<?>> WITCH;
+    public static final ResourceKey<EntityType<?>> WITHER;
+    public static final ResourceKey<EntityType<?>> WITHER_SKELETON;
+    public static final ResourceKey<EntityType<?>> WITHER_SKULL;
+    public static final ResourceKey<EntityType<?>> WOLF;
+    public static final ResourceKey<EntityType<?>> ZOGLIN;
+    public static final ResourceKey<EntityType<?>> ZOMBIE;
+    public static final ResourceKey<EntityType<?>> ZOMBIE_HORSE;
+    public static final ResourceKey<EntityType<?>> ZOMBIE_NAUTILUS;
+    public static final ResourceKey<EntityType<?>> ZOMBIE_VILLAGER;
+    public static final ResourceKey<EntityType<?>> ZOMBIFIED_PIGLIN;
+    public static final ResourceKey<EntityType<?>> PLAYER;
+    public static final ResourceKey<EntityType<?>> FISHING_BOBBER;
+}
+//// EntityTypes.java
+import java.util.Set;
+import net.minecraft.world.entity.ambient.Bat;
+import net.minecraft.world.entity.animal.allay.Allay;
+import net.minecraft.world.entity.animal.armadillo.Armadillo;
+import net.minecraft.world.entity.animal.axolotl.Axolotl;
+import net.minecraft.world.entity.animal.bee.Bee;
+import net.minecraft.world.entity.animal.camel.Camel;
+import net.minecraft.world.entity.animal.camel.CamelHusk;
+import net.minecraft.world.entity.animal.chicken.Chicken;
+import net.minecraft.world.entity.animal.cow.Cow;
+import net.minecraft.world.entity.animal.cow.MushroomCow;
+import net.minecraft.world.entity.animal.dolphin.Dolphin;
+import net.minecraft.world.entity.animal.equine.Donkey;
+import net.minecraft.world.entity.animal.equine.Horse;
+import net.minecraft.world.entity.animal.equine.Llama;
+import net.minecraft.world.entity.animal.equine.Mule;
+import net.minecraft.world.entity.animal.equine.SkeletonHorse;
+import net.minecraft.world.entity.animal.equine.TraderLlama;
+import net.minecraft.world.entity.animal.equine.ZombieHorse;
+import net.minecraft.world.entity.animal.feline.Cat;
+import net.minecraft.world.entity.animal.feline.Ocelot;
+import net.minecraft.world.entity.animal.fish.Cod;
+import net.minecraft.world.entity.animal.fish.Pufferfish;
+import net.minecraft.world.entity.animal.fish.Salmon;
+import net.minecraft.world.entity.animal.fish.TropicalFish;
+import net.minecraft.world.entity.animal.fox.Fox;
+import net.minecraft.world.entity.animal.frog.Frog;
+import net.minecraft.world.entity.animal.frog.Tadpole;
+import net.minecraft.world.entity.animal.goat.Goat;
+import net.minecraft.world.entity.animal.golem.CopperGolem;
+import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.animal.golem.SnowGolem;
+import net.minecraft.world.entity.animal.happyghast.HappyGhast;
+import net.minecraft.world.entity.animal.nautilus.Nautilus;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilus;
+import net.minecraft.world.entity.animal.panda.Panda;
+import net.minecraft.world.entity.animal.parrot.Parrot;
+import net.minecraft.world.entity.animal.pig.Pig;
+import net.minecraft.world.entity.animal.polarbear.PolarBear;
+import net.minecraft.world.entity.animal.rabbit.Rabbit;
+import net.minecraft.world.entity.animal.sheep.Sheep;
+import net.minecraft.world.entity.animal.sniffer.Sniffer;
+import net.minecraft.world.entity.animal.squid.GlowSquid;
+import net.minecraft.world.entity.animal.squid.Squid;
+import net.minecraft.world.entity.animal.turtle.Turtle;
+import net.minecraft.world.entity.animal.wolf.Wolf;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.decoration.Cushion;
+import net.minecraft.world.entity.decoration.GlowItemFrame;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.entity.decoration.LeashFenceKnotEntity;
+import net.minecraft.world.entity.decoration.Mannequin;
+import net.minecraft.world.entity.decoration.painting.Painting;
+import net.minecraft.world.entity.item.FallingBlockEntity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.entity.monster.Blaze;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.ElderGuardian;
+import net.minecraft.world.entity.monster.Enderman;
+import net.minecraft.world.entity.monster.Endermite;
+import net.minecraft.world.entity.monster.Ghast;
+import net.minecraft.world.entity.monster.Giant;
+import net.minecraft.world.entity.monster.Guardian;
+import net.minecraft.world.entity.monster.Phantom;
+import net.minecraft.world.entity.monster.Ravager;
+import net.minecraft.world.entity.monster.Shulker;
+import net.minecraft.world.entity.monster.Silverfish;
+import net.minecraft.world.entity.monster.Strider;
+import net.minecraft.world.entity.monster.Vex;
+import net.minecraft.world.entity.monster.Witch;
+import net.minecraft.world.entity.monster.Zoglin;
+import net.minecraft.world.entity.monster.breeze.Breeze;
+import net.minecraft.world.entity.monster.creaking.Creaking;
+import net.minecraft.world.entity.monster.cubemob.MagmaCube;
+import net.minecraft.world.entity.monster.cubemob.Slime;
+import net.minecraft.world.entity.monster.cubemob.SulfurCube;
+import net.minecraft.world.entity.monster.hoglin.Hoglin;
+import net.minecraft.world.entity.monster.illager.Evoker;
+import net.minecraft.world.entity.monster.illager.Illusioner;
+import net.minecraft.world.entity.monster.illager.Pillager;
+import net.minecraft.world.entity.monster.illager.Vindicator;
+import net.minecraft.world.entity.monster.piglin.Piglin;
+import net.minecraft.world.entity.monster.piglin.PiglinBrute;
+import net.minecraft.world.entity.monster.skeleton.Bogged;
+import net.minecraft.world.entity.monster.skeleton.Parched;
+import net.minecraft.world.entity.monster.skeleton.Skeleton;
+import net.minecraft.world.entity.monster.skeleton.Stray;
+import net.minecraft.world.entity.monster.skeleton.WitherSkeleton;
+import net.minecraft.world.entity.monster.spider.CaveSpider;
+import net.minecraft.world.entity.monster.spider.Spider;
+import net.minecraft.world.entity.monster.warden.Warden;
+import net.minecraft.world.entity.monster.zombie.Drowned;
+import net.minecraft.world.entity.monster.zombie.Husk;
+import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.entity.monster.zombie.ZombieVillager;
+import net.minecraft.world.entity.monster.zombie.ZombifiedPiglin;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.wanderingtrader.WanderingTrader;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.EvokerFangs;
+import net.minecraft.world.entity.projectile.EyeOfEnder;
+import net.minecraft.world.entity.projectile.FireworkRocketEntity;
+import net.minecraft.world.entity.projectile.FishingHook;
+import net.minecraft.world.entity.projectile.LlamaSpit;
+import net.minecraft.world.entity.projectile.ShulkerBullet;
+import net.minecraft.world.entity.projectile.arrow.Arrow;
+import net.minecraft.world.entity.projectile.arrow.SpectralArrow;
+import net.minecraft.world.entity.projectile.arrow.ThrownTrident;
+import net.minecraft.world.entity.projectile.hurtingprojectile.DragonFireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.SmallFireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
+import net.minecraft.world.entity.projectile.hurtingprojectile.windcharge.BreezeWindCharge;
+import net.minecraft.world.entity.projectile.hurtingprojectile.windcharge.WindCharge;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.Snowball;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEgg;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEnderpearl;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownExperienceBottle;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownLingeringPotion;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownSplashPotion;
+import net.minecraft.world.entity.vehicle.boat.Boat;
+import net.minecraft.world.entity.vehicle.boat.ChestBoat;
+import net.minecraft.world.entity.vehicle.boat.ChestRaft;
+import net.minecraft.world.entity.vehicle.boat.Raft;
+import net.minecraft.world.entity.vehicle.minecart.Minecart;
+import net.minecraft.world.entity.vehicle.minecart.MinecartChest;
+import net.minecraft.world.entity.vehicle.minecart.MinecartCommandBlock;
+import net.minecraft.world.entity.vehicle.minecart.MinecartFurnace;
+import net.minecraft.world.entity.vehicle.minecart.MinecartHopper;
+import net.minecraft.world.entity.vehicle.minecart.MinecartSpawner;
+import net.minecraft.world.entity.vehicle.minecart.MinecartTNT;
+public class EntityTypes {
+    public static final EntityType<Boat> ACACIA_BOAT;
+    public static final EntityType<ChestBoat> ACACIA_CHEST_BOAT;
+    public static final EntityType<Allay> ALLAY;
+    public static final EntityType<AreaEffectCloud> AREA_EFFECT_CLOUD;
+    public static final EntityType<Armadillo> ARMADILLO;
+    public static final EntityType<ArmorStand> ARMOR_STAND;
+    public static final EntityType<Arrow> ARROW;
+    public static final EntityType<Axolotl> AXOLOTL;
+    public static final EntityType<ChestRaft> BAMBOO_CHEST_RAFT;
+    public static final EntityType<Raft> BAMBOO_RAFT;
+    public static final EntityType<Bat> BAT;
+    public static final EntityType<Bee> BEE;
+    public static final EntityType<Boat> BIRCH_BOAT;
+    public static final EntityType<ChestBoat> BIRCH_CHEST_BOAT;
+    public static final EntityType<Blaze> BLAZE;
+    public static final EntityType<Display.BlockDisplay> BLOCK_DISPLAY;
+    public static final EntityType<Bogged> BOGGED;
+    public static final EntityType<Breeze> BREEZE;
+    public static final EntityType<BreezeWindCharge> BREEZE_WIND_CHARGE;
+    public static final EntityType<Camel> CAMEL;
+    public static final EntityType<CamelHusk> CAMEL_HUSK;
+    public static final EntityType<Cat> CAT;
+    public static final EntityType<CaveSpider> CAVE_SPIDER;
+    public static final EntityType<Boat> CHERRY_BOAT;
+    public static final EntityType<ChestBoat> CHERRY_CHEST_BOAT;
+    public static final EntityType<MinecartChest> CHEST_MINECART;
+    public static final EntityType<Chicken> CHICKEN;
+    public static final EntityType<Cod> COD;
+    public static final EntityType<CopperGolem> COPPER_GOLEM;
+    public static final EntityType<MinecartCommandBlock> COMMAND_BLOCK_MINECART;
+    public static final EntityType<Cow> COW;
+    public static final EntityType<Creaking> CREAKING;
+    public static final EntityType<Creeper> CREEPER;
+    public static final EntityType<Cushion> CUSHION;
+    public static final EntityType<Boat> DARK_OAK_BOAT;
+    public static final EntityType<ChestBoat> DARK_OAK_CHEST_BOAT;
+    public static final EntityType<Dolphin> DOLPHIN;
+    public static final EntityType<Donkey> DONKEY;
+    public static final EntityType<DragonFireball> DRAGON_FIREBALL;
+    public static final EntityType<Drowned> DROWNED;
+    public static final EntityType<ThrownEgg> EGG;
+    public static final EntityType<ElderGuardian> ELDER_GUARDIAN;
+    public static final EntityType<Enderman> ENDERMAN;
+    public static final EntityType<Endermite> ENDERMITE;
+    public static final EntityType<EnderDragon> ENDER_DRAGON;
+    public static final EntityType<ThrownEnderpearl> ENDER_PEARL;
+    public static final EntityType<EndCrystal> END_CRYSTAL;
+    public static final EntityType<Evoker> EVOKER;
+    public static final EntityType<EvokerFangs> EVOKER_FANGS;
+    public static final EntityType<ThrownExperienceBottle> EXPERIENCE_BOTTLE;
+    public static final EntityType<ExperienceOrb> EXPERIENCE_ORB;
+    public static final EntityType<EyeOfEnder> EYE_OF_ENDER;
+    public static final EntityType<FallingBlockEntity> FALLING_BLOCK;
+    public static final EntityType<LargeFireball> FIREBALL;
+    public static final EntityType<FireworkRocketEntity> FIREWORK_ROCKET;
+    public static final EntityType<Fox> FOX;
+    public static final EntityType<Frog> FROG;
+    public static final EntityType<MinecartFurnace> FURNACE_MINECART;
+    public static final EntityType<Ghast> GHAST;
+    public static final EntityType<HappyGhast> HAPPY_GHAST;
+    public static final EntityType<Giant> GIANT;
+    public static final EntityType<GlowItemFrame> GLOW_ITEM_FRAME;
+    public static final EntityType<GlowSquid> GLOW_SQUID;
+    public static final EntityType<Goat> GOAT;
+    public static final EntityType<Guardian> GUARDIAN;
+    public static final EntityType<Hoglin> HOGLIN;
+    public static final EntityType<MinecartHopper> HOPPER_MINECART;
+    public static final EntityType<Horse> HORSE;
+    public static final EntityType<Husk> HUSK;
+    public static final EntityType<Illusioner> ILLUSIONER;
+    public static final EntityType<Interaction> INTERACTION;
+    public static final EntityType<IronGolem> IRON_GOLEM;
+    public static final EntityType<ItemEntity> ITEM;
+    public static final EntityType<Display.ItemDisplay> ITEM_DISPLAY;
+    public static final EntityType<ItemFrame> ITEM_FRAME;
+    public static final EntityType<Boat> JUNGLE_BOAT;
+    public static final EntityType<ChestBoat> JUNGLE_CHEST_BOAT;
+    public static final EntityType<LeashFenceKnotEntity> LEASH_KNOT;
+    public static final EntityType<LightningBolt> LIGHTNING_BOLT;
+    public static final EntityType<Llama> LLAMA;
+    public static final EntityType<LlamaSpit> LLAMA_SPIT;
+    public static final EntityType<MagmaCube> MAGMA_CUBE;
+    public static final EntityType<Boat> MANGROVE_BOAT;
+    public static final EntityType<ChestBoat> MANGROVE_CHEST_BOAT;
+    public static final EntityType<Mannequin> MANNEQUIN;
+    public static final EntityType<Marker> MARKER;
+    public static final EntityType<Minecart> MINECART;
+    public static final EntityType<MushroomCow> MOOSHROOM;
+    public static final EntityType<Mule> MULE;
+    public static final EntityType<Nautilus> NAUTILUS;
+    public static final EntityType<Boat> OAK_BOAT;
+    public static final EntityType<ChestBoat> OAK_CHEST_BOAT;
+    public static final EntityType<Ocelot> OCELOT;
+    public static final EntityType<OminousItemSpawner> OMINOUS_ITEM_SPAWNER;
+    public static final EntityType<Painting> PAINTING;
+    public static final EntityType<Boat> PALE_OAK_BOAT;
+    public static final EntityType<ChestBoat> PALE_OAK_CHEST_BOAT;
+    public static final EntityType<Panda> PANDA;
+    public static final EntityType<Parched> PARCHED;
+    public static final EntityType<Parrot> PARROT;
+    public static final EntityType<Phantom> PHANTOM;
+    public static final EntityType<Pig> PIG;
+    public static final EntityType<Piglin> PIGLIN;
+    public static final EntityType<PiglinBrute> PIGLIN_BRUTE;
+    public static final EntityType<Pillager> PILLAGER;
+    public static final EntityType<PolarBear> POLAR_BEAR;
+    public static final EntityType<Boat> POPLAR_BOAT;
+    public static final EntityType<ChestBoat> POPLAR_CHEST_BOAT;
+    public static final EntityType<ThrownSplashPotion> SPLASH_POTION;
+    public static final EntityType<ThrownLingeringPotion> LINGERING_POTION;
+    public static final EntityType<Pufferfish> PUFFERFISH;
+    public static final EntityType<Rabbit> RABBIT;
+    public static final EntityType<Ravager> RAVAGER;
+    public static final EntityType<Salmon> SALMON;
+    public static final EntityType<Sheep> SHEEP;
+    public static final EntityType<Shulker> SHULKER;
+    public static final EntityType<ShulkerBullet> SHULKER_BULLET;
+    public static final EntityType<Silverfish> SILVERFISH;
+    public static final EntityType<Skeleton> SKELETON;
+    public static final EntityType<SkeletonHorse> SKELETON_HORSE;
+    public static final EntityType<Slime> SLIME;
+    public static final EntityType<SmallFireball> SMALL_FIREBALL;
+    public static final EntityType<Sniffer> SNIFFER;
+    public static final EntityType<Snowball> SNOWBALL;
+    public static final EntityType<SnowGolem> SNOW_GOLEM;
+    public static final EntityType<MinecartSpawner> SPAWNER_MINECART;
+    public static final EntityType<SpectralArrow> SPECTRAL_ARROW;
+    public static final EntityType<Spider> SPIDER;
+    public static final EntityType<Boat> SPRUCE_BOAT;
+    public static final EntityType<ChestBoat> SPRUCE_CHEST_BOAT;
+    public static final EntityType<Squid> SQUID;
+    public static final EntityType<Stray> STRAY;
+    public static final EntityType<Strider> STRIDER;
+    public static final EntityType<SulfurCube> SULFUR_CUBE;
+    public static final EntityType<Tadpole> TADPOLE;
+    public static final EntityType<Display.TextDisplay> TEXT_DISPLAY;
+    public static final EntityType<PrimedTnt> TNT;
+    public static final EntityType<MinecartTNT> TNT_MINECART;
+    public static final EntityType<TraderLlama> TRADER_LLAMA;
+    public static final EntityType<ThrownTrident> TRIDENT;
+    public static final EntityType<TropicalFish> TROPICAL_FISH;
+    public static final EntityType<Turtle> TURTLE;
+    public static final EntityType<Vex> VEX;
+    public static final EntityType<Villager> VILLAGER;
+    public static final EntityType<Vindicator> VINDICATOR;
+    public static final EntityType<WanderingTrader> WANDERING_TRADER;
+    public static final EntityType<Warden> WARDEN;
+    public static final EntityType<WindCharge> WIND_CHARGE;
+    public static final EntityType<Witch> WITCH;
+    public static final EntityType<WitherBoss> WITHER;
+    public static final EntityType<WitherSkeleton> WITHER_SKELETON;
+    public static final EntityType<WitherSkull> WITHER_SKULL;
+    public static final EntityType<Wolf> WOLF;
+    public static final EntityType<Zoglin> ZOGLIN;
+    public static final EntityType<Zombie> ZOMBIE;
+    public static final EntityType<ZombieHorse> ZOMBIE_HORSE;
+    public static final EntityType<ZombieNautilus> ZOMBIE_NAUTILUS;
+    public static final EntityType<ZombieVillager> ZOMBIE_VILLAGER;
+    public static final EntityType<ZombifiedPiglin> ZOMBIFIED_PIGLIN;
+    public static final EntityType<Player> PLAYER;
+    public static final EntityType<FishingHook> FISHING_BOBBER;
+    static final Set<EntityType<?>> OP_ONLY_CUSTOM_DATA;
+}
+//// EquipmentSlot.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.function.IntFunction;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.item.ItemStack;
+public enum EquipmentSlot implements StringRepresentable {
+    MAINHAND, OFFHAND, FEET, LEGS, CHEST, HEAD, BODY, SADDLE;
+    public static final int NO_COUNT_LIMIT = 0;
+    public static final List<EquipmentSlot> VALUES;
+    public static final IntFunction<EquipmentSlot> BY_ID;
+    public static final StringRepresentable.EnumCodec<EquipmentSlot> CODEC;
+    public static final StreamCodec<ByteBuf, EquipmentSlot> STREAM_CODEC;
+    public Type getType();
+    public int getIndex();
+    public int getIndex(int base);
+    public ItemStack limit(ItemStack toEquip);
+    public int getId();
+    public int getFilterBit(int offset);
+    public String getName();
+    public boolean isArmor();
+    public String getSerializedName();
+    public boolean canIncreaseExperience();
+    public static EquipmentSlot byName(String name);
+    public static enum Type {
+        HAND, HUMANOID_ARMOR, ANIMAL_ARMOR, SADDLE;
+    }
+}
+//// EquipmentSlotGroup.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.Iterator;
+import java.util.List;
+import java.util.function.IntFunction;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum EquipmentSlotGroup implements StringRepresentable, Iterable<EquipmentSlot> {
+    ANY, MAINHAND, OFFHAND, HAND, FEET, LEGS, CHEST, HEAD, ARMOR, BODY, SADDLE;
+    public static final IntFunction<EquipmentSlotGroup> BY_ID;
+    public static final Codec<EquipmentSlotGroup> CODEC;
+    public static final StreamCodec<ByteBuf, EquipmentSlotGroup> STREAM_CODEC;
+    public static EquipmentSlotGroup bySlot(EquipmentSlot slot);
+    public String getSerializedName();
+    public boolean test(EquipmentSlot slot);
+    public List<EquipmentSlot> slots();
+    public Iterator<EquipmentSlot> iterator();
+}
+//// EquipmentTable.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.storage.loot.LootTable;
+public record EquipmentTable(ResourceKey<LootTable> lootTable, Map<EquipmentSlot, Float> slotDropChances) {
+    public static final Codec<Map<EquipmentSlot, Float>> DROP_CHANCES_CODEC;
+    public static final Codec<EquipmentTable> CODEC;
+    public EquipmentTable(ResourceKey<LootTable> lootTable, float dropChance);
+}
+//// EquipmentUser.java
+import java.util.List;
+import java.util.Map;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.LootTable;
+public interface EquipmentUser {
+    void setItemSlot(EquipmentSlot slot, ItemStack stack);
+    ItemStack getItemBySlot(EquipmentSlot slot);
+    void setDropChance(EquipmentSlot slot, float dropChance);
+    default void equip(EquipmentTable equipment, LootParams lootParams);
+    default void equip(ResourceKey<LootTable> lootTable, LootParams lootParams, Map<EquipmentSlot, Float> dropChances);
+    default void equip(ResourceKey<LootTable> lootTable, LootParams lootParams, long optionalLootTableSeed, Map<EquipmentSlot, Float> dropChances);
+    default EquipmentSlot resolveSlot(ItemStack toEquip, List<EquipmentSlot> alreadyInsertedIntoSlots);
+}
+//// ExperienceOrb.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public class ExperienceOrb extends Entity {
+    protected static final EntityDataAccessor<Integer> DATA_VALUE;
+    public ExperienceOrb(Level level, double x, double y, double z, int value);
+    public ExperienceOrb(Level level, Vec3 pos, Vec3 roughly, int value);
+    public ExperienceOrb(EntityType<? extends ExperienceOrb> type, Level level);
+    protected void unstuckIfPossible(double maxDistance);
+    protected Entity.MovementEmission getMovementEmission();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected double getDefaultGravity();
+    public void tick();
+    protected float getAirDrag();
+    public BlockPos getBlockPosBelowThatAffectsMyMovement();
+    public static void award(ServerLevel level, Vec3 pos, int amount);
+    public static void awardWithDirection(ServerLevel level, Vec3 pos, Vec3 roughDirection, int amount);
+    protected void doWaterSplashEffect();
+    public final boolean hurtClient(DamageSource source);
+    public final boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public void playerTouch(Player player);
+    public int getValue();
+    public int getIcon();
+    public static int getExperienceValue(int maxValue);
+    public boolean isAttackable();
+    public SoundSource getSoundSource();
+    protected InterpolationHandler createInterpolationHandler();
+    public MoveSimulationType getMoveSimulationType();
+}
+//// HasCustomInventoryScreen.java
+import net.minecraft.world.entity.player.Player;
+public interface HasCustomInventoryScreen {
+    void openCustomInventoryScreen(Player player);
+}
+//// HumanoidArm.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum HumanoidArm implements StringRepresentable {
+    LEFT, RIGHT;
+    public static final Codec<HumanoidArm> CODEC;
+    public static final StreamCodec<ByteBuf, HumanoidArm> STREAM_CODEC;
+    public HumanoidArm getOpposite();
+    public Component caption();
+    public String getSerializedName();
+}
+//// InsideBlockEffectApplier.java
+import java.util.function.Consumer;
+public interface InsideBlockEffectApplier {
+    InsideBlockEffectApplier NOOP;
+    void apply(InsideBlockEffectType type);
+    void runBefore(InsideBlockEffectType type, Consumer<Entity> effect);
+    void runAfter(InsideBlockEffectType type, Consumer<Entity> effect);
+    public static class StepBasedCollector implements InsideBlockEffectApplier {
+        public void advanceStep(int step);
+        public void applyAndClear(Entity entity);
+        public void apply(InsideBlockEffectType type);
+        public void runBefore(InsideBlockEffectType type, Consumer<Entity> effect);
+        public void runAfter(InsideBlockEffectType type, Consumer<Entity> effect);
+    }
+}
+//// InsideBlockEffectType.java
+import java.util.function.Consumer;
+public enum InsideBlockEffectType {
+    FREEZE, CLEAR_FREEZE, FIRE_IGNITE, LAVA_IGNITE, EXTINGUISH;
+    public Consumer<Entity> effect();
+}
+//// Interaction.java
+import com.mojang.serialization.Codec;
+import java.util.UUID;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public class Interaction extends Entity implements Attackable, Targeting {
+    public Interaction(EntityType<?> type, Level level);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    public boolean canBeHitByProjectile();
+    public boolean isPickable();
+    public PushReaction getPistonPushReaction();
+    public boolean isIgnoringBlockTriggers();
+    public boolean skipAttackInteraction(Entity source);
+    public final boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    public void tick();
+    public LivingEntity getLastAttacker();
+    public LivingEntity getTarget();
+    public EntityDimensions getDimensions(Pose pose);
+    protected AABB makeBoundingBox(Vec3 position);
+    static record PlayerAction(UUID player, long timestamp) {
+        public static final Codec<PlayerAction> CODEC;
+    }
+}
+//// InterpolationHandler.java
+import net.minecraft.core.PositionAndRotation;
+import net.minecraft.world.phys.Vec3;
+public interface InterpolationHandler {
+    InterpolationHandler NO_OP;
+    default InterpolationTracker interpolationTracker();
+    PositionAndRotation target();
+    boolean interpolateTo(PositionPath position, float yRot, float xRot, boolean hasRotation);
+    void interpolate();
+    void applyPredictedMovement(Vec3 delta);
+    boolean hasActiveInterpolation();
+    void cancel();
+    public static class NoOpInterpolationHandler implements InterpolationHandler {
+        public PositionAndRotation target();
+        public boolean interpolateTo(PositionPath position, float yRot, float xRot, boolean hasRotation);
+        public void interpolate();
+        public void applyPredictedMovement(Vec3 delta);
+        public boolean hasActiveInterpolation();
+        public void cancel();
+    }
+}
+//// InterpolationTracker.java
+import net.minecraft.world.phys.Vec3;
+public interface InterpolationTracker {
+    InterpolationTracker NO_OP;
+    void updateTracking(Vec3 trackingPos);
+    PositionPath getPositionPath(Vec3 trackingPos);
+    void clear();
+    public static record NoOpInterpolationTracker() implements InterpolationTracker {
+        public void updateTracking(Vec3 trackingPos);
+        public PositionPath getPositionPath(Vec3 trackingPos);
+        public void clear();
+    }
+}
+//// ItemBasedSteering.java
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.util.RandomSource;
+public class ItemBasedSteering {
+    public ItemBasedSteering(SynchedEntityData entityData, EntityDataAccessor<Integer> boostTimeAccessor);
+    public void onSynced();
+    public boolean boost(RandomSource random);
+    public void tickBoost();
+    public float boostFactor();
+}
+//// ItemOwner.java
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+public interface ItemOwner {
+    Level level();
+    Vec3 position();
+    float getVisualRotationYInDegrees();
+    default LivingEntity asLivingEntity();
+    static ItemOwner offsetFromOwner(ItemOwner owner, Vec3 offset);
+    public static record OffsetFromOwner(ItemOwner owner, Vec3 offset) implements ItemOwner {
+        public Level level();
+        public Vec3 position();
+        public float getVisualRotationYInDegrees();
+        public LivingEntity asLivingEntity();
+    }
+}
+//// ItemSteerable.java
+public interface ItemSteerable {
+    boolean boost();
+}
+//// Leashable.java
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+public interface Leashable {
+    String LEASH_TAG;
+    double LEASH_TOO_FAR_DIST;
+    double LEASH_ELASTIC_DIST;
+    double MAXIMUM_ALLOWED_LEASHED_DIST;
+    Vec3 AXIS_SPECIFIC_ELASTICITY;
+    float SPRING_DAMPENING;
+    double TORSIONAL_ELASTICITY;
+    double STIFFNESS;
+    List<Vec3> ENTITY_ATTACHMENT_POINT;
+    List<Vec3> LEASHER_ATTACHMENT_POINT;
+    List<Vec3> SHARED_QUAD_ATTACHMENT_POINTS;
+    LeashData getLeashData();
+    void setLeashData(LeashData leashData);
+    default boolean isLeashed();
+    default boolean mayBeLeashed();
+    default boolean canHaveALeashAttachedTo(Entity entity);
+    default double leashDistanceTo(Entity entity);
+    default boolean canBeLeashed();
+    default void setDelayedLeashHolderId(int entityId);
+    default void readLeashData(ValueInput input);
+    default void writeLeashData(ValueOutput output, LeashData leashData);
+    default void dropLeash();
+    default void removeLeash();
+    default void onLeashRemoved();
+    static <E extends Entity & Leashable> void tickLeash(ServerLevel level, E entity);
+    default void onElasticLeashPull();
+    default double leashSnapDistance();
+    default double leashElasticDistance();
+    static <E extends Entity & Leashable> float angularFriction(E entity);
+    default void whenLeashedTo(Entity leashHolder);
+    default void leashTooFarBehaviour();
+    default void closeRangeLeashBehaviour(Entity leashHolder);
+    default boolean checkElasticInteractions(Entity leashHolder, LeashData leashData);
+    default boolean supportQuadLeash();
+    default Vec3[] getQuadLeashOffsets();
+    static Vec3[] createQuadLeashOffsets(Entity entity, double frontOffset, double frontBack, double leftRight, double height);
+    default Vec3 getLeashOffset(float partialTicks);
+    default Vec3 getLeashOffset();
+    default void setLeashedTo(Entity holder, boolean synch);
+    default Entity getLeashHolder();
+    static List<Leashable> leashableLeashedTo(Entity entity);
+    static List<Leashable> leashableInArea(Entity entity, Predicate<Leashable> test);
+    static List<Leashable> leashableInArea(Level level, Vec3 pos, Predicate<Leashable> test);
+    public static final class LeashData {
+        public static final Codec<LeashData> CODEC;
+        public Entity leashHolder;
+        public Either<UUID, BlockPos> delayedLeashInfo;
+        public double angularMomentum;
+        private LeashData(Either<UUID, BlockPos> delayedLeashInfo);
+        private LeashData(Entity entity);
+        private LeashData(int entityId);
+        public void setLeashHolder(Entity leashHolder);
+    }
+    public static record Wrench(Vec3 force, double torque) {
+        public static final Wrench ZERO;
+        public static double torqueFromForce(Vec3 leverArm, Vec3 force);
+        public static Wrench accumulate(List<Wrench> wrenches);
+        public Wrench scale(double scale);
+    }
+}
+//// LightningBolt.java
+import java.util.stream.Stream;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class LightningBolt extends Entity {
+    public long seed;
+    public LightningBolt(EntityType<? extends LightningBolt> type, Level level);
+    public void setVisualOnly(boolean visualOnly);
+    public SoundSource getSoundSource();
+    public ServerPlayer getCause();
+    public void setCause(ServerPlayer cause);
+    public void tick();
+    public boolean shouldRenderAtSqrDistance(double distance);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public int getBlocksSetOnFire();
+    public Stream<Entity> getHitEntities();
+    public final boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+}
+//// LinearInterpolationHandler.java
+import net.minecraft.core.PositionAndRotation;
+public class LinearInterpolationHandler extends AbstractInterpolationHandler {
+    public static final int DEFAULT_INTERPOLATION_STEPS = 3;
+    private LinearInterpolationHandler(Entity entity, int interpolationSteps);
+    public static InterpolationHandler create(Entity entity, int interpolationSteps);
+    public static InterpolationHandler create(Entity entity);
+    public void setInterpolationLength(int steps);
+    protected PositionAndRotation.Mutable interpolationData();
+    protected void startInterpolating(PositionPath position, float yRot, float xRot);
+    protected void doInterpolate();
+    public boolean hasActiveInterpolation();
+    public void cancel();
+    static class InterpolationData extends PositionAndRotation.Mutable {
+    }
+}
+//// LivingEntity.java
+import com.google.common.collect.ImmutableList;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.BlockUtil;
+import net.minecraft.util.Prediction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.CombatTracker;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.ai.Brain;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeMap;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.AttackRange;
+import net.minecraft.world.item.component.SwingAnimation;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.effects.EnchantmentLocationBasedEffect;
+import net.minecraft.world.item.equipment.Equippable;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.waypoints.Waypoint;
+import net.minecraft.world.waypoints.WaypointTransmitter;
+public abstract class LivingEntity extends Entity implements Attackable, WaypointTransmitter {
+    public static final String TAG_ATTRIBUTES = "attributes";
+    public static final String TAG_SLEEPING_POS = "sleeping_pos";
+    public static final String TAG_EQUIPMENT = "equipment";
+    public static final String TAG_BRAIN = "Brain";
+    public static final String TAG_FALL_FLYING = "FallFlying";
+    public static final String TAG_HURT_TIME = "HurtTime";
+    public static final String TAG_DEATH_TIME = "DeathTime";
+    public static final String TAG_HEALTH = "Health";
+    public static final int EQUIPMENT_SLOT_OFFSET = 98;
+    public static final int ARMOR_SLOT_OFFSET = 100;
+    public static final int BODY_ARMOR_OFFSET = 105;
+    public static final int SADDLE_OFFSET = 106;
+    public static final int PLAYER_HURT_EXPERIENCE_TIME = 100;
+    public static final double MIN_MOVEMENT_DISTANCE = 0.003;
+    public static final double DEFAULT_BASE_GRAVITY = 0.08;
+    public static final int DEATH_DURATION = 20;
+    protected static final float INPUT_FRICTION = 0.98F;
+    public static final float BASE_JUMP_POWER = 0.42F;
+    protected static final float DEFAULT_KNOCKBACK = 0.4F;
+    protected static final int DAMAGE_COOLDOWN_DURATION = 20;
+    protected static final int HURT_DURATION_TICKS = 10;
+    protected static final int LIVING_ENTITY_FLAG_IS_USING = 1;
+    protected static final int LIVING_ENTITY_FLAG_OFF_HAND = 2;
+    protected static final int LIVING_ENTITY_FLAG_SPIN_ATTACK = 4;
+    protected static final EntityDataAccessor<Byte> DATA_LIVING_ENTITY_FLAGS;
+    protected static final EntityDimensions SLEEPING_DIMENSIONS;
+    public static final float EXTRA_RENDER_CULLING_SIZE_WITH_BIG_HAT = 0.5F;
+    public static final float DEFAULT_BABY_SCALE = 0.5F;
+    protected static final float SWIMMING_VERTICAL_SPEED = 0.04F;
+    public static final float BASE_HORIZONTAL_AIR_DRAG = 0.91F;
+    public static final float BASE_VERTICAL_AIR_DRAG = 0.98F;
+    public static final float WATER_DRAG = 0.8F;
+    public static final float SPRINTING_WATER_DRAG = 0.9F;
+    public static final float LAVA_DRAG = 0.5F;
+    public static final float LAVA_SHALLOW_VERTICAL_DRAG = 0.8F;
+    public static final float DOLPHINS_GRACE_WATER_DRAG = 0.96F;
+    public static final float FLYING_AIR_DRAG = 0.91F;
+    public static final float FLYING_VERTICAL_AIR_DRAG = 0.91F;
+    public static final float FLYING_LAVA_DRAG = 0.5F;
+    public static final float FLYING_WATER_DRAG = 0.8F;
+    public static final float ELYTRA_HORIZONTAL_AIR_DRAG = 0.99F;
+    public static final float ELYTRA_VERTICAL_AIR_DRAG = 0.98F;
+    public static final float BASE_SWIM_SPEED = 0.02F;
+    public static final Predicate<LivingEntity> PLAYER_NOT_WEARING_DISGUISE_ITEM;
+    public int removeArrowTime;
+    public int removeStingerTime;
+    public int hurtTime;
+    public int hurtDuration;
+    public int deathTime;
+    public int damageCooldownTime;
+    protected int attackStrengthTicker;
+    protected int itemSwapTicker;
+    public final WalkAnimationState walkAnimation;
+    public float yBodyRot;
+    public float yBodyRotO;
+    public float yHeadRot;
+    public float yHeadRotO;
+    public final ElytraAnimationState elytraAnimationState;
+    protected EntityReference<Player> lastHurtByPlayer;
+    protected int lastHurtByPlayerMemoryTime;
+    protected boolean dead;
+    protected int noActionTime;
+    protected float lastHurt;
+    protected boolean jumping;
+    public float xxa;
+    public float yya;
+    public float zza;
+    protected double lerpYHeadRot;
+    protected int lerpHeadSteps;
+    protected ItemStack useItem;
+    protected int useItemRemaining;
+    protected int fallFlyTicks;
+    protected int autoSpinAttackTicks;
+    protected float autoSpinAttackDmg;
+    protected ItemStack autoSpinAttackItemStack;
+    protected Object2LongMap<Entity> recentKineticEnemies;
+    protected Brain<?> brain;
+    protected final EntityEquipment equipment;
+    public Vec3 currentImpulseImpactPos;
+    protected LivingEntity(EntityType<? extends LivingEntity> type, Level level);
+    public LivingEntity asLivingEntity();
+    protected EntityEquipment createEquipment();
+    public Brain<? extends LivingEntity> getBrain();
+    protected Brain<? extends LivingEntity> makeBrain(Brain.Packed packedBrain);
+    public void kill(ServerLevel level);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public static AttributeSupplier.Builder createLivingAttributes();
+    protected void checkFallDamage(double ya, boolean onGround, BlockState onState, BlockPos pos);
+    public boolean canBreatheUnderwater();
+    public float getSwimAmount(float a);
+    public boolean hasLandedInLiquid();
+    public void baseTick();
+    protected boolean shouldTakeDrowningDamage();
+    protected float getBlockSpeedFactor();
+    public float getLuck();
+    protected void removeFrost();
+    protected void tryAddFrost();
+    protected void onChangedBlock(ServerLevel level, BlockPos pos);
+    public boolean isBaby();
+    public float getAgeScale();
+    public final float getScale();
+    protected float sanitizeScale(float scale);
+    public boolean isAffectedByFluids();
+    protected void tickDeath();
+    public boolean shouldDropExperience();
+    protected boolean shouldDropLoot(ServerLevel level);
+    protected int decreaseAirSupply(int currentSupply);
+    protected int increaseAirSupply(int currentSupply);
+    public final int getExperienceReward(ServerLevel level, Entity killer);
+    protected int getBaseExperienceReward(ServerLevel level);
+    protected boolean isAlwaysExperienceDropper();
+    public LivingEntity getLastHurtByMob();
+    public Player getLastHurtByPlayer();
+    public LivingEntity getLastAttacker();
+    public int getLastHurtByMobTimestamp();
+    public void setLastHurtByPlayer(Player player, int timeToRemember);
+    public void setLastHurtByPlayer(UUID player, int timeToRemember);
+    public void setLastHurtByMob(LivingEntity hurtBy);
+    public LivingEntity getLastHurtMob();
+    public int getLastHurtMobTimestamp();
+    public void setLastHurtMob(Entity target);
+    public int getNoActionTime();
+    public void setNoActionTime(int noActionTime);
+    public boolean shouldDiscardFriction();
+    public void setDiscardFriction(boolean discardFriction);
+    protected boolean doesEmitEquipEvent(EquipmentSlot slot);
+    public void onEquipItem(EquipmentSlot slot, ItemStack oldStack, ItemStack stack);
+    protected Holder<SoundEvent> getEquipSound(EquipmentSlot slot, ItemStack stack, Equippable equippable);
+    public void remove(Entity.RemovalReason reason);
+    public void onRemoval(Entity.RemovalReason reason);
+    protected void triggerOnDeathMobEffects(ServerLevel level, Entity.RemovalReason reason);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public ItemEntity drop(ItemStack itemStack, boolean thrownFromHand, Prediction prediction);
+    protected void readAdditionalSaveData(ValueInput input);
+    public void updateDataBeforeSync();
+    protected void tickEffects();
+    protected void updateInvisibilityStatus();
+    public double getVisibilityPercent(ServerLevel serverLevel, Entity targetingEntity);
+    public boolean canAttack(LivingEntity target);
+    public boolean canBeSeenAsEnemy();
+    public boolean canBeSeenByAnyone();
+    public static boolean areAllEffectsAmbient(Collection<MobEffectInstance> effects);
+    protected void removeEffectParticles();
+    public boolean removeAllEffects();
+    public Collection<MobEffectInstance> getActiveEffects();
+    public Map<Holder<MobEffect>, MobEffectInstance> getActiveEffectsMap();
+    public boolean hasEffect(Holder<MobEffect> effect);
+    public MobEffectInstance getEffect(Holder<MobEffect> effect);
+    public float getEffectBlendFactor(Holder<MobEffect> effect, float partialTicks);
+    public final boolean addEffect(MobEffectInstance newEffect);
+    public boolean addEffect(MobEffectInstance newEffect, Entity source);
+    public boolean canBeAffected(MobEffectInstance newEffect);
+    public void forceAddEffect(MobEffectInstance newEffect, Entity source);
+    public boolean isInvertedHealAndHarm();
+    public final MobEffectInstance removeEffectNoUpdate(Holder<MobEffect> effect);
+    public boolean removeEffect(Holder<MobEffect> effect);
+    protected void onEffectAdded(MobEffectInstance effect, Entity source);
+    public void sendEffectToPassengers(MobEffectInstance effect);
+    protected void onEffectUpdated(MobEffectInstance effect, boolean doRefreshAttributes, Entity source);
+    protected void onEffectsRemoved(Collection<MobEffectInstance> effects);
+    protected void onAttributeUpdated(Holder<Attribute> attribute);
+    public void heal(float heal);
+    public float getHealth();
+    public void setHealth(float health);
+    public boolean isDeadOrDying();
+    public boolean wasHurtRecently();
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+    public void dealDefaultKnockback(DamageSource source, float damage, boolean blocked);
+    public float applyItemBlocking(ServerLevel level, DamageSource source, float damage);
+    protected void resolveMobResponsibleForDamage(DamageSource source);
+    protected Player resolvePlayerResponsibleForDamage(DamageSource source);
+    protected void blockUsingItem(ServerLevel level, LivingEntity attacker, DamageSource source, float damage, boolean fullyBlocked);
+    protected void blockedByItem(LivingEntity defender, DamageSource source, float damage, boolean fullyBlocked);
+    public DamageSource getLastDamageSource();
+    public DamageSource getLastDamageSource(int damageSourceTimeout);
+    protected void playHurtSound(DamageSource source);
+    public void makeSound(SoundEvent sound);
+    public void die(DamageSource source);
+    protected void handleKillingBlow();
+    protected void createWitherRose(LivingEntity killer);
+    protected void dropAllDeathLoot(ServerLevel level, DamageSource source);
+    protected void dropEquipment(ServerLevel level);
+    protected void dropExperience(ServerLevel level, Entity killer);
+    protected void dropCustomDeathLoot(ServerLevel level, DamageSource source, boolean killedByPlayer);
+    public long getLootTableSeed();
+    protected float getKnockback(Entity target, DamageSource damageSource);
+    protected void dropFromLootTable(ServerLevel level, DamageSource source, boolean playerKilled);
+    public void dropFromLootTable(ServerLevel level, DamageSource source, boolean playerKilled, ResourceKey<LootTable> lootTable);
+    public void dropFromLootTable(ServerLevel level, DamageSource source, boolean playerKilled, ResourceKey<LootTable> lootTable, Consumer<ItemStack> itemStackConsumer);
+    public boolean dropFromEntityInteractLootTable(ServerLevel level, ResourceKey<LootTable> key, Entity interactingEntity, ItemInstance tool, BiConsumer<ServerLevel, ItemStack> consumer);
+    public boolean dropFromGiftLootTable(ServerLevel level, ResourceKey<LootTable> key, BiConsumer<ServerLevel, ItemStack> consumer);
+    protected void dropFromShearingLootTable(ServerLevel level, ResourceKey<LootTable> key, ItemInstance tool, BiConsumer<ServerLevel, ItemStack> consumer);
+    protected boolean dropFromLootTable(ServerLevel level, ResourceKey<LootTable> key, Function<LootParams.Builder, LootParams> paramsBuilder, BiConsumer<ServerLevel, ItemStack> consumer);
+    public void knockback(double power, double xd, double zd, DamageSource source, float damage, boolean comesFromEffect);
+    public void knockback(double power, double xd, double zd, DamageSource source, float damage);
+    public void indicateDamage(double xd, double zd);
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected SoundEvent getDeathSound();
+    public void skipDropExperience();
+    public boolean wasExperienceConsumed();
+    public float getHurtDir();
+    protected AABB getHitbox();
+    public Map<Enchantment, Set<EnchantmentLocationBasedEffect>> activeLocationDependentEnchantments(EquipmentSlot slot);
+    public void postPiercingAttack();
+    public Fallsounds getFallSounds();
+    public Optional<BlockPos> getLastClimbablePos();
+    public boolean onClimbable();
+    public boolean isAlive();
+    public boolean isLookingAtMe(LivingEntity target, double coneSize, boolean adjustForDistance, boolean seeThroughTransparentBlocks, double... gazeHeights);
+    public int getMaxFallDistance();
+    protected final int getComfortableFallDistance(float allowedDamage);
+    public boolean causeFallDamage(double fallDistance, float damageModifier, DamageSource damageSource);
+    public void setIgnoreFallDamageFromCurrentImpulse(boolean ignoreFallDamage, Vec3 newImpulseImpactPos);
+    public void applyPostImpulseGraceTime(int ticks);
+    public boolean isIgnoringFallDamageFromCurrentImpulse();
+    public void tryResetCurrentImpulseContext();
+    public boolean isInPostImpulseGraceTime();
+    public void resetCurrentImpulseContext();
+    protected int calculateFallDamage(double fallDistance, float damageModifier);
+    protected void playBlockFallSound();
+    public void animateHurt(float yaw);
+    public int getArmorValue();
+    protected void hurtArmor(DamageSource damageSource, float damage);
+    protected void hurtHelmet(DamageSource damageSource, float damage);
+    protected void doHurtEquipment(DamageSource damageSource, float damage, EquipmentSlot... slots);
+    protected float getDamageAfterArmorAbsorb(DamageSource damageSource, float damage);
+    protected float getDamageAfterMagicAbsorb(DamageSource damageSource, float damage);
+    protected void actuallyHurt(ServerLevel level, DamageSource source, float dmg);
+    public CombatTracker getCombatTracker();
+    public LivingEntity getKillCredit();
+    public final float getMaxHealth();
+    public final float getMaxAbsorption();
+    public final int getArrowCount();
+    public final void setArrowCount(int count);
+    public final int getStingerCount();
+    public final void setStingerCount(int count);
+    public void swingAndResetAttackStrength(InteractionHand hand, SwingAnimation animation, boolean sendToSwingingEntity);
+    public boolean swing(InteractionHand hand, SwingAnimation animation, boolean sendToSwingingEntity);
+    public void handleDamageEvent(DamageSource source);
+    public void handleEntityEvent(byte id);
+    public float getTicksSinceLastKineticHitFeedback(float partial);
+    public void makePoofParticles();
+    protected void onBelowWorld();
+    protected double getEntityBounciness();
+    public AttributeInstance getAttribute(Holder<Attribute> attribute);
+    public double getAttributeValue(Holder<Attribute> attribute);
+    public double getAttributeBaseValue(Holder<Attribute> attribute);
+    public AttributeMap getAttributes();
+    public ItemStack getMainHandItem();
+    public ItemStack getOffhandItem();
+    public ItemStack getItemHeldByArm(HumanoidArm arm);
+    public ItemStack getWeaponItem();
+    public AttackRange getAttackRangeWith(ItemStack weaponItem);
+    public ItemStack getActiveItem();
+    public boolean isHolding(Item item);
+    public boolean isHolding(Predicate<ItemStack> itemPredicate);
+    public ItemStack getItemInHand(InteractionHand hand);
+    public void setItemInHand(InteractionHand hand, ItemStack itemStack);
+    public boolean hasItemInSlot(EquipmentSlot slot);
+    public boolean canUseSlot(EquipmentSlot slot);
+    public ItemStack getItemBySlot(EquipmentSlot slot);
+    public void setItemSlot(EquipmentSlot slot, ItemStack itemStack);
+    public float getArmorCoverPercentage();
+    public void setSprinting(boolean isSprinting);
+    protected float getSoundVolume();
+    public float getVoicePitch();
+    protected boolean isImmobile();
+    public void push(Entity entity);
+    public boolean shouldShowName();
+    protected float getJumpPower();
+    protected float getJumpPower(float multiplier);
+    public float getJumpBoostPower();
+    public void jumpFromGround();
+    protected void goDownInWater();
+    protected void jumpInLiquid(TagKey<Fluid> type);
+    protected float getWaterSlowDown();
+    public boolean canStandOnFluid(FluidState fluid);
+    protected double getDefaultGravity();
+    protected double getEffectiveGravity();
+    public void travel(Vec3 input);
+    public VoxelShape getLiquidCollisionShape();
+    protected boolean shouldTravelInFluid(FluidState fluidState);
+    protected void travelFlying(Vec3 input, float speed);
+    protected void travelFlying(Vec3 input, float waterSpeed, float lavaSpeed, float airSpeed);
+    protected float getAirDrag();
+    protected void travelInFluid(Vec3 input);
+    protected void travelInWater(Vec3 input, double baseGravity, boolean isFalling, double oldY);
+    protected boolean isInShallowFluid(TagKey<Fluid> fluidTag);
+    public boolean isInFluidDeeperThan(double depth, TagKey<Fluid> fluidTag);
+    public void stopFallFlying();
+    protected void tickRidden(Player controller, Vec3 riddenInput);
+    protected Vec3 getRiddenInput(Player controller, Vec3 selfInput);
+    protected float getRiddenSpeed(Player controller);
+    public void calculateEntityAnimation(boolean useY);
+    protected void updateWalkAnimation(float distance);
+    public Vec3 getFluidFallingAdjustedMovement(double baseGravity, boolean isFalling, Vec3 movement);
+    protected float getFlyingSpeed();
+    public float getSpeed();
+    public void setSpeed(float speed);
+    public boolean doHurtTarget(ServerLevel level, Entity target);
+    public void causeExtraKnockback(Entity target, float knockback, Vec3 oldMovement, DamageSource damageSource, float damage, boolean comesFromEffect);
+    protected void playAttackSound();
+    public void tick();
+    public boolean wasRecentlyStabbed(Entity target, int allowedTime);
+    public void rememberStabbedEntity(Entity target);
+    public int stabbedEntities(Predicate<Entity> filter);
+    public boolean stabAttack(EquipmentSlot weaponSlot, Entity target, float baseDamage, boolean dealsDamage, boolean dealsKnockback, boolean dismounts);
+    public void onAttack();
+    protected Map<EquipmentSlot, ItemStack> collectEquipmentChanges(Map<EquipmentSlot, ItemStack> lastEquipmentItems);
+    public boolean equipmentHasChanged(ItemStack previous, ItemStack current);
+    protected void tickHeadTurn(float yBodyRotT);
+    protected float getMaxHeadRotationRelativeToBody();
+    public void aiStep();
+    protected void applyInput();
+    public boolean isSensitiveToWater();
+    public boolean isJumping();
+    protected void updateFallFlying();
+    protected boolean canGlide();
+    protected void serverAiStep();
+    protected void pushEntities();
+    protected void checkAutoSpinAttack(AABB old, AABB current);
+    protected void doPush(Entity entity);
+    protected void doAutoAttackOnTouch(LivingEntity entity);
+    public boolean isAutoSpinAttack();
+    public void stopRiding();
+    public void rideTick();
+    protected InterpolationHandler createInterpolationHandler();
+    public void lerpHeadTo(float yRot, int steps);
+    public void setJumping(boolean jump);
+    public void onItemPickup(ItemEntity entity);
+    public void take(Entity entity, int orgCount);
+    public boolean hasLineOfSight(Entity target);
+    public boolean hasLineOfSight(Entity target, ClipContext.Block blockCollidingContext, ClipContext.Fluid fluidCollidingContext, double eyeHeight);
+    public float getViewYRot(float a);
+    public SwingDescription getCurrentSwing();
+    public float getSwingAnimation(float partialTicks);
+    public boolean isSwinging();
+    public boolean isPickable();
+    public boolean isPushable();
+    public float getYHeadRot();
+    public void setYHeadRot(float yHeadRot);
+    public void setYBodyRot(float yBodyRot);
+    public Vec3 getRelativePortalPosition(Direction.Axis axis, BlockUtil.FoundRectangle portalArea);
+    public static Vec3 resetForwardDirectionOfRelativePortalPosition(Vec3 offsets);
+    public float getAbsorptionAmount();
+    public final void setAbsorptionAmount(float absorptionAmount);
+    protected void internalSetAbsorptionAmount(float absorptionAmount);
+    public void onEnterCombat();
+    public void onLeaveCombat();
+    protected void updateEffectVisibility();
+    public abstract HumanoidArm getMainArm();
+    public boolean isUsingItem();
+    public InteractionHand getUsedItemHand();
+    public ItemEntity createItemStackToDrop(ItemStack itemStack, boolean randomly, boolean thrownFromHand);
+    protected void updateUsingItem(ItemStack useItem);
+    protected void setLivingEntityFlag(int flag, boolean value);
+    public void startUsingItem(InteractionHand hand);
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    public void lookAt(EntityAnchorArgument.Anchor anchor, Vec3 pos);
+    public float getPreciseBodyRotation(float partial);
+    public void spawnItemParticles(ItemStack itemStack, int count);
+    protected void completeUsingItem();
+    public void handleExtraItemsCreatedOnUse(ItemStack extraCreatedRemainder);
+    public ItemStack getUseItem();
+    public int getUseItemRemainingTicks();
+    public int getTicksUsingItem();
+    public float getTicksUsingItem(float partialTicks);
+    public void releaseUsingItem();
+    public void stopUsingItem();
+    public boolean isBlocking();
+    public ItemStack getItemBlockingWith();
+    public boolean isSuppressingSlidingDownLadder();
+    public boolean isFallFlying();
+    public boolean isVisuallySwimming();
+    public int getFallFlyingTicks();
+    public boolean randomTeleport(double xx, double yy, double zz, boolean showParticles, TagKey<Block> avoidanceTag);
+    public boolean randomTeleport(double xx, double yy, double zz, boolean showParticles, Predicate<BlockState> isInvalidPosition);
+    public boolean canRandomlyTeleportTo(double x, double y, double z);
+    public boolean isAffectedByPotions();
+    public boolean attackable();
+    public void setRecordPlayingNearby(BlockPos jukebox, boolean isPlaying);
+    public boolean canPickUpLoot();
+    public final EntityDimensions getDimensions(Pose pose);
+    protected EntityDimensions getDefaultDimensions(Pose pose);
+    public ImmutableList<Pose> getDismountPoses();
+    public AABB getLocalBoundsForPose(Pose pose);
+    protected boolean wouldNotSuffocateAtTargetPose(Pose pose);
+    public boolean canUsePortal(boolean ignorePassenger);
+    public Optional<BlockPos> getSleepingPos();
+    public void setSleepingPos(BlockPos bedPosition);
+    public void clearSleepingPos();
+    public boolean isSleeping();
+    public boolean startSleeping(BlockPos bedPosition);
+    public void stopSleeping();
+    public Direction getBedOrientation();
+    public boolean isInWall();
+    public ItemStack getProjectile(ItemStack heldWeapon);
+    public void onEquippedItemBroken(ItemStack brokenItem, EquipmentSlot inSlot);
+    public final boolean canEquipWithDispenser(ItemStack itemStack);
+    protected boolean canDispenserEquipIntoSlot(EquipmentSlot slot);
+    public EquipmentSlot getEquipmentSlotForItem(ItemStack itemStack);
+    public boolean isEquippableInSlot(ItemStack itemStack, EquipmentSlot slot);
+    public SlotAccess getSlot(int slot);
+    public boolean canFreeze();
+    public boolean isCurrentlyGlowing();
+    public float getVisualRotationYInDegrees();
+    public void recreateFromPacket(ClientboundAddEntityPacket packet);
+    public float getSecondsToDisableBlocking();
+    public float maxUpStep();
+    public Vec3 getPassengerRidingPosition(Entity passenger);
+    protected void lerpHeadRotationStep(int lerpHeadSteps, double targetYHeadRot);
+    public void igniteForTicks(int numberOfTicks);
+    public boolean hasInfiniteMaterials();
+    public boolean isInvulnerableTo(ServerLevel level, DamageSource source);
+    public static boolean canGlideUsing(ItemStack itemStack, EquipmentSlot slot);
+    public int getLastHurtByPlayerMemoryTime();
+    public boolean isTransmittingWaypoint();
+    public Optional<WaypointTransmitter.Connection> makeWaypointConnectionWith(ServerPlayer player);
+    public Waypoint.Icon waypointIcon();
+    public DamageSource createDamageSource();
+    public static record Fallsounds(SoundEvent small, SoundEvent big) {
+    }
+    public static class SwingState {
+        public boolean startIfAble(InteractionHand hand, SwingAnimation animation, int durationTicks);
+        public void tick();
+        public float getAnimation(float partialTicks);
+        public boolean isSwinging();
+    }
+    public static record SwingDescription(InteractionHand hand, SwingAnimation animation, int durationTicks) {
+    }
+}
+//// Marker.java
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class Marker extends Entity {
+    public Marker(EntityType<?> type, Level level);
+    public void tick();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity serverEntity);
+    protected boolean canAddPassenger(Entity passenger);
+    protected boolean couldAcceptPassenger();
+    protected void addPassenger(Entity passenger);
+    public PushReaction getPistonPushReaction();
+    public boolean isIgnoringBlockTriggers();
+    public final boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+}
+//// Mob.java
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.debug.DebugValueSource;
+import net.minecraft.world.Container;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.control.BodyRotationControl;
+import net.minecraft.world.entity.ai.control.JumpControl;
+import net.minecraft.world.entity.ai.control.LookControl;
+import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.ai.goal.GoalSelector;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.ai.sensing.Sensing;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.SwingAnimation;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+public abstract class Mob extends LivingEntity implements Targeting, EquipmentUser, Leashable {
+    protected static final int PICKUP_REACH = 1;
+    public static final float MAX_WEARING_ARMOR_CHANCE = 0.15F;
+    public static final float WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE = 0.1087F;
+    public static final float WEARING_ARMOR_UPGRADE_MATERIAL_ATTEMPTS = 3.0F;
+    public static final float MAX_PICKUP_LOOT_CHANCE = 0.55F;
+    public static final float MAX_ENCHANTED_ARMOR_CHANCE = 0.5F;
+    public static final float MAX_ENCHANTED_WEAPON_CHANCE = 0.25F;
+    public static final int UPDATE_GOAL_SELECTOR_EVERY_N_TICKS = 2;
+    protected static final Identifier RANDOM_SPAWN_BONUS_ID;
+    public static final String TAG_DROP_CHANCES = "drop_chances";
+    public static final String TAG_LEFT_HANDED = "LeftHanded";
+    public static final String TAG_CAN_PICK_UP_LOOT = "CanPickUpLoot";
+    public static final String TAG_NO_AI = "NoAI";
+    public static final String TAG_PERSISTENCE_REQUIRED = "PersistenceRequired";
+    public int ambientSoundTime;
+    protected int xpReward;
+    protected LookControl lookControl;
+    protected MoveControl moveControl;
+    protected JumpControl jumpControl;
+    protected PathNavigation navigation;
+    protected final GoalSelector goalSelector;
+    protected final GoalSelector targetSelector;
+    protected Mob(EntityType<? extends Mob> type, Level level);
+    protected void registerGoals();
+    public static AttributeSupplier.Builder createMobAttributes();
+    protected PathNavigation createNavigation(Level level);
+    protected boolean shouldPassengersInheritMalus();
+    public float getPathfindingMalus(PathType pathType);
+    public void setPathfindingMalus(PathType pathType, float cost);
+    public void onPathfindingStart();
+    public void onPathfindingDone();
+    protected BodyRotationControl createBodyControl();
+    public LookControl getLookControl();
+    public MoveControl getMoveControl();
+    public JumpControl getJumpControl();
+    public PathNavigation getNavigation();
+    public LivingEntity getControllingPassenger();
+    public Sensing getSensing();
+    public LivingEntity getTarget();
+    public LivingEntity getTargetUnchecked();
+    protected LivingEntity asValidTarget(LivingEntity target);
+    protected final LivingEntity getTargetFromBrain();
+    public void setTarget(LivingEntity target);
+    public boolean canAttack(LivingEntity target);
+    public boolean canUseNonMeleeWeapon(ItemStack item);
+    public void ate();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public int getAmbientSoundInterval();
+    public void playAmbientSound();
+    public void baseTick();
+    protected void playHurtSound(DamageSource source);
+    protected int getBaseExperienceReward(ServerLevel level);
+    public void spawnAnim();
+    public void handleEntityEvent(byte id);
+    public void tick();
+    protected void updateControlFlags();
+    protected void tickHeadTurn(float yBodyRotT);
+    protected SoundEvent getAmbientSound();
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void dropFromLootTable(ServerLevel level, DamageSource source, boolean playerKilled);
+    public final Optional<ResourceKey<LootTable>> getLootTable();
+    public long getLootTableSeed();
+    public void setZza(float zza);
+    public void setYya(float yya);
+    public void setXxa(float xxa);
+    public void setSpeed(float speed);
+    public void stopInPlace();
+    public void aiStep();
+    protected EquipmentSlot sunProtectionSlot();
+    protected Vec3i getPickupReach();
+    protected void pickUpItem(ServerLevel level, ItemEntity entity);
+    public ItemStack equipItemIfPossible(ServerLevel level, ItemStack itemStack);
+    protected void setItemSlotAndDropWhenKilled(EquipmentSlot slot, ItemStack itemStack);
+    protected boolean canShearEquipment(Player player);
+    protected boolean attemptToShearEquipment(Player player, InteractionHand hand, ItemStack heldItem);
+    protected void shearItem(Player player, InteractionHand hand, ItemStack heldItem, EquipmentSlot slot, ItemStack itemStackToShear);
+    public void setGuaranteedDrop(EquipmentSlot slot);
+    protected boolean canReplaceCurrentItem(ItemStack newItemStack, ItemStack currentItemStack, EquipmentSlot slot);
+    public boolean canReplaceEqualItem(ItemStack newItemStack, ItemStack currentItemStack);
+    public boolean canHoldItem(ItemStack itemStack);
+    public boolean wantsToPickUp(ServerLevel level, ItemStack itemStack);
+    public TagKey<Item> getPreferredWeaponType();
+    public boolean removeWhenFarAway(double distSqr);
+    public boolean requiresCustomPersistence();
+    public void checkDespawn();
+    protected final void serverAiStep();
+    protected void customServerAiStep(ServerLevel level);
+    public int getMaxHeadXRot();
+    public int getMaxHeadYRot();
+    public void clampHeadRotationToBody();
+    public int getHeadRotSpeed();
+    public void lookAt(Entity entity, float yMax, float xMax);
+    public static boolean checkMobSpawnRules(EntityType<? extends Mob> type, LevelAccessor level, EntitySpawnReason spawnReason, BlockPos pos, RandomSource random);
+    public boolean checkSpawnRules(LevelAccessor level, EntitySpawnReason spawnReason);
+    public boolean checkSpawnObstruction(LevelReader level);
+    public int getMaxSpawnClusterSize();
+    public boolean isMaxGroupSizeReached(int groupSize);
+    public int getMaxFallDistance();
+    public ItemStack getBodyArmorItem();
+    public boolean isSaddled();
+    public boolean isWearingBodyArmor();
+    public Container createEquipmentSlotContainer(EquipmentSlot slot);
+    protected void dropCustomDeathLoot(ServerLevel level, DamageSource source, boolean killedByPlayer);
+    public DropChances getDropChances();
+    public void dropPreservedEquipment(ServerLevel level);
+    public Set<EquipmentSlot> dropPreservedEquipment(ServerLevel level, Predicate<ItemStack> shouldDrop);
+    public void equip(EquipmentTable equipment);
+    public void equip(ResourceKey<LootTable> lootTable, Map<EquipmentSlot, Float> dropChances);
+    protected void populateDefaultEquipmentSlots(RandomSource random, DifficultyInstance difficulty);
+    public static Item getEquipmentForSlot(EquipmentSlot slot, int type);
+    protected void populateDefaultEquipmentEnchantments(ServerLevelAccessor level, RandomSource random, DifficultyInstance localDifficulty);
+    protected void enchantSpawnedWeapon(ServerLevelAccessor level, RandomSource random, DifficultyInstance difficulty);
+    protected void enchantSpawnedArmor(ServerLevelAccessor level, RandomSource random, EquipmentSlot slot, DifficultyInstance difficulty);
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData);
+    public void setPersistenceRequired();
+    public void setDropChance(EquipmentSlot slot, float percent);
+    public boolean canPickUpLoot();
+    public void setCanPickUpLoot(boolean canPickUpLoot);
+    protected boolean canDispenserEquipIntoSlot(EquipmentSlot slot);
+    public boolean isPersistenceRequired();
+    public InteractionResult interact(Player player, InteractionHand hand, Vec3 location);
+    protected void onOffspringSpawnedFromEgg(Player spawner, Mob offspring);
+    protected InteractionResult mobInteract(Player player, InteractionHand hand);
+    protected void usePlayerItem(Player player, InteractionHand hand, ItemStack itemStack);
+    public boolean isWithinHome();
+    public boolean isWithinHome(BlockPos pos);
+    public boolean isWithinHome(Vec3 pos);
+    public void setHomeTo(BlockPos newCenter, int radius);
+    public BlockPos getHomePosition();
+    public int getHomeRadius();
+    public void clearHome();
+    public boolean hasHome();
+    public <T extends Mob> T convertTo(EntityType<T> entityType, ConversionParams params, EntitySpawnReason spawnReason, ConversionParams.AfterConversion<T> afterConversion);
+    public <T extends Mob> T convertTo(EntityType<T> entityType, ConversionParams params, ConversionParams.AfterConversion<T> afterConversion);
+    public Leashable. LeashData getLeashData();
+    public void setLeashData(Leashable. LeashData leashData);
+    public void onLeashRemoved();
+    public void leashTooFarBehaviour();
+    public boolean canBeLeashed();
+    public boolean startRiding(Entity entity, boolean force, boolean sendEventAndTriggers);
+    public boolean isEffectiveAi();
+    public void setNoAi(boolean flag);
+    public void setLeftHanded(boolean flag);
+    public void setAggressive(boolean flag);
+    public boolean isNoAi();
+    public boolean isLeftHanded();
+    public boolean isAggressive();
+    public void setBaby(boolean baby);
+    public HumanoidArm getMainArm();
+    public boolean isWithinMeleeAttackRange(LivingEntity target);
+    protected AABB getAttackBoundingBox(double horizontalExpansion);
+    public boolean doHurtTarget(ServerLevel level, Entity target);
+    protected void jumpInLiquid(TagKey<Fluid> type);
+    public void removeFreeWill();
+    public GoalSelector getGoalSelector();
+    public void removeAllGoals(Predicate<Goal> predicate);
+    protected void removeAfterChangingDimensions();
+    public ItemStack getPickResult();
+    protected void onAttributeUpdated(Holder<Attribute> attribute);
+    public void registerDebugValues(ServerLevel level, DebugValueSource.Registration registration);
+    public float chargeSpeedModifier();
+    public void swingForAttack(InteractionHand hand);
+    public void swing(InteractionHand hand, SwingAnimation animation);
+}
+//// MobCategory.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.StringRepresentable;
+public enum MobCategory implements StringRepresentable {
+    MONSTER, CREATURE, AMBIENT, AXOLOTLS, UNDERGROUND_WATER_CREATURE, WATER_CREATURE, WATER_AMBIENT, MISC;
+    public static final Codec<MobCategory> CODEC;
+    public String getName();
+    public String getDebugAbbreviation();
+    public String getSerializedName();
+    public int getMaxInstancesPerChunk();
+    public boolean isFriendly();
+    public boolean isPersistent();
+    public int getDespawnDistance();
+    public int getNoDespawnDistance();
+}
+//// MoveSimulationType.java
+public enum MoveSimulationType {
+    SERVER_AND_CLIENT, AUTHORITATIVE_SIDE, AUTHORITATIVE_SIDE_AND_SERVER;
+}
+//// MoverType.java
+public enum MoverType {
+    SELF, PLAYER, PISTON, SHULKER_BOX, SHULKER;
+    public boolean isServerAndClientSimulated();
+}
+//// NeutralMob.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public interface NeutralMob {
+    String TAG_ANGER_END_TIME;
+    String TAG_ANGRY_AT;
+    long NO_ANGER_END_TIME;
+    long getPersistentAngerEndTime();
+    default void setTimeToRemainAngry(long remainingTime);
+    void setPersistentAngerEndTime(long endTime);
+    EntityReference<LivingEntity> getPersistentAngerTarget();
+    void setPersistentAngerTarget(EntityReference<LivingEntity> persistentAngerTarget);
+    void startPersistentAngerTimer();
+    Level level();
+    default void addPersistentAngerSaveData(ValueOutput output);
+    default void readPersistentAngerSaveData(Level level, ValueInput input);
+    default void updatePersistentAnger(ServerLevel level, boolean stayAngryIfTargetPresent);
+    default boolean isAngryAt(LivingEntity entity, ServerLevel level);
+    default boolean isAngryAtAllPlayers(ServerLevel level);
+    default boolean isAngry();
+    default void playerDied(ServerLevel level, Player player);
+    default void forgetCurrentTargetAndRefreshUniversalAnger();
+    default void stopBeingAngry();
+    LivingEntity getLastHurtByMob();
+    void setLastHurtByMob(LivingEntity hurtBy);
+    void setTarget(LivingEntity target);
+    boolean canAttack(LivingEntity target);
+    LivingEntity getTarget();
+    LivingEntity getTargetUnchecked();
+}
+//// OminousItemSpawner.java
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class OminousItemSpawner extends Entity {
+    public static final int TICKS_BEFORE_ABOUT_TO_SPAWN_SOUND = 36;
+    public OminousItemSpawner(EntityType<? extends OminousItemSpawner> type, Level level);
+    public static OminousItemSpawner create(Level level, ItemStack item);
+    public void tick();
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void readAdditionalSaveData(ValueInput input);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected boolean canAddPassenger(Entity passenger);
+    protected boolean couldAcceptPassenger();
+    protected void addPassenger(Entity passenger);
+    public PushReaction getPistonPushReaction();
+    public boolean isIgnoringBlockTriggers();
+    public void addParticles();
+    public ItemStack getItem();
+    public final boolean hurtServer(ServerLevel level, DamageSource source, float damage);
+}
+//// OwnableEntity.java
+import net.minecraft.world.level.Level;
+public interface OwnableEntity {
+    EntityReference<LivingEntity> getOwnerReference();
+    Level level();
+    default LivingEntity getOwner();
+    default LivingEntity getRootOwner();
+}
+//// PathfinderMob.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+public abstract class PathfinderMob extends Mob {
+    protected static final float DEFAULT_WALK_TARGET_VALUE = 0.0F;
+    protected PathfinderMob(EntityType<? extends PathfinderMob> type, Level level);
+    public float getWalkTargetValue(BlockPos pos);
+    public float getWalkTargetValue(BlockPos pos, LevelReader level);
+    public boolean checkSpawnRules(LevelAccessor level, EntitySpawnReason spawnReason);
+    public boolean isPathFinding();
+    public boolean isPanicking();
+    protected boolean shouldStayCloseToLeashHolder();
+    public void closeRangeLeashBehaviour(Entity leashHolder);
+    public void whenLeashedTo(Entity leashHolder);
+    protected double followLeashSpeed();
+}
+//// PlayerRideable.java
+public interface PlayerRideable {
+}
+//// PlayerRideableJumping.java
+public interface PlayerRideableJumping extends PlayerRideable {
+    void onPlayerJump(int jumpAmount);
+    boolean canJump();
+    void handleStartJump(int jumpScale);
+    void handleStopJump();
+    default int getJumpCooldown();
+    default float getPlayerJumpPendingScale(int jumpAmount);
+}
+//// PortalProcessor.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Portal;
+import net.minecraft.world.level.portal.TeleportTransition;
+public class PortalProcessor {
+    public PortalProcessor(Portal portal, BlockPos portalEntryPosition);
+    public boolean processPortalTeleportation(ServerLevel serverLevel, Entity entity, boolean allowedToTeleport);
+    public TeleportTransition getPortalDestination(ServerLevel serverLevel, Entity entity);
+    public Portal.Transition getPortalLocalTransition();
+    public boolean hasExpired();
+    public BlockPos getEntryPosition();
+    public void updateEntryPosition(BlockPos entryPosition);
+    public int getPortalTime();
+    public boolean isInsidePortalThisTick();
+    public void setAsInsidePortalThisTick(boolean insidePortal);
+    public boolean isSamePortal(Portal portal);
+}
+//// Pose.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.IntFunction;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum Pose implements StringRepresentable {
+    STANDING, FALL_FLYING, SLEEPING, SWIMMING, SPIN_ATTACK, CROUCHING, LONG_JUMPING, DYING, CROAKING, USING_TONGUE, SITTING, ROARING, SNIFFING, EMERGING, DIGGING, SLIDING, SHOOTING, INHALING;
+    public static final IntFunction<Pose> BY_ID;
+    public static final Codec<Pose> CODEC;
+    public static final StreamCodec<ByteBuf, Pose> STREAM_CODEC;
+    public int id();
+    public String getSerializedName();
+}
+//// PositionMoveRotation.java
+import java.util.Set;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.portal.TeleportTransition;
+import net.minecraft.world.phys.Vec3;
+public record PositionMoveRotation(Vec3 position, Vec3 deltaMovement, float yRot, float xRot) {
+    public static final StreamCodec<FriendlyByteBuf, PositionMoveRotation> STREAM_CODEC;
+    public static PositionMoveRotation of(Entity entity);
+    public PositionMoveRotation withRotation(float yRot, float xRot);
+    public static PositionMoveRotation of(TeleportTransition transition);
+    public static PositionMoveRotation calculateAbsolute(PositionMoveRotation source, PositionMoveRotation change, Set<Relative> relatives);
+}
+//// PositionPath.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.function.IntFunction;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.phys.Vec3;
+public interface PositionPath {
+    StreamCodec<ByteBuf, PositionPath> STREAM_CODEC;
+    Vec3 endPosition();
+    Type type();
+    static PositionPath of(Vec3 position);
+    static PositionPath stepped(List<PositionStep> steps);
+    public static record Linear(Vec3 endPosition) implements PositionPath {
+        public static final StreamCodec<ByteBuf, Linear> STREAM_CODEC;
+        public Type type();
+    }
+    public static record Stepped(Vec3 endPosition, List<PositionStep> steps) implements PositionPath {
+        public static final StreamCodec<ByteBuf, Stepped> STREAM_CODEC;
+        public Stepped(List<PositionStep> steps);
+        public Type type();
+    }
+    public static enum Type {
+        LINEAR, STEPPED;
+        public static final IntFunction<Type> BY_ID;
+        public static final StreamCodec<ByteBuf, Type> STREAM_CODEC;
+        public StreamCodec<ByteBuf, ? extends PositionPath> streamCodec();
+    }
+}
+//// PositionStep.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.phys.Vec3;
+public record PositionStep(Vec3 position, int tickOffset) {
+    public static final StreamCodec<ByteBuf, PositionStep> STREAM_CODEC;
+    public PositionStep addDelta(Vec3 delta);
+}
+//// PostSpawnProcessor.java
+public interface PostSpawnProcessor<T extends Entity> {
+    void apply(T target);
+    default PostSpawnProcessor<T> andThen(PostSpawnProcessor<? super T> after);
+    static <T extends Entity> PostSpawnProcessor<T> nop();
+}
+//// Relative.java
+import io.netty.buffer.ByteBuf;
+import java.util.Set;
+import net.minecraft.network.codec.StreamCodec;
+public enum Relative {
+    X, Y, Z, Y_ROT, X_ROT, DELTA_X, DELTA_Y, DELTA_Z, ROTATE_DELTA;
+    public static final Set<Relative> ALL;
+    public static final Set<Relative> ROTATION;
+    public static final Set<Relative> DELTA;
+    public static final StreamCodec<ByteBuf, Set<Relative>> SET_STREAM_CODEC;
+    public static Set<Relative> union(Set<Relative>... sets);
+    public static Set<Relative> rotation(boolean relativeYRot, boolean relativeXRot);
+    public static Set<Relative> position(boolean relativeX, boolean relativeY, boolean relativeZ);
+    public static Set<Relative> direction(boolean relativeX, boolean relativeY, boolean relativeZ);
+    public static Set<Relative> unpack(int value);
+    public static int pack(Set<Relative> set);
+}
+//// ReputationEventHandler.java
+import net.minecraft.world.entity.ai.village.ReputationEventType;
+public interface ReputationEventHandler {
+    void onReputationEventFrom(ReputationEventType type, Entity source);
+}
+//// Shearable.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.item.ItemStack;
+public interface Shearable {
+    void shear(ServerLevel level, SoundSource soundSource, ItemStack tool);
+    boolean readyForShearing();
+}
+//// SlotAccess.java
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import net.minecraft.world.item.ItemStack;
+public interface SlotAccess {
+    ItemStack get();
+    boolean set(ItemStack itemStack);
+    static SlotAccess of(Supplier<ItemStack> getter, Consumer<ItemStack> setter);
+    static SlotAccess forEquipmentSlot(LivingEntity entity, EquipmentSlot slot, Predicate<ItemStack> validator);
+    static SlotAccess forEquipmentSlot(LivingEntity entity, EquipmentSlot slot);
+    static SlotAccess forListElement(List<ItemStack> stacks, int index);
+}
+//// SlotProvider.java
+import it.unimi.dsi.fastutil.ints.IntList;
+import net.minecraft.world.item.slot.SlotCollection;
+public interface SlotProvider {
+    SlotAccess getSlot(int slot);
+    default SlotCollection getSlotsFromRange(IntList slots);
+}
+//// SpawnGroupData.java
+public interface SpawnGroupData {
+}
+//// SpawnPlacementType.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+public interface SpawnPlacementType {
+    boolean isSpawnPositionOk(LevelReader level, BlockPos blockPos, EntityType<?> type);
+    default BlockPos adjustSpawnPosition(LevelReader level, BlockPos candidate);
+}
+//// SpawnPlacementTypes.java
+public interface SpawnPlacementTypes {
+    SpawnPlacementType NO_RESTRICTIONS;
+    SpawnPlacementType IN_WATER;
+    SpawnPlacementType IN_LAVA;
+    SpawnPlacementType ON_GROUND;
+}
+//// SpawnPlacements.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.levelgen.Heightmap;
+public class SpawnPlacements {
+    public static SpawnPlacementType getPlacementType(EntityType<?> type);
+    public static boolean isSpawnPositionOk(EntityType<?> type, LevelReader level, BlockPos blockPos);
+    public static Heightmap.Types getHeightmapType(EntityType<?> type);
+    public static <T extends Entity> boolean checkSpawnRules(EntityType<T> type, ServerLevelAccessor level, EntitySpawnReason spawnReason, BlockPos pos, RandomSource random);
+    static record Data(Heightmap.Types heightMap, SpawnPlacementType placement, SpawnPredicate<?> predicate) {
+    }
+    public interface SpawnPredicate<T extends Entity> {
+        boolean test(EntityType<T> type, ServerLevelAccessor level, EntitySpawnReason spawnReason, BlockPos pos, RandomSource random);
+    }
+}
+//// SteppedInterpolationHandler.java
+import net.minecraft.core.PositionAndRotation;
+import net.minecraft.world.phys.Vec3;
+public class SteppedInterpolationHandler extends AbstractInterpolationHandler {
+    private SteppedInterpolationHandler(Entity entity);
+    public static InterpolationHandler create(Entity entity);
+    protected PositionAndRotation.Mutable interpolationData();
+    protected void startInterpolating(PositionPath position, float yRot, float xRot);
+    protected void doInterpolate();
+    public boolean hasActiveInterpolation();
+    public void cancel();
+    static class Step extends PositionAndRotation.Mutable {
+        public Step(Vec3 position, float yRot, float xRot, int tickOffset);
+    }
+    static class InterpolationData extends PositionAndRotation.Mutable {
+        public void addDelta(Vec3 delta);
+        public void addRotation(float yRot, float xRot);
+    }
+}
+//// SteppedInterpolationTracker.java
+import net.minecraft.world.phys.Vec3;
+public class SteppedInterpolationTracker extends InterpolationHandler.NoOpInterpolationHandler implements InterpolationTracker {
+    public SteppedInterpolationTracker(Entity entity);
+    public InterpolationTracker interpolationTracker();
+    public void applyPredictedMovement(Vec3 delta);
+    public void updateTracking(Vec3 trackingPos);
+    public PositionPath getPositionPath(Vec3 currentPosition);
+    public void clear();
+}
+//// SulfurCubeArchetype.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.valueproviders.FloatProvider;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.item.Item;
+public record SulfurCubeArchetype(HolderSet<Item> items, List<AttributeEntry> attributeModifiers, boolean buoyant, Optional<ExplosionData> explosion, Optional<ContactDamage> contactDamage, KnockbackModifiers knockbackModifiers, SoundSettings soundSettings) {
+    public static final Codec<SulfurCubeArchetype> DIRECT_CODEC;
+    public static KnockbackModifiers DEFAULT_KNOCKBACK_MODIFIERS;
+    public static SoundSettings DEFAULT_SOUND_SETTINGS;
+    public static record AttributeEntry(Holder<Attribute> attribute, AttributeModifier modifier) {
+        public static final Codec<AttributeEntry> CODEC;
+        public static AttributeEntry add(Holder<Attribute> attribute, double amount, ResourceKey<SulfurCubeArchetype> archetype);
+        public static AttributeEntry multiply(Holder<Attribute> attribute, double amount, ResourceKey<SulfurCubeArchetype> archetype);
+    }
+    public static record ExplosionData(int power, boolean causesFire, int fuse) {
+        public static final Codec<ExplosionData> CODEC;
+    }
+    public static record ContactDamage(Holder<DamageType> damageType, FloatProvider amount, boolean attributeToSource) {
+        public static final Codec<ContactDamage> CODEC;
+    }
+    public static record KnockbackModifiers(float horizontalPower, float verticalPower) {
+        public static final Codec<KnockbackModifiers> CODEC;
+    }
+    public static record SoundSettings(Holder<SoundEvent> hitSound, Holder<SoundEvent> pushSound, float pushSoundImpulseThreshold, float pushSoundCooldown) {
+        public static final Codec<SoundSettings> CODEC;
+    }
+}
+//// SulfurCubeArchetypes.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public class SulfurCubeArchetypes {
+    public static final ResourceKey<SulfurCubeArchetype> REGULAR;
+    public static final ResourceKey<SulfurCubeArchetype> BOUNCY;
+    public static final ResourceKey<SulfurCubeArchetype> SLOW_BOUNCY;
+    public static final ResourceKey<SulfurCubeArchetype> SLOW_FLAT;
+    public static final ResourceKey<SulfurCubeArchetype> FAST_FLAT;
+    public static final ResourceKey<SulfurCubeArchetype> LIGHT;
+    public static final ResourceKey<SulfurCubeArchetype> FAST_SLIDING;
+    public static final ResourceKey<SulfurCubeArchetype> SLOW_SLIDING;
+    public static final ResourceKey<SulfurCubeArchetype> HIGH_RESISTANCE;
+    public static final ResourceKey<SulfurCubeArchetype> STICKY;
+    public static final ResourceKey<SulfurCubeArchetype> EXPLOSIVE;
+    public static final ResourceKey<SulfurCubeArchetype> HOT;
+    public static void bootstrap(BootstrapContext<SulfurCubeArchetype> context);
+}
+//// TamableAnimal.java
+import java.util.Optional;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.ai.goal.PanicGoal;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.scores.PlayerTeam;
+public abstract class TamableAnimal extends Animal implements OwnableEntity {
+    public static final int TELEPORT_WHEN_DISTANCE_IS_SQ = 144;
+    protected static final EntityDataAccessor<Byte> DATA_FLAGS_ID;
+    protected static final EntityDataAccessor<Optional<EntityReference<LivingEntity>>> DATA_OWNERUUID_ID;
+    protected TamableAnimal(EntityType<? extends TamableAnimal> type, Level level);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    protected void addAdditionalSaveData(ValueOutput output);
+    protected void readAdditionalSaveData(ValueInput input);
+    public boolean canBeLeashed();
+    protected void spawnTamingParticles(boolean success);
+    public void handleEntityEvent(byte id);
+    public boolean isTame();
+    public void setTame(boolean isTame, boolean includeSideEffects);
+    protected void applyTamingSideEffects();
+    protected void feed(Player player, InteractionHand hand, ItemStack itemStack, float healingFactor, float defaultHeal);
+    public boolean isInSittingPose();
+    public void setInSittingPose(boolean value);
+    public EntityReference<LivingEntity> getOwnerReference();
+    public void setOwner(LivingEntity owner);
+    public void setOwnerReference(EntityReference<LivingEntity> owner);
+    public void tame(Player player);
+    public boolean canAttack(LivingEntity target);
+    public boolean isOwnedBy(LivingEntity entity);
+    public boolean wantsToAttack(LivingEntity target, LivingEntity owner);
+    public PlayerTeam getTeam();
+    protected boolean considersEntityAsAlly(Entity other);
+    public void die(DamageSource source);
+    public boolean isOrderedToSit();
+    public void setOrderedToSit(boolean orderedToSit);
+    public void tryToTeleportToOwner();
+    public boolean shouldTryTeleportToOwner();
+    public final boolean unableToMoveToOwner();
+    protected boolean canFlyToOwner();
+    public class TamableAnimalPanicGoal extends PanicGoal {
+        public TamableAnimalPanicGoal(double speedModifier, TagKey<DamageType> panicCausingDamageTypes);
+        public TamableAnimalPanicGoal(double speedModifier);
+        public void tick();
+    }
+}
+//// Targeting.java
+public interface Targeting {
+    LivingEntity getTarget();
+}
+//// TraceableEntity.java
+public interface TraceableEntity {
+    Entity getOwner();
+}
+//// UpdateInterval.java
+public interface UpdateInterval {
+    UpdateInterval NEVER;
+    boolean test(int tick);
+    int nextInterval(int tick);
+    static UpdateInterval periodic(int period);
+}
+//// WalkAnimationState.java
+public class WalkAnimationState {
+    public void setSpeed(float speed);
+    public void update(float targetSpeed, float factor, float positionScale);
+    public void stop();
+    public float speed();
+    public float speed(float partialTicks);
+    public float position();
+    public float position(float partialTicks);
+    public boolean isMoving();
+}

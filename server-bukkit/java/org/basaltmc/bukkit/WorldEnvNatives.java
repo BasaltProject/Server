@@ -63,6 +63,17 @@ public final class WorldEnvNatives {
 
     public static native boolean setRaid(String world, int id, int omenLevel, int totalGroups);
 
+    /** Acts on a raid ("stop", "join", "set_leader", "remove_leader", "create"); the raid id, or -1. */
+    public static native int raidControl(String world, int id, String action, int first, int second, int third, int fourth, int value);
+
+    /** Total ticks, rate and paused flag, then one "name=ticks" per time marker. */
+    public static native String[] clock(String world);
+
+    public static native boolean setClockRate(String world, float rate);
+
+    /** 0 when there is no such marker, 1 when the clock stayed, 2 when it moved. */
+    public static native int moveToTimeMarker(String world, String marker);
+
     /** Fluid name, source flag, level and falling flag joined by bars. */
     public static native String fluidAt(String world, int x, int y, int z);
 
@@ -96,6 +107,7 @@ public final class WorldEnvNatives {
     public static native void setChunkForced(String world, int chunkX, int chunkZ, boolean forced);
 
     /** The inhabited ticks of a loaded chunk, after setting them when `set` is not negative. */
+    public static native long randomSequence(String world, String id, int operation, long argument);
     public static native long inhabitedTime(String world, int chunkX, int chunkZ, long set);
 
     /** Id, `boolean` or `int`, and starting value of every game rule. */

@@ -1,0 +1,68 @@
+//// Action.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.ClickEvent;
+public interface Action {
+    Codec<Action> CODEC;
+    MapCodec<? extends Action> codec();
+    Optional<ClickEvent> createAction(Map<String, ValueGetter> parameters);
+    public interface ValueGetter {
+        String asTemplateSubstitution();
+        Tag asTag();
+        static Map<String, String> getAsTemplateSubstitutions(Map<String, ValueGetter> parameters);
+        static ValueGetter of(String value);
+        static ValueGetter of(Supplier<String> value);
+    }
+}
+//// ActionTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class ActionTypes {
+    public static MapCodec<? extends Action> bootstrap(Registry<MapCodec<? extends Action>> registry);
+}
+//// CommandTemplate.java
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.network.chat.ClickEvent;
+public record CommandTemplate(ParsedTemplate template) implements Action {
+    public static final MapCodec<CommandTemplate> MAP_CODEC;
+    public MapCodec<CommandTemplate> codec();
+    public Optional<ClickEvent> createAction(Map<String, Action.ValueGetter> parameters);
+}
+//// CustomAll.java
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.resources.Identifier;
+public record CustomAll(Identifier id, Optional<CompoundTag> additions) implements Action {
+    public static final MapCodec<CustomAll> MAP_CODEC;
+    public MapCodec<CustomAll> codec();
+    public Optional<ClickEvent> createAction(Map<String, Action.ValueGetter> parameters);
+}
+//// ParsedTemplate.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import net.minecraft.commands.functions.StringTemplate;
+public class ParsedTemplate {
+    public static final Codec<ParsedTemplate> CODEC;
+    public static final Codec<String> VARIABLE_CODEC;
+    private ParsedTemplate(String raw, StringTemplate parsed);
+    public String instantiate(Map<String, String> arguments);
+}
+//// StaticAction.java
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.network.chat.ClickEvent;
+public record StaticAction(ClickEvent value) implements Action {
+    public static final Map<ClickEvent.Action, MapCodec<StaticAction>> WRAPPED_CODECS;
+    public MapCodec<StaticAction> codec();
+    public Optional<ClickEvent> createAction(Map<String, Action.ValueGetter> parameters);
+}

@@ -1,0 +1,38 @@
+//// NetworkDataOutputStream.java
+import java.io.IOException;
+public class NetworkDataOutputStream {
+    public NetworkDataOutputStream(int size);
+    public void writeBytes(byte[] data) throws IOException;
+    public void writeString(String data) throws IOException;
+    public void write(int data) throws IOException;
+    public void writeShort(short data) throws IOException;
+    public void writeInt(int data) throws IOException;
+    public void writeFloat(float data) throws IOException;
+    public byte[] toByteArray();
+    public void reset();
+}
+//// PktUtils.java
+public class PktUtils {
+    public static final int MAX_PACKET_SIZE = 1460;
+    public static final char[] HEX_CHAR;
+    public static String stringFromByteArray(byte[] b, int offset, int length);
+    public static int intFromByteArray(byte[] b, int offset);
+    public static int intFromByteArray(byte[] b, int offset, int length);
+    public static int intFromNetworkByteArray(byte[] b, int offset, int length);
+    public static String toHexString(byte b);
+}
+//// RconConsoleSource.java
+import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+public class RconConsoleSource implements CommandSource {
+    public RconConsoleSource(MinecraftServer server);
+    public void prepareForCommand();
+    public String getCommandResponse();
+    public CommandSourceStack createCommandSourceStack();
+    public void sendSystemMessage(Component message);
+    public boolean acceptsSuccess();
+    public boolean acceptsFailure();
+    public boolean shouldInformAdmins();
+}

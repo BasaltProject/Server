@@ -1,0 +1,155 @@
+//// AlterGroundDecorator.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public class AlterGroundDecorator extends TreeDecorator {
+    public static final MapCodec<AlterGroundDecorator> CODEC;
+    public AlterGroundDecorator(Holder<BlockStateProvider> provider);
+    protected TreeDecoratorType<?> type();
+    public void place(TreeDecorator.Context context);
+}
+//// AttachedToLeavesDecorator.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public class AttachedToLeavesDecorator extends TreeDecorator {
+    public static final MapCodec<AttachedToLeavesDecorator> CODEC;
+    protected final float probability;
+    protected final int exclusionRadiusXZ;
+    protected final int exclusionRadiusY;
+    protected final Holder<BlockStateProvider> blockProvider;
+    protected final int requiredEmptyBlocks;
+    protected final List<Direction> directions;
+    public AttachedToLeavesDecorator(float probability, int exclusionRadiusXZ, int exclusionRadiusY, Holder<BlockStateProvider> blockProvider, int requiredEmptyBlocks, List<Direction> directions);
+    public void place(TreeDecorator.Context context);
+    protected TreeDecoratorType<?> type();
+}
+//// AttachedToLogsDecorator.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public class AttachedToLogsDecorator extends TreeDecorator {
+    public static final MapCodec<AttachedToLogsDecorator> CODEC;
+    public AttachedToLogsDecorator(float probability, Holder<BlockStateProvider> blockProvider, List<Direction> directions);
+    public void place(TreeDecorator.Context context);
+    protected TreeDecoratorType<?> type();
+}
+//// BeehiveDecorator.java
+import com.mojang.serialization.MapCodec;
+public class BeehiveDecorator extends TreeDecorator {
+    public static final MapCodec<BeehiveDecorator> CODEC;
+    public BeehiveDecorator(float probability);
+    protected TreeDecoratorType<?> type();
+    public void place(TreeDecorator.Context context);
+}
+//// CocoaDecorator.java
+import com.mojang.serialization.MapCodec;
+public class CocoaDecorator extends TreeDecorator {
+    public static final MapCodec<CocoaDecorator> CODEC;
+    public CocoaDecorator(float probability);
+    protected TreeDecoratorType<?> type();
+    public void place(TreeDecorator.Context context);
+}
+//// CreakingHeartDecorator.java
+import com.mojang.serialization.MapCodec;
+public class CreakingHeartDecorator extends TreeDecorator {
+    public static final MapCodec<CreakingHeartDecorator> CODEC;
+    public CreakingHeartDecorator(float probability);
+    protected TreeDecoratorType<?> type();
+    public void place(TreeDecorator.Context context);
+}
+//// LeaveVineDecorator.java
+import com.mojang.serialization.MapCodec;
+public class LeaveVineDecorator extends TreeDecorator {
+    public static final MapCodec<LeaveVineDecorator> CODEC;
+    protected TreeDecoratorType<?> type();
+    public LeaveVineDecorator(float probability);
+    public void place(TreeDecorator.Context context);
+}
+//// PaleMossDecorator.java
+import com.mojang.serialization.MapCodec;
+public class PaleMossDecorator extends TreeDecorator {
+    public static final MapCodec<PaleMossDecorator> CODEC;
+    protected TreeDecoratorType<?> type();
+    public PaleMossDecorator(float leavesProbability, float trunkProbability, float groundProbability);
+    public void place(TreeDecorator.Context context);
+}
+//// PlaceOnGroundDecorator.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+public class PlaceOnGroundDecorator extends TreeDecorator {
+    public static final MapCodec<PlaceOnGroundDecorator> CODEC;
+    public PlaceOnGroundDecorator(int tries, int radius, int height, Holder<BlockStateProvider> blockStateProvider);
+    protected TreeDecoratorType<?> type();
+    public void place(TreeDecorator.Context context);
+}
+//// ShelfMushroomDecorator.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+public class ShelfMushroomDecorator extends TreeDecorator {
+    public static final MapCodec<ShelfMushroomDecorator> CODEC;
+    public ShelfMushroomDecorator(float probability);
+    protected TreeDecoratorType<?> type();
+    public void place(TreeDecorator.Context context);
+    public static boolean isBlockReplaceableWithShelfMushroom(TreeDecorator.Context context, BlockPos pos);
+}
+//// TreeDecorator.java
+import com.mojang.serialization.Codec;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+public abstract class TreeDecorator {
+    public static final Codec<TreeDecorator> CODEC;
+    protected abstract TreeDecoratorType<?> type();
+    public abstract void place(Context context);
+    public static final class Context {
+        public Context(WorldGenLevel level, BiConsumer<BlockPos, BlockState> decorationSetter, RandomSource random, Set<BlockPos> trunkSet, Set<BlockPos> foliageSet, Set<BlockPos> rootSet);
+        public void placeVine(BlockPos pos, BooleanProperty direction);
+        public void setBlock(BlockPos pos, BlockState state);
+        public boolean isAir(BlockPos pos);
+        public boolean checkBlock(BlockPos pos, Predicate<BlockState> predicate);
+        public boolean isReplaceable(BlockPos pos);
+        public boolean isWaterOrWaterNearby(BlockPos pos);
+        public WorldGenLevel level();
+        public RandomSource random();
+        public ObjectArrayList<BlockPos> logs();
+        public ObjectArrayList<BlockPos> leaves();
+        public ObjectArrayList<BlockPos> roots();
+    }
+}
+//// TreeDecoratorType.java
+import com.mojang.serialization.MapCodec;
+public class TreeDecoratorType<P extends TreeDecorator> {
+    public static final TreeDecoratorType<TrunkVineDecorator> TRUNK_VINE;
+    public static final TreeDecoratorType<LeaveVineDecorator> LEAVE_VINE;
+    public static final TreeDecoratorType<PaleMossDecorator> PALE_MOSS;
+    public static final TreeDecoratorType<CreakingHeartDecorator> CREAKING_HEART;
+    public static final TreeDecoratorType<CocoaDecorator> COCOA;
+    public static final TreeDecoratorType<ShelfMushroomDecorator> SHELF_MUSHROOM;
+    public static final TreeDecoratorType<BeehiveDecorator> BEEHIVE;
+    public static final TreeDecoratorType<AlterGroundDecorator> ALTER_GROUND;
+    public static final TreeDecoratorType<AttachedToLeavesDecorator> ATTACHED_TO_LEAVES;
+    public static final TreeDecoratorType<PlaceOnGroundDecorator> PLACE_ON_GROUND;
+    public static final TreeDecoratorType<AttachedToLogsDecorator> ATTACHED_TO_LOGS;
+    private TreeDecoratorType(MapCodec<P> codec);
+    public MapCodec<P> codec();
+}
+//// TrunkVineDecorator.java
+import com.mojang.serialization.MapCodec;
+public class TrunkVineDecorator extends TreeDecorator {
+    public static final MapCodec<TrunkVineDecorator> CODEC;
+    public static final TrunkVineDecorator INSTANCE;
+    protected TreeDecoratorType<?> type();
+    public void place(TreeDecorator.Context context);
+}

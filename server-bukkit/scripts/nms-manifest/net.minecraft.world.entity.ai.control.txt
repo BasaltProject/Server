@@ -1,0 +1,94 @@
+//// BodyRotationControl.java
+import net.minecraft.world.entity.Mob;
+public class BodyRotationControl implements Control {
+    public BodyRotationControl(Mob mob);
+    public void clientTick();
+}
+//// Control.java
+public interface Control {
+    default float rotateTowards(float fromAngle, float toAngle, float maxRot);
+}
+//// FlyingMoveControl.java
+import net.minecraft.world.entity.Mob;
+public class FlyingMoveControl<T extends Mob> extends MoveControl<T> {
+    public FlyingMoveControl(T mob, int maxTurn, boolean hoversInPlace);
+    public void tick();
+}
+//// JumpControl.java
+import net.minecraft.world.entity.Mob;
+public class JumpControl implements Control {
+    protected boolean jump;
+    public JumpControl(Mob mob);
+    public void jump();
+    public void tick();
+}
+//// LookControl.java
+import java.util.Optional;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.phys.Vec3;
+public class LookControl implements Control {
+    protected final Mob mob;
+    protected float yMaxRotSpeed;
+    protected float xMaxRotAngle;
+    protected int lookAtCooldown;
+    protected double wantedX;
+    protected double wantedY;
+    protected double wantedZ;
+    public LookControl(Mob mob);
+    public void setLookAt(Vec3 vec);
+    public void setLookAt(Entity target);
+    public void setLookAt(Entity target, float yMaxRotSpeed, float xMaxRotAngle);
+    public void setLookAt(double x, double y, double z);
+    public void setLookAt(double x, double y, double z, float yMaxRotSpeed, float xMaxRotAngle);
+    public void tick();
+    protected void clampHeadRotationToBody();
+    protected boolean resetXRotOnTick();
+    public boolean isLookingAtTarget();
+    public double getWantedX();
+    public double getWantedY();
+    public double getWantedZ();
+    protected Optional<Float> getXRotD();
+    protected Optional<Float> getYRotD();
+}
+//// MoveControl.java
+import net.minecraft.world.entity.Mob;
+public class MoveControl<T extends Mob> implements Control {
+    public static final float MIN_SPEED = 0.0005F;
+    public static final float MIN_SPEED_SQR = 2.5000003e-07F;
+    protected static final int MAX_TURN = 90;
+    protected final T mob;
+    protected double wantedX;
+    protected double wantedY;
+    protected double wantedZ;
+    protected double speedModifier;
+    protected float strafeForwards;
+    protected float strafeRight;
+    protected Operation operation;
+    public MoveControl(T mob);
+    public boolean hasWanted();
+    public double getSpeedModifier();
+    public void setWantedPosition(double x, double y, double z, double speedModifier);
+    public void strafe(float forwards, float right);
+    public void tick();
+    protected float rotlerp(float a, float b, float max);
+    public double getWantedX();
+    public double getWantedY();
+    public double getWantedZ();
+    public void setWait();
+    protected static enum Operation {
+        WAIT, MOVE_TO, STRAFE, JUMPING;
+    }
+}
+//// SmoothSwimmingLookControl.java
+import net.minecraft.world.entity.Mob;
+public class SmoothSwimmingLookControl extends LookControl {
+    public SmoothSwimmingLookControl(Mob mob, int maxYRotFromCenter);
+    public void tick();
+}
+//// SmoothSwimmingMoveControl.java
+import net.minecraft.world.entity.Mob;
+public class SmoothSwimmingMoveControl<T extends Mob> extends MoveControl<T> {
+    public SmoothSwimmingMoveControl(T mob, int maxTurnX, int maxTurnY, float inWaterSpeedModifier, float outsideWaterSpeedModifier, boolean applyGravity);
+    public void tick();
+}

@@ -1,0 +1,114 @@
+//// ChunkDependencies.java
+import com.google.common.collect.ImmutableList;
+public final class ChunkDependencies {
+    public ChunkDependencies(ImmutableList<ChunkStatus> dependencyByRadius);
+    public ImmutableList<ChunkStatus> asList();
+    public int size();
+    public int getRadiusOf(ChunkStatus status);
+    public int getRadius();
+    public ChunkStatus get(int distance);
+    public String toString();
+}
+//// ChunkPyramid.java
+import com.google.common.collect.ImmutableList;
+import java.util.function.UnaryOperator;
+public record ChunkPyramid(ImmutableList<ChunkStep> steps) {
+    public static final ChunkPyramid GENERATION_PYRAMID;
+    public static final ChunkPyramid LOADING_PYRAMID;
+    public static final int MAX_CHUNK_COORDINATE_VALUE;
+    public ChunkStep getStepTo(ChunkStatus status);
+    public static class Builder {
+        public ChunkPyramid build();
+        public Builder step(ChunkStatus status, UnaryOperator<ChunkStep.Builder> operator);
+    }
+}
+//// ChunkStatus.java
+import com.mojang.serialization.Codec;
+import java.util.EnumSet;
+import java.util.List;
+import net.minecraft.world.level.levelgen.Heightmap;
+public class ChunkStatus {
+    public static final int MAX_STRUCTURE_DISTANCE = 8;
+    public static final EnumSet<Heightmap.Types> FINAL_HEIGHTMAPS;
+    public static final ChunkStatus EMPTY;
+    public static final ChunkStatus STRUCTURE_STARTS;
+    public static final ChunkStatus STRUCTURE_REFERENCES;
+    public static final ChunkStatus BIOMES;
+    public static final ChunkStatus TERRAIN;
+    public static final ChunkStatus FEATURES;
+    public static final ChunkStatus INITIALIZE_LIGHT;
+    public static final ChunkStatus LIGHT;
+    public static final ChunkStatus SPAWN;
+    public static final ChunkStatus FULL;
+    public static final Codec<ChunkStatus> CODEC;
+    public static List<ChunkStatus> getStatusList();
+    protected ChunkStatus(ChunkStatus parent, EnumSet<Heightmap.Types> heightmapsAfter, ChunkType chunkType);
+    public int getIndex();
+    public ChunkStatus getParent();
+    public ChunkType getChunkType();
+    public static ChunkStatus byName(String key);
+    public EnumSet<Heightmap.Types> heightmapsAfter();
+    public boolean isOrAfter(ChunkStatus step);
+    public boolean isAfter(ChunkStatus step);
+    public boolean isOrBefore(ChunkStatus step);
+    public boolean isBefore(ChunkStatus step);
+    public static ChunkStatus max(ChunkStatus a, ChunkStatus b);
+    public String toString();
+    public String getName();
+}
+//// ChunkStatusTask.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.server.level.GenerationChunkHolder;
+import net.minecraft.util.StaticCache2D;
+import net.minecraft.world.level.chunk.ChunkAccess;
+public interface ChunkStatusTask {
+    CompletableFuture<ChunkAccess> doWork(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+}
+//// ChunkStatusTasks.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.server.level.GenerationChunkHolder;
+import net.minecraft.util.StaticCache2D;
+import net.minecraft.world.level.chunk.ChunkAccess;
+public class ChunkStatusTasks {
+    public static CompletableFuture<ChunkAccess> passThrough(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> generateStructureStarts(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> loadStructureStarts(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> generateStructureReferences(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> generateBiomes(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> buildTerrain(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> generateFeatures(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> initializeLight(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> light(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> generateSpawn(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+    public static CompletableFuture<ChunkAccess> full(WorldGenContext context, ChunkStep step, StaticCache2D<GenerationChunkHolder> chunks, ChunkAccess chunk);
+}
+//// ChunkStep.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.server.level.GenerationChunkHolder;
+import net.minecraft.util.StaticCache2D;
+import net.minecraft.world.level.chunk.ChunkAccess;
+public record ChunkStep(ChunkStatus targetStatus, ChunkDependencies directDependencies, ChunkDependencies accumulatedDependencies, int blockStateWriteRadius, ChunkStatusTask task) {
+    public int getAccumulatedRadiusOf(ChunkStatus status);
+    public CompletableFuture<ChunkAccess> apply(WorldGenContext context, StaticCache2D<GenerationChunkHolder> cache, ChunkAccess chunk);
+    public static class Builder {
+        protected Builder(ChunkStatus status);
+        protected Builder(ChunkStatus status, ChunkStep parent);
+        public Builder addRequirement(ChunkStatus status, int radius);
+        public Builder blockStateWriteRadius(int radius);
+        public Builder setTask(ChunkStatusTask task);
+        public ChunkStep build();
+    }
+}
+//// ChunkType.java
+public enum ChunkType {
+    PROTOCHUNK, LEVELCHUNK;
+}
+//// WorldGenContext.java
+import java.util.concurrent.Executor;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ThreadedLevelLightEngine;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+public record WorldGenContext(ServerLevel level, ChunkGenerator generator, StructureTemplateManager structureManager, ThreadedLevelLightEngine lightEngine, Executor mainThreadExecutor, LevelChunk.UnsavedListener unsavedListener) {
+}

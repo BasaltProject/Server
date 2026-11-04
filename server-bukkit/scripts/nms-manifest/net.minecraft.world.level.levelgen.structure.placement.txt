@@ -1,0 +1,113 @@
+//// AbstractSpreadingStructurePlacement.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
+public abstract class AbstractSpreadingStructurePlacement implements StructurePlacement {
+    protected static <S extends AbstractSpreadingStructurePlacement> Products.P5<RecordCodecBuilder.Mu<S>, Vec3i, FrequencyReductionMethod, Float, Integer, Optional<ExclusionZone>> placementCodec(RecordCodecBuilder.Instance<S> i);
+    protected AbstractSpreadingStructurePlacement(Vec3i locateOffset, FrequencyReductionMethod frequencyReductionMethod, float frequency, int salt, Optional<ExclusionZone> exclusionZone);
+    public abstract MapCodec<? extends AbstractSpreadingStructurePlacement> codec();
+    public Vec3i locateOffset();
+    protected FrequencyReductionMethod frequencyReductionMethod();
+    protected float frequency();
+    protected int salt();
+    protected Optional<ExclusionZone> exclusionZone();
+    public boolean isStructureChunk(ChunkGeneratorStructureState state, int sourceX, int sourceZ);
+    public boolean applyAdditionalChunkRestrictions(int sourceX, int sourceZ, long levelSeed);
+    public boolean applyInteractionsWithOtherStructures(ChunkGeneratorStructureState state, int sourceX, int sourceZ);
+    protected abstract boolean isPlacementChunk(ChunkGeneratorStructureState state, int sourceX, int sourceZ);
+    public static record ExclusionZone(Holder<StructureSet> otherSet, int chunkCount) {
+        public static final Codec<ExclusionZone> CODEC;
+    }
+    public static enum FrequencyReductionMethod implements StringRepresentable {
+        DEFAULT, LEGACY_TYPE_1, LEGACY_TYPE_2, LEGACY_TYPE_3;
+        public static final Codec<FrequencyReductionMethod> CODEC;
+        public boolean shouldGenerate(long seed, int salt, int sourceX, int sourceZ, float probability);
+        public String getSerializedName();
+    }
+    public interface FrequencyReducer {
+        boolean shouldGenerate(long seed, int salt, int sourceX, int sourceZ, float probability);
+    }
+}
+//// ConcentricRingsStructurePlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+public class ConcentricRingsStructurePlacement extends AbstractSpreadingStructurePlacement {
+    public static final MapCodec<ConcentricRingsStructurePlacement> CODEC;
+    public ConcentricRingsStructurePlacement(Vec3i locateOffset, AbstractSpreadingStructurePlacement.FrequencyReductionMethod frequencyReductionMethod, float frequency, int salt, Optional<AbstractSpreadingStructurePlacement.ExclusionZone> exclusionZone, int distance, int spread, int count, HolderSet<Biome> preferredBiomes);
+    public ConcentricRingsStructurePlacement(int distance, int spread, int count, HolderSet<Biome> preferredBiomes);
+    public int distance();
+    public int spread();
+    public int count();
+    public HolderSet<Biome> preferredBiomes();
+    protected boolean isPlacementChunk(ChunkGeneratorStructureState generatorState, int sourceX, int sourceZ);
+    public MapCodec<ConcentricRingsStructurePlacement> codec();
+}
+//// DimensionOriginStructurePlacement.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+public class DimensionOriginStructurePlacement implements StructurePlacement {
+    public static final DimensionOriginStructurePlacement INSTANCE;
+    public static final MapCodec<DimensionOriginStructurePlacement> CODEC;
+    private DimensionOriginStructurePlacement();
+    public boolean isStructureChunk(ChunkGeneratorStructureState state, int sourceX, int sourceZ);
+    public MapCodec<DimensionOriginStructurePlacement> codec();
+}
+//// RandomSpreadStructurePlacement.java
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+public class RandomSpreadStructurePlacement extends AbstractSpreadingStructurePlacement {
+    public static final MapCodec<RandomSpreadStructurePlacement> CODEC;
+    public RandomSpreadStructurePlacement(Vec3i locateOffset, AbstractSpreadingStructurePlacement.FrequencyReductionMethod frequencyReductionMethod, float frequency, int salt, Optional<AbstractSpreadingStructurePlacement.ExclusionZone> exclusionZone, int spacing, int separation, RandomSpreadType spreadType);
+    public RandomSpreadStructurePlacement(int spacing, int separation, RandomSpreadType spreadType, int salt);
+    public int spacing();
+    public int separation();
+    public RandomSpreadType spreadType();
+    public ChunkPos getPotentialStructureChunk(long seed, int sourceX, int sourceZ);
+    protected boolean isPlacementChunk(ChunkGeneratorStructureState state, int sourceX, int sourceZ);
+    public MapCodec<RandomSpreadStructurePlacement> codec();
+}
+//// RandomSpreadType.java
+import com.mojang.serialization.Codec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
+public enum RandomSpreadType implements StringRepresentable {
+    LINEAR, TRIANGULAR;
+    public static final Codec<RandomSpreadType> CODEC;
+    public String getSerializedName();
+    public int evaluate(RandomSource random, int limit);
+}
+//// StructurePlacement.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+public interface StructurePlacement {
+    Codec<StructurePlacement> CODEC;
+    boolean isStructureChunk(ChunkGeneratorStructureState state, int sourceX, int sourceZ);
+    default boolean applyAdditionalChunkRestrictions(int sourceX, int sourceZ, long levelSeed);
+    default BlockPos getLocatePos(ChunkPos chunkPos);
+    default Vec3i locateOffset();
+    MapCodec<? extends StructurePlacement> codec();
+}
+//// StructurePlacements.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public interface StructurePlacements {
+    static MapCodec<? extends StructurePlacement> bootstrap(Registry<MapCodec<? extends StructurePlacement>> registry);
+}

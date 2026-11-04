@@ -1,0 +1,373 @@
+//// EmptyFluid.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public class EmptyFluid extends Fluid {
+    public Item getBucket();
+    public boolean canBeReplacedWith(FluidState state, BlockGetter level, BlockPos pos, Fluid other, Direction direction);
+    public Vec3 getFlow(BlockGetter level, BlockPos pos, FluidState fluidState);
+    public int getTickDelay(LevelReader level);
+    protected boolean isEmpty();
+    protected float getExplosionResistance();
+    public float getHeight(FluidState fluidState, BlockGetter level, BlockPos pos);
+    public float getOwnHeight(FluidState fluidState);
+    protected BlockState createLegacyBlock(FluidState fluidState);
+    public boolean isSource(FluidState fluidState);
+    public int getAmount(FluidState fluidState);
+    public VoxelShape getShape(FluidState state, BlockGetter level, BlockPos pos);
+}
+//// FlowingFluid.java
+import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public abstract class FlowingFluid extends Fluid {
+    public static final BooleanProperty FALLING;
+    public static final IntegerProperty LEVEL;
+    protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder);
+    public Vec3 getFlow(BlockGetter level, BlockPos pos, FluidState fluidState);
+    protected boolean isSolidFace(BlockGetter level, BlockPos pos, Direction direction);
+    protected void spread(ServerLevel level, BlockPos pos, BlockState state, FluidState fluidState);
+    protected FluidState getNewLiquid(ServerLevel level, BlockPos pos, BlockState state);
+    public abstract Fluid getFlowing();
+    public FluidState getFlowing(int amount, boolean falling);
+    public abstract Fluid getSource();
+    public FluidState getSource(boolean falling);
+    protected abstract boolean canConvertToSource(ServerLevel level);
+    protected void spreadTo(LevelAccessor level, BlockPos pos, BlockState state, Direction direction, FluidState target);
+    protected abstract void beforeDestroyingBlock(LevelAccessor level, BlockPos pos, BlockState state);
+    protected int getSlopeDistance(LevelReader level, BlockPos pos, int pass, Direction from, BlockState state, SpreadContext context);
+    protected abstract int getSlopeFindDistance(LevelReader level);
+    protected Map<Direction, FluidState> getSpread(ServerLevel level, BlockPos pos, BlockState state);
+    protected abstract int getDropOff(LevelReader level);
+    protected int getSpreadDelay(Level level, BlockPos pos, FluidState oldFluidState, FluidState newFluidState);
+    public void tick(ServerLevel level, BlockPos pos, BlockState blockState, FluidState fluidState);
+    protected static int getLegacyLevel(FluidState fluidState);
+    public float getHeight(FluidState fluidState, BlockGetter level, BlockPos pos);
+    public float getOwnHeight(FluidState fluidState);
+    public abstract int getAmount(FluidState fluidState);
+    public VoxelShape getShape(FluidState state, BlockGetter level, BlockPos pos);
+    static record BlockStatePairKey(BlockState first, BlockState second, Direction direction) {
+        public boolean equals(Object o);
+        public int hashCode();
+    }
+    protected class SpreadContext {
+        private SpreadContext(BlockGetter level, BlockPos origin);
+        public BlockState getBlockState(BlockPos pos);
+        public boolean isHole(BlockPos pos);
+    }
+}
+//// Fluid.java
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.IdMapper;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public abstract class Fluid {
+    public static final IdMapper<FluidState> FLUID_STATE_REGISTRY;
+    protected final StateDefinition<Fluid, FluidState> stateDefinition;
+    protected Fluid();
+    protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder);
+    public StateDefinition<Fluid, FluidState> getStateDefinition();
+    protected final void registerDefaultState(FluidState state);
+    public final FluidState defaultFluidState();
+    public abstract Item getBucket();
+    protected void animateTick(Level level, BlockPos pos, FluidState fluidState, RandomSource random);
+    protected void tick(ServerLevel level, BlockPos pos, BlockState blockState, FluidState fluidState);
+    protected void randomTick(ServerLevel level, BlockPos pos, FluidState fluidState, RandomSource random);
+    protected void entityInside(Level level, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier);
+    protected ParticleOptions getDripParticle();
+    protected abstract boolean canBeReplacedWith(FluidState state, BlockGetter level, BlockPos pos, Fluid other, Direction direction);
+    protected abstract Vec3 getFlow(BlockGetter level, BlockPos pos, FluidState fluidState);
+    public abstract int getTickDelay(LevelReader level);
+    protected boolean isRandomlyTicking();
+    protected boolean isEmpty();
+    protected abstract float getExplosionResistance();
+    public abstract float getHeight(FluidState fluidState, BlockGetter level, BlockPos pos);
+    public abstract float getOwnHeight(FluidState fluidState);
+    protected abstract BlockState createLegacyBlock(FluidState fluidState);
+    public abstract boolean isSource(FluidState fluidState);
+    public abstract int getAmount(FluidState fluidState);
+    public boolean isSame(Fluid other);
+    public boolean is(TagKey<Fluid> tag);
+    public abstract VoxelShape getShape(FluidState state, BlockGetter level, BlockPos pos);
+    public AABB getAABB(FluidState state, BlockGetter level, BlockPos pos);
+    public Optional<SoundEvent> getPickupSound();
+    public Holder.Reference<Fluid> builtInRegistryHolder();
+}
+//// FluidIds.java
+import net.minecraft.resources.ResourceKey;
+public class FluidIds {
+    public static final ResourceKey<Fluid> EMPTY;
+    public static final ResourceKey<Fluid> FLOWING_WATER;
+    public static final ResourceKey<Fluid> WATER;
+    public static final ResourceKey<Fluid> FLOWING_LAVA;
+    public static final ResourceKey<Fluid> LAVA;
+}
+//// FluidState.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateHolder;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+public final class FluidState extends StateHolder<Fluid, FluidState> implements TypedInstance<Fluid> {
+    public static final Codec<FluidState> CODEC;
+    public static final int AMOUNT_MAX = 9;
+    public static final int AMOUNT_FULL = 8;
+    public FluidState(Fluid owner, Property<?>[] propertyKeys, Comparable<?>[] propertyValues);
+    public Fluid getType();
+    public boolean isSource();
+    public boolean isSourceOfType(Fluid fluidType);
+    public boolean isEmpty();
+    public float getHeight(BlockGetter level, BlockPos pos);
+    public float getHeightForCamera(BlockGetter level, BlockPos pos);
+    public float getOwnHeight();
+    public boolean isFull();
+    public int getAmount();
+    public boolean shouldRenderBackwardUpFace(BlockGetter level, BlockPos above);
+    public void tick(ServerLevel level, BlockPos pos, BlockState blockState);
+    public void animateTick(Level level, BlockPos pos, RandomSource random);
+    public boolean isRandomlyTicking();
+    public void randomTick(ServerLevel level, BlockPos pos, RandomSource random);
+    public Vec3 getFlow(BlockGetter level, BlockPos pos);
+    public BlockState createLegacyBlock();
+    public ParticleOptions getDripParticle();
+    public Holder<Fluid> typeHolder();
+    public float getExplosionResistance();
+    public boolean canBeReplacedWith(BlockGetter level, BlockPos pos, Fluid other, Direction direction);
+    public VoxelShape getShape(BlockGetter level, BlockPos pos);
+    public AABB getAABB(BlockGetter level, BlockPos pos);
+    public void entityInside(Level level, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier);
+}
+//// Fluids.java
+public class Fluids {
+    public static final Fluid EMPTY;
+    public static final FlowingFluid FLOWING_WATER;
+    public static final FlowingFluid WATER;
+    public static final FlowingFluid FLOWING_LAVA;
+    public static final FlowingFluid LAVA;
+}
+//// FogType.java
+public enum FogType {
+    LAVA, WATER, POWDER_SNOW, ATMOSPHERIC, NONE;
+}
+//// LavaFluid.java
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+public abstract class LavaFluid extends FlowingFluid {
+    public static final int LIGHT_EMISSION = 15;
+    public static final float MIN_LEVEL_CUTOFF = 0.44444445F;
+    public Fluid getFlowing();
+    public Fluid getSource();
+    public Item getBucket();
+    public void animateTick(Level level, BlockPos pos, FluidState fluidState, RandomSource random);
+    public void randomTick(ServerLevel level, BlockPos pos, FluidState fluidState, RandomSource random);
+    protected void entityInside(Level level, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier);
+    public ParticleOptions getDripParticle();
+    protected void beforeDestroyingBlock(LevelAccessor level, BlockPos pos, BlockState state);
+    public int getSlopeFindDistance(LevelReader level);
+    public BlockState createLegacyBlock(FluidState fluidState);
+    public boolean isSame(Fluid other);
+    public int getDropOff(LevelReader level);
+    public boolean canBeReplacedWith(FluidState state, BlockGetter level, BlockPos pos, Fluid other, Direction direction);
+    public int getTickDelay(LevelReader level);
+    public int getSpreadDelay(Level level, BlockPos pos, FluidState oldFluidState, FluidState newFluidState);
+    protected boolean canConvertToSource(ServerLevel level);
+    protected void spreadTo(LevelAccessor level, BlockPos pos, BlockState state, Direction direction, FluidState target);
+    protected boolean isRandomlyTicking();
+    protected float getExplosionResistance();
+    public Optional<SoundEvent> getPickupSound();
+    public static class Source extends LavaFluid {
+        public int getAmount(FluidState fluidState);
+        public boolean isSource(FluidState fluidState);
+    }
+    public static class Flowing extends LavaFluid {
+        protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder);
+        public int getAmount(FluidState fluidState);
+        public boolean isSource(FluidState fluidState);
+    }
+}
+//// MapColor.java
+public class MapColor {
+    public static final MapColor NONE;
+    public static final MapColor GRASS;
+    public static final MapColor SAND;
+    public static final MapColor WOOL;
+    public static final MapColor FIRE;
+    public static final MapColor ICE;
+    public static final MapColor METAL;
+    public static final MapColor PLANT;
+    public static final MapColor SNOW;
+    public static final MapColor CLAY;
+    public static final MapColor DIRT;
+    public static final MapColor STONE;
+    public static final MapColor WATER;
+    public static final MapColor WOOD;
+    public static final MapColor QUARTZ;
+    public static final MapColor COLOR_ORANGE;
+    public static final MapColor COLOR_MAGENTA;
+    public static final MapColor COLOR_LIGHT_BLUE;
+    public static final MapColor COLOR_YELLOW;
+    public static final MapColor COLOR_LIGHT_GREEN;
+    public static final MapColor COLOR_PINK;
+    public static final MapColor COLOR_GRAY;
+    public static final MapColor COLOR_LIGHT_GRAY;
+    public static final MapColor COLOR_CYAN;
+    public static final MapColor COLOR_PURPLE;
+    public static final MapColor COLOR_BLUE;
+    public static final MapColor COLOR_BROWN;
+    public static final MapColor COLOR_GREEN;
+    public static final MapColor COLOR_RED;
+    public static final MapColor COLOR_BLACK;
+    public static final MapColor GOLD;
+    public static final MapColor DIAMOND;
+    public static final MapColor LAPIS;
+    public static final MapColor EMERALD;
+    public static final MapColor PODZOL;
+    public static final MapColor NETHER;
+    public static final MapColor TERRACOTTA_WHITE;
+    public static final MapColor TERRACOTTA_ORANGE;
+    public static final MapColor TERRACOTTA_MAGENTA;
+    public static final MapColor TERRACOTTA_LIGHT_BLUE;
+    public static final MapColor TERRACOTTA_YELLOW;
+    public static final MapColor TERRACOTTA_LIGHT_GREEN;
+    public static final MapColor TERRACOTTA_PINK;
+    public static final MapColor TERRACOTTA_GRAY;
+    public static final MapColor TERRACOTTA_LIGHT_GRAY;
+    public static final MapColor TERRACOTTA_CYAN;
+    public static final MapColor TERRACOTTA_PURPLE;
+    public static final MapColor TERRACOTTA_BLUE;
+    public static final MapColor TERRACOTTA_BROWN;
+    public static final MapColor TERRACOTTA_GREEN;
+    public static final MapColor TERRACOTTA_RED;
+    public static final MapColor TERRACOTTA_BLACK;
+    public static final MapColor CRIMSON_NYLIUM;
+    public static final MapColor CRIMSON_STEM;
+    public static final MapColor CRIMSON_HYPHAE;
+    public static final MapColor WARPED_NYLIUM;
+    public static final MapColor WARPED_STEM;
+    public static final MapColor WARPED_HYPHAE;
+    public static final MapColor WARPED_WART_BLOCK;
+    public static final MapColor DEEPSLATE;
+    public static final MapColor RAW_IRON;
+    public static final MapColor GLOW_LICHEN;
+    public final int col;
+    public final int id;
+    private MapColor(int id, int col);
+    public int calculateARGBColor(Brightness brightness);
+    public static MapColor byId(int id);
+    public static int getColorFromPackedId(int packedId);
+    public byte getPackedId(Brightness brightness);
+    public static enum Brightness {
+        LOW, NORMAL, HIGH, LOWEST;
+        public final int id;
+        public final int modifier;
+        public static Brightness byId(int id);
+    }
+}
+//// PushReaction.java
+public enum PushReaction {
+    PUSH_PULL, PUSH, POPPED, IMMOVEABLE, IGNORE_ENTITY;
+}
+//// WaterFluid.java
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+public abstract class WaterFluid extends FlowingFluid {
+    public Fluid getFlowing();
+    public Fluid getSource();
+    public Item getBucket();
+    public void animateTick(Level level, BlockPos pos, FluidState fluidState, RandomSource random);
+    public ParticleOptions getDripParticle();
+    protected boolean canConvertToSource(ServerLevel level);
+    protected void beforeDestroyingBlock(LevelAccessor level, BlockPos pos, BlockState state);
+    protected void entityInside(Level level, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier);
+    public int getSlopeFindDistance(LevelReader level);
+    public BlockState createLegacyBlock(FluidState fluidState);
+    public boolean isSame(Fluid other);
+    public int getDropOff(LevelReader level);
+    public int getTickDelay(LevelReader level);
+    public boolean canBeReplacedWith(FluidState state, BlockGetter level, BlockPos pos, Fluid other, Direction direction);
+    protected float getExplosionResistance();
+    public Optional<SoundEvent> getPickupSound();
+    public static class Source extends WaterFluid {
+        public int getAmount(FluidState fluidState);
+        public boolean isSource(FluidState fluidState);
+    }
+    public static class Flowing extends WaterFluid {
+        protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder);
+        public int getAmount(FluidState fluidState);
+        public boolean isSource(FluidState fluidState);
+    }
+}

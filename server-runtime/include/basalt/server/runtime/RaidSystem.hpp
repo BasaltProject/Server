@@ -5,10 +5,12 @@
 #include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::player {
@@ -77,6 +79,10 @@ public:
     /// What a plugin asks of a raid's boss bar: title (component JSON), color, style, flags, progress, who sees it.
     bool controlBar(world::LoadedWorld& world, std::int32_t id, std::string_view action, std::string_view text,
                     std::int32_t value);
+
+    /// What a plugin asks of a raid itself: stop, join, set_leader, remove_leader, create. The raid id, or -1.
+    std::int32_t controlRaid(world::LoadedWorld& world, std::int32_t id, std::string_view action,
+                             const std::array<std::int32_t, 4>& arguments, std::int32_t value);
 
     static void setCelebrating(entity::ServerEntity& raider, bool celebrating);
 

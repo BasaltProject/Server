@@ -16,9 +16,22 @@ const std::string& ChunkBiomeEnvironment::biomeAt(std::int32_t x, std::int32_t y
     if (!zoomer_.has_value()) {
         return delegate_->biomeAt(x, y, z, context_);
     }
-    return zoomer_->biomeAt(
-        x, y, z, [this](std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) -> const std::string& {
+    return zoomer_->biomeAtWith(
+        x, y, z,
+        [this](std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) -> const std::string& {
             return noiseBiomeAt(quartX, quartY, quartZ, context_);
+        },
+        [this](std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) {
+            const std::int64_t key = (static_cast<std::int64_t>(quartX) & 0x1FFFFFLL) |
+                                     ((static_cast<std::int64_t>(quartY) & 0xFFFFFLL) << 21) |
+                                     ((static_cast<std::int64_t>(quartZ) & 0x1FFFFFLL) << 41);
+            const std::uint64_t mixed = static_cast<std::uint64_t>(key) * 0x9E3779B97F4A7C15ULL;
+            CornerSlot& slot = corners_[static_cast<std::size_t>(mixed >> 55)];
+            if (slot.key != key) {
+                slot.offsets = BiomeZoomer::offsetsAt(zoomer_->seed(), quartX, quartY, quartZ);
+                slot.key = key;
+            }
+            return slot.offsets;
         });
 }
 

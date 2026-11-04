@@ -191,6 +191,15 @@ void JNICALL nativeReceive(JNIEnv* env, jclass, jlong connection, jint id, jbyte
     }
 }
 
+jboolean JNICALL nativePlayerReceive(JNIEnv* env, jclass, jstring uuid, jint id, jbyteArray body) {
+    const auto player = BukkitBridge::current().services().players().byUuid(toStd(env, uuid));
+    if (player == nullptr) {
+        return JNI_FALSE;
+    }
+    const std::shared_ptr<PacketEndpoint> endpoint = BukkitBridge::current().services().packets().endpointOf(*player);
+    return endpoint != nullptr && endpoint->receiveServerbound(id, bytesOf(env, body), false) ? JNI_TRUE : JNI_FALSE;
+}
+
 void JNICALL nativeClose(JNIEnv*, jclass, jlong connection) {
     const std::shared_ptr<PacketEndpoint> endpoint = tap().endpoint(static_cast<std::uint64_t>(connection));
     if (endpoint != nullptr) {
@@ -234,6 +243,8 @@ void registerPacketNatives(JNIEnv* env, jclass natives) {
                         reinterpret_cast<void*>(&nativeSend)},
         JNINativeMethod{const_cast<char*>("packetReceive"), const_cast<char*>("(JI[B)V"),
                         reinterpret_cast<void*>(&nativeReceive)},
+        JNINativeMethod{const_cast<char*>("playerPacketReceive"), const_cast<char*>("(Ljava/lang/String;I[B)Z"),
+                        reinterpret_cast<void*>(&nativePlayerReceive)},
         JNINativeMethod{const_cast<char*>("packetClose"), const_cast<char*>("(J)V"),
                         reinterpret_cast<void*>(&nativeClose)},
         JNINativeMethod{const_cast<char*>("packetConnectionOf"), const_cast<char*>("(Ljava/lang/String;)J"),

@@ -1,0 +1,54 @@
+//// BlockDataSource.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.stream.Stream;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.coordinates.Coordinates;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.CompilableString;
+public record BlockDataSource(CompilableString<Coordinates> coordinates) implements DataSource {
+    public static final Codec<CompilableString<Coordinates>> BLOCK_POS_CODEC;
+    public static final MapCodec<BlockDataSource> MAP_CODEC;
+    public Stream<CompoundTag> getData(CommandSourceStack sender);
+    public MapCodec<BlockDataSource> codec();
+}
+//// DataSource.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.MapCodec;
+import java.util.stream.Stream;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.nbt.CompoundTag;
+public interface DataSource {
+    Stream<CompoundTag> getData(CommandSourceStack sender) throws CommandSyntaxException;
+    MapCodec<? extends DataSource> codec();
+}
+//// DataSources.java
+import com.mojang.serialization.MapCodec;
+public class DataSources {
+    public static final MapCodec<DataSource> CODEC;
+}
+//// EntityDataSource.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.MapCodec;
+import java.util.stream.Stream;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.selector.EntitySelector;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.CompilableString;
+public record EntityDataSource(CompilableString<EntitySelector> selector) implements DataSource {
+    public static final MapCodec<EntityDataSource> MAP_CODEC;
+    public Stream<CompoundTag> getData(CommandSourceStack sender) throws CommandSyntaxException;
+    public MapCodec<EntityDataSource> codec();
+}
+//// StorageDataSource.java
+import com.mojang.serialization.MapCodec;
+import java.util.stream.Stream;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+public record StorageDataSource(Identifier id) implements DataSource {
+    public static final MapCodec<StorageDataSource> MAP_CODEC;
+    public Stream<CompoundTag> getData(CommandSourceStack sender);
+    public MapCodec<StorageDataSource> codec();
+    public String toString();
+}

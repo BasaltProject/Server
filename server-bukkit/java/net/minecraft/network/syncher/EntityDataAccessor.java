@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.network.syncher;
 public record EntityDataAccessor<T>(int id, EntityDataSerializer<T> serializer) {
     public EntityDataAccessor {
@@ -7,5 +8,14 @@ public record EntityDataAccessor<T>(int id, EntityDataSerializer<T> serializer) 
     }
     public int getId() {
         return id;
+    }
+    public boolean equals(Object o) {
+        return this == o || (o instanceof EntityDataAccessor<?> other && id == other.id);
+    }
+    public int hashCode() {
+        return id;
+    }
+    public String toString() {
+        return "<entity data: " + id + ">";
     }
 }

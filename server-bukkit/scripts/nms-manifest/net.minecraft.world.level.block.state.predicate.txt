@@ -1,0 +1,23 @@
+//// BlockPredicate.java
+import java.util.function.Predicate;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class BlockPredicate implements Predicate<BlockState> {
+    public BlockPredicate(Block block);
+    public static BlockPredicate forBlock(Block block);
+    public boolean test(BlockState input);
+}
+//// BlockStatePredicate.java
+import java.util.function.Predicate;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.Property;
+public class BlockStatePredicate implements Predicate<BlockState> {
+    public static final Predicate<BlockState> ANY;
+    private BlockStatePredicate(StateDefinition<Block, BlockState> definition);
+    public static BlockStatePredicate forBlock(Block block);
+    public boolean test(BlockState input);
+    protected <T extends Comparable<T>> boolean applies(BlockState input, Property<T> key, Predicate<Object> predicate);
+    public <V extends Comparable<V>> BlockStatePredicate where(Property<V> property, Predicate<Object> predicate);
+}

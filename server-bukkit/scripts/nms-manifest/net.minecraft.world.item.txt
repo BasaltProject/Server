@@ -1,0 +1,3043 @@
+//// AdventureModePredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.advancements.predicates.BlockPredicate;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.block.state.pattern.BlockInWorld;
+public class AdventureModePredicate {
+    public static final Codec<AdventureModePredicate> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, AdventureModePredicate> STREAM_CODEC;
+    public static final Component CAN_BREAK_HEADER;
+    public static final Component CAN_PLACE_HEADER;
+    public AdventureModePredicate(List<BlockPredicate> predicates);
+    public boolean test(BlockInWorld blockInWorld);
+    public void addToTooltip(Consumer<Component> consumer);
+    public boolean equals(Object obj);
+    public int hashCode();
+    public String toString();
+}
+//// AirItem.java
+import net.minecraft.network.chat.Component;
+public class AirItem extends Item {
+    public AirItem(Item.Properties properties);
+    public Component getName(ItemStack itemStack);
+}
+//// ArmorStandItem.java
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.context.UseOnContext;
+public class ArmorStandItem extends Item {
+    public ArmorStandItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+}
+//// ArrayItemProvider.java
+import java.util.function.Predicate;
+public class ArrayItemProvider implements ItemProvider {
+    protected final ItemStack[] items;
+    protected int position;
+    public ArrayItemProvider(ItemStack[] items);
+    public boolean hasNext();
+    public void restart();
+    public final ItemStack next();
+    public final ItemStack peek();
+    protected ItemStack computeNextItem();
+    public boolean findNext(Predicate<ItemStack> predicate);
+    protected void setPosition(int newPosition);
+    public static class Cycled extends ArrayItemProvider {
+        public Cycled(ItemStack[] items);
+        public boolean hasNext();
+        protected ItemStack computeNextItem();
+        public boolean findNext(Predicate<ItemStack> predicate);
+    }
+}
+//// ArrowItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.level.Level;
+public class ArrowItem extends Item implements ProjectileItem {
+    public ArrowItem(Item.Properties properties);
+    public AbstractArrow createArrow(Level level, ItemStack itemStack, LivingEntity owner, ItemStack firedFromWeapon);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+}
+//// BannerItem.java
+import net.minecraft.world.level.block.Block;
+public class BannerItem extends StandingAndWallBlockItem {
+    public BannerItem(Block block, Block wallBlock, Item.Properties properties);
+    public DyeColor getColor();
+}
+//// BlockItem.java
+import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.TagValueOutput;
+public class BlockItem extends Item {
+    public BlockItem(Block block, Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public InteractionResult place(BlockPlaceContext placeContext);
+    protected SoundEvent getPlaceSound(BlockState blockState);
+    public BlockPlaceContext updatePlacementContext(BlockPlaceContext context);
+    protected BlockState getPlacementState(BlockPlaceContext context);
+    protected boolean canPlace(BlockPlaceContext context, BlockState stateForPlacement);
+    protected boolean mustSurvive();
+    protected boolean placeBlock(BlockPlaceContext context, BlockState placementState);
+    public static boolean updateCustomBlockEntityTag(Level level, Player player, BlockPos pos, ItemStack itemStack);
+    public boolean shouldPrintOpWarning(ItemStack stack, Player player);
+    public Block getBlock();
+    public void registerBlocks(Map<Block, Item> map, Item item);
+    public boolean canFitInsideContainerItems();
+    public void onDestroyed(ItemEntity entity);
+    public static void setBlockEntityData(ItemStack stack, BlockEntityType<?> type, TagValueOutput output);
+}
+//// BoatItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
+import net.minecraft.world.level.Level;
+public class BoatItem extends Item {
+    public BoatItem(EntityType<? extends AbstractBoat> entityType, Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}
+//// BoneMealItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+public class BoneMealItem extends Item {
+    public static final int GRASS_SPREAD_WIDTH = 3;
+    public static final int GRASS_SPREAD_HEIGHT = 1;
+    public static final int GRASS_COUNT_MULTIPLIER = 3;
+    public BoneMealItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public static boolean growCrop(ItemStack itemStack, Level level, BlockPos pos);
+    public static boolean growWaterPlant(ItemStack itemStack, Level level, BlockPos pos, Direction clickedFace);
+    public static void addGrowthParticles(LevelAccessor level, BlockPos pos, int count);
+}
+//// BottleItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class BottleItem extends Item {
+    public BottleItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    protected ItemStack turnBottleIntoItem(ItemStack itemStack, Player player, ItemStack itemStackToTurnInto);
+}
+//// BowItem.java
+import java.util.function.Predicate;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.Level;
+public class BowItem extends ProjectileWeaponItem {
+    public static final int MAX_DRAW_DURATION = 20;
+    public static final int DEFAULT_RANGE = 15;
+    public BowItem(Item.Properties properties);
+    public boolean releaseUsing(ItemStack itemStack, Level level, LivingEntity entity, int remainingTime);
+    protected void shootProjectile(LivingEntity shooter, Projectile projectileEntity, int index, float power, float uncertainty, float angle, LivingEntity targetOverrride);
+    public static float getPowerForTime(int timeHeld);
+    public int getUseDuration(ItemStack itemStack, LivingEntity user);
+    public ItemUseAnimation getUseAnimation(ItemStack itemStack);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public Predicate<ItemStack> getAllSupportedProjectiles();
+    public int getDefaultProjectileRange();
+}
+//// BrushItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+public class BrushItem extends Item {
+    public static final int ANIMATION_DURATION = 10;
+    public BrushItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public ItemUseAnimation getUseAnimation(ItemStack itemStack);
+    public int getUseDuration(ItemStack itemStack, LivingEntity user);
+    public void onUseTick(Level level, LivingEntity livingEntity, ItemStack itemStack, int ticksRemaining);
+    static record DustParticlesDelta(double xd, double yd, double zd) {
+        public static DustParticlesDelta fromDirection(Vec3 viewVector, Direction hitDirection);
+    }
+}
+//// BucketItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.phys.BlockHitResult;
+public class BucketItem extends Item implements DispensibleContainerItem {
+    protected final Fluid content;
+    public BucketItem(Fluid content, Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public ClipContext.Fluid getFluidContext();
+    public static ItemStack getEmptySuccessItem(ItemStack itemStack, Player player);
+    public void checkExtraContent(LivingEntity user, Level level, ItemStack itemStack, BlockPos pos);
+    public boolean emptyContents(LivingEntity user, Level level, BlockPos pos, BlockHitResult hitResult);
+    protected void playEmptySound(LivingEntity user, LevelAccessor level, BlockPos pos);
+    public Fluid getContent();
+}
+//// BundleItem.java
+import java.util.Optional;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ClickAction;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
+import net.minecraft.world.level.Level;
+public class BundleItem extends Item {
+    public static final int MAX_SHOWN_GRID_ITEMS_X = 4;
+    public static final int MAX_SHOWN_GRID_ITEMS_Y = 3;
+    public static final int MAX_SHOWN_GRID_ITEMS = 12;
+    public static final int OVERFLOWING_MAX_SHOWN_GRID_ITEMS = 11;
+    public BundleItem(Item.Properties properties);
+    public static float getFullnessDisplay(ItemStack itemStack);
+    public boolean overrideStackedOnOther(ItemStack self, Slot slot, ClickAction clickAction, Player player);
+    public boolean overrideOtherStackedOnMe(ItemStack self, ItemStack other, Slot slot, ClickAction clickAction, Player player, SlotAccess carriedItem);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public boolean isBarVisible(ItemStack stack);
+    public int getBarWidth(ItemStack stack);
+    public int getBarColor(ItemStack stack);
+    public static void toggleSelectedItem(ItemStack stack, int selectedItem);
+    public static int getSelectedItemIndex(ItemStack stack);
+    public static ItemStackTemplate getSelectedItem(ItemStack stack);
+    public static int getNumberOfItemsToShow(ItemStack stack);
+    public void onUseTick(Level level, LivingEntity livingEntity, ItemStack itemStack, int ticksRemaining);
+    public int getUseDuration(ItemStack itemStack, LivingEntity entity);
+    public ItemUseAnimation getUseAnimation(ItemStack itemStack);
+    public Optional<TooltipComponent> getTooltipImage(ItemStack bundle);
+    public void onDestroyed(ItemEntity entity);
+}
+//// CompassItem.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.context.UseOnContext;
+public class CompassItem extends Item {
+    public CompassItem(Item.Properties properties);
+    public boolean isFoil(ItemStack itemStack);
+    public void inventoryTick(ItemStack itemStack, ServerLevel level, Entity owner, EquipmentSlot slot);
+    public InteractionResult useOn(UseOnContext context);
+    public Component getName(ItemStack itemStack);
+}
+//// CreativeModeTab.java
+import java.util.Collection;
+import java.util.Set;
+import java.util.function.Supplier;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.level.ItemLike;
+public class CreativeModeTab {
+    private CreativeModeTab(Row row, int column, Type type, Component displayName, Supplier<ItemStack> iconGenerator, DisplayItemsGenerator displayItemsGenerator);
+    public static Identifier createTextureLocation(String name);
+    public static Builder builder(Row row, int column);
+    public Component getDisplayName();
+    public ItemStack getIconItem();
+    public Identifier getBackgroundTexture();
+    public boolean showTitle();
+    public boolean canScroll();
+    public int column();
+    public Row row();
+    public boolean hasAnyItems();
+    public boolean shouldDisplay();
+    public boolean isAlignedRight();
+    public Type getType();
+    public void buildContents(ItemDisplayParameters parameters);
+    public Collection<ItemStack> getDisplayItems();
+    public Collection<ItemStack> getSearchTabDisplayItems();
+    public boolean contains(ItemStack stack);
+    public static record ItemDisplayParameters(FeatureFlagSet enabledFeatures, boolean hasPermissions, HolderLookup.Provider holders) {
+        public boolean needsUpdate(FeatureFlagSet enabledFeatures, boolean hasPermissions, HolderLookup.Provider holders);
+    }
+    public static enum Type {
+        CATEGORY, INVENTORY, HOTBAR, SEARCH;
+    }
+    public static enum Row {
+        TOP, BOTTOM;
+    }
+    public static class Builder {
+        public Builder(Row row, int column);
+        public Builder title(Component displayName);
+        public Builder icon(Supplier<ItemStack> iconGenerator);
+        public Builder displayItems(DisplayItemsGenerator displayItemsGenerator);
+        public Builder alignedRight();
+        public Builder hideTitle();
+        public Builder noScrollBar();
+        protected Builder type(Type type);
+        public Builder backgroundTexture(Identifier backgroundTexture);
+        public CreativeModeTab build();
+    }
+    static class ItemDisplayBuilder implements Output {
+        public final Collection<ItemStack> tabContents;
+        public final Set<ItemStack> searchTabContents;
+        public ItemDisplayBuilder(CreativeModeTab tab, FeatureFlagSet featureFlagSet);
+        public void accept(ItemStack stack, TabVisibility tabVisibility);
+    }
+    protected static enum TabVisibility {
+        PARENT_AND_SEARCH_TABS, PARENT_TAB_ONLY, SEARCH_TAB_ONLY;
+    }
+    protected interface Output {
+        void accept(ItemStack stack, TabVisibility tabVisibility);
+        default void accept(ItemStack stack);
+        default void accept(ItemLike item, TabVisibility tabVisibility);
+        default void accept(ItemLike item);
+        default void acceptAll(Collection<ItemStack> stacks, TabVisibility tabVisibility);
+        default void acceptAll(Collection<ItemStack> stacks);
+    }
+    public interface DisplayItemsGenerator {
+        void accept(ItemDisplayParameters parameters, Output output);
+    }
+}
+//// CreativeModeTabs.java
+import java.util.List;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.world.flag.FeatureFlagSet;
+public class CreativeModeTabs {
+    public static CreativeModeTab bootstrap(Registry<CreativeModeTab> registry);
+    public static void validate();
+    public static CreativeModeTab getDefaultTab();
+    public static List<CreativeModeTab> tabs();
+    public static List<CreativeModeTab> allTabs();
+    public static CreativeModeTab searchTab();
+    public static boolean tryRebuildTabContents(FeatureFlagSet enabledFeatures, boolean hasPermissions, HolderLookup.Provider lookup);
+}
+//// CrossbowItem.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.core.Holder;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.Level;
+public class CrossbowItem extends ProjectileWeaponItem {
+    public static final int DEFAULT_RANGE = 8;
+    public static final float MOB_ARROW_POWER = 1.6F;
+    public CrossbowItem(Item.Properties properties);
+    public Predicate<ItemStack> getSupportedHeldProjectiles();
+    public Predicate<ItemStack> getAllSupportedProjectiles();
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public boolean releaseUsing(ItemStack itemStack, Level level, LivingEntity entity, int remainingTime);
+    public static boolean isCharged(ItemStack itemStack);
+    protected void shootProjectile(LivingEntity livingEntity, Projectile projectileEntity, int index, float power, float uncertainty, float angle, LivingEntity targetOverride);
+    protected Projectile createProjectile(Level level, LivingEntity shooter, ItemStack heldItem, ItemStack projectile, boolean isCrit);
+    protected int getDurabilityUse(ItemStack projectile);
+    public void performShooting(Level level, LivingEntity shooter, InteractionHand hand, ItemStack weapon, float power, float uncertainty, LivingEntity targetOverride);
+    public void onUseTick(Level level, LivingEntity entity, ItemStack itemStack, int ticksRemaining);
+    public int getUseDuration(ItemStack itemStack, LivingEntity user);
+    public static int getChargeDuration(ItemStack crossbow, LivingEntity user);
+    public ItemUseAnimation getUseAnimation(ItemStack itemStack);
+    public boolean useOnRelease(ItemStack itemStack);
+    public int getDefaultProjectileRange();
+    public static record ChargingSounds(Optional<Holder<SoundEvent>> start, Optional<Holder<SoundEvent>> mid, Optional<Holder<SoundEvent>> end) {
+        public static final Codec<ChargingSounds> CODEC;
+    }
+    public static enum ChargeType implements StringRepresentable {
+        NONE, ARROW, ROCKET;
+        public static final Codec<ChargeType> CODEC;
+        public String getSerializedName();
+    }
+}
+//// CushionItem.java
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.context.UseOnContext;
+public class CushionItem extends Item {
+    public CushionItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+}
+//// DebugStickItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+public class DebugStickItem extends Item {
+    public DebugStickItem(Item.Properties properties);
+    public boolean canDestroyBlock(ItemStack itemStack, BlockState state, Level level, BlockPos pos, LivingEntity user);
+    public InteractionResult useOn(UseOnContext context);
+}
+//// DiscFragmentItem.java
+import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.item.component.TooltipDisplay;
+public class DiscFragmentItem extends Item {
+    public DiscFragmentItem(Item.Properties properties);
+    public void appendHoverText(ItemStack itemStack, Item.TooltipContext context, TooltipDisplay display, Consumer<Component> builder, TooltipFlag tooltipFlag);
+    public MutableComponent getDisplayName();
+}
+//// DispensibleContainerItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
+public interface DispensibleContainerItem {
+    default void checkExtraContent(LivingEntity user, Level level, ItemStack itemStack, BlockPos pos);
+    boolean emptyContents(LivingEntity user, Level level, BlockPos pos, BlockHitResult hitResult);
+}
+//// DoubleHighBlockItem.java
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class DoubleHighBlockItem extends BlockItem {
+    public DoubleHighBlockItem(Block block, Item.Properties properties);
+    protected boolean placeBlock(BlockPlaceContext context, BlockState placementState);
+}
+//// DyeColor.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.material.MapColor;
+public enum DyeColor implements StringRepresentable {
+    WHITE, ORANGE, MAGENTA, LIGHT_BLUE, YELLOW, LIME, PINK, GRAY, LIGHT_GRAY, CYAN, PURPLE, BLUE, BROWN, GREEN, RED, BLACK;
+    public static final List<DyeColor> VALUES;
+    public static final StringRepresentable.EnumCodec<DyeColor> CODEC;
+    public static final StreamCodec<ByteBuf, DyeColor> STREAM_CODEC;
+    public static final Codec<DyeColor> LEGACY_ID_CODEC;
+    public int getId();
+    public String getName();
+    public int getTextureDiffuseColor();
+    public MapColor getMapColor();
+    public MapColor getTerracottaColor();
+    public int getFireworkColor();
+    public int getTextColor();
+    public static DyeColor byId(int id);
+    public static DyeColor byName(String name, DyeColor def);
+    public static DyeColor byFireworkColor(int color);
+    public String toString();
+    public String getSerializedName();
+    public static DyeColor getMixedColor(ServerLevel level, DyeColor dyeColor1, DyeColor dyeColor2);
+}
+//// DyeItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignTextSlot;
+public class DyeItem extends Item implements SignApplicator {
+    public DyeItem(Item.Properties properties);
+    public InteractionResult interactLivingEntity(ItemStack itemStack, Player player, LivingEntity target, InteractionHand type);
+    public boolean tryApplyToSign(Level level, SignBlockEntity sign, SignTextSlot slot, ItemStack item, Player player);
+}
+//// EggItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.Level;
+public class EggItem extends Item implements ProjectileItem {
+    public static final float PROJECTILE_SHOOT_POWER = 1.5F;
+    public EggItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+}
+//// EmptyMapItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class EmptyMapItem extends Item {
+    public EmptyMapItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}
+//// EndCrystalItem.java
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.context.UseOnContext;
+public class EndCrystalItem extends Item {
+    public EndCrystalItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+}
+//// EnderEyeItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+public class EnderEyeItem extends Item {
+    public EnderEyeItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public int getUseDuration(ItemStack itemStack, LivingEntity user);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}
+//// EnderpearlItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class EnderpearlItem extends Item {
+    public static final float PROJECTILE_SHOOT_POWER = 1.5F;
+    public EnderpearlItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}
+//// ExperienceBottleItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.Level;
+public class ExperienceBottleItem extends Item implements ProjectileItem {
+    public ExperienceBottleItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+    public ProjectileItem.DispenseConfig createDispenseConfig();
+}
+//// FireChargeItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+public class FireChargeItem extends Item implements ProjectileItem {
+    public FireChargeItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+    public void shoot(Projectile projectile, double xd, double yd, double zd, float pow, float uncertainty);
+    public ProjectileItem.DispenseConfig createDispenseConfig();
+}
+//// FireworkRocketItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+public class FireworkRocketItem extends Item implements ProjectileItem {
+    public static final byte[] CRAFTABLE_DURATIONS;
+    public static final double ROCKET_PLACEMENT_OFFSET = 0.15;
+    public FireworkRocketItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+    public ProjectileItem.DispenseConfig createDispenseConfig();
+}
+//// FishingRodItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class FishingRodItem extends Item {
+    public FishingRodItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}
+//// FlintAndSteelItem.java
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.context.UseOnContext;
+public class FlintAndSteelItem extends Item {
+    public FlintAndSteelItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+}
+//// FoodOnAStickItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ItemSteerable;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class FoodOnAStickItem<T extends Entity & ItemSteerable> extends Item {
+    public FoodOnAStickItem(EntityType<T> canInteractWith, int consumeItemDamage, Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}
+//// GameMasterBlockItem.java
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class GameMasterBlockItem extends BlockItem {
+    public GameMasterBlockItem(Block block, Item.Properties properties);
+    protected BlockState getPlacementState(BlockPlaceContext context);
+}
+//// GlowInkSacItem.java
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignTextSlot;
+public class GlowInkSacItem extends Item implements SignApplicator {
+    public GlowInkSacItem(Item.Properties properties);
+    public boolean tryApplyToSign(Level level, SignBlockEntity sign, SignTextSlot slot, ItemStack item, Player player);
+}
+//// HangingEntityItem.java
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.decoration.HangingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.component.TooltipDisplay;
+import net.minecraft.world.item.context.UseOnContext;
+public class HangingEntityItem extends Item {
+    public HangingEntityItem(EntityType<? extends HangingEntity> type, Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    protected boolean mayPlace(Player player, Direction direction, ItemStack itemStack, BlockPos blockPos);
+    public void appendHoverText(ItemStack itemStack, Item.TooltipContext context, TooltipDisplay display, Consumer<Component> builder, TooltipFlag tooltipFlag);
+}
+//// HangingSignItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class HangingSignItem extends StandingAndWallBlockItem {
+    public HangingSignItem(Block hangingSign, Block wallHangingSign, Item.Properties properties);
+    protected boolean canPlace(LevelReader level, BlockState possibleState, BlockPos pos);
+}
+//// HoneycombItem.java
+import com.google.common.collect.BiMap;
+import com.google.common.collect.ImmutableMap;
+import com.mojang.datafixers.util.Pair;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import net.minecraft.data.recipes.RecipeCategory;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.WeatheringCopperCollection;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
+import net.minecraft.world.level.block.entity.SignTextSlot;
+import net.minecraft.world.level.block.state.BlockState;
+public class HoneycombItem extends Item implements SignApplicator {
+    public static final Supplier<BiMap<Block, Block>> WAXABLES;
+    public static final Supplier<BiMap<Block, Block>> WAX_OFF_BY_BLOCK;
+    public static final ImmutableMap<Block, Pair<RecipeCategory, String>> WAXED_RECIPES;
+    public HoneycombItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public static Optional<BlockState> getWaxed(BlockState oldState);
+    public boolean tryApplyToSign(Level level, SignBlockEntity sign, SignTextSlot slot, ItemStack item, Player player);
+    public boolean canApplyToSign(SignText text, ItemStack item, Player player);
+    static record WaxedRecipeGroup(WeatheringCopperCollection<Block> block, Function<Block, Pair<RecipeCategory, String>> recipeIdProvider) {
+    }
+}
+//// InkSacItem.java
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignTextSlot;
+public class InkSacItem extends Item implements SignApplicator {
+    public InkSacItem(Item.Properties properties);
+    public boolean tryApplyToSign(Level level, SignBlockEntity sign, SignTextSlot slot, ItemStack item, Player player);
+}
+//// Instrument.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.sounds.SoundEvent;
+public record Instrument(Holder<SoundEvent> soundEvent, float useDuration, float range, int durabilityDamage, Component description) {
+    public static final Codec<Instrument> DIRECT_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Instrument> DIRECT_STREAM_CODEC;
+    public static final Codec<Holder<Instrument>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<Instrument>> STREAM_CODEC;
+}
+//// InstrumentItem.java
+import net.minecraft.core.Holder;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class InstrumentItem extends Item {
+    public InstrumentItem(Item.Properties properties);
+    public static ItemStack create(Item item, Holder<Instrument> instrument);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public int getUseDuration(ItemStack itemStack, LivingEntity user);
+    public ItemUseAnimation getUseAnimation(ItemStack itemStack);
+}
+//// Instruments.java
+import net.minecraft.core.Holder;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.sounds.SoundEvent;
+public interface Instruments {
+    int GOAT_HORN_RANGE_BLOCKS;
+    float GOAT_HORN_DURATION;
+    int GOAT_HORN_INSTRUMENT_DAMAGE;
+    ResourceKey<Instrument> PONDER_GOAT_HORN;
+    ResourceKey<Instrument> SING_GOAT_HORN;
+    ResourceKey<Instrument> SEEK_GOAT_HORN;
+    ResourceKey<Instrument> FEEL_GOAT_HORN;
+    ResourceKey<Instrument> ADMIRE_GOAT_HORN;
+    ResourceKey<Instrument> CALL_GOAT_HORN;
+    ResourceKey<Instrument> YEARN_GOAT_HORN;
+    ResourceKey<Instrument> DREAM_GOAT_HORN;
+    static void bootstrap(BootstrapContext<Instrument> context);
+    static void register(BootstrapContext<Instrument> context, ResourceKey<Instrument> key, Holder<SoundEvent> soundEvent, float duration, float range, int durabilityDamage);
+}
+//// Item.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentInitializers;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.flag.FeatureElement;
+import net.minecraft.world.flag.FeatureFlag;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.inventory.ClickAction;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
+import net.minecraft.world.item.component.Consumable;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.component.TooltipDisplay;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.item.equipment.ArmorMaterial;
+import net.minecraft.world.item.equipment.ArmorType;
+import net.minecraft.world.item.equipment.trim.TrimMaterial;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.DecoratedPotPattern;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+import net.minecraft.world.phys.BlockHitResult;
+public class Item implements ItemLike, FeatureElement {
+    public static final Codec<Holder<Item>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<Item>> STREAM_CODEC;
+    public static final Codec<Holder<Item>> CODEC_WITH_BOUND_COMPONENTS;
+    public static final Map<Block, Item> BY_BLOCK;
+    public static final Identifier BASE_ATTACK_DAMAGE_ID;
+    public static final Identifier BASE_ATTACK_SPEED_ID;
+    public static final int DEFAULT_MAX_STACK_SIZE = 64;
+    public static final int ABSOLUTE_MAX_STACK_SIZE = 99;
+    public static final int MAX_BAR_WIDTH = 13;
+    protected static final int APPROXIMATELY_INFINITE_USE_DURATION = 72000;
+    protected final String descriptionId;
+    public static int getId(Item item);
+    public static Item byId(int id);
+    public static Item byBlock(Block block);
+    public Item(Properties properties);
+    public Holder.Reference<Item> builtInRegistryHolder();
+    public DataComponentMap components();
+    public int getDefaultMaxStackSize();
+    public void onUseTick(Level level, LivingEntity livingEntity, ItemStack itemStack, int ticksRemaining);
+    public void onDestroyed(ItemEntity itemEntity);
+    public boolean canDestroyBlock(ItemStack itemStack, BlockState state, Level level, BlockPos pos, LivingEntity user);
+    public Item asItem();
+    public InteractionResult useOn(UseOnContext context);
+    public float getDestroySpeed(ItemStack itemStack, BlockState state);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public ItemStack finishUsingItem(ItemStack itemStack, Level level, LivingEntity entity);
+    public boolean isBarVisible(ItemStack stack);
+    public int getBarWidth(ItemStack stack);
+    public int getBarColor(ItemStack stack);
+    public boolean overrideStackedOnOther(ItemStack self, Slot slot, ClickAction clickAction, Player player);
+    public boolean overrideOtherStackedOnMe(ItemStack self, ItemStack other, Slot slot, ClickAction clickAction, Player player, SlotAccess carriedItem);
+    public float getAttackDamageBonus(Entity victim, float damage, DamageSource damageSource);
+    public DamageSource getItemDamageSource(LivingEntity attacker);
+    public void hurtEnemy(ItemStack itemStack, LivingEntity mob, LivingEntity attacker);
+    public void postHurtEnemy(ItemStack itemStack, LivingEntity mob, LivingEntity attacker);
+    public boolean mineBlock(ItemStack itemStack, Level level, BlockState state, BlockPos pos, LivingEntity owner);
+    public boolean isCorrectToolForDrops(ItemStack itemStack, BlockState state);
+    public InteractionResult interactLivingEntity(ItemStack itemStack, Player player, LivingEntity target, InteractionHand type);
+    public String toString();
+    public final ItemStackTemplate getCraftingRemainder();
+    public void inventoryTick(ItemStack itemStack, ServerLevel level, Entity owner, EquipmentSlot slot);
+    public void onCraftedBy(ItemStack itemStack, Player player);
+    public void onCraftedPostProcess(ItemStack itemStack, Level level);
+    public ItemUseAnimation getUseAnimation(ItemStack itemStack);
+    public int getUseDuration(ItemStack itemStack, LivingEntity user);
+    public boolean releaseUsing(ItemStack itemStack, Level level, LivingEntity entity, int remainingTime);
+    public void appendHoverText(ItemStack itemStack, TooltipContext context, TooltipDisplay display, Consumer<Component> builder, TooltipFlag tooltipFlag);
+    public Optional<TooltipComponent> getTooltipImage(ItemStack itemStack);
+    public final String getDescriptionId();
+    public Component getName(ItemStack itemStack);
+    public boolean isFoil(ItemStack itemStack);
+    protected static BlockHitResult getPlayerPOVHitResult(Level level, Player player, ClipContext.Fluid fluid);
+    public boolean useOnRelease(ItemStack itemStack);
+    public ItemStack getDefaultInstance();
+    public boolean canFitInsideContainerItems();
+    public final FeatureFlagSet requiredFeatures();
+    public boolean shouldPrintOpWarning(ItemStack stack, Player player);
+    public static class Properties {
+        public Properties();
+        public Properties food(FoodProperties foodProperties);
+        public Properties food(FoodProperties foodProperties, Consumable consumable);
+        public Properties villagerFood(int nutrition);
+        public Properties usingConvertsTo(Item item);
+        public Properties useCooldown(float seconds);
+        public Properties stacksTo(int max);
+        public Properties durability(int maxDamage);
+        public Properties craftRemainder(Item craftingRemainingItem);
+        public Properties craftRemainder(ItemStackTemplate craftingRemainingItem);
+        public Properties rarity(Rarity rarity);
+        public Properties fireResistant();
+        public Properties jukeboxPlayable(ResourceKey<JukeboxSong> song);
+        public Properties enchantable(int value);
+        public Properties potPattern(ResourceKey<DecoratedPotPattern> pattern);
+        public Properties repairable(Item repairItem);
+        public Properties repairable(TagKey<Item> repairItems);
+        public Properties equippable(EquipmentSlot slot);
+        public Properties equippableUnswappable(EquipmentSlot slot);
+        public Properties tool(ToolMaterial material, TagKey<Block> minesEfficiently, float attackDamageBaseline, float attackSpeedBaseline, float disableBlockingSeconds);
+        public Properties pickaxe(ToolMaterial material, float attackDamageBaseline, float attackSpeedBaseline);
+        public Properties axe(ToolMaterial material, float attackDamageBaseline, float attackSpeedBaseline);
+        public Properties hoe(ToolMaterial material, float attackDamageBaseline, float attackSpeedBaseline);
+        public Properties shovel(ToolMaterial material, float attackDamageBaseline, float attackSpeedBaseline);
+        public Properties sword(ToolMaterial material, float attackDamageBaseline, float attackSpeedBaseline);
+        public Properties spear(ToolMaterial material, float attackDuration, float damageMultiplier, float delay, float dismountTime, float dismountThreshold, float knockbackTime, float knockbackThreshold, float damageTime, float damageThreshold);
+        public Properties spawnEgg(EntityType<?> type);
+        public Properties humanoidArmor(ArmorMaterial material, ArmorType type);
+        public Properties wolfArmor(ArmorMaterial material);
+        public Properties horseArmor(ArmorMaterial material);
+        public Properties nautilusArmor(ArmorMaterial material);
+        public Properties trimMaterial(ResourceKey<TrimMaterial> material);
+        public Properties signText();
+        public Properties cookingFuel(ResourceKey<ContextIntProvider> burnTime);
+        public Properties brewingFuel(ResourceKey<ContextIntProvider> uses);
+        public Properties requiredFeatures(FeatureFlag... flags);
+        public Properties requiredFeatures(FeatureFlagSet flags);
+        public Properties setId(ResourceKey<Item> id);
+        public Properties overrideDescription(String descriptionId);
+        public Properties useBlockDescriptionPrefix();
+        public Properties useItemDescriptionPrefix();
+        protected String effectiveDescriptionId();
+        public Identifier effectiveModel();
+        public <T> Properties component(DataComponentType<T> type, T value);
+        public <T> Properties delayedComponent(DataComponentType<T> type, DataComponentInitializers.SingleComponentInitializer<T> initializer);
+        public <T> Properties delayedHolderComponent(DataComponentType<Holder<T>> type, ResourceKey<T> valueKey);
+        public Properties attributes(ItemAttributeModifiers attributes);
+        public Properties compostable(ResourceKey<ContextIntProvider> layers);
+        public final Properties loweredMobVisibility(ResourceKey<EntityType<?>>... entityTypeIds);
+    }
+    public interface TooltipContext {
+        TooltipContext EMPTY;
+        HolderLookup. Provider registries();
+        float tickRate();
+        MapItemSavedData mapData(MapId id);
+        boolean isPeaceful();
+        static TooltipContext of(Level level);
+        static TooltipContext of(HolderLookup.Provider registries);
+    }
+}
+//// ItemCooldowns.java
+import net.minecraft.resources.Identifier;
+public class ItemCooldowns {
+    public boolean isOnCooldown(ItemStack item);
+    public float getCooldownPercent(ItemStack item, float a);
+    public void tick();
+    public Identifier getCooldownGroup(ItemStack item);
+    public void addCooldown(ItemStack item, int time);
+    public void addCooldown(Identifier cooldownGroup, int time);
+    public void removeCooldown(Identifier cooldownGroup);
+    protected void onCooldownStarted(Identifier cooldownGroup, int duration);
+    protected void onCooldownEnded(Identifier cooldownGroup);
+    static record CooldownInstance(int startTime, int endTime) {
+    }
+}
+//// ItemDisplayContext.java
+import com.mojang.serialization.Codec;
+import java.util.function.IntFunction;
+import net.minecraft.util.StringRepresentable;
+public enum ItemDisplayContext implements StringRepresentable {
+    NONE, THIRD_PERSON_LEFT_HAND, THIRD_PERSON_RIGHT_HAND, FIRST_PERSON_LEFT_HAND, FIRST_PERSON_RIGHT_HAND, HEAD, GUI, GROUND, FIXED, ON_SHELF;
+    public static final Codec<ItemDisplayContext> CODEC;
+    public static final IntFunction<ItemDisplayContext> BY_ID;
+    public String getSerializedName();
+    public byte getId();
+    public boolean firstPerson();
+    public boolean leftHand();
+}
+//// ItemFrameItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.decoration.HangingEntity;
+import net.minecraft.world.entity.player.Player;
+public class ItemFrameItem extends HangingEntityItem {
+    public ItemFrameItem(EntityType<? extends HangingEntity> entityType, Item.Properties properties);
+    protected boolean mayPlace(Player player, Direction direction, ItemStack itemStack, BlockPos blockPos);
+}
+//// ItemInstance.java
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
+public interface ItemInstance extends TypedInstance<Item>, DataComponentGetter {
+    String FIELD_ID;
+    String FIELD_COUNT;
+    String FIELD_COMPONENTS;
+    int count();
+    default int getMaxStackSize();
+}
+//// ItemProvider.java
+import java.util.Collection;
+import java.util.NoSuchElementException;
+import java.util.function.Predicate;
+public interface ItemProvider {
+    boolean hasNext();
+    void restart();
+    ItemStack next() throws NoSuchElementException;
+    ItemStack peek() throws NoSuchElementException;
+    boolean findNext(Predicate<ItemStack> predicate);
+    default boolean findNextNonEmpty();
+    default ItemProvider orElseProvide(ItemStack fallbackItem);
+    static ItemProvider of(ItemStack... items);
+    static ItemProvider of(Collection<ItemStack> items);
+    static ItemProvider cycle(ItemStack... items);
+    static ItemProvider cycle(Collection<ItemStack> items);
+    public static class FallbackItemProvider implements ItemProvider {
+        public FallbackItemProvider(ItemProvider itemProvider, ItemStack fallbackItem);
+        public boolean hasNext();
+        public void restart();
+        public ItemProvider orElseProvide(ItemStack fallbackItem);
+        public ItemStack peek();
+        public ItemStack next();
+        public boolean findNext(Predicate<ItemStack> predicate);
+    }
+}
+//// ItemStack.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentHolder;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.PatchedDataComponentMap;
+import net.minecraft.core.component.TypedDataComponent;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.SlotAccess;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.inventory.ClickAction;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.component.SwingAnimation;
+import net.minecraft.world.item.component.TooltipDisplay;
+import net.minecraft.world.item.component.TooltipProvider;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.pattern.BlockInWorld;
+import net.minecraft.world.level.gameevent.GameEvent;
+import org.apache.commons.lang3.function.TriConsumer;
+public final class ItemStack implements DataComponentHolder, ItemInstance {
+    public static final MapCodec<ItemStack> MAP_CODEC;
+    public static final Codec<ItemStack> CODEC;
+    public static final Codec<ItemStack> OPTIONAL_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ItemStack> OPTIONAL_STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ItemStack> OPTIONAL_UNTRUSTED_STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ItemStack> STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, List<ItemStack>> OPTIONAL_LIST_STREAM_CODEC;
+    public static final ItemStack EMPTY;
+    public static DataResult<ItemStack> validateStrict(ItemStack itemStack);
+    public static StreamCodec<RegistryFriendlyByteBuf, ItemStack> validatedStreamCodec(StreamCodec<RegistryFriendlyByteBuf, ItemStack> codec);
+    public Optional<TooltipComponent> getTooltipImage();
+    public DataComponentMap getComponents();
+    public DataComponentMap getPrototype();
+    public DataComponentPatch getComponentsPatch();
+    public DataComponentMap immutableComponents();
+    public boolean hasNonDefault(DataComponentType<?> type);
+    public ItemStack(ItemLike item, int count);
+    public ItemStack(ItemLike item);
+    public ItemStack(Holder<Item> item, int count);
+    public ItemStack(Holder<Item> item);
+    public ItemStack(Holder<Item> item, int count, DataComponentPatch components);
+    private ItemStack(Holder<Item> item, int count, PatchedDataComponentMap components);
+    private ItemStack(Void nullMarker);
+    public boolean isEmpty();
+    public boolean isItemEnabled(FeatureFlagSet enabledFeatures);
+    public ItemStack split(int amount);
+    public ItemStack copyAndClear();
+    public Item getItem();
+    public Holder<Item> typeHolder();
+    public boolean is(Predicate<Holder<Item>> item);
+    public InteractionResult useOn(UseOnContext context);
+    public float getDestroySpeed(BlockState state);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public ItemStack finishUsingItem(Level level, LivingEntity livingEntity);
+    public boolean isStackable();
+    public boolean isDamageableItem();
+    public boolean isDamaged();
+    public int getDamageValue();
+    public void setDamageValue(int value);
+    public int getMaxDamage();
+    public boolean isBroken();
+    public boolean nextDamageWillBreak();
+    public void hurtAndBreak(int amount, ServerLevel level, ServerPlayer player, Consumer<ItemStack> onBreak);
+    public void hurtWithoutBreaking(int amount, Player player);
+    public void hurtAndBreak(int amount, LivingEntity owner, InteractionHand hand);
+    public void hurtAndBreak(int amount, LivingEntity owner, EquipmentSlot slot);
+    public ItemStack hurtAndConvertOnBreak(int amount, ItemLike newItem, LivingEntity owner, EquipmentSlot slot);
+    public boolean isBarVisible();
+    public int getBarWidth();
+    public int getBarColor();
+    public boolean overrideStackedOnOther(Slot slot, ClickAction clickAction, Player player);
+    public boolean overrideOtherStackedOnMe(ItemStack other, Slot slot, ClickAction clickAction, Player player, SlotAccess carriedItem);
+    public boolean hurtEnemy(LivingEntity mob, LivingEntity attacker);
+    public void postHurtEnemy(LivingEntity mob, LivingEntity attacker);
+    public void mineBlock(Level level, BlockState state, BlockPos pos, Player owner);
+    public boolean isCorrectToolForDrops(BlockState state);
+    public InteractionResult interactLivingEntity(Player player, LivingEntity target, InteractionHand hand);
+    public ItemStack copy();
+    public ItemStack copyWithCount(int count);
+    public ItemStack transmuteCopy(ItemLike newItem);
+    public ItemStack transmuteCopy(ItemLike newItem, int newCount);
+    public static boolean matches(ItemStack a, ItemStack b);
+    public static boolean listMatches(List<ItemStack> left, List<ItemStack> right);
+    public static boolean isSameItem(ItemStack a, ItemStack b);
+    public static boolean isSameItemSameComponents(ItemStack a, ItemStack b);
+    public static boolean matchesIgnoringComponents(ItemStack a, ItemStack b, Predicate<DataComponentType<?>> ignoredPredicate);
+    public static MapCodec<ItemStack> lenientOptionalFieldOf(String name);
+    public static int hashItemAndComponents(ItemStack item);
+    public static int hashStackList(List<ItemStack> items);
+    public String toString();
+    public void inventoryTick(Level level, Entity owner, EquipmentSlot slot);
+    public void onCraftedBy(Player player, int craftCount);
+    public void onCraftedBySystem(Level level);
+    public int getUseDuration(LivingEntity user);
+    public ItemUseAnimation getUseAnimation();
+    public void releaseUsing(Level level, LivingEntity entity, int remainingTime);
+    public void causeUseVibration(Entity causer, Holder.Reference<GameEvent> event);
+    public boolean useOnRelease();
+    public <T> T set(DataComponentType<T> type, T value);
+    public <T> T set(TypedDataComponent<T> value);
+    public <T> void copyFrom(DataComponentType<T> type, DataComponentGetter source);
+    public <T, U> T update(DataComponentType<T> type, T defaultValue, U value, BiFunction<T, U, T> combiner);
+    public <T> T update(DataComponentType<T> type, T defaultValue, UnaryOperator<T> function);
+    public <T> T remove(DataComponentType<? extends T> type);
+    public void applyComponentsAndValidate(DataComponentPatch patch);
+    public void applyComponents(DataComponentPatch patch);
+    public void applyComponents(DataComponentMap components);
+    public Component getHoverName();
+    public Component getCustomName();
+    public Component getItemName();
+    public Component getStyledHoverName();
+    public <T> void addToTooltip(DataComponentType<T> type, TooltipProvider.Getter<T> tooltipGetter, Item.TooltipContext context, TooltipDisplay display, Consumer<Component> consumer, TooltipFlag flag);
+    public <T extends TooltipProvider> void addToTooltip(DataComponentType<T> type, Item.TooltipContext context, TooltipDisplay display, Consumer<Component> consumer, TooltipFlag flag);
+    public List<Component> getTooltipLines(Item.TooltipContext context, Player player, TooltipFlag tooltipFlag);
+    public void addDetailsToTooltip(Item.TooltipContext context, TooltipDisplay display, Player player, TooltipFlag tooltipFlag, Consumer<Component> builder);
+    public boolean hasFoil();
+    public Rarity getRarity();
+    public boolean isEnchantable();
+    public void enchant(Holder<Enchantment> enchantment, int level);
+    public boolean isEnchanted();
+    public ItemEnchantments getEnchantments();
+    public void forEachModifier(EquipmentSlotGroup slot, TriConsumer<Holder<Attribute>, AttributeModifier, ItemAttributeModifiers.Display> consumer);
+    public void forEachModifier(EquipmentSlot slot, BiConsumer<Holder<Attribute>, AttributeModifier> consumer);
+    public Component getDisplayName();
+    public SwingAnimation getAttackAnimation();
+    public SwingAnimation getInteractAnimation();
+    public boolean canPlaceOnBlockInAdventureMode(BlockInWorld blockInWorld);
+    public boolean canBreakBlockInAdventureMode(BlockInWorld blockInWorld);
+    public int getPopTime();
+    public void setPopTime(int popTime);
+    public int getCount();
+    public int count();
+    public void setCount(int count);
+    public void limitSize(int maxStackSize);
+    public void grow(int amount);
+    public void shrink(int amount);
+    public void consume(int amount, LivingEntity owner);
+    public ItemStack consumeAndReturn(int amount, LivingEntity owner);
+    public void onUseTick(Level level, LivingEntity livingEntity, int ticksRemaining);
+    public void onDestroyed(ItemEntity itemEntity);
+    public boolean canBeHurtBy(DamageSource source);
+    public boolean isValidRepairItem(ItemStack repairItem);
+    public boolean canDestroyBlock(BlockState state, Level level, BlockPos pos, Player player);
+    public DamageSource getDamageSource(LivingEntity attacker);
+}
+//// ItemStackLinkedSet.java
+import java.util.Set;
+public class ItemStackLinkedSet {
+    public static Set<ItemStack> createTypeAndComponentsSet();
+}
+//// ItemStackTemplate.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record ItemStackTemplate(Holder<Item> item, int count, DataComponentPatch components) implements ItemInstance {
+    public static final MapCodec<ItemStackTemplate> MAP_CODEC;
+    public static final Codec<ItemStackTemplate> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ItemStackTemplate> STREAM_CODEC;
+    public ItemStackTemplate(Item item);
+    public ItemStackTemplate(Item item, int count);
+    public ItemStackTemplate(Item item, DataComponentPatch patch);
+    public ItemStackTemplate(Holder<Item> item, int count, DataComponentPatch components);
+    public static ItemStackTemplate fromNonEmptyStack(ItemStack itemStack);
+    public static ItemStackTemplate fromStack(ItemStack itemStack);
+    public static ItemStackTemplate fromNonEmptyStack(ItemStack itemStack, int newCount);
+    public ItemStackTemplate withCount(int count);
+    public ItemStack create();
+    public ItemStack apply(DataComponentPatch additionalPatch);
+    public ItemStack apply(int count, DataComponentPatch additionalPatch);
+    public Holder<Item> typeHolder();
+    public <T> T get(DataComponentType<? extends T> type);
+}
+//// ItemUseAnimation.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum ItemUseAnimation implements StringRepresentable {
+    NONE, EAT, DRINK, BLOCK, BOW, TRIDENT, CROSSBOW, SPYGLASS, TOOT_HORN, BRUSH, BUNDLE, SPEAR;
+    public static final Codec<ItemUseAnimation> CODEC;
+    public static final StreamCodec<ByteBuf, ItemUseAnimation> STREAM_CODEC;
+    public int getId();
+    public String getSerializedName();
+    public boolean hasCustomArmTransform();
+}
+//// ItemUtils.java
+import java.util.stream.Stream;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class ItemUtils {
+    public static InteractionResult startUsingInstantly(Level level, Player player, InteractionHand hand);
+    public static ItemStack createFilledResult(ItemStack itemStack, Player player, ItemStack newItemStack, boolean limitCreativeStackSize);
+    public static ItemStack createFilledResult(ItemStack itemStack, Player player, ItemStack newItemStack);
+    public static void onContainerDestroyed(ItemEntity container, Stream<ItemStack> contents);
+}
+//// Items.java
+import net.minecraft.world.level.block.ColorCollection;
+import net.minecraft.world.level.block.WeatheringCopperCollection;
+public class Items {
+    public static final Item AIR;
+    public static final Item STONE;
+    public static final Item GRANITE;
+    public static final Item POLISHED_GRANITE;
+    public static final Item DIORITE;
+    public static final Item POLISHED_DIORITE;
+    public static final Item ANDESITE;
+    public static final Item POLISHED_ANDESITE;
+    public static final Item DEEPSLATE;
+    public static final Item COBBLED_DEEPSLATE;
+    public static final Item POLISHED_DEEPSLATE;
+    public static final Item CALCITE;
+    public static final Item TUFF;
+    public static final Item TUFF_SLAB;
+    public static final Item TUFF_STAIRS;
+    public static final Item TUFF_WALL;
+    public static final Item CHISELED_TUFF;
+    public static final Item POLISHED_TUFF;
+    public static final Item POLISHED_TUFF_SLAB;
+    public static final Item POLISHED_TUFF_STAIRS;
+    public static final Item POLISHED_TUFF_WALL;
+    public static final Item TUFF_BRICKS;
+    public static final Item TUFF_BRICK_SLAB;
+    public static final Item TUFF_BRICK_STAIRS;
+    public static final Item TUFF_BRICK_WALL;
+    public static final Item CHISELED_TUFF_BRICKS;
+    public static final Item SULFUR;
+    public static final Item POTENT_SULFUR;
+    public static final Item SULFUR_SLAB;
+    public static final Item SULFUR_STAIRS;
+    public static final Item SULFUR_WALL;
+    public static final Item POLISHED_SULFUR;
+    public static final Item POLISHED_SULFUR_SLAB;
+    public static final Item POLISHED_SULFUR_STAIRS;
+    public static final Item POLISHED_SULFUR_WALL;
+    public static final Item SULFUR_BRICKS;
+    public static final Item SULFUR_BRICK_SLAB;
+    public static final Item SULFUR_BRICK_STAIRS;
+    public static final Item SULFUR_BRICK_WALL;
+    public static final Item CHISELED_SULFUR;
+    public static final Item CINNABAR;
+    public static final Item CINNABAR_SLAB;
+    public static final Item CINNABAR_STAIRS;
+    public static final Item CINNABAR_WALL;
+    public static final Item POLISHED_CINNABAR;
+    public static final Item POLISHED_CINNABAR_SLAB;
+    public static final Item POLISHED_CINNABAR_STAIRS;
+    public static final Item POLISHED_CINNABAR_WALL;
+    public static final Item CINNABAR_BRICKS;
+    public static final Item CINNABAR_BRICK_SLAB;
+    public static final Item CINNABAR_BRICK_STAIRS;
+    public static final Item CINNABAR_BRICK_WALL;
+    public static final Item CHISELED_CINNABAR;
+    public static final Item DRIPSTONE_BLOCK;
+    public static final Item GRASS_BLOCK;
+    public static final Item DIRT;
+    public static final Item COARSE_DIRT;
+    public static final Item PODZOL;
+    public static final Item ROOTED_DIRT;
+    public static final Item MUD;
+    public static final Item CRIMSON_NYLIUM;
+    public static final Item WARPED_NYLIUM;
+    public static final Item COBBLESTONE;
+    public static final Item OAK_PLANKS;
+    public static final Item SPRUCE_PLANKS;
+    public static final Item BIRCH_PLANKS;
+    public static final Item JUNGLE_PLANKS;
+    public static final Item ACACIA_PLANKS;
+    public static final Item CHERRY_PLANKS;
+    public static final Item DARK_OAK_PLANKS;
+    public static final Item PALE_OAK_PLANKS;
+    public static final Item MANGROVE_PLANKS;
+    public static final Item POPLAR_PLANKS;
+    public static final Item BAMBOO_PLANKS;
+    public static final Item CRIMSON_PLANKS;
+    public static final Item WARPED_PLANKS;
+    public static final Item BAMBOO_MOSAIC;
+    public static final Item OAK_SAPLING;
+    public static final Item SPRUCE_SAPLING;
+    public static final Item BIRCH_SAPLING;
+    public static final Item JUNGLE_SAPLING;
+    public static final Item ACACIA_SAPLING;
+    public static final Item CHERRY_SAPLING;
+    public static final Item DARK_OAK_SAPLING;
+    public static final Item PALE_OAK_SAPLING;
+    public static final Item MANGROVE_PROPAGULE;
+    public static final Item POPLAR_SAPLING;
+    public static final Item BEDROCK;
+    public static final Item SAND;
+    public static final Item SUSPICIOUS_SAND;
+    public static final Item SUSPICIOUS_GRAVEL;
+    public static final Item RED_SAND;
+    public static final Item GRAVEL;
+    public static final Item COAL_ORE;
+    public static final Item DEEPSLATE_COAL_ORE;
+    public static final Item IRON_ORE;
+    public static final Item DEEPSLATE_IRON_ORE;
+    public static final Item COPPER_ORE;
+    public static final Item DEEPSLATE_COPPER_ORE;
+    public static final Item GOLD_ORE;
+    public static final Item DEEPSLATE_GOLD_ORE;
+    public static final Item REDSTONE_ORE;
+    public static final Item DEEPSLATE_REDSTONE_ORE;
+    public static final Item EMERALD_ORE;
+    public static final Item DEEPSLATE_EMERALD_ORE;
+    public static final Item LAPIS_ORE;
+    public static final Item DEEPSLATE_LAPIS_ORE;
+    public static final Item DIAMOND_ORE;
+    public static final Item DEEPSLATE_DIAMOND_ORE;
+    public static final Item NETHER_GOLD_ORE;
+    public static final Item NETHER_QUARTZ_ORE;
+    public static final Item ANCIENT_DEBRIS;
+    public static final Item COAL_BLOCK;
+    public static final Item RAW_IRON_BLOCK;
+    public static final Item RAW_COPPER_BLOCK;
+    public static final Item RAW_GOLD_BLOCK;
+    public static final Item HEAVY_CORE;
+    public static final Item AMETHYST_BLOCK;
+    public static final Item BUDDING_AMETHYST;
+    public static final Item IRON_BLOCK;
+    public static final WeatheringCopperCollection<Item> COPPER_BLOCK;
+    public static final Item GOLD_BLOCK;
+    public static final Item DIAMOND_BLOCK;
+    public static final Item NETHERITE_BLOCK;
+    public static final WeatheringCopperCollection<Item> CHISELED_COPPER;
+    public static final WeatheringCopperCollection<Item> CUT_COPPER;
+    public static final WeatheringCopperCollection<Item> CUT_COPPER_STAIRS;
+    public static final WeatheringCopperCollection<Item> CUT_COPPER_SLAB;
+    public static final Item OAK_LOG;
+    public static final Item SPRUCE_LOG;
+    public static final Item BIRCH_LOG;
+    public static final Item JUNGLE_LOG;
+    public static final Item ACACIA_LOG;
+    public static final Item CHERRY_LOG;
+    public static final Item PALE_OAK_LOG;
+    public static final Item DARK_OAK_LOG;
+    public static final Item MANGROVE_LOG;
+    public static final Item POPLAR_LOG;
+    public static final Item MANGROVE_ROOTS;
+    public static final Item MUDDY_MANGROVE_ROOTS;
+    public static final Item CRIMSON_STEM;
+    public static final Item WARPED_STEM;
+    public static final Item BAMBOO_BLOCK;
+    public static final Item STRIPPED_OAK_LOG;
+    public static final Item STRIPPED_SPRUCE_LOG;
+    public static final Item STRIPPED_BIRCH_LOG;
+    public static final Item STRIPPED_JUNGLE_LOG;
+    public static final Item STRIPPED_ACACIA_LOG;
+    public static final Item STRIPPED_CHERRY_LOG;
+    public static final Item STRIPPED_DARK_OAK_LOG;
+    public static final Item STRIPPED_PALE_OAK_LOG;
+    public static final Item STRIPPED_MANGROVE_LOG;
+    public static final Item STRIPPED_POPLAR_LOG;
+    public static final Item STRIPPED_CRIMSON_STEM;
+    public static final Item STRIPPED_WARPED_STEM;
+    public static final Item STRIPPED_OAK_WOOD;
+    public static final Item STRIPPED_SPRUCE_WOOD;
+    public static final Item STRIPPED_BIRCH_WOOD;
+    public static final Item STRIPPED_JUNGLE_WOOD;
+    public static final Item STRIPPED_ACACIA_WOOD;
+    public static final Item STRIPPED_CHERRY_WOOD;
+    public static final Item STRIPPED_DARK_OAK_WOOD;
+    public static final Item STRIPPED_PALE_OAK_WOOD;
+    public static final Item STRIPPED_MANGROVE_WOOD;
+    public static final Item STRIPPED_POPLAR_WOOD;
+    public static final Item STRIPPED_CRIMSON_HYPHAE;
+    public static final Item STRIPPED_WARPED_HYPHAE;
+    public static final Item STRIPPED_BAMBOO_BLOCK;
+    public static final Item OAK_WOOD;
+    public static final Item SPRUCE_WOOD;
+    public static final Item BIRCH_WOOD;
+    public static final Item JUNGLE_WOOD;
+    public static final Item ACACIA_WOOD;
+    public static final Item CHERRY_WOOD;
+    public static final Item PALE_OAK_WOOD;
+    public static final Item DARK_OAK_WOOD;
+    public static final Item MANGROVE_WOOD;
+    public static final Item POPLAR_WOOD;
+    public static final Item CRIMSON_HYPHAE;
+    public static final Item WARPED_HYPHAE;
+    public static final Item OAK_LEAVES;
+    public static final Item SPRUCE_LEAVES;
+    public static final Item BIRCH_LEAVES;
+    public static final Item JUNGLE_LEAVES;
+    public static final Item ACACIA_LEAVES;
+    public static final Item CHERRY_LEAVES;
+    public static final Item DARK_OAK_LEAVES;
+    public static final Item PALE_OAK_LEAVES;
+    public static final Item MANGROVE_LEAVES;
+    public static final Item RED_POPLAR_LEAVES;
+    public static final Item ORANGE_POPLAR_LEAVES;
+    public static final Item YELLOW_POPLAR_LEAVES;
+    public static final Item AZALEA_LEAVES;
+    public static final Item FLOWERING_AZALEA_LEAVES;
+    public static final Item SPONGE;
+    public static final Item WET_SPONGE;
+    public static final Item GLASS;
+    public static final Item TINTED_GLASS;
+    public static final Item LAPIS_BLOCK;
+    public static final Item SANDSTONE;
+    public static final Item CHISELED_SANDSTONE;
+    public static final Item CUT_SANDSTONE;
+    public static final Item COBWEB;
+    public static final Item SHORT_GRASS;
+    public static final Item FERN;
+    public static final Item BUSH;
+    public static final Item RED_SHRUB;
+    public static final Item AZALEA;
+    public static final Item FLOWERING_AZALEA;
+    public static final Item DEAD_BUSH;
+    public static final Item FIREFLY_BUSH;
+    public static final Item DRY_SHORT_GRASS;
+    public static final Item DRY_TALL_GRASS;
+    public static final Item SEAGRASS;
+    public static final Item SEA_PICKLE;
+    public static final ColorCollection<Item> WOOL;
+    public static final ColorCollection<Item> WOOL_STAIRS;
+    public static final ColorCollection<Item> WOOL_SLAB;
+    public static final Item DANDELION;
+    public static final Item GOLDEN_DANDELION;
+    public static final Item OPEN_EYEBLOSSOM;
+    public static final Item CLOSED_EYEBLOSSOM;
+    public static final Item POPPY;
+    public static final Item BLUE_ORCHID;
+    public static final Item ALLIUM;
+    public static final Item AZURE_BLUET;
+    public static final Item RED_TULIP;
+    public static final Item ORANGE_TULIP;
+    public static final Item WHITE_TULIP;
+    public static final Item PINK_TULIP;
+    public static final Item OXEYE_DAISY;
+    public static final Item CORNFLOWER;
+    public static final Item LILY_OF_THE_VALLEY;
+    public static final Item WITHER_ROSE;
+    public static final Item TORCHFLOWER;
+    public static final Item PITCHER_PLANT;
+    public static final Item SPORE_BLOSSOM;
+    public static final Item BROWN_MUSHROOM;
+    public static final Item RED_MUSHROOM;
+    public static final Item SHELF_MUSHROOM;
+    public static final Item CRIMSON_FUNGUS;
+    public static final Item WARPED_FUNGUS;
+    public static final Item CRIMSON_ROOTS;
+    public static final Item WARPED_ROOTS;
+    public static final Item NETHER_SPROUTS;
+    public static final Item WEEPING_VINES;
+    public static final Item TWISTING_VINES;
+    public static final Item SUGAR_CANE;
+    public static final Item KELP;
+    public static final Item PINK_PETALS;
+    public static final Item WILDFLOWERS;
+    public static final Item LEAF_LITTER;
+    public static final Item MOSS_CARPET;
+    public static final Item MOSS_BLOCK;
+    public static final Item PALE_MOSS_CARPET;
+    public static final Item PALE_HANGING_MOSS;
+    public static final Item PALE_MOSS_BLOCK;
+    public static final Item HANGING_ROOTS;
+    public static final Item BIG_DRIPLEAF;
+    public static final Item SMALL_DRIPLEAF;
+    public static final Item BAMBOO;
+    public static final Item OAK_SLAB;
+    public static final Item SPRUCE_SLAB;
+    public static final Item BIRCH_SLAB;
+    public static final Item JUNGLE_SLAB;
+    public static final Item ACACIA_SLAB;
+    public static final Item CHERRY_SLAB;
+    public static final Item DARK_OAK_SLAB;
+    public static final Item PALE_OAK_SLAB;
+    public static final Item MANGROVE_SLAB;
+    public static final Item POPLAR_SLAB;
+    public static final Item BAMBOO_SLAB;
+    public static final Item BAMBOO_MOSAIC_SLAB;
+    public static final Item CRIMSON_SLAB;
+    public static final Item WARPED_SLAB;
+    public static final Item STONE_SLAB;
+    public static final Item SMOOTH_STONE_SLAB;
+    public static final Item SANDSTONE_SLAB;
+    public static final Item CUT_STANDSTONE_SLAB;
+    public static final Item PETRIFIED_OAK_SLAB;
+    public static final Item COBBLESTONE_SLAB;
+    public static final Item BRICK_SLAB;
+    public static final Item STONE_BRICK_SLAB;
+    public static final Item MUD_BRICK_SLAB;
+    public static final Item NETHER_BRICK_SLAB;
+    public static final Item QUARTZ_SLAB;
+    public static final Item RED_SANDSTONE_SLAB;
+    public static final Item CUT_RED_SANDSTONE_SLAB;
+    public static final Item PURPUR_SLAB;
+    public static final Item PRISMARINE_SLAB;
+    public static final Item PRISMARINE_BRICK_SLAB;
+    public static final Item DARK_PRISMARINE_SLAB;
+    public static final Item SMOOTH_QUARTZ;
+    public static final Item SMOOTH_RED_SANDSTONE;
+    public static final Item SMOOTH_SANDSTONE;
+    public static final Item SMOOTH_STONE;
+    public static final Item BRICKS;
+    public static final Item ACACIA_SHELF;
+    public static final Item BAMBOO_SHELF;
+    public static final Item BIRCH_SHELF;
+    public static final Item CHERRY_SHELF;
+    public static final Item CRIMSON_SHELF;
+    public static final Item DARK_OAK_SHELF;
+    public static final Item JUNGLE_SHELF;
+    public static final Item MANGROVE_SHELF;
+    public static final Item POPLAR_SHELF;
+    public static final Item OAK_SHELF;
+    public static final Item PALE_OAK_SHELF;
+    public static final Item SPRUCE_SHELF;
+    public static final Item WARPED_SHELF;
+    public static final Item BOOKSHELF;
+    public static final Item CHISELED_BOOKSHELF;
+    public static final Item DECORATED_POT;
+    public static final Item MOSSY_COBBLESTONE;
+    public static final Item OBSIDIAN;
+    public static final Item TORCH;
+    public static final Item END_ROD;
+    public static final Item CHORUS_PLANT;
+    public static final Item CHORUS_FLOWER;
+    public static final Item PURPUR_BLOCK;
+    public static final Item PURPUR_PILLAR;
+    public static final Item PURPUR_STAIRS;
+    public static final Item SPAWNER;
+    public static final Item CREAKING_HEART;
+    public static final Item CHEST;
+    public static final Item CRAFTING_TABLE;
+    public static final Item FARMLAND;
+    public static final Item FURNACE;
+    public static final Item LADDER;
+    public static final Item COBBLESTONE_STAIRS;
+    public static final Item SNOW;
+    public static final Item ICE;
+    public static final Item SNOW_BLOCK;
+    public static final Item CACTUS;
+    public static final Item CACTUS_FLOWER;
+    public static final Item CLAY;
+    public static final Item JUKEBOX;
+    public static final Item OAK_FENCE;
+    public static final Item SPRUCE_FENCE;
+    public static final Item BIRCH_FENCE;
+    public static final Item JUNGLE_FENCE;
+    public static final Item ACACIA_FENCE;
+    public static final Item CHERRY_FENCE;
+    public static final Item DARK_OAK_FENCE;
+    public static final Item PALE_OAK_FENCE;
+    public static final Item MANGROVE_FENCE;
+    public static final Item POPLAR_FENCE;
+    public static final Item BAMBOO_FENCE;
+    public static final Item CRIMSON_FENCE;
+    public static final Item WARPED_FENCE;
+    public static final Item PUMPKIN;
+    public static final Item CARVED_PUMPKIN;
+    public static final Item JACK_O_LANTERN;
+    public static final Item NETHERRACK;
+    public static final Item SOUL_SAND;
+    public static final Item SOUL_SOIL;
+    public static final Item BASALT;
+    public static final Item POLISHED_BASALT;
+    public static final Item SMOOTH_BASALT;
+    public static final Item SOUL_TORCH;
+    public static final Item COPPER_TORCH;
+    public static final Item GLOWSTONE;
+    public static final Item INFESTED_STONE;
+    public static final Item INFESTED_COBBLESTONE;
+    public static final Item INFESTED_STONE_BRICKS;
+    public static final Item INFESTED_MOSSY_STONE_BRICKS;
+    public static final Item INFESTED_CRACKED_STONE_BRICKS;
+    public static final Item INFESTED_CHISELED_STONE_BRICKS;
+    public static final Item INFESTED_DEEPSLATE;
+    public static final Item STONE_BRICKS;
+    public static final Item MOSSY_STONE_BRICKS;
+    public static final Item CRACKED_STONE_BRICKS;
+    public static final Item CHISELED_STONE_BRICKS;
+    public static final Item PACKED_MUD;
+    public static final Item MUD_BRICKS;
+    public static final Item DEEPSLATE_BRICKS;
+    public static final Item CRACKED_DEEPSLATE_BRICKS;
+    public static final Item DEEPSLATE_TILES;
+    public static final Item CRACKED_DEEPSLATE_TILES;
+    public static final Item CHISELED_DEEPSLATE;
+    public static final Item REINFORCED_DEEPSLATE;
+    public static final Item BROWN_MUSHROOM_BLOCK;
+    public static final Item RED_MUSHROOM_BLOCK;
+    public static final Item MUSHROOM_STEM;
+    public static final Item IRON_BARS;
+    public static final WeatheringCopperCollection<Item> COPPER_BARS;
+    public static final Item IRON_CHAIN;
+    public static final WeatheringCopperCollection<Item> COPPER_CHAIN;
+    public static final Item GLASS_PANE;
+    public static final Item MELON;
+    public static final Item VINE;
+    public static final Item GLOW_LICHEN;
+    public static final Item RESIN_CLUMP;
+    public static final Item RESIN_BLOCK;
+    public static final Item RESIN_BRICKS;
+    public static final Item RESIN_BRICK_STAIRS;
+    public static final Item RESIN_BRICK_SLAB;
+    public static final Item RESIN_BRICK_WALL;
+    public static final Item CHISELED_RESIN_BRICKS;
+    public static final Item BRICK_STAIRS;
+    public static final Item STONE_BRICK_STAIRS;
+    public static final Item MUD_BRICK_STAIRS;
+    public static final Item MYCELIUM;
+    public static final Item LILY_PAD;
+    public static final Item NETHER_BRICKS;
+    public static final Item CRACKED_NETHER_BRICKS;
+    public static final Item CHISELED_NETHER_BRICKS;
+    public static final Item NETHER_BRICK_FENCE;
+    public static final Item NETHER_BRICK_STAIRS;
+    public static final Item SCULK;
+    public static final Item SCULK_VEIN;
+    public static final Item SCULK_CATALYST;
+    public static final Item SCULK_SHRIEKER;
+    public static final Item ENCHANTING_TABLE;
+    public static final Item END_PORTAL_FRAME;
+    public static final Item END_STONE;
+    public static final Item END_STONE_BRICKS;
+    public static final Item DRAGON_EGG;
+    public static final Item SANDSTONE_STAIRS;
+    public static final Item ENDER_CHEST;
+    public static final Item EMERALD_BLOCK;
+    public static final Item OAK_STAIRS;
+    public static final Item SPRUCE_STAIRS;
+    public static final Item BIRCH_STAIRS;
+    public static final Item JUNGLE_STAIRS;
+    public static final Item ACACIA_STAIRS;
+    public static final Item CHERRY_STAIRS;
+    public static final Item DARK_OAK_STAIRS;
+    public static final Item PALE_OAK_STAIRS;
+    public static final Item MANGROVE_STAIRS;
+    public static final Item POPLAR_STAIRS;
+    public static final Item BAMBOO_STAIRS;
+    public static final Item BAMBOO_MOSAIC_STAIRS;
+    public static final Item CRIMSON_STAIRS;
+    public static final Item WARPED_STAIRS;
+    public static final Item COMMAND_BLOCK;
+    public static final Item BEACON;
+    public static final Item COBBLESTONE_WALL;
+    public static final Item MOSSY_COBBLESTONE_WALL;
+    public static final Item BRICK_WALL;
+    public static final Item PRISMARINE_WALL;
+    public static final Item RED_SANDSTONE_WALL;
+    public static final Item MOSSY_STONE_BRICK_WALL;
+    public static final Item GRANITE_WALL;
+    public static final Item STONE_BRICK_WALL;
+    public static final Item MUD_BRICK_WALL;
+    public static final Item NETHER_BRICK_WALL;
+    public static final Item ANDESITE_WALL;
+    public static final Item RED_NETHER_BRICK_WALL;
+    public static final Item SANDSTONE_WALL;
+    public static final Item END_STONE_BRICK_WALL;
+    public static final Item DIORITE_WALL;
+    public static final Item BLACKSTONE_WALL;
+    public static final Item POLISHED_BLACKSTONE_WALL;
+    public static final Item POLISHED_BLACKSTONE_BRICK_WALL;
+    public static final Item COBBLED_DEEPSLATE_WALL;
+    public static final Item POLISHED_DEEPSLATE_WALL;
+    public static final Item DEEPSLATE_BRICK_WALL;
+    public static final Item DEEPSLATE_TILE_WALL;
+    public static final Item ANVIL;
+    public static final Item CHIPPED_ANVIL;
+    public static final Item DAMAGED_ANVIL;
+    public static final Item CHISELED_QUARTZ_BLOCK;
+    public static final Item QUARTZ_BLOCK;
+    public static final Item QUARTZ_BRICKS;
+    public static final Item QUARTZ_PILLAR;
+    public static final Item QUARTZ_STAIRS;
+    public static final ColorCollection<Item> DYED_TERRACOTTA;
+    public static final Item BARRIER;
+    public static final Item LIGHT;
+    public static final Item HAY_BLOCK;
+    public static final ColorCollection<Item> CARPET;
+    public static final Item TERRACOTTA;
+    public static final Item PACKED_ICE;
+    public static final Item DIRT_PATH;
+    public static final Item SUNFLOWER;
+    public static final Item LILAC;
+    public static final Item ROSE_BUSH;
+    public static final Item PEONY;
+    public static final Item TALL_GRASS;
+    public static final Item LARGE_FERN;
+    public static final ColorCollection<Item> STAINED_GLASS;
+    public static final ColorCollection<Item> STAINED_GLASS_PANE;
+    public static final Item PRISMARINE;
+    public static final Item PRISMARINE_BRICKS;
+    public static final Item DARK_PRISMARINE;
+    public static final Item PRISMARINE_STAIRS;
+    public static final Item PRISMARINE_BRICK_STAIRS;
+    public static final Item DARK_PRISMARINE_STAIRS;
+    public static final Item SEA_LANTERN;
+    public static final Item RED_SANDSTONE;
+    public static final Item CHISELED_RED_SANDSTONE;
+    public static final Item CUT_RED_SANDSTONE;
+    public static final Item RED_SANDSTONE_STAIRS;
+    public static final Item REPEATING_COMMAND_BLOCK;
+    public static final Item CHAIN_COMMAND_BLOCK;
+    public static final Item MAGMA_BLOCK;
+    public static final Item NETHER_WART_BLOCK;
+    public static final Item WARPED_WART_BLOCK;
+    public static final Item RED_NETHER_BRICKS;
+    public static final Item BONE_BLOCK;
+    public static final Item STRUCTURE_VOID;
+    public static final Item SHULKER_BOX;
+    public static final ColorCollection<Item> DYED_SHULKER_BOX;
+    public static final ColorCollection<Item> GLAZED_TERRACOTTA;
+    public static final ColorCollection<Item> CONCRETE;
+    public static final ColorCollection<Item> CONCRETE_STAIRS;
+    public static final ColorCollection<Item> CONCRETE_SLAB;
+    public static final ColorCollection<Item> CONCRETE_POWDER;
+    public static final Item TURTLE_EGG;
+    public static final Item SNIFFER_EGG;
+    public static final Item DRIED_GHAST;
+    public static final Item DEAD_TUBE_CORAL_BLOCK;
+    public static final Item DEAD_BRAIN_CORAL_BLOCK;
+    public static final Item DEAD_BUBBLE_CORAL_BLOCK;
+    public static final Item DEAD_FIRE_CORAL_BLOCK;
+    public static final Item DEAD_HORN_CORAL_BLOCK;
+    public static final Item TUBE_CORAL_BLOCK;
+    public static final Item BRAIN_CORAL_BLOCK;
+    public static final Item BUBBLE_CORAL_BLOCK;
+    public static final Item FIRE_CORAL_BLOCK;
+    public static final Item HORN_CORAL_BLOCK;
+    public static final Item TUBE_CORAL;
+    public static final Item BRAIN_CORAL;
+    public static final Item BUBBLE_CORAL;
+    public static final Item FIRE_CORAL;
+    public static final Item HORN_CORAL;
+    public static final Item DEAD_BRAIN_CORAL;
+    public static final Item DEAD_BUBBLE_CORAL;
+    public static final Item DEAD_FIRE_CORAL;
+    public static final Item DEAD_HORN_CORAL;
+    public static final Item DEAD_TUBE_CORAL;
+    public static final Item TUBE_CORAL_FAN;
+    public static final Item BRAIN_CORAL_FAN;
+    public static final Item BUBBLE_CORAL_FAN;
+    public static final Item FIRE_CORAL_FAN;
+    public static final Item HORN_CORAL_FAN;
+    public static final Item DEAD_TUBE_CORAL_FAN;
+    public static final Item DEAD_BRAIN_CORAL_FAN;
+    public static final Item DEAD_BUBBLE_CORAL_FAN;
+    public static final Item DEAD_FIRE_CORAL_FAN;
+    public static final Item DEAD_HORN_CORAL_FAN;
+    public static final Item BLUE_ICE;
+    public static final Item CONDUIT;
+    public static final Item POLISHED_GRANITE_STAIRS;
+    public static final Item SMOOTH_RED_SANDSTONE_STAIRS;
+    public static final Item MOSSY_STONE_BRICK_STAIRS;
+    public static final Item POLISHED_DIORITE_STAIRS;
+    public static final Item MOSSY_COBBLESTONE_STAIRS;
+    public static final Item END_STONE_BRICK_STAIRS;
+    public static final Item STONE_STAIRS;
+    public static final Item SMOOTH_SANDSTONE_STAIRS;
+    public static final Item SMOOTH_QUARTZ_STAIRS;
+    public static final Item GRANITE_STAIRS;
+    public static final Item ANDESITE_STAIRS;
+    public static final Item RED_NETHER_BRICK_STAIRS;
+    public static final Item POLISHED_ANDESITE_STAIRS;
+    public static final Item DIORITE_STAIRS;
+    public static final Item COBBLED_DEEPSLATE_STAIRS;
+    public static final Item POLISHED_DEEPSLATE_STAIRS;
+    public static final Item DEEPSLATE_BRICK_STAIRS;
+    public static final Item DEEPSLATE_TILE_STAIRS;
+    public static final Item POLISHED_GRANITE_SLAB;
+    public static final Item SMOOTH_RED_SANDSTONE_SLAB;
+    public static final Item MOSSY_STONE_BRICK_SLAB;
+    public static final Item POLISHED_DIORITE_SLAB;
+    public static final Item MOSSY_COBBLESTONE_SLAB;
+    public static final Item END_STONE_BRICK_SLAB;
+    public static final Item SMOOTH_SANDSTONE_SLAB;
+    public static final Item SMOOTH_QUARTZ_SLAB;
+    public static final Item GRANITE_SLAB;
+    public static final Item ANDESITE_SLAB;
+    public static final Item RED_NETHER_BRICK_SLAB;
+    public static final Item POLISHED_ANDESITE_SLAB;
+    public static final Item DIORITE_SLAB;
+    public static final Item COBBLED_DEEPSLATE_SLAB;
+    public static final Item POLISHED_DEEPSLATE_SLAB;
+    public static final Item DEEPSLATE_BRICK_SLAB;
+    public static final Item DEEPSLATE_TILE_SLAB;
+    public static final Item SCAFFOLDING;
+    public static final Item REDSTONE;
+    public static final Item REDSTONE_TORCH;
+    public static final Item REDSTONE_BLOCK;
+    public static final Item REPEATER;
+    public static final Item COMPARATOR;
+    public static final Item PISTON;
+    public static final Item STICKY_PISTON;
+    public static final Item SLIME_BLOCK;
+    public static final Item HONEY_BLOCK;
+    public static final Item OBSERVER;
+    public static final Item HOPPER;
+    public static final Item DISPENSER;
+    public static final Item DROPPER;
+    public static final Item LECTERN;
+    public static final Item TARGET;
+    public static final Item LEVER;
+    public static final WeatheringCopperCollection<Item> LIGHTNING_ROD;
+    public static final Item DAYLIGHT_DETECTOR;
+    public static final Item SCULK_SENSOR;
+    public static final Item CALIBRATED_SCULK_SENSOR;
+    public static final Item TRIPWIRE_HOOK;
+    public static final Item TRAPPED_CHEST;
+    public static final Item TNT;
+    public static final Item REDSTONE_LAMP;
+    public static final Item NOTE_BLOCK;
+    public static final Item STONE_BUTTON;
+    public static final Item POLISHED_BLACKSTONE_BUTTON;
+    public static final Item OAK_BUTTON;
+    public static final Item SPRUCE_BUTTON;
+    public static final Item BIRCH_BUTTON;
+    public static final Item JUNGLE_BUTTON;
+    public static final Item ACACIA_BUTTON;
+    public static final Item CHERRY_BUTTON;
+    public static final Item DARK_OAK_BUTTON;
+    public static final Item PALE_OAK_BUTTON;
+    public static final Item MANGROVE_BUTTON;
+    public static final Item POPLAR_BUTTON;
+    public static final Item BAMBOO_BUTTON;
+    public static final Item CRIMSON_BUTTON;
+    public static final Item WARPED_BUTTON;
+    public static final Item STONE_PRESSURE_PLATE;
+    public static final Item POLISHED_BLACKSTONE_PRESSURE_PLATE;
+    public static final Item LIGHT_WEIGHTED_PRESSURE_PLATE;
+    public static final Item HEAVY_WEIGHTED_PRESSURE_PLATE;
+    public static final Item OAK_PRESSURE_PLATE;
+    public static final Item SPRUCE_PRESSURE_PLATE;
+    public static final Item BIRCH_PRESSURE_PLATE;
+    public static final Item JUNGLE_PRESSURE_PLATE;
+    public static final Item ACACIA_PRESSURE_PLATE;
+    public static final Item CHERRY_PRESSURE_PLATE;
+    public static final Item DARK_OAK_PRESSURE_PLATE;
+    public static final Item PALE_OAK_PRESSURE_PLATE;
+    public static final Item MANGROVE_PRESSURE_PLATE;
+    public static final Item POPLAR_PRESSURE_PLATE;
+    public static final Item BAMBOO_PRESSURE_PLATE;
+    public static final Item CRIMSON_PRESSURE_PLATE;
+    public static final Item WARPED_PRESSURE_PLATE;
+    public static final Item IRON_DOOR;
+    public static final Item OAK_DOOR;
+    public static final Item SPRUCE_DOOR;
+    public static final Item BIRCH_DOOR;
+    public static final Item JUNGLE_DOOR;
+    public static final Item ACACIA_DOOR;
+    public static final Item CHERRY_DOOR;
+    public static final Item DARK_OAK_DOOR;
+    public static final Item PALE_OAK_DOOR;
+    public static final Item MANGROVE_DOOR;
+    public static final Item POPLAR_DOOR;
+    public static final Item BAMBOO_DOOR;
+    public static final Item CRIMSON_DOOR;
+    public static final Item WARPED_DOOR;
+    public static final WeatheringCopperCollection<Item> COPPER_DOOR;
+    public static final Item IRON_TRAPDOOR;
+    public static final Item OAK_TRAPDOOR;
+    public static final Item SPRUCE_TRAPDOOR;
+    public static final Item BIRCH_TRAPDOOR;
+    public static final Item JUNGLE_TRAPDOOR;
+    public static final Item ACACIA_TRAPDOOR;
+    public static final Item CHERRY_TRAPDOOR;
+    public static final Item DARK_OAK_TRAPDOOR;
+    public static final Item PALE_OAK_TRAPDOOR;
+    public static final Item MANGROVE_TRAPDOOR;
+    public static final Item POPLAR_TRAPDOOR;
+    public static final Item BAMBOO_TRAPDOOR;
+    public static final Item CRIMSON_TRAPDOOR;
+    public static final Item WARPED_TRAPDOOR;
+    public static final WeatheringCopperCollection<Item> COPPER_TRAPDOOR;
+    public static final Item OAK_FENCE_GATE;
+    public static final Item SPRUCE_FENCE_GATE;
+    public static final Item BIRCH_FENCE_GATE;
+    public static final Item JUNGLE_FENCE_GATE;
+    public static final Item ACACIA_FENCE_GATE;
+    public static final Item CHERRY_FENCE_GATE;
+    public static final Item DARK_OAK_FENCE_GATE;
+    public static final Item PALE_OAK_FENCE_GATE;
+    public static final Item MANGROVE_FENCE_GATE;
+    public static final Item POPLAR_FENCE_GATE;
+    public static final Item BAMBOO_FENCE_GATE;
+    public static final Item CRIMSON_FENCE_GATE;
+    public static final Item WARPED_FENCE_GATE;
+    public static final Item POWERED_RAIL;
+    public static final Item DETECTOR_RAIL;
+    public static final Item RAIL;
+    public static final Item ACTIVATOR_RAIL;
+    public static final Item SADDLE;
+    public static final ColorCollection<Item> HARNESS;
+    public static final Item MINECART;
+    public static final Item CHEST_MINECART;
+    public static final Item FURNACE_MINECART;
+    public static final Item TNT_MINECART;
+    public static final Item HOPPER_MINECART;
+    public static final Item CARROT_ON_A_STICK;
+    public static final Item WARPED_FUNGUS_ON_A_STICK;
+    public static final Item PHANTOM_MEMBRANE;
+    public static final Item ELYTRA;
+    public static final Item OAK_BOAT;
+    public static final Item OAK_CHEST_BOAT;
+    public static final Item SPRUCE_BOAT;
+    public static final Item SPRUCE_CHEST_BOAT;
+    public static final Item BIRCH_BOAT;
+    public static final Item BIRCH_CHEST_BOAT;
+    public static final Item JUNGLE_BOAT;
+    public static final Item JUNGLE_CHEST_BOAT;
+    public static final Item ACACIA_BOAT;
+    public static final Item ACACIA_CHEST_BOAT;
+    public static final Item CHERRY_BOAT;
+    public static final Item CHERRY_CHEST_BOAT;
+    public static final Item DARK_OAK_BOAT;
+    public static final Item DARK_OAK_CHEST_BOAT;
+    public static final Item PALE_OAK_BOAT;
+    public static final Item PALE_OAK_CHEST_BOAT;
+    public static final Item MANGROVE_BOAT;
+    public static final Item MANGROVE_CHEST_BOAT;
+    public static final Item POPLAR_BOAT;
+    public static final Item POPLAR_CHEST_BOAT;
+    public static final Item BAMBOO_RAFT;
+    public static final Item BAMBOO_CHEST_RAFT;
+    public static final Item STRUCTURE_BLOCK;
+    public static final Item JIGSAW;
+    public static final Item TEST_BLOCK;
+    public static final Item TEST_INSTANCE_BLOCK;
+    public static final Item TURTLE_HELMET;
+    public static final Item TURTLE_SCUTE;
+    public static final Item ARMADILLO_SCUTE;
+    public static final Item WOLF_ARMOR;
+    public static final Item FLINT_AND_STEEL;
+    public static final Item BOWL;
+    public static final Item APPLE;
+    public static final Item BOW;
+    public static final Item ARROW;
+    public static final Item COAL;
+    public static final Item CHARCOAL;
+    public static final Item DIAMOND;
+    public static final Item EMERALD;
+    public static final Item LAPIS_LAZULI;
+    public static final Item QUARTZ;
+    public static final Item AMETHYST_SHARD;
+    public static final Item RAW_IRON;
+    public static final Item IRON_INGOT;
+    public static final Item RAW_COPPER;
+    public static final Item COPPER_INGOT;
+    public static final Item RAW_GOLD;
+    public static final Item GOLD_INGOT;
+    public static final Item NETHERITE_INGOT;
+    public static final Item NETHERITE_SCRAP;
+    public static final Item WOODEN_SWORD;
+    public static final Item WOODEN_SHOVEL;
+    public static final Item WOODEN_PICKAXE;
+    public static final Item WOODEN_AXE;
+    public static final Item WOODEN_HOE;
+    public static final Item COPPER_SWORD;
+    public static final Item COPPER_SHOVEL;
+    public static final Item COPPER_PICKAXE;
+    public static final Item COPPER_AXE;
+    public static final Item COPPER_HOE;
+    public static final Item STONE_SWORD;
+    public static final Item STONE_SHOVEL;
+    public static final Item STONE_PICKAXE;
+    public static final Item STONE_AXE;
+    public static final Item STONE_HOE;
+    public static final Item GOLDEN_SWORD;
+    public static final Item GOLDEN_SHOVEL;
+    public static final Item GOLDEN_PICKAXE;
+    public static final Item GOLDEN_AXE;
+    public static final Item GOLDEN_HOE;
+    public static final Item IRON_SWORD;
+    public static final Item IRON_SHOVEL;
+    public static final Item IRON_PICKAXE;
+    public static final Item IRON_AXE;
+    public static final Item IRON_HOE;
+    public static final Item DIAMOND_SWORD;
+    public static final Item DIAMOND_SHOVEL;
+    public static final Item DIAMOND_PICKAXE;
+    public static final Item DIAMOND_AXE;
+    public static final Item DIAMOND_HOE;
+    public static final Item NETHERITE_SWORD;
+    public static final Item NETHERITE_SHOVEL;
+    public static final Item NETHERITE_PICKAXE;
+    public static final Item NETHERITE_AXE;
+    public static final Item NETHERITE_HOE;
+    public static final Item STICK;
+    public static final Item MUSHROOM_STEW;
+    public static final Item STRING;
+    public static final Item FEATHER;
+    public static final Item GUNPOWDER;
+    public static final Item WHEAT_SEEDS;
+    public static final Item WHEAT;
+    public static final Item BREAD;
+    public static final Item LEATHER_HELMET;
+    public static final Item LEATHER_CHESTPLATE;
+    public static final Item LEATHER_LEGGINGS;
+    public static final Item LEATHER_BOOTS;
+    public static final Item COPPER_HELMET;
+    public static final Item COPPER_CHESTPLATE;
+    public static final Item COPPER_LEGGINGS;
+    public static final Item COPPER_BOOTS;
+    public static final Item CHAINMAIL_HELMET;
+    public static final Item CHAINMAIL_CHESTPLATE;
+    public static final Item CHAINMAIL_LEGGINGS;
+    public static final Item CHAINMAIL_BOOTS;
+    public static final Item IRON_HELMET;
+    public static final Item IRON_CHESTPLATE;
+    public static final Item IRON_LEGGINGS;
+    public static final Item IRON_BOOTS;
+    public static final Item DIAMOND_HELMET;
+    public static final Item DIAMOND_CHESTPLATE;
+    public static final Item DIAMOND_LEGGINGS;
+    public static final Item DIAMOND_BOOTS;
+    public static final Item GOLDEN_HELMET;
+    public static final Item GOLDEN_CHESTPLATE;
+    public static final Item GOLDEN_LEGGINGS;
+    public static final Item GOLDEN_BOOTS;
+    public static final Item NETHERITE_HELMET;
+    public static final Item NETHERITE_CHESTPLATE;
+    public static final Item NETHERITE_LEGGINGS;
+    public static final Item NETHERITE_BOOTS;
+    public static final Item FLINT;
+    public static final Item PORKCHOP;
+    public static final Item COOKED_PORKCHOP;
+    public static final Item PAINTING;
+    public static final Item GOLDEN_APPLE;
+    public static final Item ENCHANTED_GOLDEN_APPLE;
+    public static final Item OAK_SIGN;
+    public static final Item SPRUCE_SIGN;
+    public static final Item BIRCH_SIGN;
+    public static final Item JUNGLE_SIGN;
+    public static final Item ACACIA_SIGN;
+    public static final Item CHERRY_SIGN;
+    public static final Item DARK_OAK_SIGN;
+    public static final Item PALE_OAK_SIGN;
+    public static final Item MANGROVE_SIGN;
+    public static final Item POPLAR_SIGN;
+    public static final Item BAMBOO_SIGN;
+    public static final Item CRIMSON_SIGN;
+    public static final Item WARPED_SIGN;
+    public static final Item OAK_HANGING_SIGN;
+    public static final Item SPRUCE_HANGING_SIGN;
+    public static final Item BIRCH_HANGING_SIGN;
+    public static final Item JUNGLE_HANGING_SIGN;
+    public static final Item ACACIA_HANGING_SIGN;
+    public static final Item CHERRY_HANGING_SIGN;
+    public static final Item DARK_OAK_HANGING_SIGN;
+    public static final Item PALE_OAK_HANGING_SIGN;
+    public static final Item MANGROVE_HANGING_SIGN;
+    public static final Item POPLAR_HANGING_SIGN;
+    public static final Item BAMBOO_HANGING_SIGN;
+    public static final Item CRIMSON_HANGING_SIGN;
+    public static final Item WARPED_HANGING_SIGN;
+    public static final Item BUCKET;
+    public static final Item WATER_BUCKET;
+    public static final Item LAVA_BUCKET;
+    public static final Item POWDER_SNOW_BUCKET;
+    public static final Item SNOWBALL;
+    public static final Item LEATHER;
+    public static final Item MILK_BUCKET;
+    public static final Item PUFFERFISH_BUCKET;
+    public static final Item SALMON_BUCKET;
+    public static final Item COD_BUCKET;
+    public static final Item TROPICAL_FISH_BUCKET;
+    public static final Item AXOLOTL_BUCKET;
+    public static final Item SULFUR_CUBE_BUCKET;
+    public static final Item TADPOLE_BUCKET;
+    public static final Item BRICK;
+    public static final Item CLAY_BALL;
+    public static final Item DRIED_KELP_BLOCK;
+    public static final Item PAPER;
+    public static final Item BOOK;
+    public static final Item SLIME_BALL;
+    public static final Item EGG;
+    public static final Item BLUE_EGG;
+    public static final Item BROWN_EGG;
+    public static final Item COMPASS;
+    public static final Item RECOVERY_COMPASS;
+    public static final Item BUNDLE;
+    public static final ColorCollection<Item> DYED_BUNDLE;
+    public static final ColorCollection<Item> CUSHION;
+    public static final Item FISHING_ROD;
+    public static final Item CLOCK;
+    public static final Item SPYGLASS;
+    public static final Item GLOWSTONE_DUST;
+    public static final Item COD;
+    public static final Item SALMON;
+    public static final Item TROPICAL_FISH;
+    public static final Item PUFFERFISH;
+    public static final Item COOKED_COD;
+    public static final Item COOKED_SALMON;
+    public static final Item INK_SAC;
+    public static final Item GLOW_INK_SAC;
+    public static final Item COCOA_BEANS;
+    public static final ColorCollection<Item> DYE;
+    public static final Item BONE_MEAL;
+    public static final Item BONE;
+    public static final Item SUGAR;
+    public static final Item CAKE;
+    public static final ColorCollection<Item> BED;
+    public static final Item STRAW_BED;
+    public static final Item COOKIE;
+    public static final Item CRAFTER;
+    public static final Item FILLED_MAP;
+    public static final Item OCEAN_MONUMENT_MAP;
+    public static final Item WOODLAND_MANSION_MAP;
+    public static final Item BURIED_TRIAL_CHAMBERS_MAP;
+    public static final Item JUNGLE_PYRAMID_MAP;
+    public static final Item SWAMP_HUT_MAP;
+    public static final Item DESERT_VILLAGE_MAP;
+    public static final Item PLAINS_VILLAGE_MAP;
+    public static final Item SAVANNA_VILLAGE_MAP;
+    public static final Item SNOWY_VILLAGE_MAP;
+    public static final Item TAIGA_VILLAGE_MAP;
+    public static final Item BURIED_TREASURE_MAP;
+    public static final Item BURIED_ANCIENT_CITY_MAP;
+    public static final Item BURIED_MINESHAFT_MAP;
+    public static final Item DESERT_PYRAMID_MAP;
+    public static final Item ABANDONED_CAMP_MAP;
+    public static final Item WARM_OCEAN_RUINS_MAP;
+    public static final Item SHEARS;
+    public static final Item MELON_SLICE;
+    public static final Item DRIED_KELP;
+    public static final Item PUMPKIN_SEEDS;
+    public static final Item MELON_SEEDS;
+    public static final Item BEEF;
+    public static final Item COOKED_BEEF;
+    public static final Item CHICKEN;
+    public static final Item COOKED_CHICKEN;
+    public static final Item ROTTEN_FLESH;
+    public static final Item ENDER_PEARL;
+    public static final Item BLAZE_ROD;
+    public static final Item GHAST_TEAR;
+    public static final Item GOLD_NUGGET;
+    public static final Item NETHER_WART;
+    public static final Item GLASS_BOTTLE;
+    public static final Item POTION;
+    public static final Item SPIDER_EYE;
+    public static final Item FERMENTED_SPIDER_EYE;
+    public static final Item BLAZE_POWDER;
+    public static final Item MAGMA_CREAM;
+    public static final Item BREWING_STAND;
+    public static final Item CAULDRON;
+    public static final Item ENDER_EYE;
+    public static final Item GLISTERING_MELON_SLICE;
+    public static final Item CHICKEN_SPAWN_EGG;
+    public static final Item COW_SPAWN_EGG;
+    public static final Item PIG_SPAWN_EGG;
+    public static final Item SHEEP_SPAWN_EGG;
+    public static final Item CAMEL_SPAWN_EGG;
+    public static final Item DONKEY_SPAWN_EGG;
+    public static final Item HORSE_SPAWN_EGG;
+    public static final Item MULE_SPAWN_EGG;
+    public static final Item CAT_SPAWN_EGG;
+    public static final Item PARROT_SPAWN_EGG;
+    public static final Item WOLF_SPAWN_EGG;
+    public static final Item ARMADILLO_SPAWN_EGG;
+    public static final Item BAT_SPAWN_EGG;
+    public static final Item BEE_SPAWN_EGG;
+    public static final Item FOX_SPAWN_EGG;
+    public static final Item GOAT_SPAWN_EGG;
+    public static final Item LLAMA_SPAWN_EGG;
+    public static final Item OCELOT_SPAWN_EGG;
+    public static final Item PANDA_SPAWN_EGG;
+    public static final Item POLAR_BEAR_SPAWN_EGG;
+    public static final Item RABBIT_SPAWN_EGG;
+    public static final Item AXOLOTL_SPAWN_EGG;
+    public static final Item COD_SPAWN_EGG;
+    public static final Item DOLPHIN_SPAWN_EGG;
+    public static final Item FROG_SPAWN_EGG;
+    public static final Item GLOW_SQUID_SPAWN_EGG;
+    public static final Item NAUTILUS_SPAWN_EGG;
+    public static final Item PUFFERFISH_SPAWN_EGG;
+    public static final Item SALMON_SPAWN_EGG;
+    public static final Item SQUID_SPAWN_EGG;
+    public static final Item TADPOLE_SPAWN_EGG;
+    public static final Item TROPICAL_FISH_SPAWN_EGG;
+    public static final Item TURTLE_SPAWN_EGG;
+    public static final Item ALLAY_SPAWN_EGG;
+    public static final Item MOOSHROOM_SPAWN_EGG;
+    public static final Item SNIFFER_SPAWN_EGG;
+    public static final Item SULFUR_CUBE_SPAWN_EGG;
+    public static final Item COPPER_GOLEM_SPAWN_EGG;
+    public static final Item IRON_GOLEM_SPAWN_EGG;
+    public static final Item SNOW_GOLEM_SPAWN_EGG;
+    public static final Item TRADER_LLAMA_SPAWN_EGG;
+    public static final Item VILLAGER_SPAWN_EGG;
+    public static final Item WANDERING_TRADER_SPAWN_EGG;
+    public static final Item BOGGED_SPAWN_EGG;
+    public static final Item CAMEL_HUSK_SPAWN_EGG;
+    public static final Item DROWNED_SPAWN_EGG;
+    public static final Item HUSK_SPAWN_EGG;
+    public static final Item PARCHED_SPAWN_EGG;
+    public static final Item SKELETON_SPAWN_EGG;
+    public static final Item SKELETON_HORSE_SPAWN_EGG;
+    public static final Item STRAY_SPAWN_EGG;
+    public static final Item WITHER_SPAWN_EGG;
+    public static final Item WITHER_SKELETON_SPAWN_EGG;
+    public static final Item ZOMBIE_SPAWN_EGG;
+    public static final Item ZOMBIE_HORSE_SPAWN_EGG;
+    public static final Item ZOMBIE_NAUTILUS_SPAWN_EGG;
+    public static final Item ZOMBIE_VILLAGER_SPAWN_EGG;
+    public static final Item CAVE_SPIDER_SPAWN_EGG;
+    public static final Item SPIDER_SPAWN_EGG;
+    public static final Item BREEZE_SPAWN_EGG;
+    public static final Item CREAKING_SPAWN_EGG;
+    public static final Item CREEPER_SPAWN_EGG;
+    public static final Item ELDER_GUARDIAN_SPAWN_EGG;
+    public static final Item GUARDIAN_SPAWN_EGG;
+    public static final Item PHANTOM_SPAWN_EGG;
+    public static final Item SILVERFISH_SPAWN_EGG;
+    public static final Item SLIME_SPAWN_EGG;
+    public static final Item WARDEN_SPAWN_EGG;
+    public static final Item WITCH_SPAWN_EGG;
+    public static final Item EVOKER_SPAWN_EGG;
+    public static final Item PILLAGER_SPAWN_EGG;
+    public static final Item RAVAGER_SPAWN_EGG;
+    public static final Item VINDICATOR_SPAWN_EGG;
+    public static final Item VEX_SPAWN_EGG;
+    public static final Item BLAZE_SPAWN_EGG;
+    public static final Item GHAST_SPAWN_EGG;
+    public static final Item HAPPY_GHAST_SPAWN_EGG;
+    public static final Item HOGLIN_SPAWN_EGG;
+    public static final Item MAGMA_CUBE_SPAWN_EGG;
+    public static final Item PIGLIN_SPAWN_EGG;
+    public static final Item PIGLIN_BRUTE_SPAWN_EGG;
+    public static final Item STRIDER_SPAWN_EGG;
+    public static final Item ZOGLIN_SPAWN_EGG;
+    public static final Item ZOMBIFIED_PIGLIN_SPAWN_EGG;
+    public static final Item ENDER_DRAGON_SPAWN_EGG;
+    public static final Item ENDERMAN_SPAWN_EGG;
+    public static final Item ENDERMITE_SPAWN_EGG;
+    public static final Item SHULKER_SPAWN_EGG;
+    public static final Item EXPERIENCE_BOTTLE;
+    public static final Item FIRE_CHARGE;
+    public static final Item WIND_CHARGE;
+    public static final Item WRITABLE_BOOK;
+    public static final Item WRITTEN_BOOK;
+    public static final Item BREEZE_ROD;
+    public static final Item MACE;
+    public static final Item ITEM_FRAME;
+    public static final Item GLOW_ITEM_FRAME;
+    public static final Item FLOWER_POT;
+    public static final Item CARROT;
+    public static final Item POTATO;
+    public static final Item BAKED_POTATO;
+    public static final Item POISONOUS_POTATO;
+    public static final Item MAP;
+    public static final Item GOLDEN_CARROT;
+    public static final Item SKELETON_SKULL;
+    public static final Item WITHER_SKELETON_SKULL;
+    public static final Item PLAYER_HEAD;
+    public static final Item ZOMBIE_HEAD;
+    public static final Item CREEPER_HEAD;
+    public static final Item DRAGON_HEAD;
+    public static final Item PIGLIN_HEAD;
+    public static final Item NETHER_STAR;
+    public static final Item PUMPKIN_PIE;
+    public static final Item FIREWORK_ROCKET;
+    public static final Item FIREWORK_STAR;
+    public static final Item ENCHANTED_BOOK;
+    public static final Item NETHER_BRICK;
+    public static final Item RESIN_BRICK;
+    public static final Item PRISMARINE_SHARD;
+    public static final Item PRISMARINE_CRYSTALS;
+    public static final Item RABBIT;
+    public static final Item COOKED_RABBIT;
+    public static final Item RABBIT_STEW;
+    public static final Item RABBIT_FOOT;
+    public static final Item RABBIT_HIDE;
+    public static final Item ARMOR_STAND;
+    public static final Item COPPER_HORSE_ARMOR;
+    public static final Item IRON_HORSE_ARMOR;
+    public static final Item GOLDEN_HORSE_ARMOR;
+    public static final Item DIAMOND_HORSE_ARMOR;
+    public static final Item NETHERITE_HORSE_ARMOR;
+    public static final Item LEATHER_HORSE_ARMOR;
+    public static final Item LEAD;
+    public static final Item NAME_TAG;
+    public static final Item COMMAND_BLOCK_MINECART;
+    public static final Item MUTTON;
+    public static final Item COOKED_MUTTON;
+    public static final ColorCollection<Item> BANNER;
+    public static final Item END_CRYSTAL;
+    public static final Item CHORUS_FRUIT;
+    public static final Item POPPED_CHORUS_FRUIT;
+    public static final Item TORCHFLOWER_SEEDS;
+    public static final Item PITCHER_POD;
+    public static final Item BEETROOT;
+    public static final Item BEETROOT_SEEDS;
+    public static final Item BEETROOT_SOUP;
+    public static final Item DRAGON_BREATH;
+    public static final Item SPLASH_POTION;
+    public static final Item SPECTRAL_ARROW;
+    public static final Item TIPPED_ARROW;
+    public static final Item LINGERING_POTION;
+    public static final Item SHIELD;
+    public static final Item WOODEN_SPEAR;
+    public static final Item STONE_SPEAR;
+    public static final Item COPPER_SPEAR;
+    public static final Item IRON_SPEAR;
+    public static final Item GOLDEN_SPEAR;
+    public static final Item DIAMOND_SPEAR;
+    public static final Item NETHERITE_SPEAR;
+    public static final Item TOTEM_OF_UNDYING;
+    public static final Item SHULKER_SHELL;
+    public static final Item IRON_NUGGET;
+    public static final Item COPPER_NUGGET;
+    public static final Item KNOWLEDGE_BOOK;
+    public static final Item DEBUG_STICK;
+    public static final Item MUSIC_DISC_13;
+    public static final Item MUSIC_DISC_CAT;
+    public static final Item MUSIC_DISC_BLOCKS;
+    public static final Item MUSIC_DISC_BOUNCE;
+    public static final Item MUSIC_DISC_CHIRP;
+    public static final Item MUSIC_DISC_CREATOR;
+    public static final Item MUSIC_DISC_CREATOR_MUSIC_BOX;
+    public static final Item MUSIC_DISC_FAR;
+    public static final Item MUSIC_DISC_LAVA_CHICKEN;
+    public static final Item MUSIC_DISC_MALL;
+    public static final Item MUSIC_DISC_MELLOHI;
+    public static final Item MUSIC_DISC_STAL;
+    public static final Item MUSIC_DISC_STRAD;
+    public static final Item MUSIC_DISC_WARD;
+    public static final Item MUSIC_DISC_11;
+    public static final Item MUSIC_DISC_WAIT;
+    public static final Item MUSIC_DISC_OTHERSIDE;
+    public static final Item MUSIC_DISC_RELIC;
+    public static final Item MUSIC_DISC_5;
+    public static final Item MUSIC_DISC_PIGSTEP;
+    public static final Item MUSIC_DISC_PRECIPICE;
+    public static final Item MUSIC_DISC_TEARS;
+    public static final Item DISC_FRAGMENT_5;
+    public static final Item TRIDENT;
+    public static final Item NAUTILUS_SHELL;
+    public static final Item IRON_NAUTILUS_ARMOR;
+    public static final Item GOLDEN_NAUTILUS_ARMOR;
+    public static final Item DIAMOND_NAUTILUS_ARMOR;
+    public static final Item NETHERITE_NAUTILUS_ARMOR;
+    public static final Item COPPER_NAUTILUS_ARMOR;
+    public static final Item HEART_OF_THE_SEA;
+    public static final Item CROSSBOW;
+    public static final Item SUSPICIOUS_STEW;
+    public static final Item LOOM;
+    public static final Item FLOWER_BANNER_PATTERN;
+    public static final Item CREEPER_BANNER_PATTERN;
+    public static final Item SKULL_BANNER_PATTERN;
+    public static final Item MOJANG_BANNER_PATTERN;
+    public static final Item GLOBE_BANNER_PATTERN;
+    public static final Item PIGLIN_BANNER_PATTERN;
+    public static final Item FLOW_BANNER_PATTERN;
+    public static final Item GUSTER_BANNER_PATTERN;
+    public static final Item FIELD_MASONED_BANNER_PATTERN;
+    public static final Item BORDURE_INDENTED_BANNER_PATTERN;
+    public static final Item GOAT_HORN;
+    public static final Item COMPOSTER;
+    public static final Item BARREL;
+    public static final Item SMOKER;
+    public static final Item BLAST_FURNACE;
+    public static final Item CARTOGRAPHY_TABLE;
+    public static final Item FLETCHING_TABLE;
+    public static final Item GRINDSTONE;
+    public static final Item SMITHING_TABLE;
+    public static final Item STONECUTTER;
+    public static final Item BELL;
+    public static final Item LANTERN;
+    public static final Item SOUL_LANTERN;
+    public static final WeatheringCopperCollection<Item> COPPER_LANTERN;
+    public static final Item SWEET_BERRIES;
+    public static final Item GLOW_BERRIES;
+    public static final Item CAMPFIRE;
+    public static final Item SOUL_CAMPFIRE;
+    public static final Item SHROOMLIGHT;
+    public static final Item HONEYCOMB;
+    public static final Item BEE_NEST;
+    public static final Item BEEHIVE;
+    public static final Item HONEY_BOTTLE;
+    public static final Item HONEYCOMB_BLOCK;
+    public static final Item LODESTONE;
+    public static final Item CRYING_OBSIDIAN;
+    public static final Item BLACKSTONE;
+    public static final Item BLACKSTONE_SLAB;
+    public static final Item BLACKSTONE_STAIRS;
+    public static final Item GILDED_BLACKSTONE;
+    public static final Item POLISHED_BLACKSTONE;
+    public static final Item POLISHED_BLACKSTONE_SLAB;
+    public static final Item POLISHED_BLACKSTONE_STAIRS;
+    public static final Item CHISELED_POLISHED_BLACKSTONE;
+    public static final Item POLISHED_BLACKSTONE_BRICKS;
+    public static final Item POLISHED_BLACKSTONE_BRICK_SLAB;
+    public static final Item POLISHED_BLACKSTONE_BRICK_STAIRS;
+    public static final Item CRACKED_POLISHED_BLACKSTONE_BRICKS;
+    public static final Item RESPAWN_ANCHOR;
+    public static final Item CANDLE;
+    public static final ColorCollection<Item> DYED_CANDLE;
+    public static final Item SMALL_AMETHYST_BUD;
+    public static final Item MEDIUM_AMETHYST_BUD;
+    public static final Item LARGE_AMETHYST_BUD;
+    public static final Item AMETHYST_CLUSTER;
+    public static final Item POINTED_DRIPSTONE;
+    public static final Item SULFUR_SPIKE;
+    public static final Item OCHRE_FROGLIGHT;
+    public static final Item VERDANT_FROGLIGHT;
+    public static final Item PEARLESCENT_FROGLIGHT;
+    public static final Item FROGSPAWN;
+    public static final Item ECHO_SHARD;
+    public static final Item BRUSH;
+    public static final Item NETHERITE_UPGRADE_SMITHING_TEMPLATE;
+    public static final Item SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item DUNE_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item COAST_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item WILD_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item WARD_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item EYE_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item VEX_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item TIDE_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item RIB_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item RAISER_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item HOST_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item FLOW_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item BOLT_ARMOR_TRIM_SMITHING_TEMPLATE;
+    public static final Item ANGLER_POTTERY_SHERD;
+    public static final Item ARCHER_POTTERY_SHERD;
+    public static final Item ARMS_UP_POTTERY_SHERD;
+    public static final Item BLADE_POTTERY_SHERD;
+    public static final Item BREWER_POTTERY_SHERD;
+    public static final Item BURN_POTTERY_SHERD;
+    public static final Item DANGER_POTTERY_SHERD;
+    public static final Item EXPLORER_POTTERY_SHERD;
+    public static final Item FLOW_POTTERY_SHERD;
+    public static final Item FRIEND_POTTERY_SHERD;
+    public static final Item GUSTER_POTTERY_SHERD;
+    public static final Item HEART_POTTERY_SHERD;
+    public static final Item HEARTBREAK_POTTERY_SHERD;
+    public static final Item HOWL_POTTERY_SHERD;
+    public static final Item MINER_POTTERY_SHERD;
+    public static final Item MOURNER_POTTERY_SHERD;
+    public static final Item PLENTY_POTTERY_SHERD;
+    public static final Item PRIZE_POTTERY_SHERD;
+    public static final Item SCRAPE_POTTERY_SHERD;
+    public static final Item SHEAF_POTTERY_SHERD;
+    public static final Item SHELTER_POTTERY_SHERD;
+    public static final Item SKULL_POTTERY_SHERD;
+    public static final Item SNORT_POTTERY_SHERD;
+    public static final WeatheringCopperCollection<Item> COPPER_GRATE;
+    public static final WeatheringCopperCollection<Item> COPPER_BULB;
+    public static final WeatheringCopperCollection<Item> COPPER_CHEST;
+    public static final WeatheringCopperCollection<Item> COPPER_GOLEM_STATUE;
+    public static final Item TRIAL_SPAWNER;
+    public static final Item TRIAL_KEY;
+    public static final Item OMINOUS_TRIAL_KEY;
+    public static final Item VAULT;
+    public static final Item OMINOUS_BOTTLE;
+}
+//// JukeboxPlayable.java
+import com.mojang.serialization.Codec;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.component.TooltipProvider;
+import net.minecraft.world.level.Level;
+public record JukeboxPlayable(Holder<JukeboxSong> song) implements TooltipProvider {
+    public static final Codec<JukeboxPlayable> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, JukeboxPlayable> STREAM_CODEC;
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+    public static InteractionResult tryInsertIntoJukebox(Level level, BlockPos pos, ItemStack toInsert, Player player);
+}
+//// JukeboxSong.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.sounds.SoundEvent;
+public record JukeboxSong(Holder<SoundEvent> soundEvent, Component description, float lengthInSeconds, int comparatorOutput) {
+    public static final Codec<JukeboxSong> DIRECT_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, JukeboxSong> DIRECT_STREAM_CODEC;
+    public static final Codec<Holder<JukeboxSong>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<JukeboxSong>> STREAM_CODEC;
+    public int lengthInTicks();
+    public boolean hasFinished(long ticksElapsed);
+    public static Optional<Holder<JukeboxSong>> fromStack(ItemStack stack);
+}
+//// JukeboxSongPlayer.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+public class JukeboxSongPlayer {
+    public static final int PLAY_EVENT_INTERVAL_TICKS = 20;
+    public JukeboxSongPlayer(OnSongChanged onSongChanged, BlockPos blockPos);
+    public boolean isPlaying();
+    public JukeboxSong getSong();
+    public long getTicksSinceSongStarted();
+    public void setSongWithoutPlaying(Holder<JukeboxSong> song, long ticksSinceSongStarted);
+    public void play(LevelAccessor level, Holder<JukeboxSong> song);
+    public void stop(LevelAccessor level, BlockState blockState);
+    public void tick(LevelAccessor level, BlockState blockState);
+    public interface OnSongChanged {
+        void notifyChange();
+    }
+}
+//// JukeboxSongs.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+public interface JukeboxSongs {
+    ResourceKey<JukeboxSong> THIRTEEN;
+    ResourceKey<JukeboxSong> CAT;
+    ResourceKey<JukeboxSong> BLOCKS;
+    ResourceKey<JukeboxSong> CHIRP;
+    ResourceKey<JukeboxSong> FAR;
+    ResourceKey<JukeboxSong> MALL;
+    ResourceKey<JukeboxSong> MELLOHI;
+    ResourceKey<JukeboxSong> STAL;
+    ResourceKey<JukeboxSong> STRAD;
+    ResourceKey<JukeboxSong> WARD;
+    ResourceKey<JukeboxSong> ELEVEN;
+    ResourceKey<JukeboxSong> WAIT;
+    ResourceKey<JukeboxSong> PIGSTEP;
+    ResourceKey<JukeboxSong> OTHERSIDE;
+    ResourceKey<JukeboxSong> FIVE;
+    ResourceKey<JukeboxSong> RELIC;
+    ResourceKey<JukeboxSong> PRECIPICE;
+    ResourceKey<JukeboxSong> CREATOR;
+    ResourceKey<JukeboxSong> CREATOR_MUSIC_BOX;
+    ResourceKey<JukeboxSong> TEARS;
+    ResourceKey<JukeboxSong> LAVA_CHICKEN;
+    ResourceKey<JukeboxSong> BOUNCE;
+    static void bootstrap(BootstrapContext<JukeboxSong> context);
+}
+//// KnowledgeBookItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class KnowledgeBookItem extends Item {
+    public KnowledgeBookItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}
+//// LeadItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+public class LeadItem extends Item {
+    public LeadItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public static InteractionResult bindPlayerMobs(Player player, Level level, BlockPos pos);
+}
+//// LingeringPotionItem.java
+import net.minecraft.core.Position;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion;
+import net.minecraft.world.level.Level;
+public class LingeringPotionItem extends ThrowablePotionItem {
+    public LingeringPotionItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    protected AbstractThrownPotion createPotion(ServerLevel level, LivingEntity owner, ItemStack itemStack);
+    protected AbstractThrownPotion createPotion(Level level, Position position, ItemStack itemStack);
+}
+//// MaceItem.java
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.component.Tool;
+public class MaceItem extends Item {
+    public static final float SMASH_ATTACK_FALL_THRESHOLD = 1.5F;
+    public static final float SMASH_ATTACK_KNOCKBACK_RADIUS = 3.5F;
+    public MaceItem(Item.Properties properties);
+    public static ItemAttributeModifiers createAttributes();
+    public static Tool createToolProperties();
+    public void hurtEnemy(ItemStack itemStack, LivingEntity mob, LivingEntity attacker);
+    public void postHurtEnemy(ItemStack itemStack, LivingEntity mob, LivingEntity attacker);
+    public float getAttackDamageBonus(Entity victim, float ignoredDamage, DamageSource damageSource);
+    public static boolean canSmashAttack(LivingEntity attacker);
+    public DamageSource getItemDamageSource(LivingEntity attacker);
+}
+//// MapItem.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
+public class MapItem extends Item {
+    public static final int IMAGE_WIDTH = 128;
+    public static final int IMAGE_HEIGHT = 128;
+    public MapItem(Item.Properties properties);
+    public static ItemStack create(ServerLevel level, int originX, int originZ, byte scale, boolean trackPosition, boolean unlimitedTracking);
+    public static void applyNewSavedData(ServerLevel level, ItemStack map, int originX, int originZ, byte scale, boolean trackPosition, boolean unlimitedTracking);
+    public static MapItemSavedData getSavedData(MapId id, Level level);
+    public static MapItemSavedData getSavedData(ItemStack itemStack, Level level);
+    public void update(Level level, Entity player, MapItemSavedData data);
+    public static void renderBiomePreviewMap(ServerLevel level, ItemStack mapItemStack);
+    public void inventoryTick(ItemStack itemStack, ServerLevel level, Entity owner, EquipmentSlot slot);
+    public void onCraftedPostProcess(ItemStack itemStack, Level level);
+    public InteractionResult useOn(UseOnContext context);
+}
+//// MinecartItem.java
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
+import net.minecraft.world.item.context.UseOnContext;
+public class MinecartItem extends Item {
+    public MinecartItem(EntityType<? extends AbstractMinecart> type, Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+}
+//// MobBucketItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.phys.BlockHitResult;
+public class MobBucketItem extends BucketItem {
+    public MobBucketItem(EntityType<? extends Mob> type, Fluid content, SoundEvent emptySound, Item.Properties properties);
+    public void checkExtraContent(LivingEntity user, Level level, ItemStack itemStack, BlockPos pos);
+    protected void playEmptySound(LivingEntity user, LevelAccessor level, BlockPos pos);
+    public boolean emptyContents(LivingEntity user, Level level, BlockPos pos, BlockHitResult hitResult);
+    public ClipContext.Fluid getFluidContext();
+}
+//// NameTagItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+public class NameTagItem extends Item {
+    public NameTagItem(Item.Properties properties);
+    public InteractionResult interactLivingEntity(ItemStack itemStack, Player player, LivingEntity target, InteractionHand type);
+}
+//// PlaceOnWaterBlockItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+public class PlaceOnWaterBlockItem extends BlockItem {
+    public PlaceOnWaterBlockItem(Block block, Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}
+//// PlayerHeadItem.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.Block;
+public class PlayerHeadItem extends StandingAndWallBlockItem {
+    public PlayerHeadItem(Block block, Block wallBlock, Item.Properties properties);
+    public Component getName(ItemStack itemStack);
+}
+//// PotionItem.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.context.UseOnContext;
+public class PotionItem extends Item {
+    public PotionItem(Item.Properties properties);
+    public ItemStack getDefaultInstance();
+    public InteractionResult useOn(UseOnContext context);
+    public Component getName(ItemStack itemStack);
+}
+//// ProjectileItem.java
+import java.util.Optional;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.core.dispenser.BlockSource;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.Level;
+public interface ProjectileItem {
+    Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+    default DispenseConfig createDispenseConfig();
+    default void shoot(Projectile projectile, double xd, double yd, double zd, float pow, float uncertainty);
+    public static record DispenseConfig(PositionFunction positionFunction, float uncertainty, float power, Optional< Integer> overrideDispenseEvent) {
+        public static final DispenseConfig DEFAULT;
+        public static Builder builder();
+        public static class Builder {
+            public Builder positionFunction(PositionFunction positionFunction);
+            public Builder uncertainty(float uncertainty);
+            public Builder power(float power);
+            public Builder overrideDispenseEvent(int dispenseEvent);
+            public DispenseConfig build();
+        }
+    }
+    public interface PositionFunction {
+        Position getDispensePosition(BlockSource source, Direction direction);
+    }
+}
+//// ProjectileWeaponItem.java
+import java.util.List;
+import java.util.function.Predicate;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.Level;
+public abstract class ProjectileWeaponItem extends Item {
+    public static final Predicate<ItemStack> ARROW_ONLY;
+    public static final Predicate<ItemStack> ARROW_OR_FIREWORK;
+    public ProjectileWeaponItem(Item.Properties properties);
+    public Predicate<ItemStack> getSupportedHeldProjectiles();
+    public abstract Predicate<ItemStack> getAllSupportedProjectiles();
+    public static ItemStack getHeldProjectile(LivingEntity entity, Predicate<ItemStack> valid);
+    public abstract int getDefaultProjectileRange();
+    protected void shoot(ServerLevel level, LivingEntity shooter, InteractionHand hand, ItemStack weapon, List<ItemStack> projectiles, float power, float uncertainty, boolean isCrit, LivingEntity targetOverride);
+    protected int getDurabilityUse(ItemStack projectile);
+    protected abstract void shootProjectile(LivingEntity shooter, Projectile projectileEntity, int index, float power, float uncertainty, float angle, LivingEntity targetOverrride);
+    protected Projectile createProjectile(Level level, LivingEntity shooter, ItemStack weapon, ItemStack projectile, boolean isCrit);
+    protected static List<ItemStack> draw(ItemStack weapon, ItemStack projectile, LivingEntity shooter);
+    protected static ItemStack useAmmo(ItemStack weapon, ItemStack projectile, LivingEntity holder, boolean forceInfinite);
+}
+//// Rarity.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.IntFunction;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum Rarity implements StringRepresentable {
+    COMMON, UNCOMMON, RARE, EPIC;
+    public static final Codec<Rarity> CODEC;
+    public static final IntFunction<Rarity> BY_ID;
+    public static final StreamCodec<ByteBuf, Rarity> STREAM_CODEC;
+    public ChatFormatting color();
+    public String getSerializedName();
+}
+//// ScaffoldingBlockItem.java
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.block.Block;
+public class ScaffoldingBlockItem extends BlockItem {
+    public ScaffoldingBlockItem(Block block, Item.Properties properties);
+    public BlockPlaceContext updatePlacementContext(BlockPlaceContext context);
+    protected boolean mustSurvive();
+}
+//// ServerItemCooldowns.java
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+public class ServerItemCooldowns extends ItemCooldowns {
+    public ServerItemCooldowns(ServerPlayer player);
+    protected void onCooldownStarted(Identifier cooldownGroup, int duration);
+    protected void onCooldownEnded(Identifier cooldownGroup);
+}
+//// ShearsItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.component.Tool;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+public class ShearsItem extends Item {
+    public ShearsItem(Item.Properties properties);
+    public static Tool createToolProperties();
+    public boolean mineBlock(ItemStack itemStack, Level level, BlockState state, BlockPos pos, LivingEntity miner);
+    public InteractionResult useOn(UseOnContext context);
+}
+//// ShieldItem.java
+import net.minecraft.network.chat.Component;
+public class ShieldItem extends Item {
+    public ShieldItem(Item.Properties properties);
+    public Component getName(ItemStack itemStack);
+}
+//// SignApplicator.java
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
+import net.minecraft.world.level.block.entity.SignTextSlot;
+public interface SignApplicator {
+    boolean tryApplyToSign(Level level, SignBlockEntity sign, SignTextSlot slot, ItemStack item, Player player);
+    default boolean canApplyToSign(SignText text, ItemStack item, Player player);
+}
+//// SmithingTemplateItem.java
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.component.TooltipDisplay;
+public class SmithingTemplateItem extends Item {
+    public SmithingTemplateItem(Component appliesTo, Component ingredients, Component baseSlotDescription, Component additionsSlotDescription, List<Identifier> baseSlotEmptyIcons, List<Identifier> additionalSlotEmptyIcons, Item.Properties properties);
+    public static SmithingTemplateItem createArmorTrimTemplate(Item.Properties properties);
+    public static SmithingTemplateItem createNetheriteUpgradeTemplate(Item.Properties properties);
+    public void appendHoverText(ItemStack itemStack, Item.TooltipContext context, TooltipDisplay display, Consumer<Component> builder, TooltipFlag tooltipFlag);
+    public Component getBaseSlotDescription();
+    public Component getAdditionSlotDescription();
+    public List<Identifier> getBaseSlotEmptyIcons();
+    public List<Identifier> getAdditionalSlotEmptyIcons();
+}
+//// SnowballItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.Level;
+public class SnowballItem extends Item implements ProjectileItem {
+    public static final float PROJECTILE_SHOOT_POWER = 1.5F;
+    public SnowballItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+}
+//// SolidBucketItem.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+public class SolidBucketItem extends BlockItem implements DispensibleContainerItem {
+    public SolidBucketItem(Block content, SoundEvent placeSound, Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    protected SoundEvent getPlaceSound(BlockState blockState);
+    public boolean emptyContents(LivingEntity user, Level level, BlockPos pos, BlockHitResult hitResult);
+}
+//// SpawnEggItem.java
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+public class SpawnEggItem extends Item {
+    public SpawnEggItem(Item.Properties properties);
+    public InteractionResult useOn(UseOnContext context);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public static boolean spawnsEntity(ItemStack itemStack, EntityType<?> type);
+    public static Optional<Holder<Item>> byId(EntityType<?> type);
+    public static EntityType<?> getType(ItemStack itemStack);
+    public static Optional<Mob> spawnOffspringFromSpawnEgg(Player player, Mob parent, EntityType<? extends Mob> type, ServerLevel level, Vec3 pos, ItemStack spawnEggStack);
+    public boolean shouldPrintOpWarning(ItemStack stack, Player player);
+}
+//// SpectralArrowItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.level.Level;
+public class SpectralArrowItem extends ArrowItem {
+    public SpectralArrowItem(Item.Properties properties);
+    public AbstractArrow createArrow(Level level, ItemStack itemStack, LivingEntity owner, ItemStack firedFromWeapon);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+}
+//// SplashPotionItem.java
+import net.minecraft.core.Position;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion;
+import net.minecraft.world.level.Level;
+public class SplashPotionItem extends ThrowablePotionItem {
+    public SplashPotionItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    protected AbstractThrownPotion createPotion(ServerLevel level, LivingEntity owner, ItemStack itemStack);
+    protected AbstractThrownPotion createPotion(Level level, Position position, ItemStack itemStack);
+}
+//// SpyglassItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class SpyglassItem extends Item {
+    public static final int USE_DURATION = 1200;
+    public static final float ZOOM_FOV_MODIFIER = 0.1F;
+    public SpyglassItem(Item.Properties properties);
+    public int getUseDuration(ItemStack itemStack, LivingEntity user);
+    public ItemUseAnimation getUseAnimation(ItemStack itemStack);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public ItemStack finishUsingItem(ItemStack itemStack, Level level, LivingEntity entity);
+    public boolean releaseUsing(ItemStack itemStack, Level level, LivingEntity entity, int remainingTime);
+}
+//// StandingAndWallBlockItem.java
+import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class StandingAndWallBlockItem extends BlockItem {
+    protected final Block wallBlock;
+    public StandingAndWallBlockItem(Block block, Block wallBlock, Direction attachmentDirection, Item.Properties properties);
+    protected boolean canPlace(LevelReader level, BlockState possibleState, BlockPos pos);
+    protected BlockState getPlacementState(BlockPlaceContext context);
+    public void registerBlocks(Map<Block, Item> map, Item item);
+}
+//// SwingAnimationType.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public enum SwingAnimationType implements StringRepresentable {
+    NONE, WHACK, STAB;
+    public static final StringRepresentable.EnumCodec<SwingAnimationType> CODEC;
+    public static final StreamCodec<ByteBuf, SwingAnimationType> STREAM_CODEC;
+    public int getId();
+    public String getSerializedName();
+    public static SwingAnimationType byName(String name, SwingAnimationType defaultAnimation);
+}
+//// ThrowablePotionItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion;
+import net.minecraft.world.level.Level;
+public abstract class ThrowablePotionItem extends PotionItem implements ProjectileItem {
+    public static final float PROJECTILE_SHOOT_POWER = 0.5F;
+    public ThrowablePotionItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    protected abstract AbstractThrownPotion createPotion(ServerLevel level, LivingEntity owner, ItemStack itemStack);
+    protected abstract AbstractThrownPotion createPotion(Level level, Position position, ItemStack itemStack);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+    public ProjectileItem.DispenseConfig createDispenseConfig();
+}
+//// TippedArrowItem.java
+import net.minecraft.network.chat.Component;
+public class TippedArrowItem extends ArrowItem {
+    public TippedArrowItem(Item.Properties properties);
+    public ItemStack getDefaultInstance();
+    public Component getName(ItemStack itemStack);
+}
+//// ToolMaterial.java
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.block.Block;
+public record ToolMaterial(TagKey<Block> incorrectBlocksForDrops, int durability, float speed, float attackDamageBonus, int enchantmentValue, TagKey<Item> repairItems) {
+    public static final ToolMaterial WOOD;
+    public static final ToolMaterial STONE;
+    public static final ToolMaterial COPPER;
+    public static final ToolMaterial IRON;
+    public static final ToolMaterial DIAMOND;
+    public static final ToolMaterial GOLD;
+    public static final ToolMaterial NETHERITE;
+    public Item.Properties applyToolProperties(Item.Properties properties, TagKey<Block> minesEfficiently, float attackDamageBaseline, float attackSpeedBaseline, float disableBlockingSeconds);
+    public Item.Properties applySwordProperties(Item.Properties properties, float attackDamageBaseline, float attackSpeedBaseline);
+}
+//// TooltipFlag.java
+public interface TooltipFlag {
+    Default NORMAL;
+    Default ADVANCED;
+    boolean isAdvanced();
+    boolean isCreative();
+    public static record Default(boolean advanced, boolean creative) implements TooltipFlag {
+        public boolean isAdvanced();
+        public boolean isCreative();
+        public Default asCreative();
+    }
+}
+//// TridentItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.component.Tool;
+import net.minecraft.world.level.Level;
+public class TridentItem extends Item implements ProjectileItem {
+    public static final int THROW_THRESHOLD_TIME = 10;
+    public static final float BASE_DAMAGE = 8.0F;
+    public static final float PROJECTILE_SHOOT_POWER = 2.5F;
+    public TridentItem(Item.Properties properties);
+    public static ItemAttributeModifiers createAttributes();
+    public static Tool createToolProperties();
+    public ItemUseAnimation getUseAnimation(ItemStack itemStack);
+    public int getUseDuration(ItemStack itemStack, LivingEntity user);
+    public boolean releaseUsing(ItemStack itemStack, Level level, LivingEntity entity, int remainingTime);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+}
+//// WindChargeItem.java
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.Level;
+public class WindChargeItem extends Item implements ProjectileItem {
+    public static final float PROJECTILE_SHOOT_POWER = 1.5F;
+    public WindChargeItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+    public Projectile asProjectile(Level level, Position position, ItemStack itemStack, Direction direction);
+    public void shoot(Projectile projectile, double xd, double yd, double zd, float pow, float uncertainty);
+    public ProjectileItem.DispenseConfig createDispenseConfig();
+}
+//// WritableBookItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class WritableBookItem extends Item {
+    public WritableBookItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}
+//// WrittenBookItem.java
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+public class WrittenBookItem extends Item {
+    public WrittenBookItem(Item.Properties properties);
+    public InteractionResult use(Level level, Player player, InteractionHand hand);
+}

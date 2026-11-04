@@ -36,6 +36,7 @@ public final class Natives {
     public static native void packetTap(boolean on);
     public static native void packetSend(long connection, int id, byte[] body);
     public static native void packetReceive(long connection, int id, byte[] body);
+    public static native boolean playerPacketReceive(String uuid, int id, byte[] body);
     public static native void packetClose(long connection);
     public static native long packetConnectionOf(String uuid);
 }

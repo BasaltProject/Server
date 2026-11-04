@@ -1,0 +1,197 @@
+//// ChunkGenerationEvent.java
+import jdk.jfr.Event;
+import jdk.jfr.EventType;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+public class ChunkGenerationEvent extends Event {
+    public static final String EVENT_NAME = "minecraft.ChunkGeneration";
+    public static final EventType TYPE;
+    public final int worldPosX;
+    public final int worldPosZ;
+    public final int chunkPosX;
+    public final int chunkPosZ;
+    public final String targetStatus;
+    public final String level;
+    public ChunkGenerationEvent(ChunkPos pos, ResourceKey<Level> dimension, String name);
+    public static class Fields {
+        public static final String WORLD_POS_X = "worldPosX";
+        public static final String WORLD_POS_Z = "worldPosZ";
+        public static final String CHUNK_POS_X = "chunkPosX";
+        public static final String CHUNK_POS_Z = "chunkPosZ";
+        public static final String STATUS = "status";
+        public static final String LEVEL = "level";
+        private Fields();
+    }
+}
+//// ChunkRegionIoEvent.java
+import jdk.jfr.Event;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.storage.RegionFileVersion;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+public abstract class ChunkRegionIoEvent extends Event {
+    public final int regionPosX;
+    public final int regionPosZ;
+    public final int localChunkPosX;
+    public final int localChunkPosZ;
+    public final int chunkPosX;
+    public final int chunkPosZ;
+    public final String levelId;
+    public final String dimension;
+    public final String type;
+    public final String compression;
+    public final int bytes;
+    protected ChunkRegionIoEvent(RegionStorageInfo info, ChunkPos chunkPos, RegionFileVersion version, int bytes);
+    public static class Fields {
+        public static final String REGION_POS_X = "regionPosX";
+        public static final String REGION_POS_Z = "regionPosZ";
+        public static final String LOCAL_POS_X = "localPosX";
+        public static final String LOCAL_POS_Z = "localPosZ";
+        public static final String CHUNK_POS_X = "chunkPosX";
+        public static final String CHUNK_POS_Z = "chunkPosZ";
+        public static final String LEVEL = "level";
+        public static final String DIMENSION = "dimension";
+        public static final String TYPE = "type";
+        public static final String COMPRESSION = "compression";
+        public static final String BYTES = "bytes";
+        private Fields();
+    }
+}
+//// ChunkRegionReadEvent.java
+import jdk.jfr.EventType;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.storage.RegionFileVersion;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+public class ChunkRegionReadEvent extends ChunkRegionIoEvent {
+    public static final String EVENT_NAME = "minecraft.ChunkRegionRead";
+    public static final EventType TYPE;
+    public ChunkRegionReadEvent(RegionStorageInfo info, ChunkPos chunkPos, RegionFileVersion version, int bytes);
+}
+//// ChunkRegionWriteEvent.java
+import jdk.jfr.EventType;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.storage.RegionFileVersion;
+import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+public class ChunkRegionWriteEvent extends ChunkRegionIoEvent {
+    public static final String EVENT_NAME = "minecraft.ChunkRegionWrite";
+    public static final EventType TYPE;
+    public ChunkRegionWriteEvent(RegionStorageInfo info, ChunkPos chunkPos, RegionFileVersion version, int bytes);
+}
+//// ClientFpsEvent.java
+import jdk.jfr.Event;
+import jdk.jfr.EventType;
+public class ClientFpsEvent extends Event {
+    public static final String EVENT_NAME = "minecraft.ClientFps";
+    public static final EventType TYPE;
+    public final int fps;
+    public ClientFpsEvent(int fps);
+    public static class Fields {
+        public static final String FPS = "fps";
+        private Fields();
+    }
+}
+//// NetworkSummaryEvent.java
+import jdk.jfr.Event;
+import jdk.jfr.EventType;
+public class NetworkSummaryEvent extends Event {
+    public static final String EVENT_NAME = "minecraft.NetworkSummary";
+    public static final EventType TYPE;
+    public final String remoteAddress;
+    public long sentBytes;
+    public int sentPackets;
+    public long receivedBytes;
+    public int receivedPackets;
+    public NetworkSummaryEvent(String remoteAddress);
+    public static final class Fields {
+        public static final String REMOTE_ADDRESS = "remoteAddress";
+        public static final String SENT_BYTES = "sentBytes";
+        public static final String RECEIVED_BYTES = "receivedBytes";
+        private Fields();
+    }
+    public static final class SumAggregation {
+        public SumAggregation(String remoteAddress);
+        public void trackSentPacket(int size);
+        public void trackReceivedPacket(int size);
+        public void commitEvent();
+    }
+}
+//// PacketEvent.java
+import java.net.SocketAddress;
+import jdk.jfr.Event;
+public abstract class PacketEvent extends Event {
+    public final String protocolId;
+    public final String packetDirection;
+    public final String packetId;
+    public final String remoteAddress;
+    public final int bytes;
+    public PacketEvent(String protocolId, String packetDirection, String packetId, SocketAddress remoteAddress, int bytes);
+    public static final class Fields {
+        public static final String REMOTE_ADDRESS = "remoteAddress";
+        public static final String PROTOCOL_ID = "protocolId";
+        public static final String PACKET_DIRECTION = "packetDirection";
+        public static final String PACKET_ID = "packetId";
+        public static final String BYTES = "bytes";
+        private Fields();
+    }
+}
+//// PacketReceivedEvent.java
+import java.net.SocketAddress;
+import jdk.jfr.EventType;
+public class PacketReceivedEvent extends PacketEvent {
+    public static final String NAME = "minecraft.PacketReceived";
+    public static final EventType TYPE;
+    public PacketReceivedEvent(String protocolId, String packetDirection, String packetId, SocketAddress remoteAddress, int readableBytes);
+}
+//// PacketSentEvent.java
+import java.net.SocketAddress;
+import jdk.jfr.EventType;
+public class PacketSentEvent extends PacketEvent {
+    public static final String NAME = "minecraft.PacketSent";
+    public static final EventType TYPE;
+    public PacketSentEvent(String protocolId, String packetDirection, String packetId, SocketAddress remoteAddress, int writtenBytes);
+}
+//// ServerTickTimeEvent.java
+import jdk.jfr.Event;
+import jdk.jfr.EventType;
+public class ServerTickTimeEvent extends Event {
+    public static final String EVENT_NAME = "minecraft.ServerTickTime";
+    public static final EventType TYPE;
+    public final long averageTickDurationNanos;
+    public ServerTickTimeEvent(float averageTickTimeMs);
+    public static class Fields {
+        public static final String AVERAGE_TICK_DURATION = "averageTickDuration";
+        private Fields();
+    }
+}
+//// StructureGenerationEvent.java
+import jdk.jfr.Event;
+import jdk.jfr.EventType;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.structure.Structure;
+public class StructureGenerationEvent extends Event {
+    public static final String EVENT_NAME = "minecraft.StructureGeneration";
+    public static final EventType TYPE;
+    public final int chunkPosX;
+    public final int chunkPosZ;
+    public final String structure;
+    public final String level;
+    public boolean success;
+    public StructureGenerationEvent(ChunkPos sourceChunkPos, Holder<Structure> structure, ResourceKey<Level> level);
+    public interface Fields {
+        String CHUNK_POS_X;
+        String CHUNK_POS_Z;
+        String STRUCTURE;
+        String LEVEL;
+        String SUCCESS;
+    }
+}
+//// WorldLoadFinishedEvent.java
+import jdk.jfr.Event;
+import jdk.jfr.EventType;
+public class WorldLoadFinishedEvent extends Event {
+    public static final String EVENT_NAME = "minecraft.LoadWorld";
+    public static final EventType TYPE;
+}

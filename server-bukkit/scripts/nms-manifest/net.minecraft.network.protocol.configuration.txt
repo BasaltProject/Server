@@ -1,0 +1,153 @@
+//// ClientConfigurationPacketListener.java
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.common.ClientCommonPacketListener;
+public interface ClientConfigurationPacketListener extends ClientCommonPacketListener {
+    default ConnectionProtocol protocol();
+    void handleCodeOfConduct(ClientboundCodeOfConductPacket packet);
+    void handleConfigurationFinished(ClientboundFinishConfigurationPacket packet);
+    void handleRegistryData(ClientboundRegistryDataPacket packet);
+    void handleEnabledFeatures(ClientboundUpdateEnabledFeaturesPacket packet);
+    void handleSelectKnownPacks(ClientboundSelectKnownPacks packet);
+    void handleResetChat(ClientboundResetChatPacket packet);
+}
+//// ClientboundCodeOfConductPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientboundCodeOfConductPacket(String codeOfConduct) implements Packet<ClientConfigurationPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundCodeOfConductPacket> STREAM_CODEC;
+    public PacketType<ClientboundCodeOfConductPacket> type();
+    public void handle(ClientConfigurationPacketListener listener);
+}
+//// ClientboundFinishConfigurationPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ClientboundFinishConfigurationPacket implements Packet<ClientConfigurationPacketListener> {
+    public static final ClientboundFinishConfigurationPacket INSTANCE;
+    public static final StreamCodec<ByteBuf, ClientboundFinishConfigurationPacket> STREAM_CODEC;
+    private ClientboundFinishConfigurationPacket();
+    public PacketType<ClientboundFinishConfigurationPacket> type();
+    public void handle(ClientConfigurationPacketListener listener);
+    public boolean isTerminal();
+}
+//// ClientboundRegistryDataPacket.java
+import java.util.List;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistrySynchronization;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.ResourceKey;
+public record ClientboundRegistryDataPacket(ResourceKey<? extends Registry<?>> registry, List<RegistrySynchronization.PackedRegistryEntry> entries) implements Packet<ClientConfigurationPacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientboundRegistryDataPacket> STREAM_CODEC;
+    public PacketType<ClientboundRegistryDataPacket> type();
+    public void handle(ClientConfigurationPacketListener listener);
+}
+//// ClientboundResetChatPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ClientboundResetChatPacket implements Packet<ClientConfigurationPacketListener> {
+    public static final ClientboundResetChatPacket INSTANCE;
+    public static final StreamCodec<ByteBuf, ClientboundResetChatPacket> STREAM_CODEC;
+    private ClientboundResetChatPacket();
+    public PacketType<ClientboundResetChatPacket> type();
+    public void handle(ClientConfigurationPacketListener listener);
+}
+//// ClientboundSelectKnownPacks.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.server.packs.repository.KnownPack;
+public record ClientboundSelectKnownPacks(List<KnownPack> knownPacks) implements Packet<ClientConfigurationPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundSelectKnownPacks> STREAM_CODEC;
+    public PacketType<ClientboundSelectKnownPacks> type();
+    public void handle(ClientConfigurationPacketListener listener);
+}
+//// ClientboundUpdateEnabledFeaturesPacket.java
+import io.netty.buffer.ByteBuf;
+import java.util.Set;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.resources.Identifier;
+public record ClientboundUpdateEnabledFeaturesPacket(Set<Identifier> features) implements Packet<ClientConfigurationPacketListener> {
+    public static final StreamCodec<ByteBuf, ClientboundUpdateEnabledFeaturesPacket> STREAM_CODEC;
+    public PacketType<ClientboundUpdateEnabledFeaturesPacket> type();
+    public void handle(ClientConfigurationPacketListener listener);
+}
+//// ConfigurationPacketTypes.java
+import net.minecraft.network.protocol.PacketType;
+public class ConfigurationPacketTypes {
+    public static final PacketType<ClientboundCodeOfConductPacket> CLIENTBOUND_CODE_OF_CONDUCT;
+    public static final PacketType<ClientboundFinishConfigurationPacket> CLIENTBOUND_FINISH_CONFIGURATION;
+    public static final PacketType<ClientboundRegistryDataPacket> CLIENTBOUND_REGISTRY_DATA;
+    public static final PacketType<ClientboundResetChatPacket> CLIENTBOUND_RESET_CHAT;
+    public static final PacketType<ClientboundSelectKnownPacks> CLIENTBOUND_SELECT_KNOWN_PACKS;
+    public static final PacketType<ClientboundUpdateEnabledFeaturesPacket> CLIENTBOUND_UPDATE_ENABLED_FEATURES;
+    public static final PacketType<ServerboundAcceptCodeOfConductPacket> SERVERBOUND_ACCEPT_CODE_OF_CONDUCT;
+    public static final PacketType<ServerboundFinishConfigurationPacket> SERVERBOUND_FINISH_CONFIGURATION;
+    public static final PacketType<ServerboundSelectKnownPacks> SERVERBOUND_SELECT_KNOWN_PACKS;
+}
+//// ConfigurationProtocols.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.ProtocolInfo;
+import net.minecraft.network.protocol.SimpleUnboundProtocol;
+public class ConfigurationProtocols {
+    public static final SimpleUnboundProtocol<ServerConfigurationPacketListener, FriendlyByteBuf> SERVERBOUND_TEMPLATE;
+    public static final ProtocolInfo<ServerConfigurationPacketListener> SERVERBOUND;
+    public static final SimpleUnboundProtocol<ClientConfigurationPacketListener, FriendlyByteBuf> CLIENTBOUND_TEMPLATE;
+    public static final ProtocolInfo<ClientConfigurationPacketListener> CLIENTBOUND;
+}
+//// ServerConfigurationPacketListener.java
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.common.ServerCommonPacketListener;
+public interface ServerConfigurationPacketListener extends ServerCommonPacketListener {
+    default ConnectionProtocol protocol();
+    void handleConfigurationFinished(ServerboundFinishConfigurationPacket packet);
+    void handleSelectKnownPacks(ServerboundSelectKnownPacks packet);
+    void handleAcceptCodeOfConduct(ServerboundAcceptCodeOfConductPacket packet);
+}
+//// ServerboundAcceptCodeOfConductPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ServerboundAcceptCodeOfConductPacket() implements Packet<ServerConfigurationPacketListener> {
+    public static final ServerboundAcceptCodeOfConductPacket INSTANCE;
+    public static final StreamCodec<ByteBuf, ServerboundAcceptCodeOfConductPacket> STREAM_CODEC;
+    public PacketType<ServerboundAcceptCodeOfConductPacket> type();
+    public void handle(ServerConfigurationPacketListener listener);
+}
+//// ServerboundFinishConfigurationPacket.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public class ServerboundFinishConfigurationPacket implements Packet<ServerConfigurationPacketListener> {
+    public static final ServerboundFinishConfigurationPacket INSTANCE;
+    public static final StreamCodec<ByteBuf, ServerboundFinishConfigurationPacket> STREAM_CODEC;
+    private ServerboundFinishConfigurationPacket();
+    public PacketType<ServerboundFinishConfigurationPacket> type();
+    public void handle(ServerConfigurationPacketListener listener);
+    public boolean isTerminal();
+}
+//// ServerboundSelectKnownPacks.java
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.server.packs.repository.KnownPack;
+public record ServerboundSelectKnownPacks(List<KnownPack> knownPacks) implements Packet<ServerConfigurationPacketListener> {
+    public static final StreamCodec<ByteBuf, ServerboundSelectKnownPacks> STREAM_CODEC;
+    public PacketType<ServerboundSelectKnownPacks> type();
+    public void handle(ServerConfigurationPacketListener listener);
+}

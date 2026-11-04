@@ -1,0 +1,25 @@
+//// AdvancementProvider.java
+import java.util.List;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.core.registries.SingleRegistryBootstrap;
+import net.minecraft.data.worldgen.BootstrapContext;
+public class AdvancementProvider implements SingleRegistryBootstrap<Advancement> {
+    public AdvancementProvider(List<AdvancementSubProvider.Factory> subProviders);
+    public void run(BootstrapContext<Advancement> output);
+}
+//// AdvancementSubProvider.java
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.predicates.DamageSourcePredicate;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.world.damagesource.DamageType;
+public abstract class AdvancementSubProvider {
+    protected final BootstrapContext<Advancement> output;
+    protected final HolderGetter<DamageType> damageTypes;
+    protected AdvancementSubProvider(BootstrapContext<Advancement> output);
+    public abstract void generate();
+    protected DamageSourcePredicate.Builder isProjectile();
+    public interface Factory {
+        AdvancementSubProvider create(BootstrapContext<Advancement> output);
+    }
+}

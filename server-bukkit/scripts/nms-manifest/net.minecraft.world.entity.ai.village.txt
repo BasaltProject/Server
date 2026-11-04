@@ -1,0 +1,19 @@
+//// ReputationEventType.java
+public interface ReputationEventType {
+    ReputationEventType ZOMBIE_VILLAGER_CURED;
+    ReputationEventType GOLEM_KILLED;
+    ReputationEventType VILLAGER_HURT;
+    ReputationEventType VILLAGER_KILLED;
+    ReputationEventType TRADE;
+    static ReputationEventType register(String name);
+}
+//// VillageSiege.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.CustomSpawner;
+public class VillageSiege implements CustomSpawner {
+    public VillageSiege();
+    public void tick(ServerLevel level, boolean spawnEnemies);
+    static enum State {
+        SIEGE_CAN_ACTIVATE, SIEGE_TONIGHT, SIEGE_DONE;
+    }
+}

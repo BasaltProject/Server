@@ -1,0 +1,62 @@
+//// CanyonWorldCarver.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.FloatProvider;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.CarverOutput;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
+public record CanyonWorldCarver(float probability, HeightProvider y, FloatProvider verticalRotation, Shape shape) implements WorldCarver {
+    public static final MapCodec<CanyonWorldCarver> MAP_CODEC;
+    public boolean isStartChunk(RandomSource random);
+    public boolean carve(WorldGenerationContext context, RandomSource random, ChunkPos chunkPos, ChunkPos sourceChunkPos, CarverOutput output);
+    public MapCodec<CanyonWorldCarver> codec();
+    public static record Shape(FloatProvider distanceFactor, FloatProvider thickness, int widthSmoothness, FloatProvider horizontalRadiusFactor, float verticalRadiusDefaultFactor, float verticalRadiusCenterFactor, FloatProvider yScale) {
+        public static final Codec<Shape> CODEC;
+    }
+}
+//// CaveWorldCarver.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.FloatProvider;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.CarverOutput;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
+public record CaveWorldCarver(float probability, HeightProvider y, IntProvider count, FloatProvider thickness, boolean weirdThicknessBias, FloatProvider roomVerticalRadiusMultiplier, FloatProvider horizontalRadiusMultiplier, FloatProvider verticalRadiusMultiplier, FloatProvider startVerticalRadiusMultiplier, FloatProvider floorLevel) implements WorldCarver {
+    public static final MapCodec<CaveWorldCarver> MAP_CODEC;
+    public boolean isStartChunk(RandomSource random);
+    public boolean carve(WorldGenerationContext context, RandomSource random, ChunkPos chunkPos, ChunkPos sourceChunkPos, CarverOutput output);
+    public MapCodec<CaveWorldCarver> codec();
+}
+//// WorldCarver.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.CarverOutput;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+public interface WorldCarver {
+    Codec<WorldCarver> DIRECT_CODEC;
+    Codec<Holder<WorldCarver>> CODEC;
+    Codec<HolderSet<WorldCarver>> LIST_CODEC;
+    default int getRange();
+    static void carveEllipsoid(ChunkPos chunkPos, double x, double y, double z, double horizontalRadius, double verticalRadius, CarverOutput output, CarveSkipChecker skipChecker);
+    boolean carve(WorldGenerationContext context, RandomSource random, ChunkPos chunkPos, ChunkPos sourceChunkPos, CarverOutput output);
+    boolean isStartChunk(RandomSource random);
+    MapCodec<? extends WorldCarver> codec();
+    static boolean canReach(ChunkPos chunkPos, double x, double z, int currentStep, int totalSteps, float thickness);
+    public interface CarveSkipChecker {
+        boolean shouldSkip(double xd, double yd, double zd, int y);
+    }
+}
+//// WorldCarverTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public interface WorldCarverTypes {
+    static MapCodec<? extends WorldCarver> bootstrap(Registry<MapCodec<? extends WorldCarver>> registry);
+}

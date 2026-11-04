@@ -267,6 +267,18 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("block_instrument");
+    wire::lua::pushHostFunction(lua, "worlds.block_shape", [server](LuaArgs& args) {
+        const std::vector<std::int32_t> boxes =
+            server->services().worlds().collisionBoxes(static_cast<std::int32_t>(args.checkInteger(1)));
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const std::int32_t value : boxes) {
+            args.pushNumber(static_cast<double>(value) / 32.0);
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("block_shape");
     wire::lua::pushHostFunction(lua, "worlds.block_sounds", [server](LuaArgs& args) {
         const std::vector<std::string> facts =
             server->services().worlds().blockSounds(static_cast<std::int32_t>(args.checkInteger(1)));
@@ -388,6 +400,19 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("entity_types");
+    wire::lua::pushHostFunction(lua, "worlds.entity_attributes", [server](LuaArgs& args) {
+        args.pushTable();
+        for (const std::string& entry : server->services().worlds().entityDefaultAttributes(args.checkString(1))) {
+            const std::size_t split = entry.rfind('=');
+            if (split == std::string::npos) {
+                continue;
+            }
+            args.pushNumber(std::strtod(entry.c_str() + split + 1, nullptr));
+            args.setField(entry.substr(0, split));
+        }
+        return 1;
+    });
+    lua.setField("entity_attributes");
     wire::lua::pushHostFunction(lua, "worlds.registry", [server](LuaArgs& args) {
         args.pushTable();
         std::int64_t position = 1;

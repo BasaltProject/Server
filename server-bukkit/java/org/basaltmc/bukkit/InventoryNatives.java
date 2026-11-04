@@ -22,6 +22,8 @@ public final class InventoryNatives {
     public static native String[] registryTags(String registry);
     public static native String[] enchantmentIds();
     public static native byte[] craft(int width, int height, byte[] items);
+    public static native byte[] smithing(byte[] templateStack, byte[] base, byte[] addition);
+    public static native byte[] anvil(byte[] left, byte[] right, String name);
     public static native String[] recipeIds();
     public static native byte[] recipeData(String id);
     public static native boolean addRecipe(String id, byte[] data);

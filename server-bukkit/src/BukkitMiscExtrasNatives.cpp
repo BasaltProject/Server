@@ -106,7 +106,7 @@ jobjectArray JNICALL nativeAdvInfo(JNIEnv* env, jclass, jstring id) {
         env, {found->id, found->parent.value_or(""), found->root, found->hasDisplay ? "1" : "0", found->title,
               found->description, found->iconItem, found->frame, found->background.value_or(""),
               found->toast ? "1" : "0", found->announce ? "1" : "0", found->hidden ? "1" : "0",
-              std::to_string(found->x), std::to_string(found->y), std::to_string(found->experience)});
+              std::to_string(found->x), std::to_string(found->y), std::to_string(found->experience), found->json});
     if (!found->parent.has_value()) {
         env->SetObjectArrayElement(array, 1, nullptr);
     }
@@ -163,6 +163,22 @@ jboolean JNICALL nativeAdvRevoke(JNIEnv* env, jclass, jstring uuid, jstring id, 
     const std::string text = toStd(env, id);
     const std::string name = toStd(env, criterion);
     return flag(jni::onServer<bool>(false, [&] { return advancements().revoke(who, text, name); }));
+}
+
+jboolean JNICALL nativeAdvTrigger(JNIEnv* env, jclass, jstring uuid, jstring trigger, jboolean hasBlock, jint x, jint y,
+                                  jint z, jstring item, jint count, jdouble distance) {
+    const std::string who = toStd(env, uuid);
+    const std::string name = toStd(env, trigger);
+    plugins::PluginTriggerFacts facts;
+    if (hasBlock != JNI_FALSE) {
+        facts.block = std::array<std::int32_t, 3>{x, y, z};
+    }
+    facts.item = item == nullptr ? std::string{} : toStd(env, item);
+    facts.count = count;
+    if (distance >= 0.0) {
+        facts.distance = distance;
+    }
+    return flag(jni::onServer<bool>(false, [&] { return advancements().trigger(who, name, facts); }));
 }
 
 jfloat JNICALL nativeTmRate(JNIEnv*, jclass) {
@@ -285,6 +301,8 @@ void registerMiscNativesExtras(JNIEnv* env, jclass natives) {
                      reinterpret_cast<void*>(&nativeAdvGrant)),
         nativeMethod("advRevoke", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z",
                      reinterpret_cast<void*>(&nativeAdvRevoke)),
+        nativeMethod("advTrigger", "(Ljava/lang/String;Ljava/lang/String;ZIIILjava/lang/String;ID)Z",
+                     reinterpret_cast<void*>(&nativeAdvTrigger)),
         nativeMethod("tmRate", "()F", reinterpret_cast<void*>(&nativeTmRate)),
         nativeMethod("tmSetRate", "(F)V", reinterpret_cast<void*>(&nativeTmSetRate)),
         nativeMethod("tmFrozen", "()Z", reinterpret_cast<void*>(&nativeTmFrozen)),

@@ -34,6 +34,27 @@ public:
         return std::nullopt;
     }
 
+    /// What an anvil makes of two stacks (`{id, count, components}`, empty `id` for none) and a rename: `{result, cost,
+    /// materials}`.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>>
+    anvil(std::span<const std::uint8_t> left, std::span<const std::uint8_t> right, std::string_view name) const {
+        static_cast<void>(left);
+        static_cast<void>(right);
+        static_cast<void>(name);
+        return std::nullopt;
+    }
+
+    /// What a smithing table makes of a template, a base and an addition (`{id, count, components}` each): `{recipe,
+    /// result}`.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>>
+    smithing(std::span<const std::uint8_t> templateStack, std::span<const std::uint8_t> base,
+             std::span<const std::uint8_t> addition) const {
+        static_cast<void>(templateStack);
+        static_cast<void>(base);
+        static_cast<void>(addition);
+        return std::nullopt;
+    }
+
     /// The datapack definition of an enchantment as an unnamed NBT compound.
     [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> enchantmentData(std::string_view id) const {
         static_cast<void>(id);

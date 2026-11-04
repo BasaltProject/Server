@@ -1,0 +1,827 @@
+//// ByteArrayTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.Optional;
+public final class ByteArrayTag implements CollectionTag {
+    public static final TagType<ByteArrayTag> TYPE;
+    public ByteArrayTag(byte[] data);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<ByteArrayTag> getType();
+    public String toString();
+    public Tag copy();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public void accept(TagVisitor visitor);
+    public byte[] getAsByteArray();
+    public int size();
+    public ByteTag get(int index);
+    public boolean setTag(int index, Tag tag);
+    public boolean addTag(int index, Tag tag);
+    public ByteTag remove(int index);
+    public void clear();
+    public Optional<byte[]> asByteArray();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+}
+//// ByteTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+public record ByteTag(byte value) implements NumericTag {
+    public static final TagType<ByteTag> TYPE;
+    public static final ByteTag ZERO;
+    public static final ByteTag ONE;
+    public ByteTag(byte value);
+    public static ByteTag valueOf(byte data);
+    public static ByteTag valueOf(boolean data);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<ByteTag> getType();
+    public ByteTag copy();
+    public void accept(TagVisitor visitor);
+    public long longValue();
+    public int intValue();
+    public short shortValue();
+    public byte byteValue();
+    public double doubleValue();
+    public float floatValue();
+    public Number box();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+    public String toString();
+    static class Cache {
+    }
+}
+//// CollectionTag.java
+import java.util.Iterator;
+import java.util.stream.Stream;
+public interface CollectionTag extends Tag, Iterable<Tag> {
+    void clear();
+    boolean setTag(int index, Tag tag);
+    boolean addTag(int index, Tag tag);
+    Tag remove(int index);
+    Tag get(int index);
+    int size();
+    default boolean isEmpty();
+    default Iterator<Tag> iterator();
+    default Stream<Tag> stream();
+}
+//// CompoundTag.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.MapCodec;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiConsumer;
+public final class CompoundTag implements Tag {
+    public static final Codec<CompoundTag> CODEC;
+    public static final TagType<CompoundTag> TYPE;
+    CompoundTag(Map<String, Tag> tags);
+    public CompoundTag();
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public Set<String> keySet();
+    public Set<Map.Entry<String, Tag>> entrySet();
+    public Collection<Tag> values();
+    public void forEach(BiConsumer<String, Tag> consumer);
+    public byte getId();
+    public TagType<CompoundTag> getType();
+    public int size();
+    public Tag put(String name, Tag tag);
+    public void putByte(String name, byte value);
+    public void putShort(String name, short value);
+    public void putInt(String name, int value);
+    public void putLong(String name, long value);
+    public void putFloat(String name, float value);
+    public void putDouble(String name, double value);
+    public void putString(String name, String value);
+    public void putByteArray(String name, byte[] value);
+    public void putIntArray(String name, int[] value);
+    public void putLongArray(String name, long[] value);
+    public void putBoolean(String name, boolean value);
+    public Tag get(String name);
+    public boolean contains(String name);
+    public Optional<Byte> getByte(String name);
+    public byte getByteOr(String name, byte defaultValue);
+    public Optional<Short> getShort(String name);
+    public short getShortOr(String name, short defaultValue);
+    public Optional<Integer> getInt(String name);
+    public int getIntOr(String name, int defaultValue);
+    public Optional<Long> getLong(String name);
+    public long getLongOr(String name, long defaultValue);
+    public Optional<Float> getFloat(String name);
+    public float getFloatOr(String name, float defaultValue);
+    public Optional<Double> getDouble(String name);
+    public double getDoubleOr(String name, double defaultValue);
+    public Optional<String> getString(String name);
+    public String getStringOr(String name, String defaultValue);
+    public Optional<byte[]> getByteArray(String name);
+    public Optional<int[]> getIntArray(String name);
+    public Optional<long[]> getLongArray(String name);
+    public Optional<CompoundTag> getCompound(String name);
+    public CompoundTag getCompoundOrEmpty(String name);
+    public Optional<ListTag> getList(String name);
+    public ListTag getListOrEmpty(String name);
+    public Optional<Boolean> getBoolean(String name);
+    public boolean getBooleanOr(String string, boolean defaultValue);
+    public Tag remove(String name);
+    public String toString();
+    public boolean isEmpty();
+    CompoundTag shallowCopy();
+    public CompoundTag copy();
+    public Optional<CompoundTag> asCompound();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public CompoundTag merge(CompoundTag other);
+    public void accept(TagVisitor visitor);
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+    public <T> void store(String name, Codec<T> codec, T value);
+    public <T> void storeNullable(String name, Codec<T> codec, T value);
+    public <T> void store(String name, Codec<T> codec, DynamicOps<Tag> ops, T value);
+    public <T> void storeNullable(String name, Codec<T> codec, DynamicOps<Tag> ops, T value);
+    public <T> void store(MapCodec<T> codec, T value);
+    public <T> void store(MapCodec<T> codec, DynamicOps<Tag> ops, T value);
+    public <T> Optional<T> read(String name, Codec<T> codec);
+    public <T> Optional<T> read(String name, Codec<T> codec, DynamicOps<Tag> ops);
+    public <T> Optional<T> read(MapCodec<T> codec);
+    public <T> Optional<T> read(MapCodec<T> codec, DynamicOps<Tag> ops);
+}
+//// DoubleTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+public record DoubleTag(double value) implements NumericTag {
+    public static final DoubleTag ZERO;
+    public static final TagType<DoubleTag> TYPE;
+    public DoubleTag(double value);
+    public static DoubleTag valueOf(double data);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<DoubleTag> getType();
+    public DoubleTag copy();
+    public void accept(TagVisitor visitor);
+    public long longValue();
+    public int intValue();
+    public short shortValue();
+    public byte byteValue();
+    public double doubleValue();
+    public float floatValue();
+    public Number box();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+    public String toString();
+}
+//// EndTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+public final class EndTag implements Tag {
+    public static final TagType<EndTag> TYPE;
+    public static final EndTag INSTANCE;
+    private EndTag();
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<EndTag> getType();
+    public String toString();
+    public EndTag copy();
+    public void accept(TagVisitor visitor);
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+}
+//// FloatTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+public record FloatTag(float value) implements NumericTag {
+    public static final FloatTag ZERO;
+    public static final TagType<FloatTag> TYPE;
+    public FloatTag(float value);
+    public static FloatTag valueOf(float data);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<FloatTag> getType();
+    public FloatTag copy();
+    public void accept(TagVisitor visitor);
+    public long longValue();
+    public int intValue();
+    public short shortValue();
+    public byte byteValue();
+    public double doubleValue();
+    public float floatValue();
+    public Number box();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+    public String toString();
+}
+//// IntArrayTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.Optional;
+public final class IntArrayTag implements CollectionTag {
+    public static final TagType<IntArrayTag> TYPE;
+    public IntArrayTag(int[] data);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<IntArrayTag> getType();
+    public String toString();
+    public IntArrayTag copy();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public int[] getAsIntArray();
+    public void accept(TagVisitor visitor);
+    public int size();
+    public IntTag get(int index);
+    public boolean setTag(int index, Tag tag);
+    public boolean addTag(int index, Tag tag);
+    public IntTag remove(int index);
+    public void clear();
+    public Optional<int[]> asIntArray();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+}
+//// IntTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+public record IntTag(int value) implements NumericTag {
+    public static final TagType<IntTag> TYPE;
+    public IntTag(int value);
+    public static IntTag valueOf(int i);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<IntTag> getType();
+    public IntTag copy();
+    public void accept(TagVisitor visitor);
+    public long longValue();
+    public int intValue();
+    public short shortValue();
+    public byte byteValue();
+    public double doubleValue();
+    public float floatValue();
+    public Number box();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+    public String toString();
+    static class Cache {
+    }
+}
+//// ListTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.AbstractList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
+public final class ListTag extends AbstractList<Tag> implements CollectionTag {
+    public static final TagType<ListTag> TYPE;
+    public ListTag();
+    ListTag(List<Tag> list);
+    public void write(DataOutput output) throws IOException;
+    byte identifyRawElementType();
+    public void addAndUnwrap(Tag tag);
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<ListTag> getType();
+    public String toString();
+    public Tag remove(int index);
+    public boolean isEmpty();
+    public Optional<CompoundTag> getCompound(int index);
+    public CompoundTag getCompoundOrEmpty(int index);
+    public Optional<ListTag> getList(int index);
+    public ListTag getListOrEmpty(int index);
+    public Optional<Short> getShort(int index);
+    public short getShortOr(int index, short defaultValue);
+    public Optional<Integer> getInt(int index);
+    public int getIntOr(int index, int defaultValue);
+    public Optional<int[]> getIntArray(int index);
+    public Optional<long[]> getLongArray(int index);
+    public Optional<Double> getDouble(int index);
+    public double getDoubleOr(int index, double defaultValue);
+    public Optional<Float> getFloat(int index);
+    public float getFloatOr(int index, float defaultValue);
+    public Optional<String> getString(int index);
+    public String getStringOr(int index, String defaultValue);
+    public int size();
+    public Tag get(int index);
+    public Tag set(int index, Tag tag);
+    public void add(int index, Tag tag);
+    public boolean setTag(int index, Tag tag);
+    public boolean addTag(int index, Tag tag);
+    public ListTag copy();
+    public Optional<ListTag> asList();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public Stream<Tag> stream();
+    public Stream<CompoundTag> compoundStream();
+    public void accept(TagVisitor visitor);
+    public void clear();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+}
+//// LongArrayTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.Optional;
+public final class LongArrayTag implements CollectionTag {
+    public static final TagType<LongArrayTag> TYPE;
+    public LongArrayTag(long[] data);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<LongArrayTag> getType();
+    public String toString();
+    public LongArrayTag copy();
+    public boolean equals(Object obj);
+    public int hashCode();
+    public void accept(TagVisitor visitor);
+    public long[] getAsLongArray();
+    public int size();
+    public LongTag get(int index);
+    public boolean setTag(int index, Tag tag);
+    public boolean addTag(int index, Tag tag);
+    public LongTag remove(int index);
+    public void clear();
+    public Optional<long[]> asLongArray();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+}
+//// LongTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+public record LongTag(long value) implements NumericTag {
+    public static final TagType<LongTag> TYPE;
+    public LongTag(long value);
+    public static LongTag valueOf(long i);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<LongTag> getType();
+    public LongTag copy();
+    public void accept(TagVisitor visitor);
+    public long longValue();
+    public int intValue();
+    public short shortValue();
+    public byte byteValue();
+    public double doubleValue();
+    public float floatValue();
+    public Number box();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+    public String toString();
+    static class Cache {
+    }
+}
+//// NbtAccounter.java
+public class NbtAccounter {
+    public static final int DEFAULT_NBT_QUOTA = 2097152;
+    public static final int UNCOMPRESSED_NBT_QUOTA = 104857600;
+    public NbtAccounter(long quota, int maxDepth);
+    public static NbtAccounter create(long quota);
+    public static NbtAccounter defaultQuota();
+    public static NbtAccounter uncompressedQuota();
+    public static NbtAccounter unlimitedHeap();
+    public void accountBytes(long bytesPerEntry, long count);
+    public void accountBytes(long size);
+    public void pushDepth();
+    public void popDepth();
+    public long getUsage();
+    public int getDepth();
+}
+//// NbtAccounterException.java
+public class NbtAccounterException extends NbtException {
+    public NbtAccounterException(String message);
+}
+//// NbtException.java
+public class NbtException extends RuntimeException {
+    public NbtException(String message);
+}
+//// NbtFormatException.java
+public class NbtFormatException extends NbtException {
+    public NbtFormatException(String message);
+}
+//// NbtIo.java
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Path;
+import net.minecraft.util.DelegateDataOutput;
+public class NbtIo {
+    public static CompoundTag readCompressed(Path file, NbtAccounter accounter) throws IOException;
+    public static CompoundTag readCompressed(InputStream in, NbtAccounter accounter) throws IOException;
+    public static void parseCompressed(Path file, StreamTagVisitor output, NbtAccounter accounter) throws IOException;
+    public static void parseCompressed(InputStream in, StreamTagVisitor output, NbtAccounter accounter) throws IOException;
+    public static void writeCompressed(CompoundTag tag, Path file) throws IOException;
+    public static void writeCompressed(CompoundTag tag, OutputStream out) throws IOException;
+    public static void write(CompoundTag tag, Path file) throws IOException;
+    public static CompoundTag read(Path file) throws IOException;
+    public static CompoundTag read(DataInput input) throws IOException;
+    public static CompoundTag read(DataInput input, NbtAccounter accounter) throws IOException;
+    public static void write(CompoundTag tag, DataOutput output) throws IOException;
+    public static void parse(DataInput input, StreamTagVisitor output, NbtAccounter accounter) throws IOException;
+    public static Tag readAnyTag(DataInput input, NbtAccounter accounter) throws IOException;
+    public static void writeAnyTag(Tag tag, DataOutput output) throws IOException;
+    public static void writeUnnamedTag(Tag tag, DataOutput output) throws IOException;
+    public static void writeUnnamedTagWithFallback(Tag tag, DataOutput output) throws IOException;
+    public static Tag readUnnamedTag(DataInput input, NbtAccounter accounter) throws IOException;
+    public static class StringFallbackDataOutput extends DelegateDataOutput {
+        public StringFallbackDataOutput(DataOutput parent);
+        public void writeUTF(String s) throws IOException;
+    }
+}
+//// NbtUtils.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.Dynamic;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueOutput;
+public final class NbtUtils {
+    public static final String SNBT_DATA_TAG = "data";
+    public static final String LEGACY_BLOCK_STATE_ID_TAG = "Name";
+    public static final String LEGACY_BLOCKSTATE_PROPERTY_TAG = "Properties";
+    private NbtUtils();
+    public static boolean compareNbt(Tag expected, Tag actual, boolean partialListMatches);
+    public static BlockState readBlockState(HolderGetter<Block> blocks, CompoundTag tag);
+    public static CompoundTag writeBlockState(BlockState state);
+    public static Component toPrettyComponent(Tag tag);
+    public static String structureToSnbt(CompoundTag structure);
+    public static CompoundTag snbtToStructure(String snbt) throws CommandSyntaxException;
+    static CompoundTag packStructureTemplate(CompoundTag snbt);
+    static CompoundTag unpackStructureTemplate(CompoundTag template);
+    static String packBlockState(CompoundTag compound, int version);
+    static CompoundTag unpackBlockState(String compound, int version);
+    public static CompoundTag addCurrentDataVersion(CompoundTag tag);
+    public static CompoundTag addDataVersion(CompoundTag tag, int version);
+    public static <T> Dynamic<T> addDataVersion(Dynamic<T> tag, int version);
+    public static void addCurrentDataVersion(ValueOutput output);
+    public static void addDataVersion(ValueOutput output, int version);
+    public static int getDataVersion(CompoundTag tag);
+    public static int getDataVersion(CompoundTag tag, int _default);
+    public static int getDataVersion(Dynamic<?> dynamic);
+    public static int getDataVersion(Dynamic<?> dynamic, int _default);
+}
+//// NumericTag.java
+import java.util.Optional;
+public interface NumericTag extends PrimitiveTag {
+    byte byteValue();
+    short shortValue();
+    int intValue();
+    long longValue();
+    float floatValue();
+    double doubleValue();
+    Number box();
+    default Optional<Number> asNumber();
+    default Optional<Byte> asByte();
+    default Optional<Short> asShort();
+    default Optional<Integer> asInt();
+    default Optional<Long> asLong();
+    default Optional<Float> asFloat();
+    default Optional<Double> asDouble();
+    default Optional<Boolean> asBoolean();
+}
+//// PrimitiveTag.java
+public interface PrimitiveTag extends Tag {
+    default Tag copy();
+}
+//// ReportedNbtException.java
+import net.minecraft.CrashReport;
+import net.minecraft.ReportedException;
+public class ReportedNbtException extends ReportedException {
+    public ReportedNbtException(CrashReport report);
+}
+//// ShortTag.java
+import java.io.DataOutput;
+import java.io.IOException;
+public record ShortTag(short value) implements NumericTag {
+    public static final TagType<ShortTag> TYPE;
+    public ShortTag(short value);
+    public static ShortTag valueOf(short i);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<ShortTag> getType();
+    public ShortTag copy();
+    public void accept(TagVisitor visitor);
+    public long longValue();
+    public int intValue();
+    public short shortValue();
+    public byte byteValue();
+    public double doubleValue();
+    public float floatValue();
+    public Number box();
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+    public String toString();
+    static class Cache {
+    }
+}
+//// SnbtGrammar.java
+import com.mojang.serialization.DynamicOps;
+import java.util.List;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.commands.Grammar;
+import net.minecraft.util.parsing.packrat.commands.GreedyPredicateParseRule;
+public class SnbtGrammar {
+    public static String escapeControlCharacters(char c);
+    public static <T> Grammar<T> createParser(DynamicOps<T> ops);
+    static enum Sign {
+        PLUS, MINUS;
+        public void append(StringBuilder output);
+    }
+    static enum Base {
+        BINARY, DECIMAL, HEX;
+    }
+    static enum TypeSuffix {
+        FLOAT, DOUBLE, BYTE, SHORT, INT, LONG;
+    }
+    static enum SignedPrefix {
+        SIGNED, UNSIGNED;
+    }
+    static record IntegerSuffix(SignedPrefix signed, TypeSuffix type) {
+        public static final IntegerSuffix EMPTY;
+    }
+    static enum ArrayPrefix {
+        BYTE, INT, LONG;
+        public boolean isAllowed(TypeSuffix type);
+        public abstract <T> T create(DynamicOps<T> ops);
+        public abstract <T> T create(DynamicOps<T> ops, List<IntegerLiteral> entries, ParseState<?> state);
+        protected Number buildNumber(IntegerLiteral entry, ParseState<?> state);
+    }
+    static class SimpleHexLiteralParseRule extends GreedyPredicateParseRule {
+        public SimpleHexLiteralParseRule(int size);
+        protected boolean isAccepted(char c);
+    }
+    static record IntegerLiteral(Sign sign, Base base, String digits, IntegerSuffix suffix) {
+        public <T> T create(DynamicOps<T> ops, ParseState<?> state);
+        public <T> T create(DynamicOps<T> ops, TypeSuffix type, ParseState<?> state);
+    }
+    static record Signed<T>(Sign sign, T value) {
+    }
+}
+//// SnbtOperations.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.serialization.DynamicOps;
+import java.util.List;
+import java.util.Map;
+import net.minecraft.util.parsing.packrat.ParseState;
+import net.minecraft.util.parsing.packrat.SuggestionSupplier;
+public class SnbtOperations {
+    public static final String BUILTIN_TRUE = "true";
+    public static final String BUILTIN_FALSE = "false";
+    public static final Map<BuiltinKey, BuiltinOperation> BUILTIN_OPERATIONS;
+    public static final SuggestionSupplier<StringReader> BUILTIN_IDS;
+    public static record BuiltinKey(String id, int argCount) {
+        public String toString();
+    }
+    public interface BuiltinOperation {
+        <T> T run(DynamicOps<T> ops, List<T> arguments, ParseState<StringReader> state);
+    }
+}
+//// SnbtPrinterTagVisitor.java
+import java.util.List;
+public class SnbtPrinterTagVisitor implements TagVisitor {
+    public SnbtPrinterTagVisitor();
+    public SnbtPrinterTagVisitor(String indentation, int depth, List<String> path);
+    public String visit(Tag tag);
+    public void visitString(StringTag tag);
+    public void visitByte(ByteTag tag);
+    public void visitShort(ShortTag tag);
+    public void visitInt(IntTag tag);
+    public void visitLong(LongTag tag);
+    public void visitFloat(FloatTag tag);
+    public void visitDouble(DoubleTag tag);
+    public void visitByteArray(ByteArrayTag tag);
+    public void visitIntArray(IntArrayTag tag);
+    public void visitLongArray(LongArrayTag tag);
+    public void visitList(ListTag tag);
+    public void visitCompound(CompoundTag tag);
+    protected List<String> getKeys(CompoundTag tag);
+    public String pathString();
+    protected static String handleEscapePretty(String input);
+    public void visitEnd(EndTag tag);
+}
+//// StreamTagVisitor.java
+public interface StreamTagVisitor {
+    ValueResult visitEnd();
+    ValueResult visit(String value);
+    ValueResult visit(byte value);
+    ValueResult visit(short value);
+    ValueResult visit(int value);
+    ValueResult visit(long value);
+    ValueResult visit(float value);
+    ValueResult visit(double value);
+    ValueResult visit(byte[] value);
+    ValueResult visit(int[] value);
+    ValueResult visit(long[] value);
+    ValueResult visitList(TagType<?> elementType, int size);
+    EntryResult visitEntry(TagType<?> type);
+    EntryResult visitEntry(TagType<?> type, String id);
+    EntryResult visitElement(TagType<?> type, int index);
+    ValueResult visitContainerEnd();
+    ValueResult visitRootEntry(TagType<?> type);
+    public static enum ValueResult {
+        CONTINUE, BREAK, HALT;
+    }
+    public static enum EntryResult {
+        ENTER, SKIP, BREAK, HALT;
+    }
+}
+//// StringTag.java
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.Optional;
+public record StringTag(String value) implements PrimitiveTag {
+    public static final TagType<StringTag> TYPE;
+    public StringTag(String value);
+    public static void skipString(DataInput input) throws IOException;
+    public static StringTag valueOf(String data);
+    public void write(DataOutput output) throws IOException;
+    public int sizeInBytes();
+    public byte getId();
+    public TagType<StringTag> getType();
+    public String toString();
+    public StringTag copy();
+    public Optional<String> asString();
+    public void accept(TagVisitor visitor);
+    public static String quoteAndEscape(String input);
+    public static void quoteAndEscape(String input, StringBuilder result);
+    public static String escapeWithoutQuotes(String input);
+    public static void escapeWithoutQuotes(String input, StringBuilder result);
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+}
+//// StringTagVisitor.java
+public class StringTagVisitor implements TagVisitor {
+    public String build();
+    public void visitString(StringTag tag);
+    public void visitByte(ByteTag tag);
+    public void visitShort(ShortTag tag);
+    public void visitInt(IntTag tag);
+    public void visitLong(LongTag tag);
+    public void visitFloat(FloatTag tag);
+    public void visitDouble(DoubleTag tag);
+    public void visitByteArray(ByteArrayTag tag);
+    public void visitIntArray(IntArrayTag tag);
+    public void visitLongArray(LongArrayTag tag);
+    public void visitList(ListTag tag);
+    public void visitCompound(CompoundTag tag);
+    public void visitEnd(EndTag tag);
+}
+//// Tag.java
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.Optional;
+public interface Tag {
+    int OBJECT_HEADER;
+    int ARRAY_HEADER;
+    int OBJECT_REFERENCE;
+    int STRING_SIZE;
+    byte TAG_END;
+    byte TAG_BYTE;
+    byte TAG_SHORT;
+    byte TAG_INT;
+    byte TAG_LONG;
+    byte TAG_FLOAT;
+    byte TAG_DOUBLE;
+    byte TAG_BYTE_ARRAY;
+    byte TAG_STRING;
+    byte TAG_LIST;
+    byte TAG_COMPOUND;
+    byte TAG_INT_ARRAY;
+    byte TAG_LONG_ARRAY;
+    int MAX_DEPTH;
+    void write(DataOutput output) throws IOException;
+    String toString();
+    byte getId();
+    TagType<?> getType();
+    Tag copy();
+    int sizeInBytes();
+    void accept(TagVisitor visitor);
+    StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor);
+    default void acceptAsRoot(StreamTagVisitor output);
+    default Optional<String> asString();
+    default Optional<Number> asNumber();
+    default Optional<Byte> asByte();
+    default Optional<Short> asShort();
+    default Optional<Integer> asInt();
+    default Optional<Long> asLong();
+    default Optional<Float> asFloat();
+    default Optional<Double> asDouble();
+    default Optional<Boolean> asBoolean();
+    default Optional<byte[]> asByteArray();
+    default Optional<int[]> asIntArray();
+    default Optional<long[]> asLongArray();
+    default Optional<CompoundTag> asCompound();
+    default Optional<ListTag> asList();
+}
+//// TagParser.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import net.minecraft.util.parsing.packrat.commands.Grammar;
+public class TagParser<T> {
+    public static final SimpleCommandExceptionType ERROR_TRAILING_DATA;
+    public static final SimpleCommandExceptionType ERROR_EXPECTED_COMPOUND;
+    public static final char ELEMENT_SEPARATOR;
+    public static final char NAME_VALUE_SEPARATOR;
+    public static final Codec<CompoundTag> FLATTENED_CODEC;
+    public static final Codec<CompoundTag> LENIENT_CODEC;
+    private TagParser(DynamicOps<T> ops, Grammar<T> grammar);
+    public DynamicOps<T> getOps();
+    public static <T> TagParser<T> create(DynamicOps<T> ops);
+    public static CompoundTag parseCompoundFully(String input) throws CommandSyntaxException;
+    public T parseFully(String input) throws CommandSyntaxException;
+    public T parseFully(StringReader reader) throws CommandSyntaxException;
+    public T parseAsArgument(StringReader reader) throws CommandSyntaxException;
+    public static CompoundTag parseCompoundAsArgument(StringReader reader) throws CommandSyntaxException;
+}
+//// TagType.java
+import java.io.DataInput;
+import java.io.IOException;
+public interface TagType<T extends Tag> {
+    T load(DataInput input, NbtAccounter accounter) throws IOException;
+    StreamTagVisitor.ValueResult parse(DataInput input, StreamTagVisitor output, NbtAccounter accounter) throws IOException;
+    default void parseRoot(DataInput input, StreamTagVisitor output, NbtAccounter accounter) throws IOException;
+    void skip(DataInput input, int count, NbtAccounter accounter) throws IOException;
+    void skip(DataInput input, NbtAccounter accounter) throws IOException;
+    String getName();
+    String getPrettyName();
+    static TagType<EndTag> createInvalid(int id);
+    public interface StaticSize<T extends Tag> extends TagType<T> {
+        default void skip(DataInput input, NbtAccounter accounter) throws IOException;
+        default void skip(DataInput input, int count, NbtAccounter accounter) throws IOException;
+        int size();
+    }
+    public interface VariableSize<T extends Tag> extends TagType<T> {
+        default void skip(DataInput input, int count, NbtAccounter accounter) throws IOException;
+    }
+}
+//// TagTypes.java
+public class TagTypes {
+    public static TagType<?> getType(int typeId);
+}
+//// TagVisitor.java
+public interface TagVisitor {
+    void visitString(StringTag tag);
+    void visitByte(ByteTag tag);
+    void visitShort(ShortTag tag);
+    void visitInt(IntTag tag);
+    void visitLong(LongTag tag);
+    void visitFloat(FloatTag tag);
+    void visitDouble(DoubleTag tag);
+    void visitByteArray(ByteArrayTag tag);
+    void visitIntArray(IntArrayTag tag);
+    void visitLongArray(LongArrayTag tag);
+    void visitList(ListTag tag);
+    void visitCompound(CompoundTag tag);
+    void visitEnd(EndTag tag);
+}
+//// TextComponentTagVisitor.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+public class TextComponentTagVisitor implements TagVisitor {
+    public TextComponentTagVisitor(String indentation);
+    public TextComponentTagVisitor(String indentation, Styling styling);
+    public TextComponentTagVisitor(String indentation, Styling styling, boolean sortKeys);
+    public Component visit(Tag tag);
+    public void visitString(StringTag tag);
+    public void visitByte(ByteTag tag);
+    public void visitShort(ShortTag tag);
+    public void visitInt(IntTag tag);
+    public void visitLong(LongTag tag);
+    public void visitFloat(FloatTag tag);
+    public void visitDouble(DoubleTag tag);
+    public void visitByteArray(ByteArrayTag tag);
+    public void visitIntArray(IntArrayTag tag);
+    public void visitLongArray(LongArrayTag tag);
+    public void visitList(ListTag tag);
+    public void visitCompound(CompoundTag tag);
+    public void visitEnd(EndTag tag);
+    public static enum Token {
+        FOLDED, ELEMENT_SEPARATOR, LIST_CLOSE, LIST_OPEN, LIST_TYPE_SEPARATOR, STRUCT_CLOSE, STRUCT_OPEN, NAME_VALUE_SEPARATOR, BYTE_SUFFIX, BYTE_ARRAY_PREFIX, SHORT_SUFFIX, INT_ARRAY_PREFIX, LONG_SUFFIX, LONG_ARRAY_PREFIX, FLOAT_SUFFIX, DOUBLE_SUFFIX;
+        public final String text;
+    }
+    public static class RichStyling implements Styling {
+        public static final Styling INSTANCE;
+        private RichStyling();
+        public Style keyStyle();
+        public Style stringStyle();
+        public Style numberStyle();
+        public Component token(Token token);
+    }
+    public static class PlainStyling implements Styling {
+        public static final Styling INSTANCE;
+        private PlainStyling();
+        public Style keyStyle();
+        public Style stringStyle();
+        public Style numberStyle();
+        public Component token(Token token);
+    }
+    public interface Styling {
+        Style keyStyle();
+        Style stringStyle();
+        Style numberStyle();
+        Component token(Token token);
+    }
+}

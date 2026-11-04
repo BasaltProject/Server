@@ -1,0 +1,164 @@
+//// AmphibiousPathNavigation.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.pathfinder.PathFinder;
+import net.minecraft.world.phys.Vec3;
+public class AmphibiousPathNavigation extends PathNavigation {
+    public AmphibiousPathNavigation(Mob mob, Level level);
+    protected PathFinder createPathFinder(int maxVisitedNodes);
+    protected boolean canUpdatePath();
+    protected Vec3 getTempMobPos();
+    protected double getGroundY(Vec3 target);
+    protected boolean canMoveDirectly(Vec3 startPos, Vec3 stopPos);
+    public boolean isStableDestination(BlockPos pos);
+    public void setCanFloat(boolean canFloat);
+    public boolean canNavigateGround();
+}
+//// FlyingPathNavigation.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.level.pathfinder.PathFinder;
+import net.minecraft.world.phys.Vec3;
+public class FlyingPathNavigation extends PathNavigation {
+    public FlyingPathNavigation(Mob mob, Level level);
+    protected PathFinder createPathFinder(int maxVisitedNodes);
+    protected boolean canMoveDirectly(Vec3 startPos, Vec3 stopPos);
+    protected boolean canUpdatePath();
+    protected Vec3 getTempMobPos();
+    public Path createPath(Entity target, int reachRange);
+    public void tick();
+    public boolean isStableDestination(BlockPos pos);
+    public boolean canNavigateGround();
+}
+//// GroundPathNavigation.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.level.pathfinder.PathFinder;
+import net.minecraft.world.phys.Vec3;
+public class GroundPathNavigation extends PathNavigation {
+    public GroundPathNavigation(Mob mob, Level level);
+    protected PathFinder createPathFinder(int maxVisitedNodes);
+    protected boolean canUpdatePath();
+    protected Vec3 getTempMobPos();
+    public Path createPath(BlockPos pos, int reachRange);
+    public Path createPath(Entity target, int reachRange);
+    protected void trimPath();
+    public boolean canNavigateGround();
+    public void setAvoidSun(boolean avoidSun);
+    public void setCanWalkOverFences(boolean canWalkOverFences);
+    public void setCanPathToTargetsBelowSurface(boolean canPathToTargetsBelowSurface);
+}
+//// PathNavigation.java
+import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.pathfinder.NodeEvaluator;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.level.pathfinder.PathFinder;
+import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.phys.Vec3;
+public abstract class PathNavigation {
+    protected final Mob mob;
+    protected final Level level;
+    protected Path path;
+    protected double speedModifier;
+    protected int tick;
+    protected int lastStuckCheck;
+    protected Vec3 lastStuckCheckPos;
+    protected Vec3i timeoutCachedNode;
+    protected long timeoutTimer;
+    protected long lastTimeoutCheck;
+    protected double timeoutLimit;
+    protected float maxDistanceToWaypoint;
+    protected boolean hasDelayedRecomputation;
+    protected long timeLastRecompute;
+    protected NodeEvaluator nodeEvaluator;
+    public PathNavigation(Mob mob, Level level);
+    public void updatePathfinderMaxVisitedNodes();
+    public void setRequiredPathLength(float length);
+    public void resetMaxVisitedNodesMultiplier();
+    public void setMaxVisitedNodesMultiplier(float maxVisitedNodesMultiplier);
+    public BlockPos getTargetPos();
+    protected abstract PathFinder createPathFinder(int maxVisitedNodes);
+    public void setSpeedModifier(double speedModifier);
+    public void recomputePath();
+    public final Path createPath(double x, double y, double z, int reachRange);
+    public Path createPath(Stream<BlockPos> positions, int reachRange);
+    public Path createPath(Set<BlockPos> positions, int reachRange);
+    public Path createPath(BlockPos pos, int reachRange);
+    public Path createPath(BlockPos pos, int reachRange, int maxPathLength);
+    public Path createPath(Entity target, int reachRange);
+    protected Path createPath(Set<BlockPos> targets, int radiusOffset, boolean above, int reachRange);
+    protected Path createPath(Set<BlockPos> targets, int radiusOffset, boolean above, int reachRange, float maxPathLength);
+    public boolean moveTo(double x, double y, double z, double speedModifier);
+    public boolean moveTo(double x, double y, double z, int reachRange, double speedModifier);
+    public boolean moveTo(Entity target, double speedModifier);
+    public boolean moveTo(Entity target, int reachRange, double speedModifier);
+    public boolean moveTo(Path newPath, double speedModifier);
+    public Path getPath();
+    public void tick();
+    protected double getGroundY(Vec3 target);
+    protected void followThePath();
+    protected void doStuckDetection(Vec3 mobPos);
+    public boolean isDone();
+    public boolean isInProgress();
+    public void stop();
+    protected abstract Vec3 getTempMobPos();
+    protected abstract boolean canUpdatePath();
+    protected void trimPath();
+    protected boolean canMoveDirectly(Vec3 startPos, Vec3 stopPos);
+    public boolean canCutCorner(PathType pathType);
+    protected static boolean isClearForMovementBetween(Mob mob, Vec3 startPos, Vec3 stopPos, boolean blockedByFluids);
+    public boolean isStableDestination(BlockPos pos);
+    public NodeEvaluator getNodeEvaluator();
+    public void setCanFloat(boolean canFloat);
+    public boolean canFloat();
+    public boolean shouldRecomputePath(BlockPos pos);
+    public float getMaxDistanceToWaypoint();
+    public float getMaxVerticalDistanceToWaypoint();
+    public boolean isStuck();
+    public abstract boolean canNavigateGround();
+    public void setCanOpenDoors(boolean canOpenDoors);
+}
+//// WallClimberNavigation.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.pathfinder.Path;
+public class WallClimberNavigation extends GroundPathNavigation {
+    public WallClimberNavigation(Mob mob, Level level);
+    public Path createPath(BlockPos pos, int reachRange);
+    public Path createPath(Entity target, int reachRange);
+    public boolean moveTo(Entity target, double speedModifier);
+    public void tick();
+}
+//// WaterBoundPathNavigation.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.pathfinder.PathFinder;
+import net.minecraft.world.phys.Vec3;
+public class WaterBoundPathNavigation extends PathNavigation {
+    public WaterBoundPathNavigation(Mob mob, Level level);
+    protected PathFinder createPathFinder(int maxVisitedNodes);
+    protected boolean canUpdatePath();
+    protected Vec3 getTempMobPos();
+    protected double getGroundY(Vec3 target);
+    protected boolean canMoveDirectly(Vec3 startPos, Vec3 stopPos);
+    public boolean isStableDestination(BlockPos pos);
+    public void setCanFloat(boolean canFloat);
+    public boolean canNavigateGround();
+    public float getMaxVerticalDistanceToWaypoint();
+}

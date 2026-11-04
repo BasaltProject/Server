@@ -1,0 +1,148 @@
+//// LinkFSFileStore.java
+import java.io.IOException;
+import java.nio.file.FileStore;
+import java.nio.file.attribute.FileAttributeView;
+import java.nio.file.attribute.FileStoreAttributeView;
+class LinkFSFileStore extends FileStore {
+    public LinkFSFileStore(String name);
+    public String name();
+    public String type();
+    public boolean isReadOnly();
+    public long getTotalSpace();
+    public long getUsableSpace();
+    public long getUnallocatedSpace();
+    public boolean supportsFileAttributeView(Class<? extends FileAttributeView> type);
+    public boolean supportsFileAttributeView(String name);
+    public <V extends FileStoreAttributeView> V getFileStoreAttributeView(Class<V> type);
+    public Object getAttribute(String attribute) throws IOException;
+}
+//// LinkFSPath.java
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.nio.file.attribute.BasicFileAttributeView;
+import java.nio.file.attribute.BasicFileAttributes;
+class LinkFSPath implements Path {
+    public LinkFSPath(LinkFileSystem fileSystem, String name, LinkFSPath parent, PathContents pathContents);
+    public LinkFileSystem getFileSystem();
+    public boolean isAbsolute();
+    public File toFile();
+    public LinkFSPath getRoot();
+    public LinkFSPath getFileName();
+    public LinkFSPath getParent();
+    public int getNameCount();
+    public LinkFSPath getName(int index);
+    public LinkFSPath subpath(int beginIndex, int endIndex);
+    public boolean startsWith(Path other);
+    public boolean endsWith(Path other);
+    public LinkFSPath normalize();
+    public LinkFSPath resolve(Path other);
+    LinkFSPath resolveName(String name);
+    public LinkFSPath relativize(Path other);
+    public URI toUri();
+    public LinkFSPath toAbsolutePath();
+    public LinkFSPath toRealPath(LinkOption... options);
+    public WatchKey register(WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers);
+    public int compareTo(Path other);
+    public boolean equals(Object other);
+    public int hashCode();
+    public String toString();
+    public boolean exists();
+    public Path getTargetPath();
+    public PathContents. DirectoryContents getDirectoryContents();
+    public BasicFileAttributeView getBasicAttributeView();
+    public BasicFileAttributes getBasicAttributes() throws IOException;
+}
+//// LinkFSProvider.java
+import java.io.IOException;
+import java.net.URI;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.AccessMode;
+import java.nio.file.CopyOption;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileStore;
+import java.nio.file.FileSystem;
+import java.nio.file.LinkOption;
+import java.nio.file.OpenOption;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.FileAttributeView;
+import java.nio.file.spi.FileSystemProvider;
+import java.util.Map;
+import java.util.Set;
+class LinkFSProvider extends FileSystemProvider {
+    public static final String SCHEME = "x-mc-link";
+    public String getScheme();
+    public FileSystem newFileSystem(URI uri, Map<String, ?> env);
+    public FileSystem getFileSystem(URI uri);
+    public Path getPath(URI uri);
+    public SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs) throws IOException;
+    public DirectoryStream<Path> newDirectoryStream(Path dir, DirectoryStream.Filter<? super Path> filter) throws IOException;
+    public void createDirectory(Path dir, FileAttribute<?>... attrs);
+    public void delete(Path path);
+    public void copy(Path source, Path target, CopyOption... options);
+    public void move(Path source, Path target, CopyOption... options);
+    public boolean isSameFile(Path path, Path path2);
+    public boolean isHidden(Path path);
+    public FileStore getFileStore(Path path);
+    public void checkAccess(Path path, AccessMode... modes) throws IOException;
+    public <V extends FileAttributeView> V getFileAttributeView(Path path, Class<V> type, LinkOption... options);
+    public <A extends BasicFileAttributes> A readAttributes(Path path, Class<A> type, LinkOption... options) throws IOException;
+    public Map<String, Object> readAttributes(Path path, String attributes, LinkOption... options);
+    public void setAttribute(Path path, String attribute, Object value, LinkOption... options);
+}
+//// LinkFileSystem.java
+import java.nio.file.FileStore;
+import java.nio.file.FileSystem;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
+import java.nio.file.WatchService;
+import java.nio.file.attribute.UserPrincipalLookupService;
+import java.nio.file.spi.FileSystemProvider;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+public class LinkFileSystem extends FileSystem {
+    public static final String PATH_SEPARATOR = "/";
+    private LinkFileSystem(String name, DirectoryEntry rootEntry);
+    public FileSystemProvider provider();
+    public void close();
+    public boolean isOpen();
+    public boolean isReadOnly();
+    public String getSeparator();
+    public Iterable<Path> getRootDirectories();
+    public Iterable<FileStore> getFileStores();
+    public Set<String> supportedFileAttributeViews();
+    public Path getPath(String first, String... more);
+    public PathMatcher getPathMatcher(String syntaxAndPattern);
+    public UserPrincipalLookupService getUserPrincipalLookupService();
+    public WatchService newWatchService();
+    public FileStore store();
+    public LinkFSPath rootPath();
+    public static Builder builder();
+    static record DirectoryEntry(Map<String, DirectoryEntry> children, Map<String, Path> files) {
+        public DirectoryEntry();
+    }
+    public static class Builder {
+        public Builder put(List<String> path, String name, Path target);
+        public Builder put(List<String> path, Path target);
+        public FileSystem build(String name);
+    }
+}
+//// PathContents.java
+import java.nio.file.Path;
+import java.util.Map;
+interface PathContents {
+    PathContents MISSING;
+    PathContents RELATIVE;
+    public static record FileContents(Path contents) implements PathContents {
+    }
+    public static record DirectoryContents(Map<String, LinkFSPath> children) implements PathContents {
+    }
+}

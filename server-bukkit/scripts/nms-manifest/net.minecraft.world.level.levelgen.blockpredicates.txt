@@ -1,0 +1,267 @@
+//// AllOfPredicate.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelAccessor;
+public class AllOfPredicate extends CombiningPredicate {
+    public static final MapCodec<AllOfPredicate> CODEC;
+    public AllOfPredicate(List<BlockPredicate> predicates);
+    public boolean test(LevelAccessor level, BlockPos origin);
+    public BlockPredicateType<?> type();
+}
+//// AnyOfPredicate.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelAccessor;
+public class AnyOfPredicate extends CombiningPredicate {
+    public static final MapCodec<AnyOfPredicate> CODEC;
+    public AnyOfPredicate(List<BlockPredicate> predicates);
+    public boolean test(LevelAccessor level, BlockPos origin);
+    public BlockPredicateType<?> type();
+}
+//// BlockPredicate.java
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.function.BiPredicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Directional;
+import net.minecraft.core.Vec3i;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.material.Fluid;
+public interface BlockPredicate extends BiPredicate<LevelAccessor, BlockPos> {
+    Codec<BlockPredicate> CODEC;
+    BlockPredicate ONLY_IN_AIR_PREDICATE;
+    BlockPredicate ONLY_IN_AIR_OR_WATER_PREDICATE;
+    BlockPredicateType<?> type();
+    static BlockPredicate allOf(List<BlockPredicate> predicates);
+    static BlockPredicate allOf(BlockPredicate... predicates);
+    static BlockPredicate allOf(BlockPredicate a, BlockPredicate b);
+    static BlockPredicate anyOf(List<BlockPredicate> predicates);
+    static BlockPredicate anyOf(BlockPredicate... predicates);
+    static BlockPredicate anyOf(BlockPredicate a, BlockPredicate b);
+    static BlockPredicate matchesBlocks(Vec3i offset, List<Block> blocks);
+    static BlockPredicate matchesBlocks(Directional directional, Block... blocks);
+    static BlockPredicate matchesBlocks(Block... blocks);
+    static BlockPredicate matchesTag(Vec3i offset, TagKey<Block> tag);
+    static BlockPredicate matchesTag(Directional directional, TagKey<Block> tag);
+    static BlockPredicate matchesTag(TagKey<Block> tag);
+    static BlockPredicate matchesFluids(Directional directional, Fluid... fluids);
+    static BlockPredicate matchesFluids(Vec3i offset, List<Fluid> fluids);
+    static BlockPredicate matchesFluids(Fluid... fluids);
+    static BlockPredicate not(BlockPredicate predicate);
+    static BlockPredicate replaceable();
+    static BlockPredicate wouldSurvive(Block block);
+    static BlockPredicate hasSturdyFace(Direction direction);
+    static BlockPredicate hasSturdyFace(Directional offset, Direction direction);
+    static BlockPredicate solid(Directional directional);
+    static BlockPredicate solid();
+    static BlockPredicate noFluid();
+    static BlockPredicate insideWorld(Vec3i offset);
+    static BlockPredicate alwaysTrue();
+    static BlockPredicate unobstructed();
+    static BlockPredicate heightRange(VerticalAnchor minInclusive, VerticalAnchor maxInclusive);
+    static BlockPredicate volumeMatch(Vec3i min, Vec3i max, BlockPredicate match);
+}
+//// BlockPredicateType.java
+import com.mojang.serialization.MapCodec;
+public interface BlockPredicateType<P extends BlockPredicate> {
+    BlockPredicateType<MatchingBlocksPredicate> MATCHING_BLOCKS;
+    BlockPredicateType<MatchingBlockTagPredicate> MATCHING_BLOCK_TAG;
+    BlockPredicateType<MatchingFluidsPredicate> MATCHING_FLUIDS;
+    BlockPredicateType<MatchingBiomesPredicate> MATCHING_BIOMES;
+    BlockPredicateType<HasSturdyFacePredicate> HAS_STURDY_FACE;
+    BlockPredicateType<SolidPredicate> SOLID;
+    BlockPredicateType<ReplaceablePredicate> REPLACEABLE;
+    BlockPredicateType<WouldSurvivePredicate> WOULD_SURVIVE;
+    BlockPredicateType<InsideWorldBoundsPredicate> INSIDE_WORLD_BOUNDS;
+    BlockPredicateType<AnyOfPredicate> ANY_OF;
+    BlockPredicateType<AllOfPredicate> ALL_OF;
+    BlockPredicateType<NotPredicate> NOT;
+    BlockPredicateType<TrueBlockPredicate> TRUE;
+    BlockPredicateType<UnobstructedPredicate> UNOBSTRUCTED;
+    BlockPredicateType<HeightRangePredicate> HEIGHT_RANGE;
+    BlockPredicateType<VolumeMatchPredicate> VOLUME_MATCH;
+    MapCodec<P> codec();
+}
+//// CombiningPredicate.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.function.Function;
+public abstract class CombiningPredicate implements BlockPredicate {
+    protected final List<BlockPredicate> predicates;
+    protected CombiningPredicate(List<BlockPredicate> predicates);
+    public static <T extends CombiningPredicate> MapCodec<T> codec(Function<List<BlockPredicate>, T> constructor);
+}
+//// HasSturdyFacePredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.LevelAccessor;
+public class HasSturdyFacePredicate implements BlockPredicate {
+    public static final MapCodec<HasSturdyFacePredicate> CODEC;
+    public HasSturdyFacePredicate(Vec3i offset, Direction direction);
+    public boolean test(LevelAccessor level, BlockPos origin);
+    public BlockPredicateType<?> type();
+}
+//// HeightRangePredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+public record HeightRangePredicate(VerticalAnchor minInclusive, VerticalAnchor maxInclusive) implements BlockPredicate {
+    public static final MapCodec<HeightRangePredicate> CODEC;
+    public BlockPredicateType<?> type();
+    public boolean test(LevelAccessor level, BlockPos pos);
+}
+//// InsideWorldBoundsPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.LevelAccessor;
+public class InsideWorldBoundsPredicate implements BlockPredicate {
+    public static final MapCodec<InsideWorldBoundsPredicate> CODEC;
+    public InsideWorldBoundsPredicate(Vec3i offset);
+    public boolean test(LevelAccessor worldGenLevel, BlockPos blockPos);
+    public BlockPredicateType<?> type();
+}
+//// MatchingBiomesPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.biome.Biome;
+public class MatchingBiomesPredicate implements BlockPredicate {
+    public static final MapCodec<MatchingBiomesPredicate> CODEC;
+    public MatchingBiomesPredicate(HolderSet<Biome> biomes);
+    public boolean test(LevelAccessor worldGenLevel, BlockPos blockPos);
+    public BlockPredicateType<?> type();
+}
+//// MatchingBlockTagPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Vec3i;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class MatchingBlockTagPredicate extends StateTestingPredicate {
+    public static final MapCodec<MatchingBlockTagPredicate> CODEC;
+    protected MatchingBlockTagPredicate(Vec3i offset, TagKey<Block> tag);
+    protected boolean test(BlockState state);
+    public BlockPredicateType<?> type();
+}
+//// MatchingBlocksPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+public class MatchingBlocksPredicate extends StateTestingPredicate {
+    public static final MapCodec<MatchingBlocksPredicate> CODEC;
+    public MatchingBlocksPredicate(Vec3i offset, HolderSet<Block> blocks);
+    protected boolean test(BlockState state);
+    public BlockPredicateType<?> type();
+}
+//// MatchingFluidsPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Fluid;
+public class MatchingFluidsPredicate extends StateTestingPredicate {
+    public static final MapCodec<MatchingFluidsPredicate> CODEC;
+    public MatchingFluidsPredicate(Vec3i offset, HolderSet<Fluid> fluids);
+    protected boolean test(BlockState state);
+    public BlockPredicateType<?> type();
+}
+//// NotPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelAccessor;
+public class NotPredicate implements BlockPredicate {
+    public static final MapCodec<NotPredicate> CODEC;
+    public NotPredicate(BlockPredicate predicate);
+    public boolean test(LevelAccessor level, BlockPos origin);
+    public BlockPredicateType<?> type();
+}
+//// ReplaceablePredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.block.state.BlockState;
+public class ReplaceablePredicate extends StateTestingPredicate {
+    public static final MapCodec<ReplaceablePredicate> CODEC;
+    public ReplaceablePredicate(Vec3i offset);
+    protected boolean test(BlockState state);
+    public BlockPredicateType<?> type();
+}
+//// SolidPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.block.state.BlockState;
+public class SolidPredicate extends StateTestingPredicate {
+    public static final MapCodec<SolidPredicate> CODEC;
+    public SolidPredicate(Vec3i offset);
+    protected boolean test(BlockState state);
+    public BlockPredicateType<?> type();
+}
+//// StateTestingPredicate.java
+import com.mojang.datafixers.Products;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+public abstract class StateTestingPredicate implements BlockPredicate {
+    protected final Vec3i offset;
+    protected static <P extends StateTestingPredicate> Products.P1<RecordCodecBuilder.Mu<P>, Vec3i> stateTestingCodec(RecordCodecBuilder.Instance<P> instance);
+    protected StateTestingPredicate(Vec3i offset);
+    public final boolean test(LevelAccessor level, BlockPos origin);
+    protected abstract boolean test(BlockState state);
+}
+//// TrueBlockPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelAccessor;
+public class TrueBlockPredicate implements BlockPredicate {
+    public static final TrueBlockPredicate INSTANCE;
+    public static final MapCodec<TrueBlockPredicate> CODEC;
+    private TrueBlockPredicate();
+    public boolean test(LevelAccessor level, BlockPos origin);
+    public BlockPredicateType<?> type();
+}
+//// UnobstructedPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.LevelAccessor;
+public record UnobstructedPredicate(Vec3i offset) implements BlockPredicate {
+    public static final MapCodec<UnobstructedPredicate> CODEC;
+    public BlockPredicateType<?> type();
+    public boolean test(LevelAccessor worldGenLevel, BlockPos pos);
+}
+//// VolumeMatchPredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.LevelAccessor;
+public record VolumeMatchPredicate(Vec3i min, Vec3i max, BlockPredicate match) implements BlockPredicate {
+    public static final MapCodec<VolumeMatchPredicate> CODEC;
+    public BlockPredicateType<VolumeMatchPredicate> type();
+    public boolean test(LevelAccessor level, BlockPos blockPos);
+}
+//// WouldSurvivePredicate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+public class WouldSurvivePredicate implements BlockPredicate {
+    public static final MapCodec<WouldSurvivePredicate> CODEC;
+    public WouldSurvivePredicate(Vec3i offset, BlockState state);
+    public boolean test(LevelAccessor level, BlockPos origin);
+    public BlockPredicateType<?> type();
+}

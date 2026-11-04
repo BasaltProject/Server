@@ -1,0 +1,190 @@
+//// Attribute.java
+import com.mojang.serialization.Codec;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class Attribute {
+    public static final Codec<Holder<Attribute>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<Attribute>> STREAM_CODEC;
+    protected Attribute(String descriptionId, double defaultValue);
+    public double getDefaultValue();
+    public boolean isClientSyncable();
+    public Attribute setSyncable(boolean syncable);
+    public Attribute setSentiment(Sentiment sentiment);
+    public double sanitizeValue(double value);
+    public String getDescriptionId();
+    public ChatFormatting getStyle(boolean valueIncrease);
+    public static enum Sentiment {
+        POSITIVE, NEUTRAL, NEGATIVE;
+        public ChatFormatting getStyle(boolean valueIncrease);
+    }
+}
+//// AttributeInstance.java
+import com.mojang.serialization.Codec;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+public class AttributeInstance {
+    public AttributeInstance(Holder<Attribute> attribute, Consumer<AttributeInstance> onDirty);
+    public Holder<Attribute> getAttribute();
+    public double getBaseValue();
+    public void setBaseValue(double baseValue);
+    Map<Identifier, AttributeModifier> getModifiers(AttributeModifier.Operation operation);
+    public Set<AttributeModifier> getModifiers();
+    public Set<AttributeModifier> getPermanentModifiers();
+    public AttributeModifier getModifier(Identifier id);
+    public boolean hasModifier(Identifier modifier);
+    public void addOrUpdateTransientModifier(AttributeModifier modifier);
+    public void addTransientModifier(AttributeModifier modifier);
+    public void addOrReplacePermanentModifier(AttributeModifier modifier);
+    public void addPermanentModifier(AttributeModifier modifier);
+    public void addPermanentModifiers(Collection<AttributeModifier> modifiers);
+    protected void setDirty();
+    public void removeModifier(AttributeModifier modifier);
+    public boolean removeModifier(Identifier id);
+    public void removeModifiers();
+    public double getValue();
+    public void replaceFrom(AttributeInstance other);
+    public Packed pack();
+    public void apply(Packed packed);
+    public static record Packed(Holder<Attribute> attribute, double baseValue, List<AttributeModifier> modifiers) {
+        public static final Codec<Packed> CODEC;
+        public static final Codec<List<Packed>> LIST_CODEC;
+    }
+}
+//// AttributeMap.java
+import com.google.common.collect.Multimap;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+public class AttributeMap {
+    public AttributeMap(AttributeSupplier supplier);
+    public Set<AttributeInstance> getAttributesToSync();
+    public Set<AttributeInstance> getAttributesToUpdate();
+    public Collection<AttributeInstance> getSyncableAttributes();
+    public AttributeInstance getInstance(Holder<Attribute> attribute);
+    public boolean hasAttribute(Holder<Attribute> attribute);
+    public boolean hasModifier(Holder<Attribute> attribute, Identifier id);
+    public double getValue(Holder<Attribute> attribute);
+    public double getBaseValue(Holder<Attribute> attribute);
+    public double getModifierValue(Holder<Attribute> attribute, Identifier id);
+    public void addTransientAttributeModifiers(Multimap<Holder<Attribute>, AttributeModifier> modifiers);
+    public void removeAttributeModifiers(Multimap<Holder<Attribute>, AttributeModifier> modifiers);
+    public void assignAllValues(AttributeMap other);
+    public void assignBaseValues(AttributeMap other);
+    public void assignPermanentModifiers(AttributeMap other);
+    public boolean resetBaseValue(Holder<Attribute> attribute);
+    public List<AttributeInstance.Packed> pack();
+    public void apply(List<AttributeInstance.Packed> packedAttributes);
+}
+//// AttributeModifier.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.IntFunction;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.StringRepresentable;
+public record AttributeModifier(Identifier id, double amount, Operation operation) {
+    public static final MapCodec<AttributeModifier> MAP_CODEC;
+    public static final Codec<AttributeModifier> CODEC;
+    public static final StreamCodec<ByteBuf, AttributeModifier> STREAM_CODEC;
+    public boolean is(Identifier id);
+    public static enum Operation implements StringRepresentable {
+        ADD_VALUE, ADD_MULTIPLIED_BASE, ADD_MULTIPLIED_TOTAL;
+        public static final IntFunction<Operation> BY_ID;
+        public static final StreamCodec<ByteBuf, Operation> STREAM_CODEC;
+        public static final Codec<Operation> CODEC;
+        public int id();
+        public String getSerializedName();
+    }
+}
+//// AttributeSupplier.java
+import java.util.Map;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+public class AttributeSupplier {
+    private AttributeSupplier(Map<Holder<Attribute>, AttributeInstance> instances);
+    public double getValue(Holder<Attribute> attribute);
+    public double getBaseValue(Holder<Attribute> attribute);
+    public double getModifierValue(Holder<Attribute> attribute, Identifier id);
+    public AttributeInstance createInstance(Consumer<AttributeInstance> onDirty, Holder<Attribute> attribute);
+    public static Builder builder();
+    public boolean hasAttribute(Holder<Attribute> attribute);
+    public boolean hasModifier(Holder<Attribute> attribute, Identifier modifier);
+    public static class Builder {
+        public Builder add(Holder<Attribute> attribute);
+        public Builder add(Holder<Attribute> attribute, double baseValue);
+        public AttributeSupplier build();
+    }
+}
+//// Attributes.java
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+public class Attributes {
+    public static final double DEFAULT_ATTACK_SPEED = 4.0;
+    public static final Holder<Attribute> AIR_DRAG_MODIFIER;
+    public static final Holder<Attribute> ARMOR;
+    public static final Holder<Attribute> ARMOR_TOUGHNESS;
+    public static final Holder<Attribute> ATTACK_DAMAGE;
+    public static final Holder<Attribute> ATTACK_KNOCKBACK;
+    public static final Holder<Attribute> ATTACK_SPEED;
+    public static final Holder<Attribute> BELOW_NAME_DISTANCE;
+    public static final Holder<Attribute> BLOCK_BREAK_SPEED;
+    public static final Holder<Attribute> BLOCK_INTERACTION_RANGE;
+    public static final Holder<Attribute> BOUNCINESS;
+    public static final Holder<Attribute> BURNING_TIME;
+    public static final Holder<Attribute> CAMERA_DISTANCE;
+    public static final Holder<Attribute> EXPLOSION_KNOCKBACK_RESISTANCE;
+    public static final Holder<Attribute> ENTITY_INTERACTION_RANGE;
+    public static final Holder<Attribute> FALL_DAMAGE_MULTIPLIER;
+    public static final Holder<Attribute> FLYING_SPEED;
+    public static final Holder<Attribute> FOLLOW_RANGE;
+    public static final Holder<Attribute> FRICTION_MODIFIER;
+    public static final Holder<Attribute> GRAVITY;
+    public static final Holder<Attribute> JUMP_STRENGTH;
+    public static final Holder<Attribute> KNOCKBACK_RESISTANCE;
+    public static final Holder<Attribute> LUCK;
+    public static final Holder<Attribute> MAX_ABSORPTION;
+    public static final Holder<Attribute> MAX_HEALTH;
+    public static final Holder<Attribute> MINING_EFFICIENCY;
+    public static final Holder<Attribute> MOVEMENT_EFFICIENCY;
+    public static final Holder<Attribute> MOVEMENT_SPEED;
+    public static final Holder<Attribute> NAME_TAG_DISTANCE;
+    public static final Holder<Attribute> OXYGEN_BONUS;
+    public static final Holder<Attribute> SAFE_FALL_DISTANCE;
+    public static final Holder<Attribute> SCALE;
+    public static final Holder<Attribute> SNEAKING_SPEED;
+    public static final Holder<Attribute> SPAWN_REINFORCEMENTS_CHANCE;
+    public static final Holder<Attribute> STEP_HEIGHT;
+    public static final Holder<Attribute> SUBMERGED_MINING_SPEED;
+    public static final Holder<Attribute> SWEEPING_DAMAGE_RATIO;
+    public static final Holder<Attribute> TEMPT_RANGE;
+    public static final Holder<Attribute> WATER_MOVEMENT_EFFICIENCY;
+    public static final Holder<Attribute> WAYPOINT_TRANSMIT_RANGE;
+    public static final Holder<Attribute> WAYPOINT_RECEIVE_RANGE;
+    public static Holder<Attribute> bootstrap(Registry<Attribute> registry);
+}
+//// DefaultAttributes.java
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+public class DefaultAttributes {
+    public static AttributeSupplier getSupplier(EntityType<? extends LivingEntity> type);
+    public static boolean hasSupplier(EntityType<?> type);
+    public static void validate();
+}
+//// RangedAttribute.java
+public class RangedAttribute extends Attribute {
+    public RangedAttribute(String descriptionId, double defaultValue, double minValue, double maxValue);
+    public double getMinValue();
+    public double getMaxValue();
+    public double sanitizeValue(double value);
+}

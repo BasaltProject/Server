@@ -1,0 +1,1022 @@
+//// AdvancementCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.level.ServerPlayer;
+public class AdvancementCommands {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    static enum Action {
+        GRANT, REVOKE;
+        public final CommandResponseTracker.MessagesWithArg<ServerPlayer, AdvancementHolder> singleAdvancementSuccessResponse;
+        public final CommandResponseTracker.DispatchWithArg<CommandSyntaxException, ServerPlayer, AdvancementHolder> singleAdvancementsError;
+        public final CommandResponseTracker.MessagesWithArg<ServerPlayer, Integer> multipleAdvancementsSuccessResponse;
+        public final CommandResponseTracker.DispatchWithArg<CommandSyntaxException, ServerPlayer, Integer> multipleAdvancementsError;
+        public final CommandResponseTracker.MessagesWithArgs<ServerPlayer, AdvancementHolder, String> criterionSuccessResponse;
+        public final CommandResponseTracker.DispatchWithArgs<CommandSyntaxException, ServerPlayer, AdvancementHolder, String> criterionError;
+        public int perform(ServerPlayer player, Iterable<AdvancementHolder> advancements, boolean showAdvancements);
+        protected abstract boolean perform(ServerPlayer player, AdvancementHolder advancement);
+        protected abstract boolean performCriterion(ServerPlayer player, AdvancementHolder advancement, String criterion);
+    }
+    static enum Mode {
+        ONLY, THROUGH, FROM, UNTIL, EVERYTHING;
+    }
+}
+//// ArgProvider.java
+import com.mojang.brigadier.builder.ArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import net.minecraft.commands.CommandSourceStack;
+public interface ArgProvider<T> {
+    T access(CommandContext<CommandSourceStack> context) throws CommandSyntaxException;
+    ArgumentBuilder<CommandSourceStack, ?> wrap(ArgumentBuilder<CommandSourceStack, ?> parent, Function<ArgumentBuilder<CommandSourceStack, ?>, ArgumentBuilder<CommandSourceStack, ?>> function);
+    static <T> ArgProvider<T> create(String key, Supplier<ArgumentBuilder<CommandSourceStack, ?>> child, InCommandFunction<CommandContext<CommandSourceStack>, T> access);
+    static <T> List<ArgProvider<T>> buildList(String argName, List<Factory<T>> factories);
+    public interface Factory<T> {
+        ArgProvider<T> create(String arg);
+    }
+}
+//// AttributeCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class AttributeCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// BanIpCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class BanIpCommands {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// BanListCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class BanListCommands {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// BanPlayerCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class BanPlayerCommands {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// BossBarCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.bossevents.CustomBossEvent;
+public class BossBarCommands {
+    public static final SuggestionProvider<CommandSourceStack> SUGGEST_BOSS_BAR;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public static CustomBossEvent getBossBar(CommandContext<CommandSourceStack> context) throws CommandSyntaxException;
+}
+//// ChaseCommand.java
+import com.google.common.collect.BiMap;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+public class ChaseCommand {
+    public static final BiMap<String, ResourceKey<Level>> DIMENSION_NAMES;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// ClearInventoryCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class ClearInventoryCommands {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// CloneCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import java.util.function.Predicate;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.pattern.BlockInWorld;
+public class CloneCommands {
+    public static final Predicate<BlockInWorld> FILTER_AIR;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    static record DimensionAndPosition(ServerLevel dimension, BlockPos position) {
+    }
+    static enum Mode {
+        FORCE, MOVE, NORMAL;
+        public boolean canOverlap();
+    }
+    static record CloneBlockEntityInfo(CompoundTag tag, DataComponentMap components) {
+    }
+    static record CloneBlockInfo(BlockPos pos, BlockState state, CloneBlockEntityInfo blockEntityInfo, BlockState previousStateAtDestination) {
+    }
+}
+//// CommandResponseTracker.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
+public class CommandResponseTracker<Element> {
+    public static <T> CommandResponseTracker<T> create();
+    public void track(Element element, int value);
+    public void track(Element element, boolean value);
+    public void track(Element element);
+    public int totalValue();
+    public static <Element> Messages<Element> messages(SingleHandler<Component, Element> onSingle, MultipleHandler<Component> onMultiple);
+    public static <Element> Messages<Element> messages(ErrorHandler onZero, SingleHandler<Component, Element> onSingle, MultipleHandler<Component> onMultiple);
+    public static <Element> Messages<Element> messages(SimpleCommandExceptionType onZero, SingleHandler<Component, Element> onSingle, MultipleHandler<Component> onMultiple);
+    public <Result> Result dispatch(ElementType elementType, Dispatch<Result, ? super Element> dispatch);
+    public int sendFeedback(CommandSourceStack sourceStack, boolean broadcast, ElementType elementType, Messages<? super Element> messages) throws CommandSyntaxException;
+    public int sendFeedback(CommandSourceStack sourceStack, boolean broadcast, Messages<? super Element> messages) throws CommandSyntaxException;
+    public static <Element, Arg> MessagesWithArg<Element, Arg> messages(SingleHandlerWithArg<Component, Element, Arg> onSingle, MultipleHandlerWithArg<Component, Arg> onMultiple);
+    public static <Element, Arg> MessagesWithArg<Element, Arg> messages(ErrorHandlerWithArg<Arg> onZero, SingleHandlerWithArg<Component, Element, Arg> onSingle, MultipleHandlerWithArg<Component, Arg> onMultiple);
+    public static <Element, Arg> MessagesWithArg<Element, Arg> messages(SimpleCommandExceptionType onZero, SingleHandlerWithArg<Component, Element, Arg> onSingle, MultipleHandlerWithArg<Component, Arg> onMultiple);
+    public <Result, Arg> Result dispatch(ElementType elementType, DispatchWithArg<Result, ? super Element, Arg> dispatch, Arg argument);
+    public <Arg> int sendFeedback(CommandSourceStack sourceStack, boolean broadcast, ElementType elementType, MessagesWithArg<? super Element, Arg> messages, Arg argument) throws CommandSyntaxException;
+    public <Arg> int sendFeedback(CommandSourceStack sourceStack, boolean broadcast, MessagesWithArg<? super Element, Arg> messages, Arg argument) throws CommandSyntaxException;
+    public static <Element, Arg0, Arg1> MessagesWithArgs<Element, Arg0, Arg1> messages(SingleHandlerWithArgs<Component, Element, Arg0, Arg1> onSingle, MultipleHandlerWithArgs<Component, Arg0, Arg1> onMultiple);
+    public static <Element, Arg0, Arg1> MessagesWithArgs<Element, Arg0, Arg1> messages(ErrorHandlerWithArgs<Arg0, Arg1> onZero, SingleHandlerWithArgs<Component, Element, Arg0, Arg1> onSingle, MultipleHandlerWithArgs<Component, Arg0, Arg1> onMultiple);
+    public static <Element, Arg0, Arg1> MessagesWithArgs<Element, Arg0, Arg1> messages(SimpleCommandExceptionType onZero, SingleHandlerWithArgs<Component, Element, Arg0, Arg1> onSingle, MultipleHandlerWithArgs<Component, Arg0, Arg1> onMultiple);
+    public <Result, Arg0, Arg1> Result dispatch(ElementType elementType, DispatchWithArgs<Result, ? super Element, Arg0, Arg1> messages, Arg0 argument0, Arg1 argument1);
+    public <Arg0, Arg1> int sendFeedback(CommandSourceStack sourceStack, boolean broadcast, ElementType elementType, MessagesWithArgs<? super Element, Arg0, Arg1> messages, Arg0 argument0, Arg1 argument1) throws CommandSyntaxException;
+    public <Arg0, Arg1> int sendFeedback(CommandSourceStack sourceStack, boolean broadcast, MessagesWithArgs<? super Element, Arg0, Arg1> messages, Arg0 argument0, Arg1 argument1) throws CommandSyntaxException;
+    public static enum ElementType {
+        ANY, NON_ZERO;
+    }
+    public static record Dispatch<Result, Element>(SingleHandler<Result, Element> onSingle, MultipleHandler<Result> onMultiple) {
+    }
+    public static record Messages<Element>(ErrorHandler onZero, Dispatch<Component, Element> onSuccess) {
+        public void throwIfZero(int value) throws CommandSyntaxException;
+    }
+    public static record DispatchWithArg<Result, Element, Arg>(SingleHandlerWithArg<Result, Element, Arg> onSingle, MultipleHandlerWithArg<Result, Arg> onMultiple) {
+    }
+    public static record MessagesWithArg<Element, Arg>(ErrorHandlerWithArg<Arg> onZero, DispatchWithArg<Component, Element, Arg> onSuccess) {
+        public void throwIfZero(int value, Arg argument) throws CommandSyntaxException;
+    }
+    public static record DispatchWithArgs<Result, Element, Arg0, Arg1>(SingleHandlerWithArgs<Result, Element, Arg0, Arg1> onSingle, MultipleHandlerWithArgs<Result, Arg0, Arg1> onMultiple) {
+    }
+    public static record MessagesWithArgs<Element, Arg0, Arg1>(ErrorHandlerWithArgs<Arg0, Arg1> onZero, DispatchWithArgs<Component, Element, Arg0, Arg1> onSuccess) {
+        public void throwIfZero(int value, Arg0 argument0, Arg1 argument1) throws CommandSyntaxException;
+    }
+    public interface ErrorHandler {
+        CommandSyntaxException get();
+    }
+    public interface ErrorHandlerWithArg<Arg> {
+        CommandSyntaxException get(Arg argument);
+    }
+    public interface ErrorHandlerWithArgs<Arg0, Arg1> {
+        CommandSyntaxException get(Arg0 argument0, Arg1 argument1);
+    }
+    public interface MultipleHandler<Result> {
+        Result create(int elementCount, int totalValue);
+    }
+    public interface MultipleHandlerWithArg<Result, Arg> {
+        Result create(int elementCount, int totalValue, Arg argument);
+    }
+    public interface MultipleHandlerWithArgs<Result, Arg0, Arg1> {
+        Result create(int elementCount, int totalValue, Arg0 argument0, Arg1 argument1);
+    }
+    public interface SingleHandler<Result, Element> {
+        Result create(Element element, int totalValue);
+    }
+    public interface SingleHandlerWithArg<Result, Element, Arg> {
+        Result create(Element element, int totalValue, Arg argument);
+    }
+    public interface SingleHandlerWithArgs<Result, Element, Arg0, Arg1> {
+        Result create(Element element, int totalValue, Arg0 argument0, Arg1 argument1);
+    }
+}
+//// ComputeCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class ComputeCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// DamageCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class DamageCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// DataPackCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.List;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.packs.repository.Pack;
+public class DataPackCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    interface Inserter {
+        void apply(List<Pack> selected, Pack pack) throws CommandSyntaxException;
+    }
+}
+//// DeOpCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class DeOpCommands {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// DebugCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.ContextChain;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.io.PrintWriter;
+import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.execution.ChainModifiers;
+import net.minecraft.commands.execution.CustomCommandExecutor;
+import net.minecraft.commands.execution.ExecutionControl;
+import net.minecraft.commands.execution.TraceCallbacks;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+public class DebugCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    static class TraceCustomExecutor extends CustomCommandExecutor.WithErrorHandling<CommandSourceStack> implements CustomCommandExecutor.CommandAdapter<CommandSourceStack> {
+        public void runGuarded(CommandSourceStack source, ContextChain<CommandSourceStack> currentStep, ChainModifiers modifiers, ExecutionControl<CommandSourceStack> context) throws CommandSyntaxException;
+    }
+    static class Tracer implements CommandSource, TraceCallbacks {
+        public static final int INDENT_OFFSET = 1;
+        private Tracer(PrintWriter output);
+        public void onCommand(int depth, String command);
+        public void onReturn(int depth, String command, int result);
+        public void onCall(int depth, Identifier function, int size);
+        public void onError(String message);
+        public void sendSystemMessage(Component message);
+        public boolean acceptsSuccess();
+        public boolean acceptsFailure();
+        public boolean shouldInformAdmins();
+        public boolean alwaysAccepts();
+        public void close();
+    }
+}
+//// DebugConfigCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class DebugConfigCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// DebugMobSpawningCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class DebugMobSpawningCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// DebugPathCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class DebugPathCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// DefaultGameModeCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class DefaultGameModeCommands {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// DialogCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class DialogCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// DifficultyCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.Difficulty;
+public class DifficultyCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    public static int setDifficulty(CommandSourceStack source, Difficulty difficulty) throws CommandSyntaxException;
+}
+//// EffectCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class EffectCommands {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// EmoteCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class EmoteCommands {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// EnchantCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class EnchantCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// ExecuteCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.context.ContextChain;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
+import java.util.Collection;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.IntPredicate;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.ExecutionCommandSource;
+import net.minecraft.commands.execution.ChainModifiers;
+import net.minecraft.commands.execution.CustomModifierExecutor;
+import net.minecraft.commands.execution.ExecutionControl;
+import net.minecraft.commands.functions.CommandFunction;
+import net.minecraft.nbt.CompoundTag;
+public class ExecuteCommand {
+    public static final Dynamic2CommandExceptionType ERROR_FUNCTION_CONDITION_INSTANTATION_FAILURE;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public static <T extends ExecutionCommandSource<T>> void scheduleFunctionConditionsAndTest(T originalSource, List<T> currentSources, Function<T, T> functionContextModifier, IntPredicate check, ContextChain<T> currentStep, CompoundTag parameters, ExecutionControl<T> output, InCommandFunction<CommandContext<T>, Collection<CommandFunction<T>>> functionGetter, ChainModifiers modifiers);
+    static class ExecuteIfFunctionCustomModifier implements CustomModifierExecutor.ModifierAdapter<CommandSourceStack> {
+        private ExecuteIfFunctionCustomModifier(boolean check);
+        public void apply(CommandSourceStack originalSource, List<CommandSourceStack> currentSources, ContextChain<CommandSourceStack> currentStep, ChainModifiers modifiers, ExecutionControl<CommandSourceStack> output);
+    }
+    interface CommandNumericPredicate {
+        int test(CommandContext<CommandSourceStack> c) throws CommandSyntaxException;
+    }
+    interface CommandPredicate {
+        boolean test(CommandContext<CommandSourceStack> c) throws CommandSyntaxException;
+    }
+    interface IntBiPredicate {
+        boolean test(int a, int b);
+    }
+}
+//// ExperienceCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
+import java.util.function.ToIntFunction;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+public class ExperienceCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    static enum Type {
+        POINTS, LEVELS;
+        public final BiConsumer<ServerPlayer, Integer> add;
+        public final BiPredicate<ServerPlayer, Integer> set;
+        public final ToIntFunction<ServerPlayer> query;
+        public final String queryTranslationKey;
+        public final CommandResponseTracker.MessagesWithArg<ServerPlayer, Integer> addResponse;
+        public final CommandResponseTracker.MessagesWithArg<ServerPlayer, Integer> setResponse;
+        public Component queryResponse(ServerPlayer target, int result);
+    }
+}
+//// FetchProfileCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.entity.Avatar;
+public class FetchProfileCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    public static void printForAvatar(CommandSourceStack source, Avatar avatar);
+}
+//// FillBiomeCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.datafixers.util.Either;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.biome.Biome;
+public class FillBiomeCommand {
+    public static final SimpleCommandExceptionType ERROR_NOT_LOADED;
+    public static final SimpleCommandExceptionType ERROR_NO_BIOMES_SET;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public static Either<Integer, CommandSyntaxException> fill(ServerLevel level, BlockPos rawFrom, BlockPos rawTo, Holder<Biome> biome);
+    public static Either<Integer, CommandSyntaxException> fill(ServerLevel level, BlockPos rawFrom, BlockPos rawTo, Holder<Biome> biome, Predicate<Holder<Biome>> filter, Consumer<Supplier<Component>> successMessageConsumer);
+}
+//// FillCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.blocks.BlockInput;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+public class FillCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    static enum Mode {
+        REPLACE, OUTLINE, HOLLOW, DESTROY;
+        public final Filter filter;
+        public final Affector affector;
+    }
+    public interface Filter {
+        Filter NOOP;
+        BlockInput filter(BoundingBox region, BlockPos pos, BlockInput block, ServerLevel level);
+    }
+    public interface Affector {
+        Affector NOOP;
+        boolean affect(ServerLevel level, BlockPos pos);
+    }
+    interface NullableCommandFunction<T, R> {
+        R apply(T t) throws CommandSyntaxException;
+    }
+}
+//// ForceLoadCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+public class ForceLoadCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    static record ForceLoadParams(ResourceKey<Level> dimension, int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ) {
+        public ChunkPos min();
+        public ChunkPos max();
+    }
+}
+//// FunctionCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.context.ContextChain;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import java.util.Collection;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.ExecutionCommandSource;
+import net.minecraft.commands.execution.ChainModifiers;
+import net.minecraft.commands.execution.CustomCommandExecutor;
+import net.minecraft.commands.execution.ExecutionControl;
+import net.minecraft.commands.functions.CommandFunction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+public class FunctionCommand {
+    public static final Dynamic2CommandExceptionType ERROR_FUNCTION_INSTANTATION_FAILURE;
+    public static final SuggestionProvider<CommandSourceStack> SUGGEST_FUNCTION;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    public static CommandSourceStack modifySenderForExecution(CommandSourceStack sender);
+    public static <T extends ExecutionCommandSource<T>> void queueFunctions(Collection<CommandFunction<T>> functions, CompoundTag arguments, T originalSource, T functionSource, ExecutionControl<T> output, Callbacks<T> callbacks, ChainModifiers modifiers) throws CommandSyntaxException;
+    static abstract class FunctionCustomExecutor extends CustomCommandExecutor.WithErrorHandling<CommandSourceStack> implements CustomCommandExecutor.CommandAdapter<CommandSourceStack> {
+        protected abstract CompoundTag arguments(CommandContext<CommandSourceStack> context) throws CommandSyntaxException;
+        public void runGuarded(CommandSourceStack sender, ContextChain<CommandSourceStack> currentStep, ChainModifiers modifiers, ExecutionControl<CommandSourceStack> output) throws CommandSyntaxException;
+    }
+    public interface Callbacks<T> {
+        void signalResult(T originalSource, Identifier functionId, int newValue);
+    }
+}
+//// GameModeCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.PermissionCheck;
+import net.minecraft.world.level.GameType;
+public class GameModeCommand {
+    public static final PermissionCheck PERMISSION_CHECK;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    public static void setGameMode(ServerPlayer player, GameType type);
+}
+//// GameRuleCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class GameRuleCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// GiveCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class GiveCommand {
+    public static final int MAX_ALLOWED_ITEMSTACKS = 100;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// HelpCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class HelpCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// InCommandFunction.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+public interface InCommandFunction<T, R> {
+    R apply(T t) throws CommandSyntaxException;
+}
+//// JfrCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class JfrCommand {
+    private JfrCommand();
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// KickCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class KickCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// KillCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class KillCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// ListPlayersCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class ListPlayersCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// LocateCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.datafixers.util.Pair;
+import java.time.Duration;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.ResourceOrTagArgument;
+import net.minecraft.commands.arguments.ResourceOrTagKeyArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+public class LocateCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public static int showLocateResult(CommandSourceStack source, ResourceOrTagArgument.Result<?> name, BlockPos sourcePos, Pair<BlockPos, ? extends Holder<?>> found, String successMessageKey, boolean includeY, Duration taskDuration);
+    public static int showLocateResult(CommandSourceStack source, ResourceOrTagKeyArgument.Result<?> name, BlockPos sourcePos, Pair<BlockPos, ? extends Holder<?>> found, String successMessageKey, boolean includeY, Duration taskDuration);
+}
+//// LookAt.java
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+public interface LookAt {
+    void perform(CommandSourceStack source, Entity target);
+    public static record LookAtEntity(Entity entity, EntityAnchorArgument.Anchor anchor) implements LookAt {
+        public void perform(CommandSourceStack source, Entity target);
+    }
+    public static record LookAtPosition(Vec3 position) implements LookAt {
+        public void perform(CommandSourceStack source, Entity target);
+    }
+}
+//// LootCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.ArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.List;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.item.ItemStack;
+public class LootCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    interface DropConsumer {
+        void accept(CommandContext<CommandSourceStack> context, List<ItemStack> drops, CommandResponseTracker<ItemStack> response) throws CommandSyntaxException;
+    }
+    interface TailProvider {
+        ArgumentBuilder<CommandSourceStack, ?> construct(ArgumentBuilder<CommandSourceStack, ?> root, DropConsumer consumer);
+    }
+}
+//// LootContextSources.java
+import com.mojang.brigadier.builder.ArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.function.Consumer;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.LootParams;
+public class LootContextSources {
+    public static <T extends ArgumentBuilder<CommandSourceStack, T>> T addContextSources(T node, NodeVisitor factory);
+    public interface ContextDecorator {
+        LootParams customize(CommandContext<CommandSourceStack> context, LootParams.Builder params) throws CommandSyntaxException;
+        default LootParams createParams(CommandContext<CommandSourceStack> context) throws CommandSyntaxException;
+        default LootContext createContext(CommandContext<CommandSourceStack> context) throws CommandSyntaxException;
+    }
+    public interface NodeVisitor {
+        void visit(ContextDecorator contextDecorator, Consumer<ArgumentBuilder<CommandSourceStack, ?>> output);
+    }
+}
+//// MsgCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class MsgCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// OpCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class OpCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// PardonCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class PardonCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// PardonIpCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class PardonIpCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// ParticleCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class ParticleCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// PerfCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class PerfCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// PlaceCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+public class PlaceCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public static int placeFeature(CommandSourceStack source, Holder<Feature> featureHolder, BlockPos pos) throws CommandSyntaxException;
+    public static int placeJigsaw(CommandSourceStack source, Holder<StructureTemplatePool> pool, Identifier target, int maxDepth, BlockPos pos) throws CommandSyntaxException;
+    public static int placeStructure(CommandSourceStack source, Holder.Reference<Structure> structureHolder, BlockPos pos) throws CommandSyntaxException;
+    public static int placeTemplate(CommandSourceStack source, Identifier template, BlockPos pos, Rotation rotation, Mirror mirror, float integrity, int seed, boolean strict) throws CommandSyntaxException;
+}
+//// PlaySoundCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class PlaySoundCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// PostEffectCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class PostEffectCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// PublishCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.MutableComponent;
+public class PublishCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    public static MutableComponent getSuccessMessage(int port);
+}
+//// RaidCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class RaidCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// RandomCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class RandomCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// RecipeCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class RecipeCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// ReloadCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import java.util.Collection;
+import net.minecraft.commands.CommandSourceStack;
+public class ReloadCommand {
+    public static void reloadPacks(Collection<String> selectedPacks, CommandSourceStack source);
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// ReturnCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.ContextChain;
+import java.util.List;
+import net.minecraft.commands.ExecutionCommandSource;
+import net.minecraft.commands.execution.ChainModifiers;
+import net.minecraft.commands.execution.CustomCommandExecutor;
+import net.minecraft.commands.execution.CustomModifierExecutor;
+import net.minecraft.commands.execution.ExecutionControl;
+public class ReturnCommand {
+    public static <T extends ExecutionCommandSource<T>> void register(CommandDispatcher<T> dispatcher);
+    static class ReturnValueCustomExecutor<T extends ExecutionCommandSource<T>> implements CustomCommandExecutor.CommandAdapter<T> {
+        public void run(T sender, ContextChain<T> currentStep, ChainModifiers modifiers, ExecutionControl<T> output);
+    }
+    static class ReturnFailCustomExecutor<T extends ExecutionCommandSource<T>> implements CustomCommandExecutor.CommandAdapter<T> {
+        public void run(T sender, ContextChain<T> currentStep, ChainModifiers modifiers, ExecutionControl<T> output);
+    }
+    static class ReturnFromCommandCustomModifier<T extends ExecutionCommandSource<T>> implements CustomModifierExecutor.ModifierAdapter<T> {
+        public void apply(T originalSource, List<T> currentSources, ContextChain<T> currentStep, ChainModifiers modifiers, ExecutionControl<T> output);
+    }
+}
+//// RideCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class RideCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// RotateCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class RotateCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SaveAllCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SaveAllCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SaveOffCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SaveOffCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SaveOnCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SaveOnCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SayCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SayCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// ScheduleCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class ScheduleCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// ScoreboardCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.numbers.NumberFormat;
+public class ScoreboardCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public interface NumberFormatCommandExecutor {
+        int run(CommandContext<CommandSourceStack> context, NumberFormat format) throws CommandSyntaxException;
+    }
+}
+//// SeedCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SeedCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, boolean checkPermissions);
+}
+//// ServerPackCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class ServerPackCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SetBlockCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class SetBlockCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public static enum Mode {
+        REPLACE, DESTROY;
+    }
+}
+//// SetPlayerIdleTimeoutCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SetPlayerIdleTimeoutCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SetSpawnCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SetSpawnCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SetWorldSpawnCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SetWorldSpawnCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SpawnArmorTrimsCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SpawnArmorTrimsCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SpectateCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SpectateCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SpreadPlayersCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.BlockGetter;
+public class SpreadPlayersCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    static class Position {
+        public double dist(Position target);
+        public void normalize();
+        public double getLength();
+        public void moveAway(Position pos);
+        public boolean clamp(double minX, double minZ, double maxX, double maxZ);
+        public int getSpawnY(BlockGetter level, int maxHeight);
+        public boolean isSafe(BlockGetter level, int maxHeight);
+        public void randomize(RandomSource random, double minX, double minZ, double maxX, double maxZ);
+    }
+}
+//// StopCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class StopCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// StopSoundCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class StopSoundCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// StopwatchCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import net.minecraft.commands.CommandSourceStack;
+public class StopwatchCommand {
+    public static final DynamicCommandExceptionType ERROR_DOES_NOT_EXIST;
+    public static final SuggestionProvider<CommandSourceStack> SUGGEST_STOPWATCHES;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// SummonCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.Holder;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.phys.Vec3;
+public class SummonCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public static Entity createEntity(CommandSourceStack source, Holder.Reference<EntityType<?>> type, Vec3 pos, CompoundTag nbt, boolean finalize) throws CommandSyntaxException;
+}
+//// SwingCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class SwingCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// TagCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class TagCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// TeamCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class TeamCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// TeamMsgCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class TeamMsgCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// TeleportCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class TeleportCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// TellRawCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class TellRawCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// TickCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class TickCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// TimeCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.Holder;
+import net.minecraft.world.clock.WorldClock;
+public class TimeCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    interface ClockGetter {
+        Holder<WorldClock> getClock(CommandContext<CommandSourceStack> context) throws CommandSyntaxException;
+    }
+}
+//// TitleCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class TitleCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// TransferCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class TransferCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// TriggerCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandSourceStack;
+public class TriggerCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+    public static CompletableFuture<Suggestions> suggestObjectives(CommandSourceStack source, SuggestionsBuilder builder);
+}
+//// UnpublishCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class UnpublishCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// VersionCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import java.util.function.Consumer;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
+public class VersionCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, boolean checkPermissions);
+    public static void dumpVersion(Consumer<Component> output);
+}
+//// WardenSpawnTrackerCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class WardenSpawnTrackerCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// WaypointCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class WaypointCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+}
+//// WeatherCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class WeatherCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// WhitelistCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class WhitelistCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}
+//// WorldBorderCommand.java
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+public class WorldBorderCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher);
+}

@@ -1,0 +1,216 @@
+//// AbstractDragonPhaseInstance.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
+public abstract class AbstractDragonPhaseInstance implements DragonPhaseInstance {
+    protected final EnderDragon dragon;
+    public AbstractDragonPhaseInstance(EnderDragon dragon);
+    public boolean isSitting();
+    public void doClientTick();
+    public void doServerTick(ServerLevel level);
+    public void onCrystalDestroyed(EndCrystal crystal, BlockPos pos, DamageSource source, Player player);
+    public void begin();
+    public void end();
+    public float getFlySpeed();
+    public Vec3 getFlyTargetLocation();
+    public float onHurt(DamageSource source, float damage);
+    public float getTurnSpeed();
+}
+//// AbstractDragonSittingPhase.java
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+public abstract class AbstractDragonSittingPhase extends AbstractDragonPhaseInstance {
+    public AbstractDragonSittingPhase(EnderDragon dragon);
+    public boolean isSitting();
+    public float onHurt(DamageSource source, float damage);
+}
+//// DragonChargePlayerPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.phys.Vec3;
+public class DragonChargePlayerPhase extends AbstractDragonPhaseInstance {
+    public DragonChargePlayerPhase(EnderDragon dragon);
+    public void doServerTick(ServerLevel level);
+    public void begin();
+    public void setTarget(Vec3 target);
+    public float getFlySpeed();
+    public Vec3 getFlyTargetLocation();
+    public EnderDragonPhase<DragonChargePlayerPhase> getPhase();
+}
+//// DragonDeathPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.phys.Vec3;
+public class DragonDeathPhase extends AbstractDragonPhaseInstance {
+    public DragonDeathPhase(EnderDragon dragon);
+    public void doClientTick();
+    public void doServerTick(ServerLevel level);
+    public void begin();
+    public float getFlySpeed();
+    public Vec3 getFlyTargetLocation();
+    public EnderDragonPhase<DragonDeathPhase> getPhase();
+}
+//// DragonHoldingPatternPhase.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
+public class DragonHoldingPatternPhase extends AbstractDragonPhaseInstance {
+    public DragonHoldingPatternPhase(EnderDragon dragon);
+    public EnderDragonPhase<DragonHoldingPatternPhase> getPhase();
+    public void doServerTick(ServerLevel level);
+    public void begin();
+    public Vec3 getFlyTargetLocation();
+    public void onCrystalDestroyed(EndCrystal crystal, BlockPos pos, DamageSource source, Player player);
+}
+//// DragonHoverPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.phys.Vec3;
+public class DragonHoverPhase extends AbstractDragonPhaseInstance {
+    public DragonHoverPhase(EnderDragon dragon);
+    public void doServerTick(ServerLevel level);
+    public boolean isSitting();
+    public void begin();
+    public float getFlySpeed();
+    public Vec3 getFlyTargetLocation();
+    public EnderDragonPhase<DragonHoverPhase> getPhase();
+}
+//// DragonLandingApproachPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.phys.Vec3;
+public class DragonLandingApproachPhase extends AbstractDragonPhaseInstance {
+    public DragonLandingApproachPhase(EnderDragon dragon);
+    public EnderDragonPhase<DragonLandingApproachPhase> getPhase();
+    public void begin();
+    public void doServerTick(ServerLevel level);
+    public Vec3 getFlyTargetLocation();
+}
+//// DragonLandingPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.phys.Vec3;
+public class DragonLandingPhase extends AbstractDragonPhaseInstance {
+    public DragonLandingPhase(EnderDragon dragon);
+    public void doClientTick();
+    public void doServerTick(ServerLevel level);
+    public float getFlySpeed();
+    public float getTurnSpeed();
+    public void begin();
+    public Vec3 getFlyTargetLocation();
+    public EnderDragonPhase<DragonLandingPhase> getPhase();
+}
+//// DragonPhaseInstance.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
+public interface DragonPhaseInstance {
+    boolean isSitting();
+    void doClientTick();
+    void doServerTick(ServerLevel level);
+    void onCrystalDestroyed(EndCrystal crystal, BlockPos pos, DamageSource source, Player player);
+    void begin();
+    void end();
+    float getFlySpeed();
+    float getTurnSpeed();
+    EnderDragonPhase<? extends DragonPhaseInstance> getPhase();
+    Vec3 getFlyTargetLocation();
+    float onHurt(DamageSource source, float damage);
+}
+//// DragonSittingAttackingPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+public class DragonSittingAttackingPhase extends AbstractDragonSittingPhase {
+    public DragonSittingAttackingPhase(EnderDragon dragon);
+    public void doClientTick();
+    public void doServerTick(ServerLevel level);
+    public void begin();
+    public EnderDragonPhase<DragonSittingAttackingPhase> getPhase();
+}
+//// DragonSittingFlamingPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+public class DragonSittingFlamingPhase extends AbstractDragonSittingPhase {
+    public DragonSittingFlamingPhase(EnderDragon dragon);
+    public void doClientTick();
+    public void doServerTick(ServerLevel level);
+    public void begin();
+    public void end();
+    public EnderDragonPhase<DragonSittingFlamingPhase> getPhase();
+    public void resetFlameCount();
+}
+//// DragonSittingScanningPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+public class DragonSittingScanningPhase extends AbstractDragonSittingPhase {
+    public DragonSittingScanningPhase(EnderDragon dragon);
+    public void doServerTick(ServerLevel level);
+    public void begin();
+    public EnderDragonPhase<DragonSittingScanningPhase> getPhase();
+}
+//// DragonStrafePlayerPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.phys.Vec3;
+public class DragonStrafePlayerPhase extends AbstractDragonPhaseInstance {
+    public DragonStrafePlayerPhase(EnderDragon dragon);
+    public void doServerTick(ServerLevel level);
+    public void begin();
+    public void setTarget(LivingEntity target);
+    public Vec3 getFlyTargetLocation();
+    public EnderDragonPhase<DragonStrafePlayerPhase> getPhase();
+}
+//// DragonTakeoffPhase.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.phys.Vec3;
+public class DragonTakeoffPhase extends AbstractDragonPhaseInstance {
+    public DragonTakeoffPhase(EnderDragon dragon);
+    public void doServerTick(ServerLevel level);
+    public void begin();
+    public Vec3 getFlyTargetLocation();
+    public EnderDragonPhase<DragonTakeoffPhase> getPhase();
+}
+//// EnderDragonPhase.java
+import java.lang.reflect.Constructor;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+public class EnderDragonPhase<T extends DragonPhaseInstance> {
+    public static final EnderDragonPhase<DragonHoldingPatternPhase> HOLDING_PATTERN;
+    public static final EnderDragonPhase<DragonStrafePlayerPhase> STRAFE_PLAYER;
+    public static final EnderDragonPhase<DragonLandingApproachPhase> LANDING_APPROACH;
+    public static final EnderDragonPhase<DragonLandingPhase> LANDING;
+    public static final EnderDragonPhase<DragonTakeoffPhase> TAKEOFF;
+    public static final EnderDragonPhase<DragonSittingFlamingPhase> SITTING_FLAMING;
+    public static final EnderDragonPhase<DragonSittingScanningPhase> SITTING_SCANNING;
+    public static final EnderDragonPhase<DragonSittingAttackingPhase> SITTING_ATTACKING;
+    public static final EnderDragonPhase<DragonChargePlayerPhase> CHARGING_PLAYER;
+    public static final EnderDragonPhase<DragonDeathPhase> DYING;
+    public static final EnderDragonPhase<DragonHoverPhase> HOVERING;
+    private EnderDragonPhase(int id, Class<? extends DragonPhaseInstance> instanceClass, String name);
+    public DragonPhaseInstance createInstance(EnderDragon dragon);
+    protected Constructor<? extends DragonPhaseInstance> getConstructor() throws NoSuchMethodException;
+    public int getId();
+    public String toString();
+    public static EnderDragonPhase<?> getById(int id);
+    public static int getCount();
+}
+//// EnderDragonPhaseManager.java
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+public class EnderDragonPhaseManager {
+    public EnderDragonPhaseManager(EnderDragon dragon);
+    public void setPhase(EnderDragonPhase<?> target);
+    public DragonPhaseInstance getCurrentPhase();
+    public <T extends DragonPhaseInstance> T getPhase(EnderDragonPhase<T> phase);
+}

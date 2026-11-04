@@ -1,0 +1,372 @@
+//// Absolute.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Absolute(Holder<ContextFloatProvider> input) implements ContextFloatProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Absolute> MAP_CODEC;
+    public MapCodec<Absolute> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Average.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Average(HolderSet<ContextFloatProvider> inputs) implements ContextFloatProvider, AggregateProvider<ContextFloatProvider> {
+    public static final MapCodec<Average> MAP_CODEC;
+    public MapCodec<Average> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Ceiling.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Ceiling(Holder<ContextFloatProvider> input) implements ContextFloatProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Ceiling> MAP_CODEC;
+    public MapCodec<Ceiling> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// ConditionalValue.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.level.storage.loot.providers.number.ConditionalProvider;
+public record ConditionalValue(Holder<LootItemCondition> condition, Holder<ContextFloatProvider> onTrue, Holder<ContextFloatProvider> onFalse) implements ContextFloatProvider, ConditionalProvider<ContextFloatProvider> {
+    public static final MapCodec<ConditionalValue> MAP_CODEC;
+    public static final Codec<ConditionalValue> CODEC;
+    public float getFloatUnsafe(LootContext context);
+    public MapCodec<ConditionalValue> codec();
+}
+//// ConstantValue.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public record ConstantValue(float value) implements ContextFloatProvider {
+    public static final MapCodec<ConstantValue> MAP_CODEC;
+    public static final Codec<ConstantValue> INLINE_CODEC;
+    public MapCodec<ConstantValue> codec();
+    public void validate(ValidationContext context);
+    public float getFloatUnsafe(LootContext random);
+}
+//// ContextFloatProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.Validatable;
+public interface ContextFloatProvider extends Validatable {
+    float getFloatUnsafe(LootContext context) throws ArithmeticException;
+    default float getFloat(LootContext context);
+    default float getFloatOrThrow(LootContext context) throws ArithmeticException;
+    MapCodec<? extends ContextFloatProvider> codec();
+    static float intToFloatSafe(int value);
+}
+//// ContextFloatProviderTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class ContextFloatProviderTypes {
+    public static MapCodec<? extends ContextFloatProvider> bootstrap(Registry<MapCodec<? extends ContextFloatProvider>> registry);
+}
+//// ContextFloatProviders.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+public class ContextFloatProviders {
+    public static final Codec<ContextFloatProvider> DIRECT_CODEC;
+    public static final Codec<Holder<ContextFloatProvider>> CODEC;
+    public static final Codec<HolderSet<ContextFloatProvider>> LIST_CODEC;
+    public static final ResourceKey<ContextFloatProvider> COOKING_DEFAULT_SPEED_MULTIPLIER;
+    public static final ResourceKey<ContextFloatProvider> COOKING_NORMAL_SPEED_MULTIPLIER;
+    public static final ResourceKey<ContextFloatProvider> COOKING_FAST_SPEED_MULTIPLIER;
+    public static final ResourceKey<ContextFloatProvider> BREWING_DEFAULT_SPEED_MULTIPLIER;
+    public static void bootstrap(BootstrapContext<ContextFloatProvider> context);
+    public static Holder<ContextFloatProvider> abs(Holder<ContextFloatProvider> input);
+    public static Holder<ContextFloatProvider> avg(Holder<ContextFloatProvider>... inputs);
+    public static Holder<ContextFloatProvider> ceiling(Holder<ContextFloatProvider> input);
+    public static Holder<ContextFloatProvider> exactly(float value);
+    public static Holder<ContextFloatProvider> cos(Holder<ContextFloatProvider> input);
+    public static Holder<ContextFloatProvider> sub(Holder<ContextFloatProvider> left, Holder<ContextFloatProvider> right);
+    public static Holder<ContextFloatProvider> forEnchantmentLevel(LevelBasedValue amount);
+    public static Holder<ContextFloatProvider> forEnvironmentAttribute(EnvironmentAttribute<?> attribute);
+    public static Holder<ContextFloatProvider> length(Holder<ContextFloatProvider>... inputs);
+    public static Holder<ContextFloatProvider> max(Holder<ContextFloatProvider>... inputs);
+    public static Holder<ContextFloatProvider> min(Holder<ContextFloatProvider>... inputs);
+    public static Holder<ContextFloatProvider> mod(Holder<ContextFloatProvider> left, Holder<ContextFloatProvider> right);
+    public static Holder<ContextFloatProvider> negate(Holder<ContextFloatProvider> input);
+    public static Holder<ContextFloatProvider> pow(Holder<ContextFloatProvider> base, Holder<ContextFloatProvider> exponent);
+    public static Holder<ContextFloatProvider> mul(Holder<ContextFloatProvider>... inputs);
+    public static Holder<ContextFloatProvider> div(Holder<ContextFloatProvider> left, Holder<ContextFloatProvider> right);
+    public static Holder<ContextFloatProvider> round(Holder<ContextFloatProvider> input);
+    public static Holder<ContextFloatProvider> sin(Holder<ContextFloatProvider> input);
+    public static Holder<ContextFloatProvider> sqrt(Holder<ContextFloatProvider> input);
+    public static Holder<ContextFloatProvider> add(Holder<ContextFloatProvider>... inputs);
+    public static Holder<ContextFloatProvider> trunc(Holder<ContextFloatProvider> input);
+    public static Holder<ContextFloatProvider> between(float min, float max);
+}
+//// Cosine.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Cosine(Holder<ContextFloatProvider> input) implements ContextFloatProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Cosine> MAP_CODEC;
+    public MapCodec<Cosine> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Difference.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.BinaryProvider;
+public record Difference(Holder<ContextFloatProvider> left, Holder<ContextFloatProvider> right) implements ContextFloatProvider, BinaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Difference> MAP_CODEC;
+    public MapCodec<Difference> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// EnchantmentLevelProvider.java
+import com.mojang.serialization.MapCodec;
+import java.util.Set;
+import net.minecraft.util.context.ContextKey;
+import net.minecraft.world.item.enchantment.LevelBasedValue;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.LootContextUser;
+public record EnchantmentLevelProvider(LevelBasedValue amount) implements ContextFloatProvider, LootContextUser {
+    public static final MapCodec<EnchantmentLevelProvider> MAP_CODEC;
+    public MapCodec<EnchantmentLevelProvider> codec();
+    public Set<ContextKey<?>> getReferencedContextParams();
+    public float getFloatUnsafe(LootContext context);
+}
+//// EnvironmentAttributeValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.EnvironmentAttributeProvider;
+public record EnvironmentAttributeValue(EnvironmentAttribute<?> attribute) implements ContextFloatProvider, EnvironmentAttributeProvider {
+    public static final MapCodec<EnvironmentAttributeValue> MAP_CODEC;
+    public MapCodec<EnvironmentAttributeValue> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Floor.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Floor(Holder<ContextFloatProvider> input) implements ContextFloatProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Floor> MAP_CODEC;
+    public MapCodec<Floor> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// FromInt.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
+public record FromInt(Holder<ContextIntProvider> input) implements ContextFloatProvider, UnaryProvider<ContextIntProvider> {
+    public static final MapCodec<FromInt> MAP_CODEC;
+    public MapCodec<FromInt> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Length.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Length(HolderSet<ContextFloatProvider> inputs) implements ContextFloatProvider, AggregateProvider<ContextFloatProvider> {
+    public static final MapCodec<Length> MAP_CODEC;
+    public MapCodec<Length> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Maximum.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Maximum(HolderSet<ContextFloatProvider> inputs) implements ContextFloatProvider, AggregateProvider<ContextFloatProvider> {
+    public static final MapCodec<Maximum> MAP_CODEC;
+    public MapCodec<Maximum> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Minimum.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Minimum(HolderSet<ContextFloatProvider> inputs) implements ContextFloatProvider, AggregateProvider<ContextFloatProvider> {
+    public static final MapCodec<Minimum> MAP_CODEC;
+    public MapCodec<Minimum> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Modulus.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.BinaryProvider;
+public record Modulus(Holder<ContextFloatProvider> left, Holder<ContextFloatProvider> right) implements ContextFloatProvider, BinaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Modulus> MAP_CODEC;
+    public MapCodec<Modulus> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Negate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Negate(Holder<ContextFloatProvider> input) implements ContextFloatProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Negate> MAP_CODEC;
+    public MapCodec<Negate> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// NumberDispatcher.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.DispatcherProvider;
+public record NumberDispatcher(List<DispatcherProvider.Case<ContextFloatProvider>> cases, Holder<ContextFloatProvider> defaultValue) implements ContextFloatProvider, DispatcherProvider<ContextFloatProvider> {
+    public static final MapCodec<NumberDispatcher> MAP_CODEC;
+    public float getFloatUnsafe(LootContext context);
+    public MapCodec<NumberDispatcher> codec();
+}
+//// Power.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.PowerProvider;
+public record Power(Holder<ContextFloatProvider> base, Holder<ContextFloatProvider> exponent) implements ContextFloatProvider, PowerProvider<ContextFloatProvider> {
+    public static final MapCodec<Power> MAP_CODEC;
+    public MapCodec<Power> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Product.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Product(HolderSet<ContextFloatProvider> inputs) implements ContextFloatProvider, AggregateProvider<ContextFloatProvider> {
+    public static final MapCodec<Product> MAP_CODEC;
+    public MapCodec<Product> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Quotient.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.BinaryProvider;
+public record Quotient(Holder<ContextFloatProvider> left, Holder<ContextFloatProvider> right) implements ContextFloatProvider, BinaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Quotient> MAP_CODEC;
+    public MapCodec<Quotient> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// ResolvableFloat.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.Function;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+public interface ResolvableFloat {
+    Codec<ResolvableFloat> CODEC;
+    StreamCodec<ByteBuf, ResolvableFloat> STREAM_CODEC;
+    float get(LootContext context, float defaultValue);
+    static ResolvableFloat fromKey(ResourceKey<ContextFloatProvider> key);
+    static <T> float getFromItem(ItemStack itemStack, DataComponentType<T> componentType, Function<T, ResolvableFloat> getter, LootContext context, float defaultValue);
+    public static record Constant(float value) implements ResolvableFloat {
+        public float get(LootContext context, float defaultValue);
+    }
+    public static record Reference(ResourceKey<ContextFloatProvider> key) implements ResolvableFloat {
+        public float get(LootContext context, float defaultValue);
+    }
+}
+//// Round.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Round(Holder<ContextFloatProvider> input) implements ContextFloatProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Round> MAP_CODEC;
+    public MapCodec<Round> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Sine.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Sine(Holder<ContextFloatProvider> input) implements ContextFloatProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Sine> MAP_CODEC;
+    public MapCodec<Sine> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// SquareRoot.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record SquareRoot(Holder<ContextFloatProvider> input) implements ContextFloatProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<SquareRoot> MAP_CODEC;
+    public MapCodec<SquareRoot> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// StorageValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.providers.number.StoredNumberAccess;
+public record StorageValue(StoredNumberAccess access, Holder<ContextFloatProvider> fallback) implements ContextFloatProvider {
+    public static final MapCodec<StorageValue> MAP_CODEC;
+    public float getFloatUnsafe(LootContext context);
+    public void validate(ValidationContext context);
+    public MapCodec<StorageValue> codec();
+}
+//// Sum.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Sum(HolderSet<ContextFloatProvider> inputs) implements ContextFloatProvider, AggregateProvider<ContextFloatProvider> {
+    public static final MapCodec<Sum> MAP_CODEC;
+    public MapCodec<Sum> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// Truncate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Truncate(Holder<ContextFloatProvider> input) implements ContextFloatProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<Truncate> MAP_CODEC;
+    public MapCodec<Truncate> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// UniformGenerator.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.RangeProvider;
+public record UniformGenerator(Holder<ContextFloatProvider> min, Holder<ContextFloatProvider> max) implements ContextFloatProvider, RangeProvider<ContextFloatProvider> {
+    public static final MapCodec<UniformGenerator> MAP_CODEC;
+    public MapCodec<UniformGenerator> codec();
+    public float getFloatUnsafe(LootContext context);
+}
+//// WeightedListValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.DistributionProvider;
+public record WeightedListValue(WeightedList<Holder<ContextFloatProvider>> distribution) implements ContextFloatProvider, DistributionProvider<ContextFloatProvider> {
+    public static final MapCodec<WeightedListValue> MAP_CODEC;
+    public float getFloatUnsafe(LootContext context);
+    public MapCodec<WeightedListValue> codec();
+}

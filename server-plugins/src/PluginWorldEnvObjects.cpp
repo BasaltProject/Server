@@ -3,6 +3,7 @@
 #include <basalt/wire/lua/LuaCall.hpp>
 
 #include <array>
+#include <bit>
 #include <cstdint>
 
 namespace basalt::server::plugins {
@@ -205,6 +206,37 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                     env->setWeatherTimes(times[0], times[1], times[2]);
                     return 0;
                 })
+        .method("random_sequence",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const std::string id = args.checkString(base);
+                    const std::string kind = args.isNil(base + 1) ? "long" : args.checkString(base + 1);
+                    static constexpr std::array<std::string_view, 9> kKinds{
+                        "int", "bound", "long", "bool", "float", "double", "gaussian", "reset", "clear"};
+                    std::int32_t operation = -1;
+                    for (std::size_t at = 0; at < kKinds.size(); ++at) {
+                        if (kKinds[at] == kind) {
+                            operation = static_cast<std::int32_t>(at);
+                        }
+                    }
+                    if (env == nullptr || operation < 0) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    const std::int64_t argument = args.isNumber(base + 2) ? args.toInteger(base + 2) : 0;
+                    const std::int64_t value = env->randomSequence(id, operation, argument);
+                    if (operation == 3) {
+                        args.pushBoolean(value != 0);
+                    } else if (operation == 4) {
+                        args.pushNumber(static_cast<double>(std::bit_cast<float>(static_cast<std::int32_t>(value))));
+                    } else if (operation == 5 || operation == 6) {
+                        args.pushNumber(std::bit_cast<double>(value));
+                    } else {
+                        args.pushInteger(value);
+                    }
+                    return 1;
+                })
         .method("inhabited_time",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);
@@ -287,8 +319,74 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                             args.setIndex(raider++);
                         }
                         args.setField("raiders");
+                        args.pushTable();
+                        for (const auto& [wave, leader] : raid.leaders) {
+                            args.pushInteger(leader);
+                            args.setIndex(wave);
+                        }
+                        args.setField("leaders");
                         args.setIndex(position++);
                     }
+                    return 1;
+                })
+        .method("raid_control",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    std::int32_t result = -1;
+                    if (env != nullptr) {
+                        const auto id = static_cast<std::int32_t>(args.integerOr(base, -1));
+                        const std::string action{args.checkString(base + 1)};
+                        const auto field = [&](const char* key) {
+                            return static_cast<std::int32_t>(
+                                args.isTable(base + 2) ? numberField(args, base + 2, key).value_or(0) : 0);
+                        };
+                        const std::array<std::int32_t, 4> arguments =
+                            action == "create"
+                                ? std::array<std::int32_t, 4>{field("player"), field("x"), field("y"), field("z")}
+                                : std::array<std::int32_t, 4>{field("wave"), field("entity"), 0, 0};
+                        result = env->raidControl(id, action, arguments, field("amplifier"));
+                    }
+                    if (result < 0) {
+                        args.pushNil();
+                    } else {
+                        args.pushInteger(result);
+                    }
+                    return 1;
+                })
+        .method("clock",
+                [world](LuaArgs& args) {
+                    PluginWorldEnv* env = world->env();
+                    const PluginClock clock = env == nullptr ? PluginClock{} : env->clock();
+                    args.pushTable();
+                    args.pushInteger(clock.totalTicks);
+                    args.setField("ticks");
+                    args.pushNumber(static_cast<double>(clock.rate));
+                    args.setField("rate");
+                    args.pushBoolean(clock.paused);
+                    args.setField("paused");
+                    args.pushTable();
+                    for (const auto& [name, ticks] : clock.markers) {
+                        args.pushInteger(ticks);
+                        args.setField(name);
+                    }
+                    args.setField("markers");
+                    return 1;
+                })
+        .method("set_clock_rate",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    args.pushBoolean(env != nullptr && env->setClockRate(static_cast<float>(args.checkNumber(base))));
+                    return 1;
+                })
+        .method("move_to_time_marker",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    constexpr std::array<std::string_view, 3> kResults{"none", "not_moved", "moved"};
+                    const std::int32_t moved = env == nullptr ? 0 : env->moveToTimeMarker(args.checkString(base));
+                    args.pushString(std::string{kResults[static_cast<std::size_t>(moved)]});
                     return 1;
                 })
         .method("set_raid",
@@ -503,6 +601,54 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                         args.pushInteger(block.after);
                         args.setField("after");
                         args.setIndex(position++);
+                    }
+                    return 1;
+                })
+        .method("place_feature",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const std::string feature = args.checkString(base);
+                    const std::int64_t seed = args.isNil(base + 4) ? 0 : args.checkInteger(base + 4);
+                    const auto placed =
+                        env == nullptr
+                            ? std::nullopt
+                            : env->placeFeature(feature, static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 2)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 3)), seed,
+                                                args.isNil(base + 5) || args.toBoolean(base + 5));
+                    if (!placed.has_value()) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    args.pushTable();
+                    std::int64_t position = 1;
+                    for (const PluginPlacedBlock& block : *placed) {
+                        args.pushTable();
+                        args.pushInteger(block.x);
+                        args.setField("x");
+                        args.pushInteger(block.y);
+                        args.setField("y");
+                        args.pushInteger(block.z);
+                        args.setField("z");
+                        args.pushInteger(block.before);
+                        args.setField("before");
+                        args.pushInteger(block.after);
+                        args.setField("after");
+                        args.setIndex(position++);
+                    }
+                    return 1;
+                })
+        .method("feature_ids",
+                [world](LuaArgs& args) {
+                    PluginWorldEnv* env = world->env();
+                    args.pushTable();
+                    std::int64_t position = 1;
+                    if (env != nullptr) {
+                        for (const std::string& id : env->featureIds()) {
+                            args.pushString(id);
+                            args.setIndex(position++);
+                        }
                     }
                     return 1;
                 })

@@ -1,0 +1,39 @@
+//// RegistriesDatapackGenerator.java
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+import net.minecraft.resources.RegistryDataLoader;
+public class RegistriesDatapackGenerator implements DataProvider {
+    public RegistriesDatapackGenerator(PackOutput output, String name, Collection<RegistryDataLoader.RegistryData<?>> registryData, CompletableFuture<HolderLookup.Provider> registryContents);
+    public static RegistriesDatapackGenerator forWorldLayer(PackOutput output, CompletableFuture<HolderLookup.Provider> registryContents);
+    public static DataProvider forReloadableLayer(PackOutput output, CompletableFuture<HolderLookup.Provider> registryContents);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public final String getName();
+}
+//// RegistryPatchGenerator.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistrySetBuilder;
+public class RegistryPatchGenerator {
+    public static CompletableFuture<RegistrySetBuilder.PatchedRegistries> createWorldLookup(CompletableFuture<HolderLookup.Provider> vanilla, RegistrySetBuilder packBuilder);
+    public static CompletableFuture<RegistrySetBuilder.PatchedRegistries> createReloadableLookup(CompletableFuture<HolderLookup.Provider> contextFuture, CompletableFuture<HolderLookup.Provider> vanillaFuture, RegistrySetBuilder packBuilder);
+}
+//// TradeRebalanceRegistries.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistrySetBuilder;
+public class TradeRebalanceRegistries {
+    public static CompletableFuture<RegistrySetBuilder.PatchedRegistries> createPatchedWorldRegistries(CompletableFuture<HolderLookup.Provider> vanillaWorld);
+    public static CompletableFuture<RegistrySetBuilder.PatchedRegistries> createPatchedReloadable(CompletableFuture<HolderLookup.Provider> context, CompletableFuture<HolderLookup.Provider> vanilla);
+}
+//// VanillaRegistries.java
+import net.minecraft.core.HolderLookup;
+public class VanillaRegistries {
+    public static void validateThatAllBiomeFeaturesHaveBiomeFilter(HolderLookup.Provider registries);
+    public static void validateLootData(HolderLookup.Provider newRegistries);
+    public static HolderLookup.Provider createWorldLookup();
+    public static HolderLookup.Provider createReloadableLookup(HolderLookup.Provider context);
+}

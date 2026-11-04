@@ -1,0 +1,187 @@
+//// CopyOnWriteFSPath.java
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import net.minecraft.util.filefix.virtualfilesystem.exception.CowFSNoSuchFileException;
+public class CopyOnWriteFSPath implements Path {
+    private CopyOnWriteFSPath(Path path, CopyOnWriteFileSystem fs, boolean isAbsolute);
+    protected static CopyOnWriteFSPath of(CopyOnWriteFileSystem fs, String first, String... more);
+    public CopyOnWriteFileSystem getFileSystem();
+    public boolean isAbsolute();
+    public Path getRoot();
+    public CopyOnWriteFSPath getFileName();
+    public CopyOnWriteFSPath getParent();
+    public int getNameCount();
+    public Path getName(int index);
+    public Path subpath(int beginIndex, int endIndex);
+    public boolean startsWith(Path other);
+    public boolean endsWith(Path other);
+    public CopyOnWriteFSPath normalize();
+    public CopyOnWriteFSPath resolve(Path other);
+    public CopyOnWriteFSPath resolve(String other);
+    public CopyOnWriteFSPath resolve(String first, String... more);
+    public CopyOnWriteFSPath relativize(Path other);
+    public URI toUri();
+    public CopyOnWriteFSPath toAbsolutePath();
+    public CopyOnWriteFSPath toRealPath(LinkOption... options) throws CowFSNoSuchFileException;
+    public WatchKey register(WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers) throws IOException;
+    public int compareTo(Path other);
+    public String toString();
+    public boolean equals(Object o);
+    public int hashCode();
+    protected boolean isRoot();
+    protected static CopyOnWriteFSPath asCow(Path other);
+}
+//// CopyOnWriteFSProvider.java
+import java.io.IOException;
+import java.net.URI;
+import java.nio.channels.FileChannel;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.AccessMode;
+import java.nio.file.CopyOption;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileStore;
+import java.nio.file.FileSystem;
+import java.nio.file.LinkOption;
+import java.nio.file.OpenOption;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.FileAttributeView;
+import java.nio.file.spi.FileSystemProvider;
+import java.util.Map;
+import java.util.Set;
+import net.minecraft.util.filefix.virtualfilesystem.exception.CowFSNoSuchFileException;
+public class CopyOnWriteFSProvider extends FileSystemProvider {
+    public static final String SCHEME = "x-mc-copy-on-write";
+    public CopyOnWriteFSProvider(CopyOnWriteFileSystem fileSystem);
+    public String getScheme();
+    public FileSystem newFileSystem(URI uri, Map<String, ?> env) throws IOException;
+    public FileSystem getFileSystem(URI uri);
+    public Path getPath(URI uri);
+    public SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs) throws IOException;
+    public FileChannel newFileChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs) throws IOException;
+    public DirectoryStream<Path> newDirectoryStream(Path dir, DirectoryStream.Filter<? super Path> filter) throws IOException;
+    public void createDirectory(Path dir, FileAttribute<?>... attrs) throws IOException;
+    public void delete(Path path) throws IOException;
+    public void copy(Path source, Path target, CopyOption... options) throws IOException;
+    public void move(Path source, Path target, CopyOption... options) throws IOException;
+    public boolean isSameFile(Path path, Path path2);
+    public boolean isHidden(Path path);
+    public FileStore getFileStore(Path path);
+    public void checkAccess(Path path, AccessMode... modes) throws IOException;
+    public <V extends FileAttributeView> V getFileAttributeView(Path path, Class<V> type, LinkOption... options);
+    public <A extends BasicFileAttributes> A readAttributes(Path path, Class<A> type, LinkOption... options) throws IOException;
+    public Map<String, Object> readAttributes(Path path, String attributes, LinkOption... options);
+    public void setAttribute(Path path, String attribute, Object value, LinkOption... options);
+    public CopyOnWriteFSPath getRealPath(CopyOnWriteFSPath path) throws CowFSNoSuchFileException;
+    interface ChannelFactory<C> {
+        C newChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs) throws IOException;
+    }
+}
+//// CopyOnWriteFileStore.java
+import java.io.IOException;
+import java.nio.file.FileStore;
+import java.nio.file.attribute.FileAttributeView;
+import java.nio.file.attribute.FileStoreAttributeView;
+public class CopyOnWriteFileStore extends FileStore {
+    public CopyOnWriteFileStore(String name, CopyOnWriteFileSystem fs);
+    public String name();
+    public String type();
+    public boolean isReadOnly();
+    public long getTotalSpace() throws IOException;
+    public long getUsableSpace() throws IOException;
+    public long getUnallocatedSpace() throws IOException;
+    public boolean supportsFileAttributeView(Class<? extends FileAttributeView> type);
+    public boolean supportsFileAttributeView(String name);
+    public <V extends FileStoreAttributeView> V getFileStoreAttributeView(Class<V> type);
+    public Object getAttribute(String attribute) throws IOException;
+}
+//// CopyOnWriteFileSystem.java
+import java.io.IOException;
+import java.nio.file.CopyOption;
+import java.nio.file.FileStore;
+import java.nio.file.FileSystem;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
+import java.nio.file.WatchService;
+import java.nio.file.attribute.UserPrincipalLookupService;
+import java.util.List;
+import java.util.Set;
+public class CopyOnWriteFileSystem extends FileSystem {
+    private CopyOnWriteFileSystem(String name, Path baseDirectory, Path tmpDirectory, PathMatcher skippedPaths) throws IOException;
+    public static CopyOnWriteFileSystem create(String name, Path baseDirectory, Path tmpDirectory, PathMatcher skippedPaths) throws IOException;
+    protected void resetFileTreeToBaseFolderContent() throws IOException;
+    public CopyOnWriteFSProvider provider();
+    public void close() throws IOException;
+    public boolean isOpen();
+    public boolean isReadOnly();
+    public String getSeparator();
+    public Iterable<Path> getRootDirectories();
+    public Iterable<FileStore> getFileStores();
+    public Set<String> supportedFileAttributeViews();
+    public CopyOnWriteFSPath getPath(String first, String... more);
+    public PathMatcher getPathMatcher(String syntaxAndPattern);
+    public UserPrincipalLookupService getUserPrincipalLookupService();
+    public WatchService newWatchService();
+    public CopyOnWriteFileStore store();
+    public CopyOnWriteFSPath rootPath();
+    DirectoryNode fileTree();
+    public Path baseDirectory();
+    public Path tmpDirectory();
+    Path createTemporaryFilePath();
+    public FileSystem backingFileSystem();
+    public Moves collectMoveOperations(Path outPath);
+    public static void createDirectories(List<Path> directories) throws IOException;
+    public static void hardLinkFiles(List<FileMove> moves) throws IOException;
+    public static void moveFiles(List<FileMove> moves) throws IOException;
+    public static void moveFilesWithRetry(List<FileMove> moves, CopyOption... options) throws IOException;
+    public static List<FileMove> tryRevertMoves(List<FileMove> moves, CopyOption... options);
+    public static record Moves(List<Path> directories, List<FileMove> copiedFiles, List<FileMove> preexistingFiles) {
+    }
+}
+//// DirectoryNode.java
+import java.util.Collection;
+import net.minecraft.util.filefix.virtualfilesystem.exception.CowFSNoSuchFileException;
+import net.minecraft.util.filefix.virtualfilesystem.exception.CowFSNotDirectoryException;
+final class DirectoryNode extends Node {
+    public DirectoryNode(CopyOnWriteFSPath path);
+    public Collection<Node> children();
+    public void addChild(Node child);
+    void removeChild(String name);
+    public Node getChild(String name);
+    public DirectoryNode directoryByPath(CopyOnWriteFSPath path) throws CowFSNoSuchFileException, CowFSNotDirectoryException;
+    public FileNode fileByPath(CopyOnWriteFSPath path) throws CowFSNoSuchFileException;
+    public Node byPath(CopyOnWriteFSPath path) throws CowFSNoSuchFileException;
+    public Node byPathOrNull(CopyOnWriteFSPath path);
+}
+//// FileMove.java
+import com.mojang.serialization.Codec;
+import java.nio.file.Path;
+public record FileMove(Path from, Path to) {
+    public static Codec<FileMove> moveCodec(Path fromDirectory, Path toDirectory);
+}
+//// FileNode.java
+import java.io.IOException;
+import java.nio.file.Path;
+final class FileNode extends Node {
+    boolean isCopy;
+    FileNode(CopyOnWriteFSPath path, Path storagePath, boolean isCopy);
+    public void ensureCopy() throws IOException;
+    public void deleteCopy() throws IOException;
+    public Path storagePath();
+}
+//// Node.java
+abstract class Node {
+    protected DirectoryNode parent;
+    protected CopyOnWriteFSPath path;
+    protected Node(CopyOnWriteFSPath cowPath);
+    public String name();
+    protected void setParent(DirectoryNode parent);
+    protected void setPath(CopyOnWriteFSPath path);
+    public CopyOnWriteFSPath path();
+}

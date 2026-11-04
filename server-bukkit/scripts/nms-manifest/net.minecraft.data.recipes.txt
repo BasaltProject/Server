@@ -1,0 +1,359 @@
+//// BrewingProvider.java
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.alchemy.Potion;
+public abstract class BrewingProvider {
+    protected BrewingProvider(RecipeOutput output);
+    protected void addContainerTransformation(Item container, Item reagent, Item output);
+    protected void addContainer(Item container);
+    protected void buildMix(Holder<Potion> input, Item reagent, Holder<Potion> output);
+    protected void buildStartMix(Item reagent, Holder<Potion> output);
+    protected void buildTransformations();
+    protected void save(BrewingRecipeBuilder builder);
+    public final void buildRecipes();
+    protected abstract void addContainers();
+    protected abstract void addContainerTransformations();
+    protected abstract void buildMixes();
+    static record ContainerTransformation(Item container, Item reagent, Item output) {
+    }
+}
+//// BrewingRecipeBuilder.java
+import java.util.Optional;
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.predicates.PotionsPredicate;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.alchemy.Potion;
+import net.minecraft.world.item.crafting.PotionIngredient;
+import net.minecraft.world.item.crafting.Recipe;
+public class BrewingRecipeBuilder implements RecipeBuilder {
+    private BrewingRecipeBuilder(PotionIngredient input, PotionIngredient reagent, ItemStackTemplate output);
+    public static BrewingRecipeBuilder brewingMix(Item container, Holder<Potion> inputPotion, Item reagentItem, Holder<Potion> outputPotion);
+    public static BrewingRecipeBuilder brewingContainerTransform(Item inputContainer, Holder<Potion> inputPotion, Item reagentItem, Item outputContainer);
+    public RecipeBuilder unlockedBy(String name, Criterion<?> criterion);
+    public BrewingRecipeBuilder group(String group);
+    public static Optional<Holder<Potion>> getExactPotion(PotionsPredicate predicate);
+    public ResourceKey<Recipe<?>> defaultId();
+    public void save(RecipeOutput recipeOutput, ResourceKey<Recipe<?>> id);
+}
+//// CustomCraftingRecipeBuilder.java
+import java.util.function.BiFunction;
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.crafting.CraftingRecipe;
+import net.minecraft.world.item.crafting.Recipe;
+public class CustomCraftingRecipeBuilder {
+    public CustomCraftingRecipeBuilder(RecipeCategory category, Factory factory);
+    public static CustomCraftingRecipeBuilder customCrafting(RecipeCategory category, Factory factory);
+    public CustomCraftingRecipeBuilder unlockedBy(String name, Criterion<?> criterion);
+    public CustomCraftingRecipeBuilder group(String group);
+    public void save(RecipeOutput output, String name);
+    public void save(RecipeOutput output, ResourceKey<Recipe<?>> id);
+    public interface Factory extends BiFunction<Recipe.CommonInfo, CraftingRecipe.CraftingBookInfo, Recipe<?>> {
+    }
+}
+//// RecipeBuilder.java
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.ItemInstance;
+import net.minecraft.world.item.crafting.CraftingBookCategory;
+import net.minecraft.world.item.crafting.CraftingRecipe;
+import net.minecraft.world.item.crafting.Recipe;
+public interface RecipeBuilder {
+    Identifier ROOT_RECIPE_ADVANCEMENT;
+    RecipeBuilder unlockedBy(String name, Criterion<?> criterion);
+    RecipeBuilder group(String group);
+    ResourceKey<Recipe<?>> defaultId();
+    void save(RecipeOutput output, ResourceKey<Recipe<?>> location);
+    default void save(RecipeOutput output);
+    default void save(RecipeOutput output, String id);
+    static CraftingBookCategory determineCraftingBookCategory(RecipeCategory category);
+    static Recipe.CommonInfo createCraftingCommonInfo(boolean showNotification);
+    static CraftingRecipe.CraftingBookInfo createCraftingBookInfo(RecipeCategory category, String group);
+    static ResourceKey<Recipe<?>> getDefaultRecipeId(ItemInstance result);
+}
+//// RecipeCategory.java
+public enum RecipeCategory {
+    BUILDING_BLOCKS, DECORATIONS, REDSTONE, TRANSPORTATION, TOOLS, COMBAT, FOOD, BREWING, MISC;
+    public String getFolderName();
+}
+//// RecipeOutput.java
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.data.worldgen.BootstrapContextAccess;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.crafting.Recipe;
+public interface RecipeOutput extends BootstrapContextAccess {
+    void accept(ResourceKey<Recipe<?>> id, Recipe<?> recipe, AdvancementHolder advancement);
+    Advancement.Builder advancement();
+}
+//// RecipeProvider.java
+import java.util.List;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.triggers.BredAnimalsTrigger;
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.advancements.triggers.InventoryChangeTrigger;
+import net.minecraft.data.BlockFamily;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.AbstractCookingRecipe;
+import net.minecraft.world.item.crafting.CookingBookCategory;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.equipment.trim.TrimPattern;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SuspiciousEffectHolder;
+public abstract class RecipeProvider {
+    protected final RecipeOutput output;
+    protected final BootstrapContext<Advancement> advancementOutput;
+    protected RecipeProvider(BootstrapContext<Recipe<?>> recipeOutput, BootstrapContext<Advancement> advancementOutput);
+    protected abstract void buildRecipes();
+    protected void generateForEnabledBlockFamilies(FeatureFlagSet flagSet);
+    protected void oneToOneConversionRecipe(ItemLike product, ItemLike resource, String group);
+    protected void oneToOneConversionRecipe(ItemLike product, ItemLike resource, String group, int productCount);
+    protected void oreSmelting(List<ItemLike> smeltables, RecipeCategory craftingCategory, CookingBookCategory cookingCategory, ItemLike result, float experience, int cookingTime, String group);
+    protected void oreBlasting(List<ItemLike> smeltables, RecipeCategory craftingCategory, CookingBookCategory cookingCategory, ItemLike result, float experience, int cookingTime, String group);
+    protected void netheriteSmithing(Item base, RecipeCategory category, Item result);
+    protected void trimSmithing(Item trimTemplate, ResourceKey<TrimPattern> patternId, ResourceKey<Recipe<?>> id);
+    protected void twoByTwoPacker(RecipeCategory category, ItemLike result, ItemLike ingredient);
+    protected void threeByThreePacker(RecipeCategory category, ItemLike result, ItemLike ingredient, String unlockedBy);
+    protected void threeByThreePacker(RecipeCategory category, ItemLike result, ItemLike ingredient);
+    protected void planksFromLog(ItemLike result, TagKey<Item> logs, int count);
+    protected void planksFromLogs(ItemLike result, TagKey<Item> logs, int count);
+    protected void woodFromLogs(ItemLike result, ItemLike log);
+    protected void woodenBoat(ItemLike result, ItemLike planks);
+    protected void chestBoat(ItemLike chestBoat, ItemLike boat);
+    protected RecipeBuilder doorBuilder(ItemLike result, Ingredient base);
+    protected void pressurePlate(ItemLike result, ItemLike base);
+    protected void slab(RecipeCategory category, ItemLike result, ItemLike base);
+    protected void shelf(ItemLike result, ItemLike strippedLogs);
+    protected RecipeBuilder slabBuilder(RecipeCategory category, ItemLike result, Ingredient base);
+    protected RecipeBuilder stairBuilder(ItemLike result, Ingredient base);
+    protected RecipeBuilder trapdoorBuilder(ItemLike result, Ingredient base);
+    protected RecipeBuilder hangingSignBuilder(ItemLike result, Ingredient ingredient);
+    protected void colorItemWithDye(List<Item> dyes, List<Item> items, String groupName, RecipeCategory category);
+    protected void colorWithDye(List<Item> dyes, List<Item> dyedItems, Item uncoloredItem, String groupName, RecipeCategory category);
+    protected void carpet(ItemLike result, ItemLike sourceItem);
+    protected void bedFromPlanksAndWool(ItemLike result, ItemLike wool);
+    protected void banner(ItemLike result, ItemLike wool);
+    protected void stainedGlassFromGlassAndDye(ItemLike result, ItemLike dye);
+    protected void dryGhast(ItemLike result);
+    protected void harness(ItemLike result, ItemLike wool);
+    protected void stainedGlassPaneFromStainedGlass(ItemLike result, ItemLike stainedGlass);
+    protected void stainedGlassPaneFromGlassPaneAndDye(ItemLike result, ItemLike dye);
+    protected void coloredTerracottaFromTerracottaAndDye(ItemLike result, ItemLike dye);
+    protected void concretePowder(ItemLike result, ItemLike dye);
+    protected void candle(ItemLike result, ItemLike dye);
+    protected void wall(RecipeCategory category, ItemLike result, ItemLike base);
+    protected void polished(RecipeCategory category, ItemLike result, ItemLike base);
+    protected void cut(RecipeCategory category, ItemLike result, ItemLike base);
+    protected void chiseled(RecipeCategory category, ItemLike result, ItemLike base);
+    protected void mosaicBuilder(RecipeCategory category, ItemLike result, ItemLike base);
+    protected ShapedRecipeBuilder chiseledBuilder(RecipeCategory category, ItemLike result, Ingredient base);
+    protected ShapedRecipeBuilder carpetBuilder(RecipeCategory category, ItemLike result, Ingredient base);
+    protected void stonecutterResultFromBase(RecipeCategory category, ItemLike result, ItemLike base);
+    protected void stonecutterResultFromBase(RecipeCategory category, ItemLike result, ItemLike base, int count);
+    protected void nineBlockStorageRecipes(RecipeCategory unpackedFormCategory, ItemLike unpackedForm, RecipeCategory packedFormCategory, ItemLike packedForm);
+    protected void nineBlockStorageRecipesWithCustomPacking(RecipeCategory unpackedFormCategory, ItemLike unpackedForm, RecipeCategory packedFormCategory, ItemLike packedForm, String packingRecipeId, String packingRecipeGroup);
+    protected void nineBlockStorageRecipesRecipesWithCustomUnpacking(RecipeCategory unpackedFormCategory, ItemLike unpackedForm, RecipeCategory packedFormCategory, ItemLike packedForm, String unpackingRecipeId, String unpackingRecipeGroup);
+    protected void copySmithingTemplate(ItemLike smithingTemplate, ItemLike baseMaterial);
+    protected void copySmithingTemplate(ItemLike smithingTemplate, Ingredient baseMaterials);
+    protected <T extends AbstractCookingRecipe> void cookRecipes(String source, AbstractCookingRecipe.Factory<T> factory, int cookingTime);
+    protected void waxRecipes(FeatureFlagSet flagSet);
+    protected void grate(Block grateBlock, Block material);
+    protected void copperBulb(Block copperBulb, Block copperMaterial);
+    protected void waxedChiseled(Block result, Block material);
+    protected void suspiciousStew(Item item, SuspiciousEffectHolder effectHolder);
+    protected void dyedItem(Item target, String group);
+    protected void dyedShulkerBoxRecipe(Item dye, Item dyedResult);
+    protected void dyedBundleRecipe(Item dye, Item dyedResult);
+    protected void cushionRecipe(Item woolSlab, Item result);
+    protected void generateRecipes(BlockFamily family, FeatureFlagSet flagSet);
+    protected Criterion<BredAnimalsTrigger.TriggerInstance> bredAnimal();
+    protected Criterion<InventoryChangeTrigger.TriggerInstance> has(ItemLike item);
+    protected Criterion<InventoryChangeTrigger.TriggerInstance> has(TagKey<Item> tag);
+    protected static String getHasName(ItemLike baseBlock);
+    protected static String getItemName(ItemLike itemLike);
+    protected static String getSimpleRecipeName(ItemLike itemLike);
+    protected static String getConversionRecipeName(ItemLike product, ItemLike material);
+    protected static String getSmeltingRecipeName(ItemLike product);
+    protected static String getBlastingRecipeName(ItemLike product);
+    protected Ingredient tag(TagKey<Item> id);
+    protected ShapedRecipeBuilder shaped(RecipeCategory category, ItemLike item);
+    protected ShapedRecipeBuilder shaped(RecipeCategory category, ItemLike item, int count);
+    protected ShapelessRecipeBuilder shapeless(RecipeCategory category, ItemStackTemplate result);
+    protected ShapelessRecipeBuilder shapeless(RecipeCategory category, ItemLike item);
+    protected ShapelessRecipeBuilder shapeless(RecipeCategory category, ItemLike item, int count);
+    interface FamilyCraftingRecipeProvider {
+        RecipeBuilder create(RecipeProvider context, ItemLike result, ItemLike base);
+    }
+    interface FamilyStonecutterRecipeProvider {
+        void create(RecipeProvider context, ItemLike result, ItemLike base);
+    }
+}
+//// RecipeUnlockAdvancementBuilder.java
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.crafting.Recipe;
+public class RecipeUnlockAdvancementBuilder {
+    public void unlockedBy(String name, Criterion<?> criterion);
+    public AdvancementHolder build(RecipeOutput output, ResourceKey<Recipe<?>> id, RecipeCategory category);
+}
+//// ShapedRecipeBuilder.java
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.level.ItemLike;
+public class ShapedRecipeBuilder implements RecipeBuilder {
+    private ShapedRecipeBuilder(HolderGetter<Item> items, RecipeCategory category, ItemStackTemplate result);
+    private ShapedRecipeBuilder(HolderGetter<Item> items, RecipeCategory category, ItemLike result, int count);
+    public static ShapedRecipeBuilder shaped(HolderGetter<Item> items, RecipeCategory category, ItemLike item);
+    public static ShapedRecipeBuilder shaped(HolderGetter<Item> items, RecipeCategory category, ItemLike item, int count);
+    public ShapedRecipeBuilder define(Character symbol, TagKey<Item> tag);
+    public ShapedRecipeBuilder define(Character symbol, ItemLike item);
+    public ShapedRecipeBuilder define(Character symbol, Ingredient ingredient);
+    public ShapedRecipeBuilder pattern(String row);
+    public ShapedRecipeBuilder unlockedBy(String name, Criterion<?> criterion);
+    public ShapedRecipeBuilder group(String group);
+    public ShapedRecipeBuilder showNotification(boolean showNotification);
+    public ResourceKey<Recipe<?>> defaultId();
+    public void save(RecipeOutput output, ResourceKey<Recipe<?>> id);
+}
+//// ShapelessRecipeBuilder.java
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.level.ItemLike;
+public class ShapelessRecipeBuilder implements RecipeBuilder {
+    private ShapelessRecipeBuilder(HolderGetter<Item> items, RecipeCategory category, ItemStackTemplate result);
+    public static ShapelessRecipeBuilder shapeless(HolderGetter<Item> items, RecipeCategory category, ItemStackTemplate result);
+    public static ShapelessRecipeBuilder shapeless(HolderGetter<Item> items, RecipeCategory category, ItemLike item);
+    public static ShapelessRecipeBuilder shapeless(HolderGetter<Item> items, RecipeCategory category, ItemLike item, int count);
+    public ShapelessRecipeBuilder requires(TagKey<Item> tag);
+    public ShapelessRecipeBuilder requires(ItemLike item);
+    public ShapelessRecipeBuilder requires(ItemLike item, int count);
+    public ShapelessRecipeBuilder requires(Ingredient ingredient);
+    public ShapelessRecipeBuilder requires(Ingredient ingredient, int count);
+    public ShapelessRecipeBuilder unlockedBy(String name, Criterion<?> criterion);
+    public ShapelessRecipeBuilder group(String group);
+    public ResourceKey<Recipe<?>> defaultId();
+    public void save(RecipeOutput output, ResourceKey<Recipe<?>> id);
+}
+//// SimpleCookingRecipeBuilder.java
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.AbstractCookingRecipe;
+import net.minecraft.world.item.crafting.CookingBookCategory;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.level.ItemLike;
+public class SimpleCookingRecipeBuilder implements RecipeBuilder {
+    private SimpleCookingRecipeBuilder(RecipeCategory craftingCategory, CookingBookCategory cookingCategory, ItemStackTemplate result, Ingredient ingredient, float experience, int cookingTime, AbstractCookingRecipe.Factory<?> factory);
+    private SimpleCookingRecipeBuilder(RecipeCategory craftingCategory, CookingBookCategory cookingCategory, ItemLike result, Ingredient ingredient, float experience, int cookingTime, AbstractCookingRecipe.Factory<?> factory);
+    public static <T extends AbstractCookingRecipe> SimpleCookingRecipeBuilder generic(Ingredient ingredient, RecipeCategory craftingCategory, CookingBookCategory cookingCategory, ItemLike result, float experience, int cookingTime, AbstractCookingRecipe.Factory<T> factory);
+    public static SimpleCookingRecipeBuilder campfireCooking(Ingredient ingredient, RecipeCategory craftingCategory, ItemLike result, float experience, int cookingTime);
+    public static SimpleCookingRecipeBuilder blasting(Ingredient ingredient, RecipeCategory craftingCategory, CookingBookCategory cookingCategory, ItemLike result, float experience, int cookingTime);
+    public static SimpleCookingRecipeBuilder smelting(Ingredient ingredient, RecipeCategory craftingCategory, CookingBookCategory cookingCategory, ItemLike result, float experience, int cookingTime);
+    public static SimpleCookingRecipeBuilder smoking(Ingredient ingredient, RecipeCategory craftingCategory, ItemLike result, float experience, int cookingTime);
+    public SimpleCookingRecipeBuilder unlockedBy(String name, Criterion<?> criterion);
+    public SimpleCookingRecipeBuilder group(String group);
+    public ResourceKey<Recipe<?>> defaultId();
+    public void save(RecipeOutput output, ResourceKey<Recipe<?>> id);
+}
+//// SingleItemRecipeBuilder.java
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.SingleItemRecipe;
+import net.minecraft.world.level.ItemLike;
+public class SingleItemRecipeBuilder implements RecipeBuilder {
+    private SingleItemRecipeBuilder(RecipeCategory category, SingleItemRecipe.Factory<?> factory, Ingredient ingredient, ItemStackTemplate result);
+    public SingleItemRecipeBuilder(RecipeCategory category, SingleItemRecipe.Factory<?> factory, Ingredient ingredient, ItemLike result, int count);
+    public static SingleItemRecipeBuilder stonecutting(Ingredient ingredient, RecipeCategory category, ItemLike result, int count);
+    public SingleItemRecipeBuilder unlockedBy(String name, Criterion<?> criterion);
+    public SingleItemRecipeBuilder group(String group);
+    public ResourceKey<Recipe<?>> defaultId();
+    public void save(RecipeOutput output, ResourceKey<Recipe<?>> id);
+}
+//// SmithingTransformRecipeBuilder.java
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+public class SmithingTransformRecipeBuilder {
+    public SmithingTransformRecipeBuilder(Ingredient template, Ingredient base, Ingredient addition, RecipeCategory category, ItemStackTemplate result);
+    public static SmithingTransformRecipeBuilder smithing(Ingredient template, Ingredient base, Ingredient addition, RecipeCategory category, Item result);
+    public SmithingTransformRecipeBuilder unlocks(String name, Criterion<?> criterion);
+    public void save(RecipeOutput output, String id);
+    public void save(RecipeOutput output, ResourceKey<Recipe<?>> id);
+}
+//// SmithingTrimRecipeBuilder.java
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.equipment.trim.TrimPattern;
+public class SmithingTrimRecipeBuilder {
+    public SmithingTrimRecipeBuilder(RecipeCategory category, Ingredient template, Ingredient base, Ingredient addition, Holder<TrimPattern> pattern);
+    public static SmithingTrimRecipeBuilder smithingTrim(Ingredient template, Ingredient base, Ingredient addition, Holder<TrimPattern> pattern, RecipeCategory category);
+    public SmithingTrimRecipeBuilder unlocks(String name, Criterion<?> criterion);
+    public void save(RecipeOutput output, ResourceKey<Recipe<?>> id);
+}
+//// SpecialRecipeBuilder.java
+import java.util.function.Supplier;
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.crafting.Recipe;
+public class SpecialRecipeBuilder {
+    public SpecialRecipeBuilder(Supplier<Recipe<?>> factory);
+    public static SpecialRecipeBuilder special(Supplier<Recipe<?>> factory);
+    public SpecialRecipeBuilder unlockedBy(String name, Criterion<?> criterion);
+    public void save(RecipeOutput output, String name);
+    public void save(RecipeOutput output, ResourceKey<Recipe<?>> id);
+}
+//// TransmuteRecipeBuilder.java
+import net.minecraft.advancements.predicates.MinMaxBounds;
+import net.minecraft.advancements.triggers.Criterion;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.TransmuteResult;
+public class TransmuteRecipeBuilder implements RecipeBuilder {
+    private TransmuteRecipeBuilder(RecipeCategory category, TransmuteResult result, Ingredient input, Ingredient material);
+    public static TransmuteRecipeBuilder transmute(RecipeCategory category, Ingredient input, Ingredient material, Item result);
+    public static TransmuteRecipeBuilder transmute(RecipeCategory category, Ingredient input, Ingredient material, ItemStackTemplate result);
+    public static TransmuteRecipeBuilder transmute(RecipeCategory category, Ingredient input, Ingredient material, TransmuteResult result);
+    public TransmuteRecipeBuilder unlockedBy(String name, Criterion<?> criterion);
+    public TransmuteRecipeBuilder group(String group);
+    public TransmuteRecipeBuilder addMaterialCountToOutput();
+    public TransmuteRecipeBuilder setMaterialCount(MinMaxBounds.Ints materialCount);
+    public ResourceKey<Recipe<?>> defaultId();
+    public void save(RecipeOutput output, ResourceKey<Recipe<?>> id);
+}

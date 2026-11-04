@@ -1,7 +1,9 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.chunk;
 
 import java.util.function.Predicate;
 import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
 
 public class GlobalPalette<T> implements Palette<T> {
     private final IdMap<T> registry;
@@ -38,5 +40,14 @@ public class GlobalPalette<T> implements Palette<T> {
     @Override
     public Palette<T> copy() {
         return this;
+    }
+    public void read(FriendlyByteBuf buffer, IdMap<T> globalMap) {
+
+    }
+    public void write(FriendlyByteBuf buffer, IdMap<T> globalMap) {
+
+    }
+    public int getSerializedSize(IdMap<T> globalMap) {
+        return 0;
     }
 }

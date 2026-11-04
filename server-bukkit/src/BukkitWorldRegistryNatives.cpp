@@ -93,6 +93,17 @@ void JNICALL nativeSetSpawn(JNIEnv* env, jclass, jstring name, jint x, jint y, j
     }
 }
 
+jboolean JNICALL nativeDifficultyLocked(JNIEnv* env, jclass, jstring name) {
+    const auto world = worldOf(env, name);
+    return world != nullptr && world->difficultyLocked() ? JNI_TRUE : JNI_FALSE;
+}
+
+void JNICALL nativeSetDifficultyLocked(JNIEnv* env, jclass, jstring name, jboolean locked) {
+    if (const auto world = worldOf(env, name); world != nullptr) {
+        world->setDifficultyLocked(locked == JNI_TRUE);
+    }
+}
+
 jboolean JNICALL nativeSetDifficulty(JNIEnv* env, jclass, jstring name, jstring difficulty) {
     const auto world = worldOf(env, name);
     return world != nullptr && world->setDifficulty(toStd(env, difficulty)) ? JNI_TRUE : JNI_FALSE;
@@ -146,6 +157,9 @@ void registerWorldNativesRegistry(JNIEnv* env, jclass natives) {
         nativeMethod("setTime", "(Ljava/lang/String;J)V", reinterpret_cast<void*>(&nativeSetTime)),
         nativeMethod("setWeather", "(Ljava/lang/String;ZZ)V", reinterpret_cast<void*>(&nativeSetWeather)),
         nativeMethod("setSpawn", "(Ljava/lang/String;III)V", reinterpret_cast<void*>(&nativeSetSpawn)),
+        nativeMethod("difficultyLocked", "(Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeDifficultyLocked)),
+        nativeMethod("setDifficultyLocked", "(Ljava/lang/String;Z)V",
+                     reinterpret_cast<void*>(&nativeSetDifficultyLocked)),
         nativeMethod("setDifficulty", "(Ljava/lang/String;Ljava/lang/String;)Z",
                      reinterpret_cast<void*>(&nativeSetDifficulty)),
         nativeMethod("gameRule", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",

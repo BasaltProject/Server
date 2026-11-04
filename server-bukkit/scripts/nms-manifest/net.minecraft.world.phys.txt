@@ -1,0 +1,221 @@
+//// AABB.java
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
+public class AABB {
+    public final double minX;
+    public final double minY;
+    public final double minZ;
+    public final double maxX;
+    public final double maxY;
+    public final double maxZ;
+    public AABB(double minX, double minY, double minZ, double maxX, double maxY, double maxZ);
+    public AABB(BlockPos pos);
+    public AABB(Vec3 begin, Vec3 end);
+    public static AABB of(BoundingBox box);
+    public static AABB unitCubeFromLowerCorner(Vec3 pos);
+    public static AABB encapsulatingFullBlocks(BlockPos pos0, BlockPos pos1);
+    public AABB setMinX(double minX);
+    public AABB setMinY(double minY);
+    public AABB setMinZ(double minZ);
+    public AABB setMaxX(double maxX);
+    public AABB setMaxY(double maxY);
+    public AABB setMaxZ(double maxZ);
+    public double min(Direction.Axis axis);
+    public double max(Direction.Axis axis);
+    public boolean equals(Object o);
+    public int hashCode();
+    public AABB contract(double xa, double ya, double za);
+    public AABB expandTowards(Vec3 delta);
+    public AABB expandTowards(double xa, double ya, double za);
+    public AABB inflate(double xAdd, double yAdd, double zAdd);
+    public AABB inflate(double amountToAddInAllDirections);
+    public AABB intersect(AABB other);
+    public AABB minmax(AABB other);
+    public AABB move(double xa, double ya, double za);
+    public AABB move(BlockPos pos);
+    public AABB move(Vec3 pos);
+    public AABB move(Vector3f pos);
+    public boolean intersects(AABB aabb);
+    public boolean intersects(double minX, double minY, double minZ, double maxX, double maxY, double maxZ);
+    public boolean intersects(Vec3 min, Vec3 max);
+    public boolean intersects(BlockPos pos);
+    public boolean contains(Vec3 vec);
+    public boolean contains(double x, double y, double z);
+    public double getSize();
+    public double getXsize();
+    public double getYsize();
+    public double getZsize();
+    public AABB deflate(double xSubstract, double ySubtract, double zSubtract);
+    public AABB deflate(double amount);
+    public Optional<Vec3> clip(Vec3 from, Vec3 to);
+    public static Optional<Vec3> clip(double minX, double minY, double minZ, double maxX, double maxY, double maxZ, Vec3 from, Vec3 to);
+    public static BlockHitResult clip(Iterable<AABB> aabBs, Vec3 from, Vec3 to, BlockPos pos);
+    public boolean collidedAlongVector(Vec3 vector, List<AABB> aabbs);
+    public double distanceToSqr(Vec3 point);
+    public double distanceToSqr(AABB boundingBox);
+    public String toString();
+    public boolean hasNaN();
+    public Vec3 getCenter();
+    public Vec3 getBottomCenter();
+    public Vec3 getMinPosition();
+    public Vec3 getMaxPosition();
+    public static AABB ofSize(Vec3 center, double sizeX, double sizeY, double sizeZ);
+    public AABB nextDeflated();
+    public static class Builder {
+        public void include(Vector3fc v);
+        public boolean isDefined();
+        public AABB build();
+    }
+}
+//// BlockHitResult.java
+import io.netty.buffer.ByteBuf;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.codec.StreamCodec;
+public class BlockHitResult extends HitResult {
+    public static final StreamCodec<ByteBuf, BlockHitResult> STREAM_CODEC;
+    public static BlockHitResult miss(Vec3 location, Direction direction, BlockPos pos);
+    public BlockHitResult(Vec3 location, Direction direction, BlockPos pos, boolean inside);
+    public BlockHitResult(Vec3 location, Direction direction, BlockPos pos, boolean inside, boolean worldBorderHit);
+    private BlockHitResult(boolean miss, Vec3 location, Direction direction, BlockPos blockPos, boolean inside, boolean worldBorderHit);
+    public BlockHitResult withDirection(Direction direction);
+    public BlockHitResult withPosition(BlockPos blockPos);
+    public BlockHitResult hitBorder();
+    public BlockPos getBlockPos();
+    public Direction getDirection();
+    public HitResult.Type getType();
+    public boolean isInside();
+    public boolean isWorldBorderHit();
+}
+//// EntityHitResult.java
+import net.minecraft.world.entity.Entity;
+public class EntityHitResult extends HitResult {
+    public EntityHitResult(Entity entity);
+    public EntityHitResult(Entity entity, Vec3 location);
+    public Entity getEntity();
+    public HitResult.Type getType();
+}
+//// HitResult.java
+import net.minecraft.world.entity.Entity;
+public abstract class HitResult {
+    protected final Vec3 location;
+    protected HitResult(Vec3 location);
+    public double distanceTo(Entity entity);
+    public abstract Type getType();
+    public Vec3 getLocation();
+    public static enum Type {
+        MISS, BLOCK, ENTITY;
+    }
+}
+//// Vec2.java
+import com.mojang.serialization.Codec;
+public class Vec2 {
+    public static final Vec2 ZERO;
+    public static final Vec2 ONE;
+    public static final Vec2 UNIT_X;
+    public static final Vec2 NEG_UNIT_X;
+    public static final Vec2 UNIT_Y;
+    public static final Vec2 NEG_UNIT_Y;
+    public static final Vec2 MAX;
+    public static final Vec2 MIN;
+    public static final Codec<Vec2> CODEC;
+    public final float x;
+    public final float y;
+    public Vec2(float x, float y);
+    public Vec2 scale(float s);
+    public float dot(Vec2 v);
+    public Vec2 add(Vec2 rhs);
+    public Vec2 add(float v);
+    public boolean equals(Object rhs);
+    public int hashCode();
+    public Vec2 normalized();
+    public float length();
+    public float lengthSquared();
+    public float distanceToSqr(Vec2 p);
+    public Vec2 negated();
+    public Vec2 rotate(double angleRadians);
+}
+//// Vec3.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.EnumSet;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.core.Vec3i;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.RandomSource;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
+public class Vec3 implements Position {
+    public static final Codec<Vec3> CODEC;
+    public static final StreamCodec<ByteBuf, Vec3> STREAM_CODEC;
+    public static final StreamCodec<ByteBuf, Vec3> LP_STREAM_CODEC;
+    public static final Vec3 ZERO;
+    public static final Vec3 X_AXIS;
+    public static final Vec3 Y_AXIS;
+    public static final Vec3 Z_AXIS;
+    public final double x;
+    public final double y;
+    public final double z;
+    public static Vec3 atLowerCornerOf(Vec3i pos);
+    public static Vec3 atLowerCornerWithOffset(Vec3i pos, double x, double y, double z);
+    public static Vec3 atCenterOf(Vec3i pos);
+    public static Vec3 atCenterOfWithY(Vec3i pos, double y);
+    public static Vec3 atBottomCenterOf(Vec3i pos);
+    public static Vec3 upFromBottomCenterOf(Vec3i pos, double yOffset);
+    public Vec3(double x, double y, double z);
+    public Vec3(Vector3fc vec);
+    public Vec3(Vec3i vec);
+    public Vec3 vectorTo(Vec3 vec);
+    public Vec3 normalize();
+    public double dot(Vec3 vec);
+    public Vec3 cross(Vec3 vec);
+    public Vec3 subtract(Vec3 vec);
+    public Vec3 subtract(double value);
+    public Vec3 subtract(double x, double y, double z);
+    public Vec3 add(double value);
+    public Vec3 add(Vec3 vec);
+    public Vec3 add(double x, double y, double z);
+    public boolean closerThan(Position pos, double distance);
+    public double distanceTo(Vec3 vec);
+    public double distanceToSqr(Vec3 vec);
+    public double distanceToSqr(double x, double y, double z);
+    public boolean closerThan(Vec3 vec, double distanceXZ, double distanceY);
+    public Vec3 scale(double scale);
+    public Vec3 reverse();
+    public Vec3 multiply(Vec3 scale);
+    public Vec3 multiply(double xScale, double yScale, double zScale);
+    public Vec3 horizontal();
+    public Vec3 offsetRandom(RandomSource random, float offset);
+    public Vec3 offsetRandomXZ(RandomSource random, float offset);
+    public double length();
+    public double lengthSqr();
+    public double horizontalDistance();
+    public double horizontalDistanceSqr();
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+    public Vec3 lerp(Vec3 vec, double a);
+    public Vec3 xRot(float radians);
+    public Vec3 yRot(float radians);
+    public Vec3 zRot(float radians);
+    public Vec3 rotateClockwise90();
+    public static Vec3 directionFromRotation(Vec2 rotation);
+    public static Vec3 directionFromRotation(float rotX, float rotY);
+    public Vec2 rotation();
+    public Vec3 align(EnumSet<Direction.Axis> axes);
+    public double get(Direction.Axis axis);
+    public Vec3 with(Direction.Axis axis, double value);
+    public Vec3 relative(Direction direction, double distance);
+    public final double x();
+    public final double y();
+    public final double z();
+    public Vector3f toVector3f();
+    public Vec3 projectedOn(Vec3 onto);
+    public boolean isFinite();
+}

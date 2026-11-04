@@ -1,9 +1,13 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.chunk;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.function.Predicate;
+import net.minecraft.core.IdMap;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.util.CrudeIncrementalIntIdentityHashBiMap;
 
 public class HashMapPalette<T> implements Palette<T> {
     private final IdentityHashMap<T, Integer> ids = new IdentityHashMap<>();
@@ -75,5 +79,29 @@ public class HashMapPalette<T> implements Palette<T> {
     @Override
     public Palette<T> copy() {
         return new HashMapPalette<>(bits, values);
+    }
+    private HashMapPalette(int bits, CrudeIncrementalIntIdentityHashBiMap<T> values) {
+        this(bits);
+    }
+    public void read(FriendlyByteBuf buffer, IdMap<T> globalMap) {
+        values.clear();
+        ids.clear();
+        int count = buffer.readVarInt();
+        for (int i = 0; i < count; i++) {
+            add(globalMap.byIdOrThrow(buffer.readVarInt()));
+        }
+    }
+    public void write(FriendlyByteBuf buffer, IdMap<T> globalMap) {
+        buffer.writeVarInt(values.size());
+        for (T value : values) {
+            buffer.writeVarInt(globalMap.getId(value));
+        }
+    }
+    public int getSerializedSize(IdMap<T> globalMap) {
+        int size = Palette.varIntSize(values.size());
+        for (T value : values) {
+            size += Palette.varIntSize(globalMap.getId(value));
+        }
+        return size;
     }
 }

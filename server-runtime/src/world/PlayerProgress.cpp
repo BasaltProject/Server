@@ -35,8 +35,15 @@ RealAdvancements::RealAdvancements(const Jar& jar, wire::common::Logger logger) 
             continue;
         }
         advancements_.insert_or_assign(id, *parsed);
+        rawJson_.insert_or_assign(id, *text);
     }
     logger.info([this] { return "Loaded " + std::to_string(advancements_.size()) + " advancement(s)."; });
+}
+
+const std::string& RealAdvancements::rawJson(const Identifier& id) const {
+    static const std::string kNone;
+    const auto found = rawJson_.find(id);
+    return found == rawJson_.end() ? kNone : found->second;
 }
 
 std::vector<Identifier> RealAdvancements::ids() const {

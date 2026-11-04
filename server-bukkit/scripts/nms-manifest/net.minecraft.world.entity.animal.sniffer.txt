@@ -1,0 +1,124 @@
+//// Sniffer.java
+import io.netty.buffer.ByteBuf;
+import java.util.Optional;
+import java.util.function.IntFunction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.AnimationState;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.ai.Brain;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+public class Sniffer extends Animal {
+    public final AnimationState feelingHappyAnimationState;
+    public final AnimationState scentingAnimationState;
+    public final AnimationState sniffingAnimationState;
+    public final AnimationState diggingAnimationState;
+    public final AnimationState risingAnimationState;
+    public static AttributeSupplier.Builder createAttributes();
+    public Sniffer(EntityType<? extends Animal> type, Level level);
+    protected void defineSynchedData(SynchedEntityData.Builder entityData);
+    public void onPathfindingStart();
+    public void onPathfindingDone();
+    public int getBabyStartAge();
+    public EntityDimensions getDefaultDimensions(Pose pose);
+    public boolean isSearching();
+    public boolean isTempted();
+    public boolean canSniff();
+    public boolean canPlayDiggingSound();
+    public boolean supportQuadLeash();
+    public Vec3[] getQuadLeashOffsets();
+    public void onSyncedDataUpdated(EntityDataAccessor<?> accessor);
+    public Sniffer transitionTo(State state);
+    public Sniffer onDiggingComplete(boolean success);
+    Optional<BlockPos> calculateDigPosition();
+    boolean canDig();
+    public void jumpFromGround();
+    public void spawnChildFromBreeding(ServerLevel level, Animal partner);
+    public void die(DamageSource source);
+    public void tick();
+    public InteractionResult mobInteract(Player player, InteractionHand hand);
+    protected void playEatingSound();
+    protected void playStepSound(BlockPos pos, BlockState blockState);
+    protected SoundEvent getAmbientSound();
+    protected SoundEvent getHurtSound(DamageSource source);
+    protected SoundEvent getDeathSound();
+    public int getMaxHeadYRot();
+    public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob partner);
+    public boolean canMate(Animal partner);
+    public boolean isFood(ItemStack itemStack);
+    protected Brain<Sniffer> makeBrain(Brain.Packed packedBrain);
+    public Brain<Sniffer> getBrain();
+    protected void customServerAiStep(ServerLevel level);
+    public static enum State {
+        IDLING, FEELING_HAPPY, SCENTING, SNIFFING, SEARCHING, DIGGING, RISING;
+        public static final IntFunction<State> BY_ID;
+        public static final StreamCodec<ByteBuf, State> STREAM_CODEC;
+        public int id();
+    }
+}
+//// SnifferAi.java
+import java.util.List;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.ActivityData;
+import net.minecraft.world.entity.ai.behavior.Behavior;
+public class SnifferAi {
+    public static List<ActivityData<Sniffer>> getActivities();
+    public static void updateActivity(Sniffer body);
+    static class Sniffing extends Behavior<Sniffer> {
+        private Sniffing(int min, int max);
+        protected boolean checkExtraStartConditions(ServerLevel level, Sniffer body);
+        protected boolean canStillUse(ServerLevel level, Sniffer body, long timestamp);
+        protected void start(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void stop(ServerLevel level, Sniffer sniffer, long timestamp);
+    }
+    static class Searching extends Behavior<Sniffer> {
+        private Searching();
+        protected boolean checkExtraStartConditions(ServerLevel level, Sniffer sniffer);
+        protected boolean canStillUse(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void start(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void stop(ServerLevel level, Sniffer sniffer, long timestamp);
+    }
+    static class Digging extends Behavior<Sniffer> {
+        private Digging(int min, int max);
+        protected boolean checkExtraStartConditions(ServerLevel level, Sniffer sniffer);
+        protected boolean canStillUse(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void start(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void stop(ServerLevel level, Sniffer sniffer, long timestamp);
+    }
+    static class FinishedDigging extends Behavior<Sniffer> {
+        private FinishedDigging(int duration);
+        protected boolean checkExtraStartConditions(ServerLevel level, Sniffer sniffer);
+        protected boolean canStillUse(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void start(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void stop(ServerLevel level, Sniffer sniffer, long timestamp);
+    }
+    static class FeelingHappy extends Behavior<Sniffer> {
+        private FeelingHappy(int min, int max);
+        protected boolean canStillUse(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void start(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void stop(ServerLevel level, Sniffer sniffer, long timestamp);
+    }
+    static class Scenting extends Behavior<Sniffer> {
+        private Scenting(int min, int max);
+        protected boolean checkExtraStartConditions(ServerLevel level, Sniffer sniffer);
+        protected boolean canStillUse(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void start(ServerLevel level, Sniffer sniffer, long timestamp);
+        protected void stop(ServerLevel level, Sniffer sniffer, long timestamp);
+    }
+}

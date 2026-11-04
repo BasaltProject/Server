@@ -1,0 +1,341 @@
+//// Absolute.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Absolute(Holder<ContextIntProvider> input) implements ContextIntProvider, UnaryProvider<ContextIntProvider> {
+    public static final MapCodec<Absolute> MAP_CODEC;
+    public MapCodec<Absolute> codec();
+    public int getIntUnsafe(LootContext context);
+}
+//// Average.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Average(HolderSet<ContextIntProvider> inputs) implements ContextIntProvider, AggregateProvider<ContextIntProvider> {
+    public static final MapCodec<Average> MAP_CODEC;
+    public MapCodec<Average> codec();
+    public int getIntUnsafe(LootContext context) throws ArithmeticException;
+}
+//// BinomialDistributionGenerator.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+public record BinomialDistributionGenerator(Holder<ContextIntProvider> n, Holder<ContextFloatProvider> p) implements ContextIntProvider {
+    public static final MapCodec<BinomialDistributionGenerator> MAP_CODEC;
+    public MapCodec<BinomialDistributionGenerator> codec();
+    public int getIntUnsafe(LootContext context);
+    public void validate(ValidationContext context);
+}
+//// ConditionalValue.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.level.storage.loot.providers.number.ConditionalProvider;
+public record ConditionalValue(Holder<LootItemCondition> condition, Holder<ContextIntProvider> onTrue, Holder<ContextIntProvider> onFalse) implements ContextIntProvider, ConditionalProvider<ContextIntProvider> {
+    public static final MapCodec<ConditionalValue> MAP_CODEC;
+    public static final Codec<ConditionalValue> CODEC;
+    public int getIntUnsafe(LootContext context);
+    public MapCodec<ConditionalValue> codec();
+}
+//// ConstantValue.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+public record ConstantValue(int value) implements ContextIntProvider {
+    public static final MapCodec<ConstantValue> MAP_CODEC;
+    public static final Codec<ConstantValue> INLINE_CODEC;
+    public MapCodec<ConstantValue> codec();
+    public void validate(ValidationContext context);
+    public int getIntUnsafe(LootContext random);
+}
+//// ContextIntProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.Validatable;
+public interface ContextIntProvider extends Validatable {
+    int getIntUnsafe(LootContext context) throws ArithmeticException;
+    default int getInt(LootContext context);
+    MapCodec<? extends ContextIntProvider> codec();
+    static int floatToIntSafe(float value);
+    static int longToIntSafe(long value);
+}
+//// ContextIntProviderTypes.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class ContextIntProviderTypes {
+    public static MapCodec<? extends ContextIntProvider> bootstrap(Registry<MapCodec<? extends ContextIntProvider>> registry);
+}
+//// ContextIntProviders.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+public class ContextIntProviders {
+    public static final Codec<ContextIntProvider> DIRECT_CODEC;
+    public static final Codec<Holder<ContextIntProvider>> CODEC;
+    public static final Codec<HolderSet<ContextIntProvider>> LIST_CODEC;
+    public static final ResourceKey<ContextIntProvider> COMPOSTABLE_LOW;
+    public static final ResourceKey<ContextIntProvider> COMPOSTABLE_LOW_MEDIUM;
+    public static final ResourceKey<ContextIntProvider> COMPOSTABLE_MEDIUM;
+    public static final ResourceKey<ContextIntProvider> COMPOSTABLE_MEDIUM_HIGH;
+    public static final ResourceKey<ContextIntProvider> COMPOSTABLE_ALWAYS_ADD_ONE;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_BAMBOO;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_WOOL_SLABS;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_WOOL_CARPETS;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_DRY_PLANTS;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_WOOD_ITEMS_EXTRA_SMALL;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_WOOL;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_WOOD_SLABS;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_WOOD_ITEMS_LARGE;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_WOOD_ITEMS_SMALL;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_ROOTS;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_WOOD_BLOCKS;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_HANGING_SIGNS;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_BOATS;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_COAL;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_BLAZE_ROD;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_DRIED_KELP_BLOCK;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_COAL_BLOCK;
+    public static final ResourceKey<ContextIntProvider> COOKING_TIME_LAVA_BUCKET;
+    public static final ResourceKey<ContextIntProvider> COOKING_NORMAL_BURN_TIME_REDUCTION_FACTOR;
+    public static final ResourceKey<ContextIntProvider> COOKING_FAST_BURN_TIME_REDUCTION_FACTOR;
+    public static final ResourceKey<ContextIntProvider> BREWING_DEFAULT_USES;
+    public static void bootstrap(BootstrapContext<ContextIntProvider> context);
+    public static Holder<ContextIntProvider> fromFloat(Holder<ContextFloatProvider> input);
+    public static Holder<ContextIntProvider> binomial(int n, float p);
+    public static Holder<ContextIntProvider> exactly(int value);
+    public static Holder<ContextIntProvider> fromScoreboard(LootContext.EntityTarget entityTarget, String score);
+    public static Holder<ContextIntProvider> avg(Holder<ContextIntProvider>... inputs);
+    public static Holder<ContextIntProvider> sub(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right);
+    public static Holder<ContextIntProvider> max(Holder<ContextIntProvider>... inputs);
+    public static Holder<ContextIntProvider> min(Holder<ContextIntProvider>... inputs);
+    public static Holder<ContextIntProvider> mod(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right);
+    public static Holder<ContextIntProvider> floorMod(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right);
+    public static Holder<ContextIntProvider> negate(Holder<ContextIntProvider> input);
+    public static Holder<ContextIntProvider> mul(Holder<ContextIntProvider>... inputs);
+    public static Holder<ContextIntProvider> div(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right);
+    public static Holder<ContextIntProvider> floorDiv(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right);
+    public static Holder<ContextIntProvider> add(Holder<ContextIntProvider>... inputs);
+    public static Holder<ContextIntProvider> between(int min, int max);
+    public static Holder<ContextIntProvider> weighted(WeightedList<Holder<ContextIntProvider>> cases);
+}
+//// Difference.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.BinaryProvider;
+public record Difference(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right) implements ContextIntProvider, BinaryProvider<ContextIntProvider> {
+    public static final MapCodec<Difference> MAP_CODEC;
+    public MapCodec<Difference> codec();
+    public int getIntUnsafe(LootContext context);
+}
+//// EnvironmentAttributeValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.world.attribute.EnvironmentAttribute;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.EnvironmentAttributeProvider;
+public record EnvironmentAttributeValue(EnvironmentAttribute<?> attribute) implements ContextIntProvider, EnvironmentAttributeProvider {
+    public static final MapCodec<EnvironmentAttributeValue> MAP_CODEC;
+    public MapCodec<EnvironmentAttributeValue> codec();
+    public int getIntUnsafe(LootContext context) throws ArithmeticException;
+}
+//// FloorModulus.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.BinaryProvider;
+public record FloorModulus(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right) implements ContextIntProvider, BinaryProvider<ContextIntProvider> {
+    public static final MapCodec<FloorModulus> MAP_CODEC;
+    public MapCodec<FloorModulus> codec();
+    public int getIntUnsafe(LootContext context) throws ArithmeticException;
+}
+//// FloorQuotient.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.BinaryProvider;
+public record FloorQuotient(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right) implements ContextIntProvider, BinaryProvider<ContextIntProvider> {
+    public static final MapCodec<FloorQuotient> MAP_CODEC;
+    public MapCodec<FloorQuotient> codec();
+    public int getIntUnsafe(LootContext context) throws ArithmeticException;
+}
+//// FromFloat.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+import net.minecraft.world.level.storage.loot.providers.number.floats.ContextFloatProvider;
+public record FromFloat(Holder<ContextFloatProvider> input) implements ContextIntProvider, UnaryProvider<ContextFloatProvider> {
+    public static final MapCodec<FromFloat> MAP_CODEC;
+    public MapCodec<FromFloat> codec();
+    public int getIntUnsafe(LootContext context);
+}
+//// Maximum.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Maximum(HolderSet<ContextIntProvider> inputs) implements ContextIntProvider, AggregateProvider<ContextIntProvider> {
+    public static final MapCodec<Maximum> MAP_CODEC;
+    public MapCodec<Maximum> codec();
+    public int getIntUnsafe(LootContext context);
+}
+//// Minimum.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Minimum(HolderSet<ContextIntProvider> inputs) implements ContextIntProvider, AggregateProvider<ContextIntProvider> {
+    public static final MapCodec<Minimum> MAP_CODEC;
+    public MapCodec<Minimum> codec();
+    public int getIntUnsafe(LootContext context);
+}
+//// Modulus.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.BinaryProvider;
+public record Modulus(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right) implements ContextIntProvider, BinaryProvider<ContextIntProvider> {
+    public static final MapCodec<Modulus> MAP_CODEC;
+    public MapCodec<Modulus> codec();
+    public int getIntUnsafe(LootContext context) throws ArithmeticException;
+}
+//// Negate.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.UnaryProvider;
+public record Negate(Holder<ContextIntProvider> input) implements ContextIntProvider, UnaryProvider<ContextIntProvider> {
+    public static final MapCodec<Negate> MAP_CODEC;
+    public MapCodec<Negate> codec();
+    public int getIntUnsafe(LootContext context);
+}
+//// NumberDispatcher.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.DispatcherProvider;
+public record NumberDispatcher(List<DispatcherProvider.Case<ContextIntProvider>> cases, Holder<ContextIntProvider> defaultValue) implements ContextIntProvider, DispatcherProvider<ContextIntProvider> {
+    public static final MapCodec<NumberDispatcher> MAP_CODEC;
+    public int getIntUnsafe(LootContext context);
+    public MapCodec<NumberDispatcher> codec();
+}
+//// Power.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.PowerProvider;
+public record Power(Holder<ContextIntProvider> base, Holder<ContextIntProvider> exponent) implements ContextIntProvider, PowerProvider<ContextIntProvider> {
+    public static final MapCodec<Power> MAP_CODEC;
+    public MapCodec<Power> codec();
+    public int getIntUnsafe(LootContext context) throws ArithmeticException;
+}
+//// Product.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Product(HolderSet<ContextIntProvider> inputs) implements ContextIntProvider, AggregateProvider<ContextIntProvider> {
+    public static final MapCodec<Product> MAP_CODEC;
+    public MapCodec<Product> codec();
+    public int getIntUnsafe(LootContext context);
+}
+//// Quotient.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.BinaryProvider;
+public record Quotient(Holder<ContextIntProvider> left, Holder<ContextIntProvider> right) implements ContextIntProvider, BinaryProvider<ContextIntProvider> {
+    public static final MapCodec<Quotient> MAP_CODEC;
+    public MapCodec<Quotient> codec();
+    public int getIntUnsafe(LootContext context) throws ArithmeticException;
+}
+//// ResolvableInt.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.function.Function;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.LootContext;
+public interface ResolvableInt {
+    Codec<ResolvableInt> CODEC;
+    StreamCodec<ByteBuf, ResolvableInt> STREAM_CODEC;
+    int get(LootContext context, int defaultValue);
+    static ResolvableInt fromKey(ResourceKey<ContextIntProvider> key);
+    static <T> int getFromItem(ItemStack itemStack, DataComponentType<T> componentType, Function<T, ResolvableInt> getter, LootContext context, int defaultValue);
+    public static record Constant(int value) implements ResolvableInt {
+        public int get(LootContext context, int defaultValue);
+    }
+    public static record Reference(ResourceKey<ContextIntProvider> key) implements ResolvableInt {
+        public int get(LootContext context, int defaultValue);
+    }
+}
+//// ScoreboardValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.providers.score.ScoreboardNameProvider;
+public record ScoreboardValue(ScoreboardNameProvider target, String score, Holder<ContextIntProvider> fallback) implements ContextIntProvider {
+    public static final MapCodec<ScoreboardValue> MAP_CODEC;
+    public MapCodec<ScoreboardValue> codec();
+    public void validate(ValidationContext context);
+    public int getIntUnsafe(LootContext context);
+}
+//// StorageValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.ValidationContext;
+import net.minecraft.world.level.storage.loot.providers.number.StoredNumberAccess;
+public record StorageValue(StoredNumberAccess access, Holder<ContextIntProvider> fallback) implements ContextIntProvider {
+    public static final MapCodec<StorageValue> MAP_CODEC;
+    public int getIntUnsafe(LootContext context);
+    public void validate(ValidationContext context);
+    public MapCodec<StorageValue> codec();
+}
+//// Sum.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.AggregateProvider;
+public record Sum(HolderSet<ContextIntProvider> inputs) implements ContextIntProvider, AggregateProvider<ContextIntProvider> {
+    public static final MapCodec<Sum> MAP_CODEC;
+    public MapCodec<Sum> codec();
+    public int getIntUnsafe(LootContext context);
+}
+//// UniformGenerator.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.RangeProvider;
+public record UniformGenerator(Holder<ContextIntProvider> min, Holder<ContextIntProvider> max) implements ContextIntProvider, RangeProvider<ContextIntProvider> {
+    public static final MapCodec<UniformGenerator> MAP_CODEC;
+    public MapCodec<UniformGenerator> codec();
+    public int getIntUnsafe(LootContext context);
+}
+//// WeightedListValue.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Holder;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.providers.number.DistributionProvider;
+public record WeightedListValue(WeightedList<Holder<ContextIntProvider>> distribution) implements ContextIntProvider, DistributionProvider<ContextIntProvider> {
+    public static final MapCodec<WeightedListValue> MAP_CODEC;
+    public int getIntUnsafe(LootContext context);
+    public MapCodec<WeightedListValue> codec();
+}

@@ -1,0 +1,93 @@
+//// ArmorTrim.java
+import com.mojang.serialization.Codec;
+import java.util.function.Consumer;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipProvider;
+public record ArmorTrim(Holder<TrimMaterial> material, Holder<TrimPattern> pattern) implements TooltipProvider {
+    public static final Codec<ArmorTrim> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ArmorTrim> STREAM_CODEC;
+    public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components);
+}
+//// TrimMaterial.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+public record TrimMaterial(Identifier paletteId, Component description) {
+    public static final Codec<TrimMaterial> DIRECT_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, TrimMaterial> DIRECT_STREAM_CODEC;
+    public static final Codec<Holder<TrimMaterial>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<TrimMaterial>> STREAM_CODEC;
+}
+//// TrimMaterials.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+public class TrimMaterials {
+    public static final ResourceKey<TrimMaterial> QUARTZ;
+    public static final ResourceKey<TrimMaterial> IRON;
+    public static final ResourceKey<TrimMaterial> NETHERITE;
+    public static final ResourceKey<TrimMaterial> REDSTONE;
+    public static final ResourceKey<TrimMaterial> COPPER;
+    public static final ResourceKey<TrimMaterial> GOLD;
+    public static final ResourceKey<TrimMaterial> EMERALD;
+    public static final ResourceKey<TrimMaterial> DIAMOND;
+    public static final ResourceKey<TrimMaterial> LAPIS;
+    public static final ResourceKey<TrimMaterial> AMETHYST;
+    public static final ResourceKey<TrimMaterial> RESIN;
+    public static void bootstrap(BootstrapContext<TrimMaterial> context);
+    public static enum Palette {
+        QUARTZ, IRON, IRON_DARKER, NETHERITE, NETHERITE_DARKER, REDSTONE, COPPER, COPPER_DARKER, GOLD, GOLD_DARKER, EMERALD, DIAMOND, DIAMOND_DARKER, LAPIS, AMETHYST, RESIN;
+        public String suffix();
+        public Identifier id();
+    }
+}
+//// TrimPattern.java
+import com.mojang.serialization.Codec;
+import net.minecraft.core.Holder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+public record TrimPattern(Identifier assetId, Component description, boolean decal) {
+    public static final Codec<TrimPattern> DIRECT_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, TrimPattern> DIRECT_STREAM_CODEC;
+    public static final Codec<Holder<TrimPattern>> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<TrimPattern>> STREAM_CODEC;
+    public Component copyWithStyle(Holder<TrimMaterial> material);
+}
+//// TrimPatterns.java
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+public class TrimPatterns {
+    public static final ResourceKey<TrimPattern> SENTRY;
+    public static final ResourceKey<TrimPattern> DUNE;
+    public static final ResourceKey<TrimPattern> COAST;
+    public static final ResourceKey<TrimPattern> WILD;
+    public static final ResourceKey<TrimPattern> WARD;
+    public static final ResourceKey<TrimPattern> EYE;
+    public static final ResourceKey<TrimPattern> VEX;
+    public static final ResourceKey<TrimPattern> TIDE;
+    public static final ResourceKey<TrimPattern> SNOUT;
+    public static final ResourceKey<TrimPattern> RIB;
+    public static final ResourceKey<TrimPattern> SPIRE;
+    public static final ResourceKey<TrimPattern> WAYFINDER;
+    public static final ResourceKey<TrimPattern> SHAPER;
+    public static final ResourceKey<TrimPattern> SILENCE;
+    public static final ResourceKey<TrimPattern> RAISER;
+    public static final ResourceKey<TrimPattern> HOST;
+    public static final ResourceKey<TrimPattern> FLOW;
+    public static final ResourceKey<TrimPattern> BOLT;
+    public static void bootstrap(BootstrapContext<TrimPattern> context);
+    public static void register(BootstrapContext<TrimPattern> context, ResourceKey<TrimPattern> registryKey);
+    public static Identifier defaultAssetId(ResourceKey<TrimPattern> registryKey);
+}

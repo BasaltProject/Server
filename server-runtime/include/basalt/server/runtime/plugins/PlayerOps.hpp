@@ -9,6 +9,10 @@
 #include <string_view>
 #include <vector>
 
+namespace basalt::server::storage {
+struct StoredItemStack;
+}
+
 namespace basalt::server::runtime::player {
 class PlayerRegistry;
 class PlayerSession;
@@ -35,12 +39,14 @@ struct Context {
 [[nodiscard]] bool isNone(const Value& value);
 
 [[nodiscard]] world::LoadedWorld* worldOf(Context& context);
+[[nodiscard]] std::optional<storage::StoredItemStack> decodeItem(const std::string& bytes);
 
 [[nodiscard]] std::optional<Value> state(Context& context, Verb verb, std::string_view name, const Args& args);
 [[nodiscard]] std::optional<Value> hud(Context& context, Verb verb, std::string_view name, const Args& args);
 [[nodiscard]] std::optional<Value> view(Context& context, Verb verb, std::string_view name, const Args& args);
 [[nodiscard]] std::optional<Value> misc(Context& context, Verb verb, std::string_view name, const Args& args);
 [[nodiscard]] std::optional<Value> tail(Context& context, Verb verb, std::string_view name, const Args& args);
+[[nodiscard]] std::optional<Value> packets(Context& context, Verb verb, std::string_view name, const Args& args);
 
 [[nodiscard]] std::optional<Value> dispatch(Context& context, Verb verb, std::string_view name, const Args& args);
 

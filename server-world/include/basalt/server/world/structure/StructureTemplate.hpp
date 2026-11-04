@@ -121,6 +121,7 @@ private:
 
     StructurePos size_;
     std::vector<StructureBlockInfo> blocks_;
+    std::vector<std::uint32_t> jigsawIndices_;
     std::vector<std::vector<StructureBlockInfo>> palettes_;
     std::vector<StructureEntityInfo> entities_;
 };

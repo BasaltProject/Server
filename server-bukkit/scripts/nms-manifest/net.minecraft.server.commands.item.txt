@@ -1,0 +1,85 @@
+//// BlockItemAccessor.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.Dynamic3CommandExceptionType;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.commands.ArgProvider;
+import net.minecraft.server.commands.CommandResponseTracker;
+import net.minecraft.world.Container;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.slot.SlotCollection;
+import net.minecraft.world.item.slot.SlotSource;
+public record BlockItemAccessor(BlockPos pos) implements ItemAccessor<BlockPos> {
+    public static final ArgProvider.Factory<ItemAccessor<?>> PROVIDER;
+    public SlotCollection getSlots(CommandSourceStack source, SlotSource slotSource) throws CommandSyntaxException;
+    public void setItems(CommandSourceStack source, SlotSource slotSource, ItemAccessor.SetterFunction<BlockPos> function) throws CommandSyntaxException;
+    public int getReplaceSuccess(CommandSourceStack source, CommandResponseTracker<BlockPos> tracker, ItemStack knownItem) throws CommandSyntaxException;
+    public int getModifySuccess(CommandSourceStack source, CommandResponseTracker<BlockPos> tracker) throws CommandSyntaxException;
+    public static Container getContainer(CommandSourceStack source, BlockPos pos, Dynamic3CommandExceptionType exceptionType) throws CommandSyntaxException;
+}
+//// EntityItemAccessor.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.Collection;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.commands.ArgProvider;
+import net.minecraft.server.commands.CommandResponseTracker;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.slot.SlotCollection;
+import net.minecraft.world.item.slot.SlotSource;
+public record EntityItemAccessor(Collection<? extends Entity> entities) implements ItemAccessor<Entity> {
+    public static final ArgProvider.Factory<ItemAccessor<?>> PROVIDER;
+    public SlotCollection getSlots(CommandSourceStack source, SlotSource slotSource);
+    public void setItems(CommandSourceStack source, SlotSource slotSource, ItemAccessor.SetterFunction<Entity> function);
+    public int getReplaceSuccess(CommandSourceStack source, CommandResponseTracker<Entity> tracker, ItemStack knownItem) throws CommandSyntaxException;
+    public int getModifySuccess(CommandSourceStack source, CommandResponseTracker<Entity> tracker) throws CommandSyntaxException;
+}
+//// ItemAccessor.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.commands.CommandResponseTracker;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.slot.SlotCollection;
+import net.minecraft.world.item.slot.SlotSource;
+public interface ItemAccessor<Target> {
+    void setItems(CommandSourceStack source, SlotSource slotSource, SetterFunction<Target> function) throws CommandSyntaxException;
+    SlotCollection getSlots(CommandSourceStack source, SlotSource slotSource) throws CommandSyntaxException;
+    int getReplaceSuccess(CommandSourceStack source, CommandResponseTracker<Target> tracker, ItemStack knownItem) throws CommandSyntaxException;
+    int getModifySuccess(CommandSourceStack source, CommandResponseTracker<Target> tracker) throws CommandSyntaxException;
+    public interface SetterFunction<Target> {
+        int apply(Target target, SlotCollection slots);
+    }
+}
+//// ItemCommands.java
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.Dynamic3CommandExceptionType;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import java.util.Collection;
+import java.util.List;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.commands.ArgProvider;
+import net.minecraft.world.entity.SlotProvider;
+import net.minecraft.world.item.ItemProvider;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.slot.SlotCollection;
+import net.minecraft.world.item.slot.SlotSource;
+public class ItemCommands {
+    public static final Dynamic3CommandExceptionType ERROR_TARGET_NOT_A_CONTAINER;
+    public static final Dynamic3CommandExceptionType ERROR_SOURCE_NOT_A_CONTAINER;
+    public static final DynamicCommandExceptionType ERROR_TARGET_INAPPLICABLE_SLOT;
+    public static final SimpleCommandExceptionType ERROR_TARGET_NO_CHANGES;
+    public static final DynamicCommandExceptionType ERROR_TARGET_NO_CHANGES_KNOWN_ITEM;
+    public static final List<ArgProvider.Factory<ItemAccessor<?>>> ALL_PROVIDERS;
+    public static final List<ArgProvider<ItemAccessor<?>>> TARGET_PROVIDERS;
+    public static final List<ArgProvider<ItemAccessor<?>>> SOURCE_PROVIDERS;
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context);
+    public static ItemProvider replaceItemProvider(Collection<ItemStack> items);
+    public static ItemProvider fillItemProvider(Collection<ItemStack> items);
+    public static ItemProvider overrideItemProvider(Collection<ItemStack> items);
+    static SlotCollection getSlotsFromProvider(CommandSourceStack source, SlotProvider container, SlotSource slotSource);
+    interface ItemDistributor {
+        ItemProvider apply(Collection<ItemStack> items);
+    }
+}

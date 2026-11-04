@@ -118,6 +118,8 @@ public:
 
     [[nodiscard]] std::vector<std::string> names() const;
 
+    [[nodiscard]] const std::vector<Event>& events() const { return events_; }
+
     [[nodiscard]] std::vector<Event> due(std::int64_t gameTime);
 
     /// parity: the `scheduled_events` saved data, `{events: [{trigger_time, id, callback}]}`.

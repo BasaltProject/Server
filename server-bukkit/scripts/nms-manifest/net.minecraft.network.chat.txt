@@ -1,0 +1,796 @@
+//// ChatDecorator.java
+import net.minecraft.server.level.ServerPlayer;
+public interface ChatDecorator {
+    ChatDecorator PLAIN;
+    Component decorate(ServerPlayer player, Component plain);
+}
+//// ChatType.java
+import com.mojang.serialization.Codec;
+import java.util.Optional;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.Entity;
+public record ChatType(ChatTypeDecoration chat, ChatTypeDecoration narration) {
+    public static final Codec<ChatType> DIRECT_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ChatType> DIRECT_STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Holder<ChatType>> STREAM_CODEC;
+    public static final ChatTypeDecoration DEFAULT_CHAT_DECORATION;
+    public static final ResourceKey<ChatType> CHAT;
+    public static final ResourceKey<ChatType> SAY_COMMAND;
+    public static final ResourceKey<ChatType> MSG_COMMAND_INCOMING;
+    public static final ResourceKey<ChatType> MSG_COMMAND_OUTGOING;
+    public static final ResourceKey<ChatType> TEAM_MSG_COMMAND_INCOMING;
+    public static final ResourceKey<ChatType> TEAM_MSG_COMMAND_OUTGOING;
+    public static final ResourceKey<ChatType> EMOTE_COMMAND;
+    public static void bootstrap(BootstrapContext<ChatType> context);
+    public static Bound bind(ResourceKey<ChatType> chatType, Entity entity);
+    public static Bound bind(ResourceKey<ChatType> chatType, CommandSourceStack source);
+    public static Bound bind(ResourceKey<ChatType> chatType, RegistryAccess registryAccess, Component name);
+    public static record Bound(Holder<ChatType> chatType, Component name, Optional<Component> targetName) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, Bound> STREAM_CODEC;
+        private Bound(Holder<ChatType> chatType, Component name);
+        public Component decorate(Component content);
+        public Component decorateNarration(Component content);
+        public Bound withTargetName(Component targetName);
+    }
+}
+//// ChatTypeDecoration.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public record ChatTypeDecoration(String translationKey, List<Parameter> parameters, Style style) {
+    public static final Codec<ChatTypeDecoration> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ChatTypeDecoration> STREAM_CODEC;
+    public static ChatTypeDecoration withSender(String translationKey);
+    public static ChatTypeDecoration incomingDirectMessage(String translationKey);
+    public static ChatTypeDecoration outgoingDirectMessage(String translationKey);
+    public static ChatTypeDecoration teamMessage(String translationKey);
+    public Component decorate(Component content, ChatType.Bound chatType);
+    public static enum Parameter implements StringRepresentable {
+        SENDER, TARGET, CONTENT;
+        public static final Codec<Parameter> CODEC;
+        public static final StreamCodec<ByteBuf, Parameter> STREAM_CODEC;
+        public Component select(Component content, ChatType.Bound chatType);
+        public String getSerializedName();
+        public interface Selector {
+            Component select(Component content, ChatType.Bound chatType);
+        }
+    }
+}
+//// ClickEvent.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.MapCodec;
+import java.io.File;
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.Optional;
+import net.minecraft.core.Holder;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.dialog.Dialog;
+import net.minecraft.util.StringRepresentable;
+public interface ClickEvent {
+    Codec<ClickEvent> CODEC;
+    Action action();
+    public static record OpenUrl(URI uri) implements ClickEvent {
+        public static final MapCodec<OpenUrl> CODEC;
+        public Action action();
+    }
+    public static record OpenFile(String path) implements ClickEvent {
+        public static final MapCodec<OpenFile> CODEC;
+        public OpenFile(File file);
+        public OpenFile(Path path);
+        public File file();
+        public Action action();
+    }
+    public static record RunCommand(String command) implements ClickEvent {
+        public static final MapCodec<RunCommand> CODEC;
+        public Action action();
+    }
+    public static record SuggestCommand(String command) implements ClickEvent {
+        public static final MapCodec<SuggestCommand> CODEC;
+        public Action action();
+    }
+    public static record ShowDialog(Holder<Dialog> dialog) implements ClickEvent {
+        public static final MapCodec<ShowDialog> CODEC;
+        public Action action();
+    }
+    public static record ChangePage(int page) implements ClickEvent {
+        public static final MapCodec<ChangePage> CODEC;
+        public Action action();
+    }
+    public static record CopyToClipboard(String value) implements ClickEvent {
+        public static final MapCodec<CopyToClipboard> CODEC;
+        public Action action();
+    }
+    public static record Custom(Identifier id, Optional<Tag> payload) implements ClickEvent {
+        public static final MapCodec<Custom> CODEC;
+        public Action action();
+    }
+    public static enum Action implements StringRepresentable {
+        OPEN_URL, OPEN_FILE, RUN_COMMAND, SUGGEST_COMMAND, SHOW_DIALOG, CHANGE_PAGE, COPY_TO_CLIPBOARD, CUSTOM;
+        public static final Codec<Action> UNSAFE_CODEC;
+        public static final Codec<Action> CODEC;
+        public boolean isAllowedFromServer();
+        public String getSerializedName();
+        public MapCodec<? extends ClickEvent> valueCodec();
+        public static DataResult<Action> filterForSerialization(Action action);
+    }
+}
+//// CommonComponents.java
+import java.util.Collection;
+public class CommonComponents {
+    public static final Component EMPTY;
+    public static final Component OPTION_ON;
+    public static final Component OPTION_OFF;
+    public static final Component GUI_DONE;
+    public static final Component GUI_CANCEL;
+    public static final Component GUI_YES;
+    public static final Component GUI_REMOVE;
+    public static final Component GUI_NO;
+    public static final Component GUI_OK;
+    public static final Component GUI_PROCEED;
+    public static final Component GUI_CONTINUE;
+    public static final Component GUI_BACK;
+    public static final Component GUI_TO_TITLE;
+    public static final Component GUI_ACKNOWLEDGE;
+    public static final Component GUI_OPEN_IN_BROWSER;
+    public static final Component GUI_COPY_TO_CLIPBOARD;
+    public static final Component GUI_COPY_LINK_TO_CLIPBOARD;
+    public static final Component GUI_DISCONNECT;
+    public static final Component GUI_RETURN_TO_MENU;
+    public static final Component TRANSFER_CONNECT_FAILED;
+    public static final Component CONNECT_FAILED;
+    public static final Component NEW_LINE;
+    public static final Component NARRATION_SEPARATOR;
+    public static final Component ELLIPSIS;
+    public static final Component SPACE;
+    public static MutableComponent space();
+    public static MutableComponent days(long value);
+    public static MutableComponent hours(long value);
+    public static MutableComponent minutes(long value);
+    public static Component optionStatus(boolean value);
+    public static Component disconnectButtonLabel(boolean isLocalServer);
+    public static MutableComponent optionStatus(Component name, boolean value);
+    public static MutableComponent optionNameValue(Component name, Component value);
+    public static MutableComponent joinForNarration(Component... components);
+    public static Component joinLines(Component... lines);
+    public static Component joinLines(Collection<? extends Component> lines);
+}
+//// Component.java
+import com.mojang.brigadier.Message;
+import java.net.URI;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.commands.arguments.NbtPathArgument;
+import net.minecraft.commands.arguments.selector.EntitySelector;
+import net.minecraft.network.chat.contents.data.DataSource;
+import net.minecraft.network.chat.contents.objects.ObjectInfo;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.CompilableString;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.world.level.ChunkPos;
+public interface Component extends Message, FormattedText {
+    Style getStyle();
+    ComponentContents getContents();
+    default String getString();
+    default String getString(int limit);
+    List<Component> getSiblings();
+    default String tryCollapseToString();
+    default MutableComponent plainCopy();
+    default MutableComponent copy();
+    FormattedCharSequence getVisualOrderText();
+    default <T> Optional<T> visit(FormattedText.StyledContentConsumer<T> output, Style parentStyle);
+    default <T> Optional<T> visit(FormattedText.ContentConsumer<T> output);
+    default List<Component> toFlatList();
+    default List<Component> toFlatList(Style rootStyle);
+    default boolean contains(Component other);
+    static Component nullToEmpty(String text);
+    static MutableComponent literal(String text);
+    static MutableComponent translatable(String key);
+    static MutableComponent translatable(String key, Object... args);
+    static MutableComponent translatableEscape(String key, Object... args);
+    static MutableComponent translatableWithFallback(String key, String fallback);
+    static MutableComponent translatableWithFallback(String key, String fallback, Object... args);
+    static MutableComponent empty();
+    static MutableComponent keybind(String name);
+    static MutableComponent nbt(CompilableString<NbtPathArgument.NbtPath> nbtPath, boolean interpreting, boolean plain, Optional<Component> separator, DataSource dataSource);
+    static MutableComponent score(CompilableString<EntitySelector> pattern, String objective);
+    static MutableComponent score(String name, String objective);
+    static MutableComponent selector(CompilableString<EntitySelector> pattern, Optional<Component> separator);
+    static MutableComponent object(ObjectInfo info);
+    static MutableComponent object(ObjectInfo info, Component fallback);
+    static Component translationArg(Date date);
+    static Component translationArg(Message message);
+    static Component translationArg(UUID uuid);
+    static Component translationArg(Identifier id);
+    static Component translationArg(ChunkPos chunkPos);
+    static Component translationArg(URI uri);
+}
+//// ComponentContents.java
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+public interface ComponentContents {
+    default <T> Optional<T> visit(FormattedText.StyledContentConsumer<T> output, Style currentStyle);
+    default <T> Optional<T> visit(FormattedText.ContentConsumer<T> output);
+    default MutableComponent resolve(ResolutionContext context, int recursionDepth) throws CommandSyntaxException;
+    MapCodec<? extends ComponentContents> codec();
+}
+//// ComponentSerialization.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.MapEncoder;
+import com.mojang.serialization.MapLike;
+import com.mojang.serialization.RecordBuilder;
+import io.netty.buffer.ByteBuf;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.ExtraCodecs;
+public class ComponentSerialization {
+    public static final Codec<Component> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Component> STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Optional<Component>> OPTIONAL_STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Component> TRUSTED_STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Optional<Component>> TRUSTED_OPTIONAL_STREAM_CODEC;
+    public static final StreamCodec<ByteBuf, Component> TRUSTED_CONTEXT_FREE_STREAM_CODEC;
+    public static Codec<Component> flatRestrictedCodec(int maxFlatSize);
+    public static <T> MapCodec<T> createLegacyComponentMatcher(ExtraCodecs.LateBoundIdMapper<String, MapCodec<? extends T>> types, Function<T, MapCodec<? extends T>> codecGetter, String typeFieldName);
+    static class StrictEither<T> extends MapCodec<T> {
+        public StrictEither(String typeFieldName, MapCodec<T> typed, MapCodec<T> fuzzy);
+        public <O> DataResult<T> decode(DynamicOps<O> ops, MapLike<O> input);
+        public <O> RecordBuilder<O> encode(T input, DynamicOps<O> ops, RecordBuilder<O> prefix);
+        public <T1> Stream<T1> keys(DynamicOps<T1> ops);
+    }
+    static class FuzzyCodec<T> extends MapCodec<T> {
+        public FuzzyCodec(Collection<MapCodec<? extends T>> codecs, Function<T, ? extends MapEncoder<? extends T>> encoderGetter);
+        public <S> DataResult<T> decode(DynamicOps<S> ops, MapLike<S> input);
+        public <S> RecordBuilder<S> encode(T input, DynamicOps<S> ops, RecordBuilder<S> prefix);
+        public <S> Stream<S> keys(DynamicOps<S> ops);
+        public String toString();
+    }
+}
+//// ComponentUtils.java
+import com.mojang.brigadier.Message;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.function.Function;
+public class ComponentUtils {
+    public static final String DEFAULT_SEPARATOR_TEXT = ", ";
+    public static final Component DEFAULT_SEPARATOR;
+    public static final Component DEFAULT_NO_STYLE_SEPARATOR;
+    public static MutableComponent mergeStyles(MutableComponent component, Style style);
+    public static Component mergeStyles(Component component, Style style);
+    public static Optional<MutableComponent> resolve(ResolutionContext context, Optional<Component> component, int recursionDepth) throws CommandSyntaxException;
+    public static MutableComponent resolve(ResolutionContext context, Component component) throws CommandSyntaxException;
+    public static MutableComponent resolve(ResolutionContext context, Component component, int recursionDepth) throws CommandSyntaxException;
+    public static Component formatList(Collection<String> values);
+    public static <T extends Comparable<T>> Component formatAndSortList(Collection<T> values, Function<T, Component> formatter);
+    public static <T> Component formatList(Collection<? extends T> values, Function<T, Component> formatter);
+    public static <T> MutableComponent formatList(Collection<? extends T> values, Optional<? extends Component> separator, Function<T, Component> formatter);
+    public static Component formatList(Collection<? extends Component> values, Component separator);
+    public static <T> MutableComponent formatList(Collection<? extends T> values, Component separator, Function<T, Component> formatter);
+    public static MutableComponent wrapInSquareBrackets(Component inner);
+    public static Component fromMessage(Message message);
+    public static boolean isTranslationResolvable(Component component);
+    public static MutableComponent copyOnClickText(String text);
+}
+//// FilterMask.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.util.BitSet;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.StringRepresentable;
+public class FilterMask {
+    public static final Codec<FilterMask> CODEC;
+    public static final StreamCodec<ByteBuf, FilterMask> STREAM_CODEC;
+    public static final FilterMask FULLY_FILTERED;
+    public static final FilterMask PASS_THROUGH;
+    public static final Style FILTERED_STYLE;
+    private FilterMask(BitSet mask, Type type);
+    private FilterMask(BitSet mask);
+    public FilterMask(int length);
+    public void setFiltered(int index);
+    public String apply(String text);
+    public Component applyWithFormatting(String text);
+    public boolean isEmpty();
+    public boolean isFullyFiltered();
+    public boolean equals(Object o);
+    public int hashCode();
+    static enum Type implements StringRepresentable {
+        PASS_THROUGH, FULLY_FILTERED, PARTIALLY_FILTERED;
+        public static final StreamCodec<ByteBuf, Type> STREAM_CODEC;
+        public String getSerializedName();
+    }
+}
+//// FontDescription.java
+import com.mojang.serialization.Codec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.component.ResolvableProfile;
+public interface FontDescription {
+    Codec<FontDescription> CODEC;
+    Resource DEFAULT;
+    public static record Resource(Identifier id) implements FontDescription {
+    }
+    public static record AtlasSprite(Identifier atlasId, Identifier spriteId) implements FontDescription {
+    }
+    public static record PlayerSprite(ResolvableProfile profile, boolean hat) implements FontDescription {
+    }
+}
+//// FormattedText.java
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.util.Unit;
+public interface FormattedText {
+    Optional<Unit> STOP_ITERATION;
+    FormattedText EMPTY;
+    <T> Optional<T> visit(ContentConsumer<T> output);
+    <T> Optional<T> visit(StyledContentConsumer<T> output, Style parentStyle);
+    static FormattedText of(String text);
+    static FormattedText of(String text, Style style);
+    static FormattedText composite(FormattedText... parts);
+    static FormattedText composite(List<? extends FormattedText> parts);
+    default String getString();
+    public interface ContentConsumer<T> {
+        Optional<T> accept(String contents);
+    }
+    public interface StyledContentConsumer<T> {
+        Optional<T> accept(Style style, String contents);
+    }
+}
+//// HoverEvent.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemStackTemplate;
+public interface HoverEvent {
+    Codec<HoverEvent> CODEC;
+    Action action();
+    public static record ShowText(Component value) implements HoverEvent {
+        public static final MapCodec<ShowText> CODEC;
+        public Action action();
+    }
+    public static record ShowItem(ItemStackTemplate item) implements HoverEvent {
+        public static final MapCodec<ShowItem> CODEC;
+        public Action action();
+    }
+    public static record ShowEntity(EntityTooltipInfo entity) implements HoverEvent {
+        public static final MapCodec<ShowEntity> CODEC;
+        public Action action();
+    }
+    public static class EntityTooltipInfo {
+        public static final MapCodec<EntityTooltipInfo> CODEC;
+        public final EntityType<?> type;
+        public final UUID uuid;
+        public final Optional<Component> name;
+        public EntityTooltipInfo(EntityType<?> type, UUID uuid, Component name);
+        public EntityTooltipInfo(EntityType<?> type, UUID uuid, Optional<Component> name);
+        public List<Component> getTooltipLines();
+        public boolean equals(Object o);
+        public int hashCode();
+    }
+    public static enum Action implements StringRepresentable {
+        SHOW_TEXT, SHOW_ITEM, SHOW_ENTITY;
+        public static final Codec<Action> UNSAFE_CODEC;
+        public static final Codec<Action> CODEC;
+        public boolean isAllowedFromServer();
+        public String getSerializedName();
+        public String toString();
+    }
+}
+//// LastSeenMessages.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.security.SignatureException;
+import java.util.BitSet;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.SignatureUpdater;
+public record LastSeenMessages(List<MessageSignature> entries) {
+    public static final Codec<LastSeenMessages> CODEC;
+    public static final LastSeenMessages EMPTY;
+    public static final int LAST_SEEN_MESSAGES_MAX_LENGTH = 20;
+    public void updateSignature(SignatureUpdater.Output output) throws SignatureException;
+    public Packed pack(MessageSignatureCache cache);
+    public byte computeChecksum();
+    public static record Packed(List<MessageSignature.Packed> entries) {
+        public static final Packed EMPTY;
+        public static final StreamCodec<ByteBuf, Packed> STREAM_CODEC;
+        public Optional<LastSeenMessages> unpack(MessageSignatureCache cache);
+    }
+    public static record Update(int offset, BitSet acknowledged, byte checksum) {
+        public static final byte IGNORE_CHECKSUM = (byte) 0;
+        public static final StreamCodec<ByteBuf, Update> STREAM_CODEC;
+        public boolean verifyChecksum(LastSeenMessages lastSeen);
+    }
+}
+//// LastSeenMessagesTracker.java
+public class LastSeenMessagesTracker {
+    public LastSeenMessagesTracker(int lastSeenCount);
+    public boolean addPending(MessageSignature message, boolean wasShown);
+    public void ignorePending(MessageSignature pendingMessage);
+    public int getAndClearOffset();
+    public Update generateAndApplyUpdate();
+    public int offset();
+    public static record Update(LastSeenMessages lastSeen, LastSeenMessages.Update update) {
+    }
+}
+//// LastSeenMessagesValidator.java
+public class LastSeenMessagesValidator {
+    public LastSeenMessagesValidator(int lastSeenCount);
+    public void addPending(MessageSignature message);
+    public int trackedMessagesCount();
+    public void applyOffset(int offset) throws ValidationException;
+    public LastSeenMessages applyUpdate(LastSeenMessages.Update update) throws ValidationException;
+    public static class ValidationException extends Exception {
+        public ValidationException(String message);
+    }
+}
+//// LastSeenTrackedEntry.java
+public record LastSeenTrackedEntry(MessageSignature signature, boolean pending) {
+    public LastSeenTrackedEntry acknowledge();
+}
+//// LocalChatSession.java
+import java.util.UUID;
+import net.minecraft.world.entity.player.ProfileKeyPair;
+public record LocalChatSession(UUID sessionId, ProfileKeyPair keyPair) {
+    public static LocalChatSession create(ProfileKeyPair keyPair);
+    public SignedMessageChain.Encoder createMessageEncoder(UUID profileId);
+    public RemoteChatSession asRemote();
+}
+//// MessageSignature.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import java.nio.ByteBuffer;
+import java.util.Optional;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.SignatureUpdater;
+import net.minecraft.util.SignatureValidator;
+public record MessageSignature(byte[] bytes) {
+    public static final Codec<MessageSignature> CODEC;
+    public static final StreamCodec<ByteBuf, MessageSignature> STREAM_CODEC;
+    public static final int BYTES = 256;
+    public boolean verify(SignatureValidator signature, SignatureUpdater updater);
+    public ByteBuffer asByteBuffer();
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+    public static String describe(MessageSignature signature);
+    public Packed pack(MessageSignatureCache cache);
+    public int checksum();
+    public static record Packed(int id, MessageSignature fullSignature) {
+        public static final int FULL_SIGNATURE = -1;
+        public static final StreamCodec<ByteBuf, Packed> STREAM_CODEC;
+        public Packed(MessageSignature signature);
+        public Packed(int id);
+        public Optional<MessageSignature> unpack(MessageSignatureCache cache);
+    }
+}
+//// MessageSignatureCache.java
+import java.util.List;
+public class MessageSignatureCache {
+    public static final int NOT_FOUND = -1;
+    public MessageSignatureCache(int capacity);
+    public static MessageSignatureCache createDefault();
+    public int pack(MessageSignature signature);
+    public MessageSignature unpack(int id);
+    public void push(SignedMessageBody body, MessageSignature signature);
+    void push(List<MessageSignature> entries);
+}
+//// MutableComponent.java
+import java.util.List;
+import java.util.function.UnaryOperator;
+import net.minecraft.ChatFormatting;
+import net.minecraft.util.FormattedCharSequence;
+public final class MutableComponent implements Component {
+    MutableComponent(ComponentContents contents, List<Component> siblings, Style style);
+    public static MutableComponent create(ComponentContents contents);
+    public ComponentContents getContents();
+    public List<Component> getSiblings();
+    public MutableComponent setStyle(Style style);
+    public Style getStyle();
+    public MutableComponent append(String text);
+    public MutableComponent append(Component component);
+    public MutableComponent withStyle(UnaryOperator<Style> updater);
+    public MutableComponent withStyle(Style patch);
+    public MutableComponent withStyle(ChatFormatting... formats);
+    public MutableComponent withStyle(ChatFormatting format);
+    public MutableComponent withColor(int color);
+    public MutableComponent withColor(TextColor color);
+    public MutableComponent withoutShadow();
+    public FormattedCharSequence getVisualOrderText();
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+}
+//// OutgoingChatMessage.java
+import net.minecraft.server.level.ServerPlayer;
+public interface OutgoingChatMessage {
+    Component content();
+    void sendToPlayer(ServerPlayer player, boolean filtered, ChatType.Bound chatType);
+    static OutgoingChatMessage create(PlayerChatMessage message);
+    public static record Player(PlayerChatMessage message) implements OutgoingChatMessage {
+        public Component content();
+        public void sendToPlayer(ServerPlayer player, boolean filtered, ChatType.Bound chatType);
+    }
+    public static record Disguised(Component content) implements OutgoingChatMessage {
+        public void sendToPlayer(ServerPlayer player, boolean filtered, ChatType.Bound chatType);
+    }
+}
+//// PlayerChatMessage.java
+import com.mojang.serialization.MapCodec;
+import java.security.SignatureException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+import net.minecraft.util.SignatureUpdater;
+import net.minecraft.util.SignatureValidator;
+public record PlayerChatMessage(SignedMessageLink link, MessageSignature signature, SignedMessageBody signedBody, Component unsignedContent, FilterMask filterMask) {
+    public static final MapCodec<PlayerChatMessage> MAP_CODEC;
+    public static final Duration MESSAGE_EXPIRES_AFTER_SERVER;
+    public static final Duration MESSAGE_EXPIRES_AFTER_CLIENT;
+    public static PlayerChatMessage system(String content);
+    public static PlayerChatMessage unsigned(UUID sender, String content);
+    public PlayerChatMessage withUnsignedContent(Component content);
+    public PlayerChatMessage removeUnsignedContent();
+    public PlayerChatMessage filter(FilterMask filterMask);
+    public PlayerChatMessage filter(boolean filtered);
+    public PlayerChatMessage removeSignature();
+    public static void updateSignature(SignatureUpdater.Output output, SignedMessageLink link, SignedMessageBody body) throws SignatureException;
+    public boolean verify(SignatureValidator signatureValidator);
+    public String signedContent();
+    public Component decoratedContent();
+    public Instant timeStamp();
+    public long salt();
+    public boolean hasExpiredServer(Instant now);
+    public boolean hasExpiredClient(Instant now);
+    public UUID sender();
+    public boolean isSystem();
+    public boolean hasSignature();
+    public boolean hasSignatureFrom(UUID profileId);
+    public boolean isFullyFiltered();
+    public static String describeSigned(PlayerChatMessage message);
+}
+//// RemoteChatSession.java
+import com.mojang.authlib.GameProfile;
+import io.netty.buffer.ByteBuf;
+import java.time.Duration;
+import java.util.UUID;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.SignatureValidator;
+import net.minecraft.world.entity.player.ProfilePublicKey;
+public record RemoteChatSession(UUID sessionId, ProfilePublicKey profilePublicKey) {
+    public SignedMessageValidator createMessageValidator(Duration gracePeriod);
+    public SignedMessageChain.Decoder createMessageDecoder(UUID profileId);
+    public Data asData();
+    public boolean hasExpired();
+    public static record Data(UUID sessionId, ProfilePublicKey.Data profilePublicKey) {
+        public static final StreamCodec<ByteBuf, Data> STREAM_CODEC;
+        public RemoteChatSession validate(GameProfile profile, SignatureValidator serviceSignatureValidator) throws ProfilePublicKey.ValidationException;
+    }
+}
+//// ResolutionContext.java
+import java.util.function.Predicate;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.contents.objects.ObjectInfo;
+import net.minecraft.world.entity.Entity;
+import org.apache.commons.lang3.mutable.MutableInt;
+public record ResolutionContext(CommandSourceStack source, Entity defaultScoreboardEntity, Predicate<ObjectInfo> objectInfoValidator, int depthLimit, LimitBehavior depthLimitBehavior, int resolvedComponentLimit, MutableInt resolvedComponentCount) {
+    public ObjectInfo validate(ObjectInfo description);
+    public static ResolutionContext create(CommandSourceStack source);
+    public static Builder builder();
+    public static enum LimitBehavior {
+        DISCARD_REMAINING, STOP_PROCESSING_AND_COPY_REMAINING;
+    }
+    public static class Builder {
+        public Builder();
+        public Builder withSource(CommandSourceStack source);
+        public Builder withEntityOverride(Entity defaultScoreboardEntity);
+        public Builder withObjectInfoValidator(Predicate<ObjectInfo> objectInfoValidator);
+        public Builder setDepthLimit(int depthLimit);
+        public Builder setDepthLimitBehavior(LimitBehavior behavior);
+        public ResolutionContext build();
+    }
+}
+//// SignableCommand.java
+import com.mojang.brigadier.ParseResults;
+import com.mojang.brigadier.tree.ArgumentCommandNode;
+import java.util.List;
+public record SignableCommand<S>(List<Argument<S>> arguments) {
+    public static <S> boolean hasSignableArguments(ParseResults<S> command);
+    public static <S> SignableCommand<S> of(ParseResults<S> command);
+    public Argument<S> getArgument(String name);
+    public static record Argument<S>(ArgumentCommandNode<S, ?> node, String value) {
+        public String name();
+    }
+}
+//// SignedMessageBody.java
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import java.security.SignatureException;
+import java.time.Instant;
+import java.util.Optional;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.SignatureUpdater;
+public record SignedMessageBody(String content, Instant timeStamp, long salt, LastSeenMessages lastSeen) {
+    public static final MapCodec<SignedMessageBody> MAP_CODEC;
+    public static SignedMessageBody unsigned(String content);
+    public void updateSignature(SignatureUpdater.Output output) throws SignatureException;
+    public Packed pack(MessageSignatureCache cache);
+    public static record Packed(String content, Instant timeStamp, long salt, LastSeenMessages.Packed lastSeen) {
+        public static final StreamCodec<ByteBuf, Packed> STREAM_CODEC;
+        public Optional<SignedMessageBody> unpack(MessageSignatureCache cache);
+    }
+}
+//// SignedMessageChain.java
+import java.util.UUID;
+import java.util.function.BooleanSupplier;
+import net.minecraft.util.Signer;
+import net.minecraft.world.entity.player.ProfilePublicKey;
+public class SignedMessageChain {
+    public SignedMessageChain(UUID profileId, UUID sessionId);
+    public Encoder encoder(Signer signer);
+    public Decoder decoder(ProfilePublicKey profilePublicKey);
+    public interface Encoder {
+        Encoder UNSIGNED;
+        MessageSignature pack(SignedMessageBody body);
+    }
+    public interface Decoder {
+        static Decoder unsigned(UUID profileId, BooleanSupplier enforcesSecureChat);
+        PlayerChatMessage unpack(MessageSignature signature, SignedMessageBody body) throws DecodeException;
+        default void setChainBroken();
+    }
+    public static class DecodeException extends ThrowingComponent {
+        public DecodeException(Component component);
+    }
+}
+//// SignedMessageLink.java
+import com.mojang.serialization.Codec;
+import java.security.SignatureException;
+import java.util.UUID;
+import net.minecraft.util.SignatureUpdater;
+public record SignedMessageLink(int index, UUID sender, UUID sessionId) {
+    public static final Codec<SignedMessageLink> CODEC;
+    public static SignedMessageLink unsigned(UUID sender);
+    public static SignedMessageLink root(UUID sender, UUID sessionId);
+    public void updateSignature(SignatureUpdater.Output output) throws SignatureException;
+    public boolean isDescendantOf(SignedMessageLink link);
+    public SignedMessageLink advance();
+}
+//// SignedMessageValidator.java
+import java.util.function.BooleanSupplier;
+import net.minecraft.util.SignatureValidator;
+import org.slf4j.Logger;
+public interface SignedMessageValidator {
+    Logger LOGGER;
+    SignedMessageValidator ACCEPT_UNSIGNED;
+    SignedMessageValidator REJECT_ALL;
+    PlayerChatMessage updateAndValidate(PlayerChatMessage message);
+    public static class KeyBased implements SignedMessageValidator {
+        public KeyBased(SignatureValidator validator, BooleanSupplier expired);
+        public PlayerChatMessage updateAndValidate(PlayerChatMessage message);
+    }
+}
+//// Style.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public final class Style {
+    public static final Style EMPTY;
+    public static final int NO_SHADOW = 0;
+    private Style(TextColor color, Integer shadowColor, Boolean bold, Boolean italic, Boolean underlined, Boolean strikethrough, Boolean obfuscated, ClickEvent clickEvent, HoverEvent hoverEvent, String insertion, FontDescription font);
+    public TextColor getColor();
+    public Integer getShadowColor();
+    public boolean isBold();
+    public boolean isItalic();
+    public boolean isStrikethrough();
+    public boolean isUnderlined();
+    public boolean isObfuscated();
+    public boolean isEmpty();
+    public ClickEvent getClickEvent();
+    public HoverEvent getHoverEvent();
+    public String getInsertion();
+    public FontDescription getFont();
+    public Style withColor(TextColor color);
+    public Style withColor(ChatFormatting color);
+    public Style withColor(int color);
+    public Style withShadowColor(int shadowColor);
+    public Style withoutShadow();
+    public Style withBold(Boolean bold);
+    public Style withItalic(Boolean italic);
+    public Style withUnderlined(Boolean underlined);
+    public Style withStrikethrough(Boolean strikethrough);
+    public Style withObfuscated(Boolean obfuscated);
+    public Style withClickEvent(ClickEvent clickEvent);
+    public Style withHoverEvent(HoverEvent hoverEvent);
+    public Style withInsertion(String insertion);
+    public Style withFont(FontDescription font);
+    public Style applyFormat(ChatFormatting format);
+    public Style applyLegacyFormat(ChatFormatting format);
+    public Style applyFormats(ChatFormatting... formats);
+    public Style applyTo(Style other);
+    public String toString();
+    public boolean equals(Object o);
+    public int hashCode();
+    public static class Serializer {
+        public static final MapCodec<Style> MAP_CODEC;
+        public static final Codec<Style> CODEC;
+        public static final StreamCodec<RegistryFriendlyByteBuf, Style> TRUSTED_STREAM_CODEC;
+    }
+}
+//// SubStringSource.java
+import it.unimi.dsi.fastutil.ints.Int2IntFunction;
+import java.util.List;
+import java.util.function.UnaryOperator;
+import net.minecraft.util.FormattedCharSequence;
+public class SubStringSource {
+    private SubStringSource(String plainText, List<Style> charStyles, Int2IntFunction reverseCharModifier);
+    public String getPlainText();
+    public List<FormattedCharSequence> substring(int start, int length, boolean reverse);
+    public static SubStringSource create(FormattedText text);
+    public static SubStringSource create(FormattedText text, Int2IntFunction reverseCharModifier, UnaryOperator<String> shaper);
+}
+//// TextColor.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import net.minecraft.ChatFormatting;
+public final class TextColor {
+    public static final Codec<TextColor> CODEC;
+    public static final TextColor BLACK;
+    public static final TextColor DARK_BLUE;
+    public static final TextColor DARK_GREEN;
+    public static final TextColor DARK_AQUA;
+    public static final TextColor DARK_RED;
+    public static final TextColor DARK_PURPLE;
+    public static final TextColor GOLD;
+    public static final TextColor GRAY;
+    public static final TextColor DARK_GRAY;
+    public static final TextColor BLUE;
+    public static final TextColor GREEN;
+    public static final TextColor AQUA;
+    public static final TextColor RED;
+    public static final TextColor LIGHT_PURPLE;
+    public static final TextColor YELLOW;
+    public static final TextColor WHITE;
+    private TextColor(int value, String name);
+    private TextColor(int value);
+    public int getValue();
+    public String serialize();
+    public boolean equals(Object o);
+    public int hashCode();
+    public String toString();
+    public static TextColor fromLegacyFormat(ChatFormatting format);
+    public static TextColor fromRgb(int rgb);
+    public static DataResult<TextColor> parseColor(String color);
+}
+//// ThrowingComponent.java
+public class ThrowingComponent extends Exception {
+    public ThrowingComponent(Component component);
+    public ThrowingComponent(Component component, Throwable cause);
+    public Component getComponent();
+}

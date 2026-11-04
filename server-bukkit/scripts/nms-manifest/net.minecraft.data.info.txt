@@ -1,0 +1,95 @@
+//// BiomeParametersDumpReport.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+public class BiomeParametersDumpReport implements DataProvider {
+    public BiomeParametersDumpReport(PackOutput output, CompletableFuture<HolderLookup.Provider> registries);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public final String getName();
+}
+//// BlockListReport.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+public class BlockListReport implements DataProvider {
+    public BlockListReport(PackOutput output, CompletableFuture<HolderLookup.Provider> registries);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public final String getName();
+}
+//// CommandsReport.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+public class CommandsReport implements DataProvider {
+    public CommandsReport(PackOutput output, CompletableFuture<HolderLookup.Provider> registries);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public final String getName();
+}
+//// DatapackStructureReport.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.Registry;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.StringRepresentable;
+public class DatapackStructureReport implements DataProvider {
+    public DatapackStructureReport(PackOutput output);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public String getName();
+    static record Report(Map<ResourceKey<? extends Registry<?>>, Entry> registries, Map<String, CustomPackEntry> others) {
+        public static final Codec<Report> CODEC;
+    }
+    static record Entry(boolean elements, boolean tags, boolean stable) {
+        public static final MapCodec<Entry> MAP_CODEC;
+        public static final Codec<Entry> CODEC;
+    }
+    static enum Format implements StringRepresentable {
+        STRUCTURE, MCFUNCTION;
+        public static final Codec<Format> CODEC;
+        public String getSerializedName();
+    }
+    static record CustomPackEntry(Format format, Entry entry) {
+        public static final Codec<CustomPackEntry> CODEC;
+    }
+}
+//// PacketReport.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+public class PacketReport implements DataProvider {
+    public PacketReport(PackOutput output);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public String getName();
+}
+//// RegistryComponentsReport.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+public class RegistryComponentsReport implements DataProvider {
+    public RegistryComponentsReport(PackOutput output, CompletableFuture<HolderLookup.Provider> registries);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public final String getName();
+}
+//// RegistryDumpReport.java
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.PackOutput;
+public class RegistryDumpReport implements DataProvider {
+    public RegistryDumpReport(PackOutput output);
+    public CompletableFuture<?> run(CachedOutput cache);
+    public final String getName();
+}

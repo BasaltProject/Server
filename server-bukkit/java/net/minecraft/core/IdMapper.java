@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.core;
 
 import java.util.ArrayList;
@@ -47,5 +48,7 @@ public class IdMapper<T> implements IdMap<T> {
     @Override
     public int size() {
         return tToId.size();
+    }
+    public IdMapper(int expectedSize) {
     }
 }

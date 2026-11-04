@@ -1,0 +1,182 @@
+//// BiasedToBottomInt.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record BiasedToBottomInt(int minInclusive, int maxInclusive) implements IntProvider {
+    public static final MapCodec<BiasedToBottomInt> MAP_CODEC;
+    public static BiasedToBottomInt of(int minInclusive, int maxInclusive);
+    public int sample(RandomSource random);
+    public MapCodec<BiasedToBottomInt> codec();
+    public String toString();
+}
+//// ClampedInt.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record ClampedInt(IntProvider source, int minInclusive, int maxInclusive) implements IntProvider {
+    public static final MapCodec<ClampedInt> MAP_CODEC;
+    public static ClampedInt of(IntProvider source, int minInclusive, int maxInclusive);
+    public int sample(RandomSource random);
+    public int minInclusive();
+    public int maxInclusive();
+    public MapCodec<ClampedInt> codec();
+}
+//// ClampedNormalFloat.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record ClampedNormalFloat(float mean, float deviation, float min, float max) implements FloatProvider {
+    public static final MapCodec<ClampedNormalFloat> MAP_CODEC;
+    public static ClampedNormalFloat of(float mean, float deviation, float min, float max);
+    public float sample(RandomSource random);
+    public static float sample(RandomSource random, float mean, float deviation, float min, float max);
+    public MapCodec<ClampedNormalFloat> codec();
+    public String toString();
+}
+//// ClampedNormalInt.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record ClampedNormalInt(float mean, float deviation, int minInclusive, int maxInclusive) implements IntProvider {
+    public static final MapCodec<ClampedNormalInt> MAP_CODEC;
+    public static ClampedNormalInt of(float mean, float deviation, int minInclusive, int maxInclusive);
+    public int sample(RandomSource random);
+    public static int sample(RandomSource random, float mean, float deviation, float minInclusive, float maxInclusive);
+    public MapCodec<ClampedNormalInt> codec();
+    public String toString();
+}
+//// ConstantFloat.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record ConstantFloat(float value) implements FloatProvider {
+    public static final ConstantFloat ZERO;
+    public static final MapCodec<ConstantFloat> MAP_CODEC;
+    public static ConstantFloat of(float value);
+    public float sample(RandomSource random);
+    public float min();
+    public float max();
+    public MapCodec<ConstantFloat> codec();
+    public String toString();
+}
+//// ConstantInt.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record ConstantInt(int value) implements IntProvider {
+    public static final ConstantInt ZERO;
+    public static final MapCodec<ConstantInt> MAP_CODEC;
+    public static ConstantInt of(int value);
+    public int sample(RandomSource random);
+    public int minInclusive();
+    public int maxInclusive();
+    public MapCodec<ConstantInt> codec();
+    public String toString();
+}
+//// FloatProvider.java
+import com.mojang.serialization.MapCodec;
+public interface FloatProvider extends SampledFloat {
+    float min();
+    float max();
+    MapCodec<? extends FloatProvider> codec();
+}
+//// FloatProviders.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class FloatProviders {
+    public static final Codec<FloatProvider> CODEC;
+    public static Codec<FloatProvider> codec(float minValue, float maxValue);
+    public static Codec<FloatProvider> codec(float minValue);
+    public static MapCodec<? extends FloatProvider> bootstrap(Registry<MapCodec<? extends FloatProvider>> registry);
+}
+//// IntProvider.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public interface IntProvider {
+    int sample(RandomSource random);
+    int minInclusive();
+    int maxInclusive();
+    MapCodec<? extends IntProvider> codec();
+}
+//// IntProviders.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Registry;
+public class IntProviders {
+    public static final Codec<IntProvider> CODEC;
+    public static final Codec<IntProvider> NON_NEGATIVE_CODEC;
+    public static final Codec<IntProvider> POSITIVE_CODEC;
+    public static Codec<IntProvider> codec(int minValue, int maxValue);
+    public static <T extends IntProvider> Codec<T> validateCodec(int minValue, int maxValue, Codec<T> codec);
+    public static MapCodec<? extends IntProvider> bootstrap(Registry<MapCodec<? extends IntProvider>> registry);
+}
+//// MultipliedFloats.java
+import net.minecraft.util.RandomSource;
+public class MultipliedFloats implements SampledFloat {
+    public MultipliedFloats(SampledFloat... values);
+    public float sample(RandomSource random);
+    public String toString();
+}
+//// SampledFloat.java
+import net.minecraft.util.RandomSource;
+public interface SampledFloat {
+    float sample(RandomSource random);
+}
+//// TrapezoidFloat.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record TrapezoidFloat(float min, float max, float plateau) implements FloatProvider {
+    public static final MapCodec<TrapezoidFloat> MAP_CODEC;
+    public static TrapezoidFloat of(float min, float max, float plateau);
+    public float sample(RandomSource random);
+    public MapCodec<TrapezoidFloat> codec();
+    public String toString();
+}
+//// TrapezoidInt.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record TrapezoidInt(int minInclusive, int maxInclusive, int plateau) implements IntProvider {
+    public static final MapCodec<TrapezoidInt> MAP_CODEC;
+    public static TrapezoidInt of(int min, int max, int plateau);
+    public static IntProvider triangle(int range);
+    public int sample(RandomSource random);
+    public MapCodec<TrapezoidInt> codec();
+    public String toString();
+}
+//// UniformFloat.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record UniformFloat(float min, float max) implements FloatProvider {
+    public static final MapCodec<UniformFloat> MAP_CODEC;
+    public static UniformFloat of(float min, float max);
+    public float sample(RandomSource random);
+    public MapCodec<UniformFloat> codec();
+    public String toString();
+}
+//// UniformInt.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record UniformInt(int minInclusive, int maxInclusive) implements IntProvider {
+    public static final MapCodec<UniformInt> MAP_CODEC;
+    public static UniformInt of(int minInclusive, int maxInclusive);
+    public int sample(RandomSource random);
+    public MapCodec<UniformInt> codec();
+    public String toString();
+}
+//// VeryBiasedToBottomInt.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+public record VeryBiasedToBottomInt(int minInclusive, int maxInclusive) implements IntProvider {
+    public static final MapCodec<VeryBiasedToBottomInt> MAP_CODEC;
+    public static VeryBiasedToBottomInt of(int minInclusive, int maxInclusive);
+    public int sample(RandomSource random);
+    public MapCodec<VeryBiasedToBottomInt> codec();
+    public String toString();
+}
+//// WeightedListInt.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.random.WeightedList;
+public class WeightedListInt implements IntProvider {
+    public static final MapCodec<WeightedListInt> MAP_CODEC;
+    public WeightedListInt(WeightedList<IntProvider> distribution);
+    public int sample(RandomSource random);
+    public int minInclusive();
+    public int maxInclusive();
+    public MapCodec<WeightedListInt> codec();
+}

@@ -1,0 +1,85 @@
+//// DoubleArgumentInfo.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.network.FriendlyByteBuf;
+public class DoubleArgumentInfo implements ArgumentTypeInfo<DoubleArgumentType, Template> {
+    public void serializeToNetwork(Template template, FriendlyByteBuf out);
+    public Template deserializeFromNetwork(FriendlyByteBuf in);
+    public void serializeToJson(Template template, JsonObject out);
+    public Template unpack(DoubleArgumentType argument);
+    public final class Template implements ArgumentTypeInfo.Template<DoubleArgumentType> {
+        private Template(double min, double max);
+        public DoubleArgumentType instantiate(CommandBuildContext context);
+        public ArgumentTypeInfo<DoubleArgumentType, ?> type();
+    }
+}
+//// FloatArgumentInfo.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.arguments.FloatArgumentType;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.network.FriendlyByteBuf;
+public class FloatArgumentInfo implements ArgumentTypeInfo<FloatArgumentType, Template> {
+    public void serializeToNetwork(Template template, FriendlyByteBuf out);
+    public Template deserializeFromNetwork(FriendlyByteBuf in);
+    public void serializeToJson(Template template, JsonObject out);
+    public Template unpack(FloatArgumentType argument);
+    public final class Template implements ArgumentTypeInfo.Template<FloatArgumentType> {
+        private Template(float min, float max);
+        public FloatArgumentType instantiate(CommandBuildContext context);
+        public ArgumentTypeInfo<FloatArgumentType, ?> type();
+    }
+}
+//// IntegerArgumentInfo.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.network.FriendlyByteBuf;
+public class IntegerArgumentInfo implements ArgumentTypeInfo<IntegerArgumentType, Template> {
+    public void serializeToNetwork(Template template, FriendlyByteBuf out);
+    public Template deserializeFromNetwork(FriendlyByteBuf in);
+    public void serializeToJson(Template template, JsonObject out);
+    public Template unpack(IntegerArgumentType argument);
+    public final class Template implements ArgumentTypeInfo.Template<IntegerArgumentType> {
+        private Template(int min, int max);
+        public IntegerArgumentType instantiate(CommandBuildContext context);
+        public ArgumentTypeInfo<IntegerArgumentType, ?> type();
+    }
+}
+//// LongArgumentInfo.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.arguments.LongArgumentType;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.network.FriendlyByteBuf;
+public class LongArgumentInfo implements ArgumentTypeInfo<LongArgumentType, Template> {
+    public void serializeToNetwork(Template template, FriendlyByteBuf out);
+    public Template deserializeFromNetwork(FriendlyByteBuf in);
+    public void serializeToJson(Template template, JsonObject out);
+    public Template unpack(LongArgumentType argument);
+    public final class Template implements ArgumentTypeInfo.Template<LongArgumentType> {
+        private Template(long min, long max);
+        public LongArgumentType instantiate(CommandBuildContext context);
+        public ArgumentTypeInfo<LongArgumentType, ?> type();
+    }
+}
+//// StringArgumentSerializer.java
+import com.google.gson.JsonObject;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
+import net.minecraft.network.FriendlyByteBuf;
+public class StringArgumentSerializer implements ArgumentTypeInfo<StringArgumentType, Template> {
+    public void serializeToNetwork(Template template, FriendlyByteBuf out);
+    public Template deserializeFromNetwork(FriendlyByteBuf in);
+    public void serializeToJson(Template template, JsonObject out);
+    public Template unpack(StringArgumentType argument);
+    public final class Template implements ArgumentTypeInfo.Template<StringArgumentType> {
+        public Template(StringArgumentType.StringType type);
+        public StringArgumentType instantiate(CommandBuildContext context);
+        public ArgumentTypeInfo<StringArgumentType, ?> type();
+    }
+}

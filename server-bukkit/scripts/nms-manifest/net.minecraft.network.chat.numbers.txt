@@ -1,0 +1,56 @@
+//// BlankFormat.java
+import net.minecraft.network.chat.MutableComponent;
+public class BlankFormat implements NumberFormat {
+    public static final BlankFormat INSTANCE;
+    public static final NumberFormatType<BlankFormat> TYPE;
+    private BlankFormat();
+    public MutableComponent format(int value);
+    public NumberFormatType<BlankFormat> type();
+}
+//// FixedFormat.java
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+public record FixedFormat(Component value) implements NumberFormat {
+    public static final NumberFormatType<FixedFormat> TYPE;
+    public MutableComponent format(int value);
+    public NumberFormatType<FixedFormat> type();
+}
+//// NumberFormat.java
+import net.minecraft.network.chat.MutableComponent;
+public interface NumberFormat {
+    MutableComponent format(int value);
+    NumberFormatType<? extends NumberFormat> type();
+}
+//// NumberFormatType.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public interface NumberFormatType<T extends NumberFormat> {
+    MapCodec<T> mapCodec();
+    StreamCodec<RegistryFriendlyByteBuf, T> streamCodec();
+}
+//// NumberFormatTypes.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import net.minecraft.core.Registry;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public class NumberFormatTypes {
+    public static final MapCodec<NumberFormat> MAP_CODEC;
+    public static final Codec<NumberFormat> CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, NumberFormat> STREAM_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, Optional<NumberFormat>> OPTIONAL_STREAM_CODEC;
+    public static NumberFormatType<?> bootstrap(Registry<NumberFormatType<?>> registry);
+}
+//// StyledFormat.java
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+public record StyledFormat(Style style) implements NumberFormat {
+    public static final NumberFormatType<StyledFormat> TYPE;
+    public static final StyledFormat NO_STYLE;
+    public static final StyledFormat SIDEBAR_DEFAULT;
+    public static final StyledFormat PLAYER_LIST_DEFAULT;
+    public MutableComponent format(int value);
+    public NumberFormatType<StyledFormat> type();
+}

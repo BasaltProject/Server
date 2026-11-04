@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.block.state.properties;
 
 import java.util.ArrayList;
@@ -46,5 +47,11 @@ public final class IntegerProperty extends Property<Integer> {
     @Override
     public int getInternalIndex(Integer value) {
         return value - min;
+    }
+    public boolean equals(Object o) {
+        return o instanceof IntegerProperty other && super.equals(o) && values.equals(other.values);
+    }
+    public int generateHashCode() {
+        return 31 * super.generateHashCode() + values.hashCode();
     }
 }

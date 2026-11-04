@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.core;
 
 import java.util.ArrayList;
@@ -13,6 +14,11 @@ import java.util.stream.Stream;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
+import com.mojang.serialization.Lifecycle;
+import java.util.function.BiConsumer;
+import net.minecraft.core.component.DataComponentLookup;
+import net.minecraft.tags.TagLoader;
+import net.minecraft.util.RandomSource;
 
 public class MappedRegistry<T> implements WritableRegistry<T> {
     private final ResourceKey<? extends Registry<T>> key;
@@ -23,6 +29,8 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
     private final Map<TagKey<T>, HolderSet.Named<T>> tags = new LinkedHashMap<>();
     private final IdMap<Holder<T>> holderIds = new HolderIds();
     private Runnable tagLoader;
+    private Lifecycle lifecycle = Lifecycle.stable();
+    private boolean frozen;
 
     public MappedRegistry(ResourceKey<? extends Registry<T>> key) {
         this.key = key;
@@ -193,5 +201,98 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
         public Iterator<Holder<T>> iterator() {
             return byId.stream().<Holder<T>>map(reference -> reference).iterator();
         }
+    }
+    public MappedRegistry(ResourceKey<? extends Registry<T>> key, Lifecycle lifecycle) {
+        this.key = key;
+        this.lifecycle = lifecycle;
+    }
+    public MappedRegistry(ResourceKey<? extends Registry<T>> key, Lifecycle initialLifecycle, boolean intrusiveHolders) {
+        this.key = key;
+        this.lifecycle = initialLifecycle;
+    }
+    public String toString() {
+        return "Registry[" + key + " (" + lifecycle + ")]";
+    }
+    public Holder.Reference<T> register(ResourceKey<T> key, T value, RegistrationInfo registrationInfo) {
+        return register(key, value);
+    }
+    public Optional<Holder.Reference<T>> getAny() {
+        return byId.isEmpty() ? Optional.empty() : Optional.of(byId.get(0));
+    }
+    public Optional<RegistrationInfo> registrationInfo(ResourceKey<T> element) {
+        return Optional.empty();
+    }
+    public Lifecycle registryLifecycle() {
+        return lifecycle;
+    }
+    public Set<Map.Entry<ResourceKey<T>, T>> entrySet() {
+        Set<Map.Entry<ResourceKey<T>, T>> entries = new java.util.LinkedHashSet<>();
+        for (Holder.Reference<T> holder : byId) {
+            entries.add(Map.entry(holder.key(), holder.value()));
+        }
+        return Collections.unmodifiableSet(entries);
+    }
+    public boolean isEmpty() {
+        return byId.isEmpty();
+    }
+    public Optional<Holder.Reference<T>> getRandom(RandomSource random) {
+        return byId.isEmpty() ? Optional.empty() : Optional.of(byId.get(random.nextInt(byId.size())));
+    }
+    public boolean containsKey(ResourceKey<T> key) {
+        return byKey.containsKey(key);
+    }
+    public DataComponentLookup<T> componentLookup() {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.MappedRegistry#componentLookup");
+    }
+    public Registry<T> freeze() {
+        frozen = true;
+        return this;
+    }
+    public Holder.Reference<T> createIntrusiveHolder(T value) {
+        return Holder.Reference.createIntrusive(this, value);
+    }
+    public void bindTags(Map<TagKey<T>, List<Holder<T>>> pendingTags) {
+        pendingTags.forEach(this::bindTag);
+    }
+    public void bindAllTagsToEmpty() {
+        tags.values().forEach(set -> set.bind(List.of()));
+    }
+    public HolderGetter<T> createRegistrationLookup() {
+        return this;
+    }
+    public Registry.PendingTags<T> prepareTagReload(TagLoader.LoadResult<T> tags) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.MappedRegistry#prepareTagReload");
+    }
+    interface TagSet<T> {
+        static <T> TagSet<T> unbound() {
+        return fromMap(new LinkedHashMap<>());
+        }
+        static <T> TagSet<T> fromMap(Map<TagKey<T>, HolderSet.Named<T>> tags) {
+        return new TagSet<>() {
+            @Override
+            public boolean isBound() {
+        return true;
+            }
+
+            @Override
+            public Optional<HolderSet.Named<T>> get(TagKey<T> id) {
+        return Optional.ofNullable(tags.get(id));
+            }
+
+            @Override
+            public void forEach(BiConsumer<? super TagKey<T>, ? super HolderSet.Named<T>> action) {
+        tags.forEach(action);
+            }
+
+            @Override
+            public Stream<HolderSet.Named<T>> getTags() {
+        return tags.values().stream();
+            }
+        };
+        }
+        boolean isBound();
+        Optional<HolderSet.Named<T>> get(TagKey<T> id);
+        void forEach(BiConsumer<? super TagKey<T>, ? super HolderSet.Named<T>> action);
+        Stream<HolderSet.Named<T>> getTags();
     }
 }

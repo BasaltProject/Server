@@ -1,0 +1,311 @@
+//// CharPredicate.java
+public interface CharPredicate {
+    boolean test(char value);
+    default CharPredicate and(CharPredicate other);
+    default CharPredicate negate();
+    default CharPredicate or(CharPredicate other);
+}
+//// ChatFormatting.java
+public enum ChatFormatting {
+    BLACK, DARK_BLUE, DARK_GREEN, DARK_AQUA, DARK_RED, DARK_PURPLE, GOLD, GRAY, DARK_GRAY, BLUE, GREEN, AQUA, RED, LIGHT_PURPLE, YELLOW, WHITE, OBFUSCATED, BOLD, STRIKETHROUGH, UNDERLINE, ITALIC, RESET;
+    public static final char PREFIX_CODE;
+    public String toString();
+    public static String stripFormatting(String input);
+    public static ChatFormatting getByCode(char code);
+}
+//// CrashReport.java
+import java.nio.file.Path;
+import java.util.List;
+public class CrashReport {
+    public CrashReport(String title, Throwable t);
+    public String getTitle();
+    public Throwable getException();
+    public String getDetails();
+    public void getDetails(StringBuilder builder);
+    public String getExceptionMessage();
+    public String getFriendlyReport(ReportType reportType, List<String> extraComments);
+    public String getFriendlyReport(ReportType reportType);
+    public Path getSaveFile();
+    public boolean saveToFile(Path saveFile, ReportType reportType, List<String> extraComments);
+    public boolean saveToFile(Path file, ReportType reportType);
+    public SystemReport getSystemReport();
+    public CrashReportCategory addCategory(String name);
+    public CrashReportCategory addCategory(String name, int nestedOffset);
+    public static CrashReport forThrowable(Throwable t, String title);
+    public static void preload();
+}
+//// CrashReportCategory.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+public class CrashReportCategory {
+    public CrashReportCategory(String title);
+    public static String formatLocation(LevelHeightAccessor levelHeightAccessor, double x, double y, double z);
+    public static String formatLocation(LevelHeightAccessor levelHeightAccessor, BlockPos pos);
+    public static String formatLocation(LevelHeightAccessor levelHeightAccessor, int x, int y, int z);
+    public CrashReportCategory setDetail(String key, CrashReportDetail<String> callback);
+    public CrashReportCategory setDetail(String key, Object value);
+    public void setDetailError(String key, Throwable t);
+    public int fillInStackTrace(int nestedOffset);
+    public boolean validateStackTrace(StackTraceElement source, StackTraceElement next);
+    public void getDetails(StringBuilder builder);
+    public StackTraceElement[] getStacktrace();
+    public static void populateBlockDetails(CrashReportCategory category, LevelHeightAccessor levelHeightAccessor, BlockPos pos, BlockState state);
+    public static CrashReportCategory populateBlockLocationDetails(CrashReportCategory category, LevelHeightAccessor levelHeightAccessor, BlockPos pos);
+    public static record Entry(String key, String value) {
+        public Entry(String key, Object rawValue);
+    }
+}
+//// CrashReportDetail.java
+import java.util.concurrent.Callable;
+public interface CrashReportDetail<V> extends Callable< V> {
+}
+//// DefaultUncaughtExceptionHandler.java
+import org.slf4j.Logger;
+public class DefaultUncaughtExceptionHandler implements Thread.UncaughtExceptionHandler {
+    public DefaultUncaughtExceptionHandler(Logger logger);
+    public void uncaughtException(Thread t, Throwable e);
+}
+//// DefaultUncaughtExceptionHandlerWithName.java
+import org.slf4j.Logger;
+public class DefaultUncaughtExceptionHandlerWithName implements Thread.UncaughtExceptionHandler {
+    public DefaultUncaughtExceptionHandlerWithName(Logger logger);
+    public void uncaughtException(Thread t, Throwable e);
+}
+//// DetectedVersion.java
+public class DetectedVersion {
+    public static final WorldVersion BUILT_IN;
+    public static WorldVersion createBuiltIn(String id, String name);
+    public static WorldVersion createBuiltIn(String id, String name, boolean stable);
+    public static WorldVersion tryDetectVersion();
+}
+//// ExitCodes.java
+public class ExitCodes {
+    public static final int EXIT_CODE_CRASH_DEFAULT = -1;
+    public static final int EXIT_CODE_CRASH_WITHOUT_REPORT = -2;
+    public static final int EXIT_CODE_CRASH_EARLY_NO_MODULES = -3;
+    public static final int EXIT_CODE_CRASH_EARLY_ARGUMENT_LIBRARY_LOAD = -4;
+    public static final int EXIT_CODE_CRASH_EARLY_ARGUMENT_PARSE = -5;
+    public static final int EXIT_CODE_CRASH_SHUTDOWN = -6;
+    public static final int EXIT_CODE_VERSION_PARSING_FAIL = -7;
+    public static final int EXIT_CODE_CLIENT_WATCHDOG = -8;
+}
+//// IdentifierException.java
+public class IdentifierException extends RuntimeException {
+    public IdentifierException(String message);
+    public IdentifierException(String message, Throwable cause);
+}
+//// Optionull.java
+import java.util.Collection;
+import java.util.function.Function;
+import java.util.function.Supplier;
+public class Optionull {
+    public static <T> T orElse(T t, T defaultValue);
+    public static <T, R> R map(T t, Function<T, R> map);
+    public static <T, R> R mapOrDefault(T t, Function<T, R> map, R defaultValue);
+    public static <T, R> R mapOrElse(T t, Function<T, R> map, Supplier<R> elseSupplier);
+    public static <T> T first(Collection<T> collection);
+    public static <T> T firstOrDefault(Collection<T> collection, T defaultValue);
+    public static <T> T firstOrElse(Collection<T> collection, Supplier<T> elseSupplier);
+    public static <T> boolean isNullOrEmpty(T [] t);
+    public static boolean isNullOrEmpty(boolean [] t);
+    public static boolean isNullOrEmpty(byte [] t);
+    public static boolean isNullOrEmpty(char [] t);
+    public static boolean isNullOrEmpty(short [] t);
+    public static boolean isNullOrEmpty(int [] t);
+    public static boolean isNullOrEmpty(long [] t);
+    public static boolean isNullOrEmpty(float [] t);
+    public static boolean isNullOrEmpty(double [] t);
+}
+//// ReportType.java
+import java.util.List;
+public record ReportType(String header, List<String> nuggets) {
+    public static final ReportType CRASH;
+    public static final ReportType PROFILE;
+    public static final ReportType TEST;
+    public static final ReportType NETWORK_PROTOCOL_ERROR;
+    public static final ReportType CHUNK_IO_ERROR;
+    public String getErrorComment();
+    public void appendHeader(StringBuilder builder, List<String> extraComments);
+}
+//// ReportedException.java
+public class ReportedException extends RuntimeException {
+    public ReportedException(CrashReport report);
+    public CrashReport getReport();
+    public Throwable getCause();
+    public String getMessage();
+}
+//// SharedConstants.java
+import io.netty.util.ResourceLeakDetector;
+import io.netty.util.ResourceLeakDetector.Level;
+import net.minecraft.world.level.ChunkPos;
+public class SharedConstants {
+    public static final boolean SNAPSHOT = false;
+    public static final int WORLD_VERSION = 5023;
+    public static final String SERIES = "main";
+    public static final int RELEASE_NETWORK_PROTOCOL_VERSION = 777;
+    public static final int SNAPSHOT_NETWORK_PROTOCOL_VERSION = 338;
+    public static final int SNBT_NAG_VERSION = 4997;
+    public static final boolean CRASH_EAGERLY = false;
+    public static final int RESOURCE_PACK_FORMAT_MAJOR = 97;
+    public static final int RESOURCE_PACK_FORMAT_MINOR = 1;
+    public static final int DATA_PACK_FORMAT_MAJOR = 121;
+    public static final int DATA_PACK_FORMAT_MINOR = 0;
+    public static final String RPC_MANAGEMENT_SERVER_API_VERSION = "3.1.0";
+    public static final int LANGUAGE_FORMAT = 1;
+    public static final int REPORT_FORMAT_VERSION = 1;
+    public static final String DATA_VERSION_TAG = "DataVersion";
+    public static final String DEBUG_FLAG_PREFIX = "MC_DEBUG_";
+    public static final boolean DEBUG_ENABLED;
+    public static final boolean FIX_TNT_DUPE = false;
+    public static final boolean FIX_SAND_DUPE = false;
+    public static final boolean DEBUG_OPEN_INCOMPATIBLE_WORLDS;
+    public static final boolean DEBUG_ALLOW_LOW_SIM_DISTANCE;
+    public static final boolean DEBUG_HOTKEYS;
+    public static final boolean DEBUG_UI_NARRATION;
+    public static final boolean DEBUG_SHUFFLE_UI_RENDERING_ORDER;
+    public static final boolean DEBUG_SHUFFLE_MODELS;
+    public static final boolean DEBUG_RENDER_UI_LAYERING_RECTANGLES;
+    public static final boolean DEBUG_PATHFINDING;
+    public static final boolean DEBUG_SHOW_LOCAL_SERVER_ENTITY_HIT_BOXES;
+    public static final boolean DEBUG_SHAPES;
+    public static final boolean DEBUG_NEIGHBORSUPDATE;
+    public static final boolean DEBUG_EXPERIMENTAL_REDSTONEWIRE_UPDATE_ORDER;
+    public static final boolean DEBUG_STRUCTURES;
+    public static final boolean DEBUG_GAME_EVENT_LISTENERS;
+    public static final boolean DEBUG_DUMP_TEXTURE_ATLAS;
+    public static final boolean DEBUG_STRUCTURE_EDIT_MODE;
+    public static final boolean DEBUG_SAVE_STRUCTURES_AS_SNBT;
+    public static final boolean DEBUG_SYNCHRONOUS_GL_LOGS;
+    public static final boolean DEBUG_VERBOSE_SERVER_EVENTS;
+    public static final boolean DEBUG_NAMED_RUNNABLES;
+    public static final boolean DEBUG_GOAL_SELECTOR;
+    public static final boolean DEBUG_VILLAGE_SECTIONS;
+    public static final boolean DEBUG_BRAIN;
+    public static final boolean DEBUG_POI;
+    public static final boolean DEBUG_BEES;
+    public static final boolean DEBUG_RAIDS;
+    public static final boolean DEBUG_BLOCK_BREAK;
+    public static final boolean DEBUG_MONITOR_TICK_TIMES;
+    public static final boolean DEBUG_KEEP_JIGSAW_BLOCKS_DURING_STRUCTURE_GEN;
+    public static final boolean DEBUG_DONT_SAVE_WORLD;
+    public static final boolean DEBUG_LARGE_DRIPSTONE;
+    public static final boolean DEBUG_ORE_VEINS;
+    public static final boolean DEBUG_SCULK_CATALYST;
+    public static final boolean DEBUG_BYPASS_REALMS_VERSION_CHECK;
+    public static final boolean DEBUG_SOCIAL_INTERACTIONS;
+    public static final boolean DEBUG_CHAT_DISABLED;
+    public static final boolean DEBUG_CHAT_FRIENDS_ONLY;
+    public static final boolean DEBUG_VALIDATE_RESOURCE_PATH_CASE;
+    public static final boolean DEBUG_UNLOCK_ALL_TRADES;
+    public static final boolean DEBUG_BREEZE_MOB;
+    public static final boolean DEBUG_TRIAL_SPAWNER_DETECTS_SHEEP_AS_PLAYERS;
+    public static final boolean DEBUG_VAULT_DETECTS_SHEEP_AS_PLAYERS;
+    public static final boolean DEBUG_FORCE_ONBOARDING_SCREEN;
+    public static final boolean DEBUG_CURSOR_POS;
+    public static final boolean DEBUG_DEFAULT_SKIN_OVERRIDE;
+    public static final boolean DEBUG_PANORAMA_SCREENSHOT;
+    public static final boolean DEBUG_CHASE_COMMAND;
+    public static final boolean DEBUG_VERBOSE_COMMAND_ERRORS;
+    public static final boolean DEBUG_DEV_COMMANDS;
+    public static final boolean DEBUG_ACTIVE_TEXT_AREAS;
+    public static final boolean DEBUG_SIMULATE_LIBRARY_LOAD_FAILURE;
+    public static final boolean DEBUG_IGNORE_LOCAL_MOB_CAP;
+    public static final boolean DEBUG_DISABLE_LIQUID_SPREADING;
+    public static final boolean DEBUG_AQUIFERS;
+    public static final boolean DEBUG_JFR_PROFILING_ENABLE_LEVEL_LOADING;
+    public static final boolean DEBUG_ENTITY_BLOCK_INTERSECTION;
+    public static boolean debugGenerateSquareTerrainWithoutNoise;
+    public static final boolean DEBUG_ONLY_GENERATE_HALF_THE_WORLD;
+    public static final boolean DEBUG_DISABLE_FLUID_GENERATION;
+    public static final boolean DEBUG_DISABLE_AQUIFERS;
+    public static final boolean DEBUG_DISABLE_SURFACE;
+    public static final boolean DEBUG_DISABLE_CARVERS;
+    public static final boolean DEBUG_DISABLE_STRUCTURES;
+    public static final boolean DEBUG_DISABLE_FEATURES;
+    public static final boolean DEBUG_DISABLE_ORE_VEINS;
+    public static final boolean DEBUG_DISABLE_BLENDING;
+    public static final boolean DEBUG_DISABLE_BELOW_ZERO_RETROGENERATION;
+    public static final int DEFAULT_MINECRAFT_PORT = 25565;
+    public static final boolean DEBUG_SUBTITLES;
+    public static final int DEBUG_FAKE_LATENCY_MS;
+    public static final int DEBUG_FAKE_JITTER_MS;
+    public static final ResourceLeakDetector.Level NETTY_LEAK_DETECTION;
+    public static final boolean COMMAND_STACK_TRACES;
+    public static final boolean DEBUG_WORLD_RECREATE;
+    public static final boolean DEBUG_SHOW_SERVER_DEBUG_VALUES;
+    public static final boolean DEBUG_FEATURE_COUNT;
+    public static final boolean DEBUG_CALCULATE_SOLID;
+    public static final boolean DEBUG_FORCE_TELEMETRY;
+    public static final boolean DEBUG_DONT_SEND_TELEMETRY_TO_BACKEND;
+    public static final boolean DEBUG_ENABLE_FARLANDS;
+    public static final long MAXIMUM_TICK_TIME_NANOS;
+    public static final float MAXIMUM_BLOCK_EXPLOSION_RESISTANCE = 3600000.0F;
+    public static final boolean USE_DEVONLY = false;
+    public static boolean CHECK_DATA_FIXER_SCHEMA;
+    public static boolean IS_RUNNING_IN_IDE;
+    public static boolean IS_RENDERDOC_ATTACHED;
+    public static final int WORLD_RESOLUTION = 16;
+    public static final int MAX_CHAT_LENGTH = 256;
+    public static final int MAX_USER_INPUT_COMMAND_LENGTH = 32500;
+    public static final int MAX_FUNCTION_COMMAND_LENGTH = 2000000;
+    public static final int MAX_PLAYER_NAME_LENGTH = 16;
+    public static final int MAX_CHAINED_NEIGHBOR_UPDATES = 1000000;
+    public static final int MAX_RENDER_DISTANCE = 32;
+    public static final int MAX_CLOUD_DISTANCE = 128;
+    public static final char[] ILLEGAL_FILE_CHARACTERS;
+    public static final int TICKS_PER_SECOND = 20;
+    public static final int MILLIS_PER_TICK = 50;
+    public static final int TICKS_PER_MINUTE = 1200;
+    public static final int TICKS_PER_GAME_DAY = 24000;
+    public static final int DEFAULT_RANDOM_TICK_SPEED = 3;
+    public static final float AVERAGE_GAME_TICKS_PER_RANDOM_TICK_PER_BLOCK = 1365.3334F;
+    public static final float AVERAGE_RANDOM_TICKS_PER_BLOCK_PER_MINUTE = 0.87890625F;
+    public static final float AVERAGE_RANDOM_TICKS_PER_BLOCK_PER_GAME_DAY = 17.578125F;
+    public static final int WORLD_ICON_SIZE = 64;
+    public static void setVersion(WorldVersion version);
+    public static void tryDetectVersion();
+    public static WorldVersion getCurrentVersion();
+    public static int getProtocolVersion();
+    public static boolean debugVoidTerrain(ChunkPos pos);
+}
+//// SuppressForbidden.java
+public @interface SuppressForbidden {
+    String reason();
+}
+//// SystemReport.java
+public class SystemReport {
+    public static final long BYTES_PER_MEBIBYTE = 1048576L;
+    public SystemReport();
+    public void setDetail(String key, String value);
+    public void setDetail(String key, CrashReportDetail<Object> valueSupplier);
+    public static float sizeInMiB(long bytes);
+    public void appendToCrashReportString(StringBuilder sb);
+    public String toLineSeparatedString();
+}
+//// TracingExecutor.java
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+public record TracingExecutor(ExecutorService service) implements Executor {
+    public Executor forName(String name);
+    public void execute(Runnable command);
+    public void shutdownAndAwait(long timeout, TimeUnit unit);
+}
+//// WorldVersion.java
+import java.util.Date;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.metadata.pack.PackFormat;
+import net.minecraft.world.level.storage.DataVersion;
+public interface WorldVersion {
+    DataVersion dataVersion();
+    String id();
+    String name();
+    int protocolVersion();
+    PackFormat packVersion(PackType packType);
+    Date buildTime();
+    boolean stable();
+    public static record Simple(String id, String name, DataVersion dataVersion, int protocolVersion, PackFormat resourcePackVersion, PackFormat datapackVersion, Date buildTime, boolean stable) implements WorldVersion {
+        public PackFormat packVersion(PackType packType);
+    }
+}

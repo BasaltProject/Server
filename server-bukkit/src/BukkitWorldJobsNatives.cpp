@@ -179,6 +179,14 @@ jboolean JNICALL nativeScheduleTick(JNIEnv* env, jclass, jstring name, jint x, j
                                                                                                          : JNI_FALSE;
 }
 
+jboolean JNICALL nativeHasTick(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return JNI_FALSE;
+    }
+    return guarded<bool>(false, [&] { return world->hasScheduledTick(x, y, z); }) ? JNI_TRUE : JNI_FALSE;
+}
+
 jint JNICALL nativeValidState(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jint state) {
     const auto world = worldOf(env, name);
     if (world == nullptr) {
@@ -250,6 +258,7 @@ void registerWorldNativesJobs(JNIEnv* env, jclass natives) {
         nativeMethod("useItemOn", "(Ljava/lang/String;IIIILjava/lang/String;FF)I",
                      reinterpret_cast<void*>(&nativeUseItemOn)),
         nativeMethod("scheduleTick", "(Ljava/lang/String;IIIIZ)Z", reinterpret_cast<void*>(&nativeScheduleTick)),
+        nativeMethod("hasTick", "(Ljava/lang/String;III)Z", reinterpret_cast<void*>(&nativeHasTick)),
         nativeMethod("validState", "(Ljava/lang/String;IIII)I", reinterpret_cast<void*>(&nativeValidState)),
         nativeMethod("settleBlocks", "(Ljava/lang/String;[I[II)I", reinterpret_cast<void*>(&nativeSettleBlocks)),
         nativeMethod("neighborChanged", "(Ljava/lang/String;[I[I)I", reinterpret_cast<void*>(&nativeNeighborChanged)),

@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.util;
 
 import java.util.function.IntConsumer;
@@ -20,4 +21,7 @@ public interface BitStorage {
     void unpack(int[] output);
 
     BitStorage copy();
+    default void fill(int value) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.BitStorage#fill");
+    }
 }

@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.core;
 
 public interface IdMap<T> extends Iterable<T> {
@@ -22,4 +23,5 @@ public interface IdMap<T> extends Iterable<T> {
     }
 
     int size();
+    int DEFAULT = 0;
 }

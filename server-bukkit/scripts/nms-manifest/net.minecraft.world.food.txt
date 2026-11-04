@@ -1,0 +1,118 @@
+//// FoodConstants.java
+public class FoodConstants {
+    public static final int MAX_FOOD = 20;
+    public static final float MAX_SATURATION = 20.0F;
+    public static final float START_SATURATION = 5.0F;
+    public static final float SATURATION_FLOOR = 2.5F;
+    public static final float EXHAUSTION_DROP = 4.0F;
+    public static final int HEALTH_TICK_COUNT = 80;
+    public static final int HEALTH_TICK_COUNT_SATURATED = 10;
+    public static final int HEAL_LEVEL = 18;
+    public static final int SPRINT_LEVEL = 6;
+    public static final int STARVE_LEVEL = 0;
+    public static final float FOOD_SATURATION_POOR = 0.1F;
+    public static final float FOOD_SATURATION_LOW = 0.3F;
+    public static final float FOOD_SATURATION_NORMAL = 0.6F;
+    public static final float FOOD_SATURATION_GOOD = 0.8F;
+    public static final float FOOD_SATURATION_MAX = 1.0F;
+    public static final float FOOD_SATURATION_SUPERNATURAL = 1.2F;
+    public static final float EXHAUSTION_HEAL = 6.0F;
+    public static final float EXHAUSTION_JUMP = 0.05F;
+    public static final float EXHAUSTION_SPRINT_JUMP = 0.2F;
+    public static final float EXHAUSTION_MINE = 0.005F;
+    public static final float EXHAUSTION_ATTACK = 0.1F;
+    public static final float EXHAUSTION_WALK = 0.0F;
+    public static final float EXHAUSTION_CROUCH = 0.0F;
+    public static final float EXHAUSTION_SPRINT = 0.1F;
+    public static final float EXHAUSTION_SWIM = 0.01F;
+    public static float saturationByModifier(int nutrition, float modifier);
+}
+//// FoodData.java
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public class FoodData {
+    public void eat(int food, float saturationModifier);
+    public void eat(FoodProperties foodProperties);
+    public void tick(ServerPlayer player);
+    public void readAdditionalSaveData(ValueInput input);
+    public void addAdditionalSaveData(ValueOutput output);
+    public int getFoodLevel();
+    public boolean hasEnoughFood();
+    public boolean needsFood();
+    public void addExhaustion(float amount);
+    public float getSaturationLevel();
+    public void setFoodLevel(int food);
+    public void setSaturation(float saturation);
+}
+//// FoodProperties.java
+import com.mojang.serialization.Codec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.Consumable;
+import net.minecraft.world.item.component.ConsumableListener;
+import net.minecraft.world.level.Level;
+public record FoodProperties(int nutrition, float saturation, boolean canAlwaysEat) implements ConsumableListener {
+    public static final Codec<FoodProperties> DIRECT_CODEC;
+    public static final StreamCodec<RegistryFriendlyByteBuf, FoodProperties> DIRECT_STREAM_CODEC;
+    public void onConsume(Level level, LivingEntity user, ItemStack stack, Consumable consumable);
+    public static class Builder {
+        public Builder nutrition(int nutrition);
+        public Builder saturationModifier(float saturationModifier);
+        public Builder alwaysEdible();
+        public FoodProperties build();
+    }
+}
+//// Foods.java
+public class Foods {
+    public static final FoodProperties APPLE;
+    public static final FoodProperties BAKED_POTATO;
+    public static final FoodProperties BEEF;
+    public static final FoodProperties BEETROOT;
+    public static final FoodProperties BEETROOT_SOUP;
+    public static final FoodProperties BREAD;
+    public static final FoodProperties CARROT;
+    public static final FoodProperties CHICKEN;
+    public static final FoodProperties CHORUS_FRUIT;
+    public static final FoodProperties COD;
+    public static final FoodProperties COOKED_BEEF;
+    public static final FoodProperties COOKED_CHICKEN;
+    public static final FoodProperties COOKED_COD;
+    public static final FoodProperties COOKED_MUTTON;
+    public static final FoodProperties COOKED_PORKCHOP;
+    public static final FoodProperties COOKED_RABBIT;
+    public static final FoodProperties COOKED_SALMON;
+    public static final FoodProperties COOKIE;
+    public static final FoodProperties DRIED_KELP;
+    public static final FoodProperties ENCHANTED_GOLDEN_APPLE;
+    public static final FoodProperties GOLDEN_APPLE;
+    public static final FoodProperties GOLDEN_CARROT;
+    public static final FoodProperties HONEY_BOTTLE;
+    public static final FoodProperties MELON_SLICE;
+    public static final FoodProperties MUSHROOM_STEW;
+    public static final FoodProperties MUTTON;
+    public static final FoodProperties POISONOUS_POTATO;
+    public static final FoodProperties PORKCHOP;
+    public static final FoodProperties POTATO;
+    public static final FoodProperties PUFFERFISH;
+    public static final FoodProperties PUMPKIN_PIE;
+    public static final FoodProperties RABBIT;
+    public static final FoodProperties RABBIT_STEW;
+    public static final FoodProperties ROTTEN_FLESH;
+    public static final FoodProperties SALMON;
+    public static final FoodProperties SPIDER_EYE;
+    public static final FoodProperties SUSPICIOUS_STEW;
+    public static final FoodProperties SWEET_BERRIES;
+    public static final FoodProperties GLOW_BERRIES;
+    public static final FoodProperties TROPICAL_FISH;
+}
+//// VillagerFood.java
+import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+public record VillagerFood(int nutrition) {
+    public static final Codec<VillagerFood> CODEC;
+    public static final StreamCodec<ByteBuf, VillagerFood> STREAM_CODEC;
+}

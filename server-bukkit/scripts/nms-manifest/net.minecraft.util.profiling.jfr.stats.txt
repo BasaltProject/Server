@@ -1,0 +1,109 @@
+//// ChunkGenStat.java
+import java.time.Duration;
+import jdk.jfr.consumer.RecordedEvent;
+import net.minecraft.server.level.ColumnPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+public record ChunkGenStat(Duration duration, ChunkPos chunkPos, ColumnPos worldPos, ChunkStatus status, String level) implements TimedStat {
+    public static ChunkGenStat from(RecordedEvent event);
+}
+//// ChunkIdentification.java
+import jdk.jfr.consumer.RecordedEvent;
+public record ChunkIdentification(String level, String dimension, int x, int z) {
+    public static ChunkIdentification from(RecordedEvent event);
+}
+//// CpuLoadStat.java
+import jdk.jfr.consumer.RecordedEvent;
+public record CpuLoadStat(double jvm, double userJvm, double system) {
+    public static CpuLoadStat from(RecordedEvent event);
+}
+//// FileIOStat.java
+import com.mojang.datafixers.util.Pair;
+import java.time.Duration;
+import java.util.List;
+public record FileIOStat(Duration duration, String path, long bytes) {
+    public static Summary summary(Duration recordingDuration, List<FileIOStat> ioStats);
+    public static record Summary(long totalBytes, double bytesPerSecond, long counts, double countsPerSecond, Duration timeSpentInIO, List<Pair<String, Long>> topTenContributorsByTotalBytes) {
+    }
+}
+//// FpsStat.java
+import jdk.jfr.consumer.RecordedEvent;
+public record FpsStat(int fps) {
+    public static FpsStat from(RecordedEvent event, String field);
+}
+//// GcHeapStat.java
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import jdk.jfr.consumer.RecordedEvent;
+public record GcHeapStat(Instant timestamp, long heapUsed, Timing timing) {
+    public static GcHeapStat from(RecordedEvent event);
+    public static Summary summary(Duration recordingDuration, List<GcHeapStat> heapStats, Duration gcTotalDuration, int totalGCs);
+    public static record Summary(Duration duration, Duration gcTotalDuration, int totalGCs, double allocationRateBytesPerSecond) {
+        public float gcOverHead();
+    }
+    public static enum Timing {
+        BEFORE_GC, AFTER_GC;
+    }
+}
+//// IoSummary.java
+import com.mojang.datafixers.util.Pair;
+import java.time.Duration;
+import java.util.List;
+public final class IoSummary<T> {
+    public IoSummary(Duration recordingDuration, List<Pair<T, CountAndSize>> packetStats);
+    public double getCountsPerSecond();
+    public double getSizePerSecond();
+    public long getTotalCount();
+    public long getTotalSize();
+    public List<Pair<T, CountAndSize>> largestSizeContributors();
+    public static record CountAndSize(long totalCount, long totalSize) {
+        public CountAndSize add(CountAndSize that);
+        public float averageSize();
+    }
+}
+//// PacketIdentification.java
+import jdk.jfr.consumer.RecordedEvent;
+public record PacketIdentification(String direction, String protocolId, String packetId) {
+    public static PacketIdentification from(RecordedEvent event);
+}
+//// StructureGenStat.java
+import java.time.Duration;
+import jdk.jfr.consumer.RecordedEvent;
+import net.minecraft.world.level.ChunkPos;
+public record StructureGenStat(Duration duration, ChunkPos chunkPos, String structureName, String level, boolean success) implements TimedStat {
+    public static StructureGenStat from(RecordedEvent event);
+}
+//// ThreadAllocationStat.java
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import jdk.jfr.consumer.RecordedEvent;
+import org.slf4j.Logger;
+public record ThreadAllocationStat(Instant timestamp, String threadName, long totalBytes) {
+    public static final Logger LOGGER;
+    public static ThreadAllocationStat from(RecordedEvent event);
+    public static Summary summary(List<ThreadAllocationStat> stats);
+    public static record Summary(Map<String, Double> allocationsPerSecondByThread) {
+    }
+}
+//// TickTimeStat.java
+import java.time.Duration;
+import java.time.Instant;
+import jdk.jfr.consumer.RecordedEvent;
+public record TickTimeStat(Instant timestamp, Duration currentAverage) {
+    public static TickTimeStat from(RecordedEvent event);
+}
+//// TimedStat.java
+import java.time.Duration;
+public interface TimedStat {
+    Duration duration();
+}
+//// TimedStatSummary.java
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+public record TimedStatSummary<T extends TimedStat>(T fastest, T slowest, T secondSlowest, int count, Map<Integer, Double> percentilesNanos, Duration totalDuration) {
+    public static <T extends TimedStat> Optional<TimedStatSummary<T>> summary(List<T> values);
+}

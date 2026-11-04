@@ -1,0 +1,657 @@
+//// CommandStorage.java
+import com.mojang.serialization.Codec;
+import java.util.Map;
+import java.util.stream.Stream;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public class CommandStorage {
+    public CommandStorage(SavedDataStorage savedDataStorage);
+    public CompoundTag get(Identifier id);
+    public void set(Identifier id, CompoundTag contents);
+    public Stream<Identifier> keys();
+    static class Container extends SavedData {
+        public static final Codec<Container> CODEC;
+        private Container(Map<String, CompoundTag> storage);
+        private Container();
+        public static SavedDataType<Container> type(String namespace);
+        public CompoundTag get(String id);
+        public void put(String id, CompoundTag contents);
+        public Stream<Identifier> getKeys(String namespace);
+    }
+}
+//// DataVersion.java
+public record DataVersion(int version, String series) {
+    public static final String MAIN_SERIES = "main";
+    public boolean isSideSeries();
+    public boolean isCompatible(DataVersion other);
+}
+//// DerivedLevelData.java
+import net.minecraft.CrashReportCategory;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.LevelHeightAccessor;
+public class DerivedLevelData implements ServerLevelData {
+    public DerivedLevelData(WorldData worldData, ServerLevelData wrapped);
+    public LevelData.RespawnData getRespawnData();
+    public long getGameTime();
+    public String getLevelName();
+    public GameType getGameType();
+    public void setGameTime(long time);
+    public void setSpawn(LevelData.RespawnData respawnData);
+    public void setGameType(GameType gameType);
+    public boolean isHardcore();
+    public boolean isAllowCommands();
+    public void setAllowCommands(boolean allowCommands);
+    public boolean isInitialized();
+    public void setInitialized(boolean initialized);
+    public Difficulty getDifficulty();
+    public boolean isDifficultyLocked();
+    public void fillCrashReportCategory(CrashReportCategory category, LevelHeightAccessor levelHeightAccessor);
+}
+//// FileNameDateFormatter.java
+import java.time.format.DateTimeFormatter;
+public class FileNameDateFormatter {
+    public static final DateTimeFormatter FORMATTER;
+}
+//// LevelData.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelHeightAccessor;
+public interface LevelData {
+    RespawnData getRespawnData();
+    long getGameTime();
+    boolean isHardcore();
+    Difficulty getDifficulty();
+    boolean isDifficultyLocked();
+    default void fillCrashReportCategory(CrashReportCategory category, LevelHeightAccessor levelHeightAccessor);
+    public static record RespawnData(GlobalPos globalPos, float yaw, float pitch) {
+        public static final RespawnData DEFAULT;
+        public static final MapCodec<RespawnData> MAP_CODEC;
+        public static final Codec<RespawnData> CODEC;
+        public static final StreamCodec<ByteBuf, RespawnData> STREAM_CODEC;
+        public static RespawnData of(ResourceKey<Level> dimension, BlockPos pos, float yaw, float pitch);
+        public ResourceKey<Level> dimension();
+        public BlockPos pos();
+    }
+}
+//// LevelDataAndDimensions.java
+import net.minecraft.world.level.levelgen.WorldDimensions;
+import net.minecraft.world.level.levelgen.WorldGenSettings;
+public record LevelDataAndDimensions(WorldDataAndGenSettings worldDataAndGenSettings, WorldDimensions.Complete dimensions) {
+    public static LevelDataAndDimensions create(WorldData data, WorldGenSettings genSettings, WorldDimensions.Complete dimensions);
+    public static record WorldDataAndGenSettings(WorldData data, WorldGenSettings genSettings) {
+    }
+}
+//// LevelResource.java
+public record LevelResource(String id) {
+    public static final LevelResource PLAYER_ADVANCEMENTS_DIR;
+    public static final LevelResource PLAYER_STATS_DIR;
+    public static final LevelResource PLAYER_DATA_DIR;
+    public static final LevelResource PLAYER_OLD_DATA_DIR;
+    public static final LevelResource LEVEL_DATA_FILE;
+    public static final LevelResource OLD_LEVEL_DATA_FILE;
+    public static final LevelResource ICON_FILE;
+    public static final LevelResource LOCK_FILE;
+    public static final LevelResource GENERATED_DIR;
+    public static final LevelResource DATAPACK_DIR;
+    public static final LevelResource MAP_RESOURCE_FILE;
+    public static final LevelResource DATA;
+    public static final LevelResource ROOT;
+    public String toString();
+}
+//// LevelStorageException.java
+import net.minecraft.network.chat.Component;
+public class LevelStorageException extends RuntimeException {
+    public LevelStorageException(Component message);
+    public LevelStorageException(Component message, Exception e);
+    public Component getMessageComponent();
+}
+//// LevelStorageSource.java
+import com.mojang.datafixers.DataFixer;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.Dynamic;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.WorldLoader;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.WorldDataConfiguration;
+import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.levelgen.WorldGenSettings;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+import net.minecraft.world.level.validation.ContentValidationException;
+import net.minecraft.world.level.validation.DirectoryValidator;
+import org.apache.commons.io.function.IORunnable;
+public class LevelStorageSource {
+    public static final String TAG_DATA = "Data";
+    public static final String ALLOWED_SYMLINKS_CONFIG_NAME = "allowed_symlinks.txt";
+    public LevelStorageSource(Path baseDir, Path backupDir, DirectoryValidator worldDirValidator, DataFixer fixerUpper);
+    public static DirectoryValidator parseValidator(Path configPath);
+    public static LevelStorageSource createDefault(Path path);
+    public static WorldDataConfiguration readDataConfig(Dynamic<?> levelData);
+    public static WorldLoader.PackConfig getPackConfig(Dynamic<?> levelDataTag, PackRepository packRepository, boolean safeMode);
+    public static LevelDataAndDimensions getLevelDataAndDimensions(LevelStorageAccess worldAccess, Dynamic<?> levelDataTag, WorldDataConfiguration dataConfiguration, Registry<LevelStem> datapackDimensions, HolderLookup.Provider registryAccess);
+    public static <T extends SavedData> DataResult<T> readExistingSavedData(LevelStorageAccess access, HolderLookup.Provider registryAccess, SavedDataType<T> savedDataType);
+    public static void writeGameRules(WorldData worldData, Path worldFolder, GameRules gameRules) throws IOException;
+    public static void writeWorldGenSettings(RegistryAccess registryAccess, Path worldFolder, WorldGenSettings worldGenSettings) throws IOException;
+    public String getName();
+    public LevelCandidates findLevelCandidates() throws LevelStorageException;
+    public CompletableFuture<List<LevelSummary>> loadLevelSummaries(LevelCandidates candidates);
+    public boolean isNewLevelIdAcceptable(String levelId);
+    public boolean levelExists(String levelId);
+    public Path getLevelPath(String levelId);
+    public Path getBaseDir();
+    public Path getBackupPath();
+    public LevelStorageAccess validateAndCreateAccess(String levelId) throws IOException, ContentValidationException;
+    public LevelStorageAccess createAccess(String levelId) throws IOException;
+    public DirectoryValidator getWorldDirValidator();
+    public class LevelStorageAccess implements AutoCloseable {
+        private LevelStorageAccess(String levelId, Path path) throws IOException;
+        public void releaseTemporarilyAndRun(IORunnable runnable) throws IOException;
+        public long estimateDiskSpace();
+        public boolean checkForLowDiskSpace();
+        public void safeClose();
+        public LevelStorageSource parent();
+        public LevelDirectory getLevelDirectory();
+        public String getLevelId();
+        public Path getLevelPath(LevelResource resource);
+        public Path getDimensionPath(ResourceKey<Level> name);
+        public PlayerDataStorage createPlayerStorage();
+        public void collectIssues(boolean useFallback) throws IOException;
+        public LevelSummary fixAndGetSummary() throws IOException;
+        public LevelSummary fixAndGetSummaryFromTag(Dynamic<?> dataTag);
+        public Dynamic<?> getUnfixedDataTagWithFallback() throws IOException;
+        public Dynamic<?> getUnfixedDataTag(boolean useFallback) throws IOException;
+        public void saveDataTag(WorldData levelData);
+        public void saveDataTag(WorldData levelData, UUID singleplayerUUID);
+        public void saveLevelData(Dynamic<?> tag);
+        public Optional<Path> getIconFile();
+        public void deleteLevel() throws IOException;
+        public void renameLevel(String newName) throws IOException;
+        public void renameAndDropPlayer(String newName) throws IOException;
+        public long makeWorldBackup() throws IOException;
+        public boolean hasWorldData();
+        public void close() throws IOException;
+        public boolean restoreLevelDataFromOld();
+        public Instant getFileModificationTime(boolean fallback);
+    }
+    public static record LevelCandidates(List<LevelDirectory> levels) implements Iterable<LevelDirectory> {
+        public boolean isEmpty();
+        public Iterator<LevelDirectory> iterator();
+    }
+    public static record LevelDirectory(Path path) {
+        public String directoryName();
+        public Path dataFile();
+        public Path oldDataFile();
+        public Path corruptedDataFile(ZonedDateTime time);
+        public Path rawDataFile(ZonedDateTime time);
+        public Path iconFile();
+        public Path lockFile();
+        public Path resourcePath(LevelResource resource);
+    }
+}
+//// LevelSummary.java
+import java.nio.file.Path;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.LevelSettings;
+public class LevelSummary implements Comparable<LevelSummary> {
+    public static final Component PLAY_WORLD;
+    public static final Component UPGRADE_AND_PLAY_WORLD;
+    public LevelSummary(LevelSettings settings, LevelVersion levelVersion, String levelId, boolean requiresManualConversion, boolean requiresFileFixing, boolean locked, boolean experimental, Path icon);
+    public String getLevelId();
+    public String getLevelName();
+    public Path getIcon();
+    public boolean requiresManualConversion();
+    public boolean requiresFileFixing();
+    public boolean isExperimental();
+    public long getLastPlayed();
+    public int compareTo(LevelSummary rhs);
+    public LevelSettings getSettings();
+    public GameType getGameMode();
+    public boolean isHardcore();
+    public boolean hasCommands();
+    public MutableComponent getWorldVersionName();
+    public LevelVersion levelVersion();
+    public boolean shouldBackup();
+    public boolean isDowngrade();
+    public BackupStatus backupStatus();
+    public boolean isLocked();
+    public boolean isDisabled();
+    public boolean isCompatible();
+    public Component getInfo();
+    public Component primaryActionMessage();
+    public boolean primaryActionActive();
+    public boolean canUpload();
+    public boolean canEdit();
+    public boolean canRecreate();
+    public boolean canDelete();
+    public static enum BackupStatus {
+        NONE, DOWNGRADE, UPGRADE_TO_SNAPSHOT, FILE_FIXING_REQUIRED;
+        public boolean shouldBackup();
+        public boolean isSevere();
+        public String getTranslationKey();
+    }
+    public static class SymlinkLevelSummary extends LevelSummary {
+        public SymlinkLevelSummary(String levelId, Path icon);
+        public String getLevelName();
+        public Component getInfo();
+        public long getLastPlayed();
+        public boolean isDisabled();
+        public Component primaryActionMessage();
+        public boolean primaryActionActive();
+        public boolean canUpload();
+        public boolean canEdit();
+        public boolean canRecreate();
+    }
+    public static class CorruptedLevelSummary extends LevelSummary {
+        public CorruptedLevelSummary(String levelId, Path icon, long lastPlayed);
+        public String getLevelName();
+        public Component getInfo();
+        public long getLastPlayed();
+        public boolean isDisabled();
+        public Component primaryActionMessage();
+        public boolean primaryActionActive();
+        public boolean canUpload();
+        public boolean canEdit();
+        public boolean canRecreate();
+    }
+}
+//// LevelVersion.java
+import com.mojang.serialization.Dynamic;
+public class LevelVersion {
+    private LevelVersion(int levelDataVersion, long lastPlayed, String minecraftVersionName, int minecraftVersion, String series, boolean snapshot);
+    public static LevelVersion parse(Dynamic<?> input);
+    public int levelDataVersion();
+    public long lastPlayed();
+    public String minecraftVersionName();
+    public DataVersion minecraftVersion();
+    public boolean snapshot();
+}
+//// PlayerDataStorage.java
+import com.mojang.datafixers.DataFixer;
+import java.util.Optional;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.world.entity.player.Player;
+public class PlayerDataStorage {
+    protected final DataFixer fixerUpper;
+    public PlayerDataStorage(LevelStorageSource.LevelStorageAccess levelAccess, DataFixer fixerUpper);
+    public void save(Player player);
+    public Optional<CompoundTag> load(NameAndId nameAndId);
+}
+//// PrimaryLevelData.java
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.Lifecycle;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.LevelSettings;
+import net.minecraft.world.level.WorldDataConfiguration;
+public class PrimaryLevelData implements ServerLevelData, WorldData {
+    public static final String LEVEL_NAME = "LevelName";
+    protected static final String OLD_PLAYER = "Player";
+    protected static final String SINGLEPLAYER_UUID = "singleplayer_uuid";
+    protected static final String OLD_WORLD_GEN_SETTINGS = "WorldGenSettings";
+    private PrimaryLevelData(UUID singlePlayerUUID, boolean wasModded, LevelData.RespawnData respawnData, long gameTime, int version, boolean initialized, Set<String> knownServerBrands, Set<String> removedFeatureFlags, LevelSettings settings, SpecialWorldProperty specialWorldProperty, Lifecycle worldGenSettingsLifecycle, List<Integer> versionHistory);
+    public PrimaryLevelData(LevelSettings levelSettings, SpecialWorldProperty specialWorldProperty, Lifecycle lifecycle);
+    public static <T> PrimaryLevelData parse(Dynamic<T> input, LevelSettings settings, SpecialWorldProperty specialWorldProperty, Lifecycle worldGenSettingsLifecycle);
+    public CompoundTag createTag(UUID singlePlayerUUID);
+    public static void writeLastPlayed(CompoundTag tag);
+    public static Dynamic<?> writeLastPlayed(Dynamic<?> tag);
+    public static void writeVersionTag(CompoundTag tag);
+    public static Dynamic<?> writeVersionTag(Dynamic<?> tag);
+    public void writeVersionHistory(CompoundTag tag);
+    public LevelData.RespawnData getRespawnData();
+    public long getGameTime();
+    public UUID getSinglePlayerUUID();
+    public void setGameTime(long time);
+    public void setSpawn(LevelData.RespawnData respawnData);
+    public String getLevelName();
+    public int getVersion();
+    public GameType getGameType();
+    public void setGameType(GameType gameType);
+    public boolean isHardcore();
+    public boolean isAllowCommands();
+    public void setAllowCommands(boolean allowCommands);
+    public boolean isInitialized();
+    public void setInitialized(boolean initialized);
+    public Difficulty getDifficulty();
+    public void setDifficulty(Difficulty difficulty);
+    public boolean isDifficultyLocked();
+    public void setDifficultyLocked(boolean difficultyLocked);
+    public void fillCrashReportCategory(CrashReportCategory category, LevelHeightAccessor levelHeightAccessor);
+    public boolean isFlatWorld();
+    public boolean isDebugWorld();
+    public Lifecycle worldGenSettingsLifecycle();
+    public WorldDataConfiguration getDataConfiguration();
+    public void setDataConfiguration(WorldDataConfiguration dataConfiguration);
+    public void setModdedInfo(String serverBrand, boolean isModded);
+    public boolean wasModded();
+    public Set<String> getKnownServerBrands();
+    public Set<String> getRemovedFeatureFlags();
+    public ServerLevelData overworldData();
+    public LevelSettings getLevelSettings();
+    public static enum SpecialWorldProperty {
+        NONE, FLAT, DEBUG;
+    }
+}
+//// SavedDataStorage.java
+import com.mojang.datafixers.DataFixer;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+public class SavedDataStorage implements AutoCloseable {
+    public SavedDataStorage(Path dataFolder, DataFixer fixerUpper, HolderLookup.Provider registries);
+    public <T extends SavedData> T computeIfAbsent(SavedDataType<T> type);
+    public <T extends SavedData> T get(SavedDataType<T> type);
+    public <T extends SavedData> void set(SavedDataType<T> type, T data);
+    public CompoundTag readTagFromDisk(Path dataFile, DataFixTypes type, int newVersion) throws IOException;
+    public CompletableFuture<?> scheduleSave();
+    public void saveAndJoin();
+    public void close();
+}
+//// ServerLevelData.java
+import net.minecraft.CrashReportCategory;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.LevelHeightAccessor;
+public interface ServerLevelData extends WritableLevelData {
+    String getLevelName();
+    default void fillCrashReportCategory(CrashReportCategory category, LevelHeightAccessor levelHeightAccessor);
+    GameType getGameType();
+    boolean isInitialized();
+    void setInitialized(boolean initialized);
+    boolean isAllowCommands();
+    void setAllowCommands(boolean allowCommands);
+    void setGameType(GameType gameType);
+    void setGameTime(long time);
+}
+//// TagValueInput.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.MapCodec;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.TagType;
+import net.minecraft.util.ProblemReporter;
+public class TagValueInput implements ValueInput {
+    private TagValueInput(ProblemReporter problemReporter, ValueInputContextHelper context, CompoundTag input);
+    public static ValueInput create(ProblemReporter problemReporter, HolderLookup.Provider holders, CompoundTag tag);
+    public static ValueInput.ValueInputList create(ProblemReporter problemReporter, HolderLookup.Provider holders, List<CompoundTag> tags);
+    public <T> Optional<T> read(String name, Codec<T> codec);
+    public <T> Optional<T> read(MapCodec<T> codec);
+    public Optional<ValueInput> child(String name);
+    public ValueInput childOrEmpty(String name);
+    public Optional<ValueInput.ValueInputList> childrenList(String name);
+    public ValueInput.ValueInputList childrenListOrEmpty(String name);
+    public <T> Optional<ValueInput.TypedInputList<T>> list(String name, Codec<T> codec);
+    public <T> ValueInput.TypedInputList<T> listOrEmpty(String name, Codec<T> codec);
+    public boolean getBooleanOr(String name, boolean defaultValue);
+    public byte getByteOr(String name, byte defaultValue);
+    public int getShortOr(String name, short defaultValue);
+    public Optional<Integer> getInt(String name);
+    public int getIntOr(String name, int defaultValue);
+    public long getLongOr(String name, long defaultValue);
+    public Optional<Long> getLong(String name);
+    public float getFloatOr(String name, float defaultValue);
+    public double getDoubleOr(String name, double defaultValue);
+    public Optional<String> getString(String name);
+    public String getStringOr(String name, String defaultValue);
+    public Optional<int[]> getIntArray(String name);
+    public HolderLookup.Provider lookup();
+    static class ListWrapper implements ValueInput.ValueInputList {
+        private ListWrapper(ProblemReporter problemReporter, String name, ValueInputContextHelper context, ListTag list);
+        public boolean isEmpty();
+        public Stream<ValueInput> stream();
+        public Iterator<ValueInput> iterator();
+    }
+    static class TypedListWrapper<T> implements ValueInput.TypedInputList<T> {
+        private TypedListWrapper(ProblemReporter problemReporter, String name, ValueInputContextHelper context, Codec<T> codec, ListTag list);
+        public boolean isEmpty();
+        public Stream<T> stream();
+        public Iterator<T> iterator();
+    }
+    static class CompoundListWrapper implements ValueInput.ValueInputList {
+        public CompoundListWrapper(ProblemReporter problemReporter, ValueInputContextHelper context, List<CompoundTag> list);
+        public boolean isEmpty();
+        public Stream<ValueInput> stream();
+        public Iterator<ValueInput> iterator();
+    }
+    public static record DecodeFromFieldFailedProblem(String name, Tag tag, DataResult.Error<?> error) implements ProblemReporter.Problem {
+        public String description();
+    }
+    public static record DecodeFromListFailedProblem(String name, int index, Tag tag, DataResult.Error<?> error) implements ProblemReporter.Problem {
+        public String description();
+    }
+    public static record DecodeFromMapFailedProblem(DataResult.Error<?> error) implements ProblemReporter.Problem {
+        public String description();
+    }
+    public static record UnexpectedTypeProblem(String name, TagType<?> expected, TagType<?> actual) implements ProblemReporter.Problem {
+        public String description();
+    }
+    public static record UnexpectedNonNumberProblem(String name, TagType<?> actual) implements ProblemReporter.Problem {
+        public String description();
+    }
+    public static record UnexpectedListElementTypeProblem(String name, int index, TagType<?> expected, TagType<?> actual) implements ProblemReporter.Problem {
+        public String description();
+    }
+}
+//// TagValueOutput.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.util.ProblemReporter;
+public class TagValueOutput implements ValueOutput {
+    private TagValueOutput(ProblemReporter problemReporter, DynamicOps<Tag> ops, CompoundTag output);
+    public static TagValueOutput createWithContext(ProblemReporter problemReporter, HolderLookup.Provider provider);
+    public static TagValueOutput createWithoutContext(ProblemReporter problemReporter);
+    public <T> void store(String name, Codec<T> codec, T value);
+    public <T> void storeNullable(String name, Codec<T> codec, T value);
+    public <T> void store(MapCodec<T> codec, T value);
+    public void putBoolean(String name, boolean value);
+    public void putByte(String name, byte value);
+    public void putShort(String name, short value);
+    public void putInt(String name, int value);
+    public void putLong(String name, long value);
+    public void putFloat(String name, float value);
+    public void putDouble(String name, double value);
+    public void putString(String name, String value);
+    public void putIntArray(String name, int[] value);
+    public ValueOutput child(String name);
+    public ValueOutput.ValueOutputList childrenList(String name);
+    public <T> ValueOutput.TypedOutputList<T> list(String name, Codec<T> codec);
+    public void discard(String name);
+    public boolean isEmpty();
+    public CompoundTag buildResult();
+    static class ListWrapper implements ValueOutput.ValueOutputList {
+        private ListWrapper(String fieldName, ProblemReporter problemReporter, DynamicOps<Tag> ops, ListTag output);
+        public ValueOutput addChild();
+        public void discardLast();
+        public boolean isEmpty();
+    }
+    static class TypedListWrapper<T> implements ValueOutput.TypedOutputList<T> {
+        private TypedListWrapper(ProblemReporter problemReporter, String name, DynamicOps<Tag> ops, Codec<T> codec, ListTag output);
+        public void add(T value);
+        public boolean isEmpty();
+    }
+    public static record EncodeToFieldFailedProblem(String name, Object value, DataResult.Error<?> error) implements ProblemReporter.Problem {
+        public String description();
+    }
+    public static record EncodeToListFailedProblem(String name, Object value, DataResult.Error<?> error) implements ProblemReporter.Problem {
+        public String description();
+    }
+    public static record EncodeToMapFailedProblem(Object value, DataResult.Error<?> error) implements ProblemReporter.Problem {
+        public String description();
+    }
+}
+//// ValueInput.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import java.util.Optional;
+import java.util.stream.Stream;
+import net.minecraft.core.HolderLookup;
+public interface ValueInput {
+    <T> Optional<T> read(String name, Codec<T> codec);
+    <T> Optional<T> read(MapCodec<T> codec);
+    Optional<ValueInput> child(String name);
+    ValueInput childOrEmpty(String name);
+    Optional<ValueInputList> childrenList(String name);
+    ValueInputList childrenListOrEmpty(String name);
+    <T> Optional<TypedInputList<T>> list(String name, Codec<T> codec);
+    <T> TypedInputList<T> listOrEmpty(String name, Codec<T> codec);
+    boolean getBooleanOr(String name, boolean defaultValue);
+    byte getByteOr(String name, byte defaultValue);
+    int getShortOr(String name, short defaultValue);
+    Optional<Integer> getInt(String name);
+    int getIntOr(String name, int defaultValue);
+    long getLongOr(String name, long defaultValue);
+    Optional<Long> getLong(String name);
+    float getFloatOr(String name, float defaultValue);
+    double getDoubleOr(String name, double defaultValue);
+    Optional<String> getString(String name);
+    String getStringOr(String name, String defaultValue);
+    Optional<int[]> getIntArray(String name);
+    HolderLookup.Provider lookup();
+    public interface TypedInputList<T> extends Iterable<T> {
+        boolean isEmpty();
+        Stream<T> stream();
+    }
+    public interface ValueInputList extends Iterable<ValueInput> {
+        boolean isEmpty();
+        Stream<ValueInput> stream();
+    }
+}
+//// ValueInputContextHelper.java
+import com.mojang.serialization.DynamicOps;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.Tag;
+public class ValueInputContextHelper {
+    public ValueInputContextHelper(HolderLookup.Provider lookup, DynamicOps<Tag> ops);
+    public DynamicOps<Tag> ops();
+    public HolderLookup.Provider lookup();
+    public ValueInput empty();
+    public ValueInput.ValueInputList emptyList();
+    public <T> ValueInput.TypedInputList<T> emptyTypedList();
+}
+//// ValueOutput.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+public interface ValueOutput {
+    <T> void store(String name, Codec<T> codec, T value);
+    <T> void storeNullable(String name, Codec<T> codec, T value);
+    <T> void store(MapCodec<T> codec, T value);
+    void putBoolean(String name, boolean value);
+    void putByte(String name, byte value);
+    void putShort(String name, short value);
+    void putInt(String name, int value);
+    void putLong(String name, long value);
+    void putFloat(String name, float value);
+    void putDouble(String name, double value);
+    void putString(String name, String value);
+    void putIntArray(String name, int[] value);
+    ValueOutput child(String name);
+    ValueOutputList childrenList(String name);
+    <T> TypedOutputList<T> list(String name, Codec<T> codec);
+    void discard(String name);
+    boolean isEmpty();
+    public interface TypedOutputList<T> {
+        void add(T value);
+        boolean isEmpty();
+    }
+    public interface ValueOutputList {
+        ValueOutput addChild();
+        void discardLast();
+        boolean isEmpty();
+    }
+}
+//// WorldData.java
+import com.mojang.serialization.Lifecycle;
+import java.util.Set;
+import java.util.UUID;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.LevelSettings;
+import net.minecraft.world.level.WorldDataConfiguration;
+public interface WorldData {
+    int ANVIL_VERSION_ID;
+    int MCREGION_VERSION_ID;
+    WorldDataConfiguration getDataConfiguration();
+    void setDataConfiguration(WorldDataConfiguration dataConfiguration);
+    boolean wasModded();
+    Set<String> getKnownServerBrands();
+    Set<String> getRemovedFeatureFlags();
+    void setModdedInfo(String serverBrand, boolean isModded);
+    default void fillCrashReportCategory(CrashReportCategory category);
+    default String getStorageVersionName(int version);
+    ServerLevelData overworldData();
+    LevelSettings getLevelSettings();
+    CompoundTag createTag(UUID singlePlayerUUID);
+    boolean isHardcore();
+    int getVersion();
+    String getLevelName();
+    GameType getGameType();
+    void setGameType(GameType gameType);
+    boolean isAllowCommands();
+    void setAllowCommands(boolean allowCommands);
+    Difficulty getDifficulty();
+    void setDifficulty(Difficulty difficulty);
+    boolean isDifficultyLocked();
+    void setDifficultyLocked(boolean difficultyLocked);
+    UUID getSinglePlayerUUID();
+    boolean isFlatWorld();
+    boolean isDebugWorld();
+    Lifecycle worldGenSettingsLifecycle();
+    default FeatureFlagSet enabledFeatures();
+}
+//// WritableLevelData.java
+public interface WritableLevelData extends LevelData {
+    void setSpawn(LevelData.RespawnData respawnData);
+}

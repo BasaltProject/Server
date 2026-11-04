@@ -1,0 +1,34 @@
+//// AtlasSprite.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.resources.Identifier;
+public record AtlasSprite(Identifier atlas, Identifier sprite) implements ObjectInfo {
+    public static final Identifier DEFAULT_ATLAS;
+    public static final MapCodec<AtlasSprite> MAP_CODEC;
+    public MapCodec<AtlasSprite> codec();
+    public FontDescription fontDescription();
+    public String defaultFallback();
+}
+//// ObjectInfo.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.chat.FontDescription;
+public interface ObjectInfo {
+    FontDescription fontDescription();
+    String defaultFallback();
+    MapCodec<? extends ObjectInfo> codec();
+}
+//// ObjectInfos.java
+import com.mojang.serialization.MapCodec;
+public class ObjectInfos {
+    public static final MapCodec<ObjectInfo> CODEC;
+}
+//// PlayerSprite.java
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.world.item.component.ResolvableProfile;
+public record PlayerSprite(ResolvableProfile player, boolean hat) implements ObjectInfo {
+    public static final MapCodec<PlayerSprite> MAP_CODEC;
+    public FontDescription fontDescription();
+    public String defaultFallback();
+    public MapCodec<PlayerSprite> codec();
+}

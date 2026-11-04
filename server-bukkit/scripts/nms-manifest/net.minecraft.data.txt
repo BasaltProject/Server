@@ -1,0 +1,280 @@
+//// AtlasIds.java
+import net.minecraft.resources.Identifier;
+public class AtlasIds {
+    public static final Identifier BANNER_PATTERNS;
+    public static final Identifier BLOCKS;
+    public static final Identifier ITEMS;
+    public static final Identifier CHESTS;
+    public static final Identifier DECORATED_POT;
+    public static final Identifier GUI;
+    public static final Identifier MAP_DECORATIONS;
+    public static final Identifier PAINTINGS;
+    public static final Identifier PARTICLES;
+    public static final Identifier SHIELD_PATTERNS;
+    public static final Identifier SHULKER_BOXES;
+    public static final Identifier CELESTIALS;
+}
+//// BlockFamilies.java
+import java.util.stream.Stream;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.ColorCollection;
+import net.minecraft.world.level.block.WeatheringCopperCollection;
+public class BlockFamilies {
+    public static final BlockFamily ACACIA_PLANKS;
+    public static final BlockFamily CHERRY_PLANKS;
+    public static final BlockFamily BIRCH_PLANKS;
+    public static final BlockFamily CRIMSON_PLANKS;
+    public static final BlockFamily JUNGLE_PLANKS;
+    public static final BlockFamily OAK_PLANKS;
+    public static final BlockFamily DARK_OAK_PLANKS;
+    public static final BlockFamily PALE_OAK_PLANKS;
+    public static final BlockFamily POPLAR_PLANKS;
+    public static final BlockFamily SPRUCE_PLANKS;
+    public static final BlockFamily WARPED_PLANKS;
+    public static final BlockFamily MANGROVE_PLANKS;
+    public static final BlockFamily BAMBOO_PLANKS;
+    public static final BlockFamily BAMBOO_MOSAIC;
+    public static final BlockFamily MUD_BRICKS;
+    public static final BlockFamily ANDESITE;
+    public static final BlockFamily POLISHED_ANDESITE;
+    public static final BlockFamily BLACKSTONE;
+    public static final BlockFamily POLISHED_BLACKSTONE;
+    public static final BlockFamily POLISHED_BLACKSTONE_BRICKS;
+    public static final BlockFamily BRICKS;
+    public static final BlockFamily END_STONE;
+    public static final BlockFamily END_STONE_BRICKS;
+    public static final BlockFamily MOSSY_STONE_BRICKS;
+    public static final WeatheringCopperCollection<BlockFamily> CUT_COPPER;
+    public static final WeatheringCopperCollection<BlockFamily> COPPER_BLOCK;
+    public static final BlockFamily COBBLESTONE;
+    public static final BlockFamily MOSSY_COBBLESTONE;
+    public static final BlockFamily DIORITE;
+    public static final BlockFamily POLISHED_DIORITE;
+    public static final BlockFamily GRANITE;
+    public static final BlockFamily SULFUR;
+    public static final BlockFamily POLISHED_SULFUR;
+    public static final BlockFamily SULFUR_BRICKS;
+    public static final BlockFamily CINNABAR;
+    public static final BlockFamily POLISHED_CINNABAR;
+    public static final BlockFamily CINNABAR_BRICKS;
+    public static final BlockFamily POLISHED_GRANITE;
+    public static final BlockFamily TUFF;
+    public static final BlockFamily POLISHED_TUFF;
+    public static final BlockFamily TUFF_BRICKS;
+    public static final BlockFamily RESIN_BRICKS;
+    public static final BlockFamily NETHER_BRICKS;
+    public static final BlockFamily RED_NETHER_BRICKS;
+    public static final BlockFamily PRISMARINE;
+    public static final BlockFamily PRISMARINE_BRICKS;
+    public static final BlockFamily DARK_PRISMARINE;
+    public static final BlockFamily PURPUR;
+    public static final BlockFamily QUARTZ;
+    public static final BlockFamily SMOOTH_QUARTZ;
+    public static final BlockFamily SANDSTONE;
+    public static final BlockFamily CUT_SANDSTONE;
+    public static final BlockFamily SMOOTH_SANDSTONE;
+    public static final BlockFamily RED_SANDSTONE;
+    public static final BlockFamily CUT_RED_SANDSTONE;
+    public static final BlockFamily SMOOTH_RED_SANDSTONE;
+    public static final BlockFamily STONE;
+    public static final BlockFamily STONE_BRICK;
+    public static final BlockFamily DEEPSLATE;
+    public static final BlockFamily COBBLED_DEEPSLATE;
+    public static final BlockFamily POLISHED_DEEPSLATE;
+    public static final BlockFamily DEEPSLATE_BRICKS;
+    public static final BlockFamily DEEPSLATE_TILES;
+    public static final ColorCollection<BlockFamily> WOOL;
+    public static final ColorCollection<BlockFamily> CONCRETE;
+    public static Stream<BlockFamily> getAllFamilies();
+    public static BlockFamily getFamily(Block base);
+}
+//// BlockFamily.java
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.world.level.block.Block;
+public class BlockFamily {
+    private BlockFamily(Block baseBlock);
+    public Block getBaseBlock();
+    public Map<Variant, Block> getVariants();
+    public Block get(Variant variant);
+    public boolean shouldGenerateModel();
+    public boolean shouldGenerateCraftingRecipe();
+    public boolean shouldGenerateSmeltingRecipe();
+    public boolean shouldGenerateStonecutterRecipe();
+    public Optional<String> getRecipeGroupPrefix();
+    public Optional<String> getRecipeUnlockedBy();
+    public static enum Variant {
+        BUTTON, CARPET, CHISELED, CRACKED, CUT, DOOR, CUSTOM_FENCE, FENCE, CUSTOM_FENCE_GATE, FENCE_GATE, CUSTOM_HANGING_SIGN, HANGING_SIGN, LOG, STRIPPED_LOG, MOSAIC, SIGN, SLAB, STAIRS, PRESSURE_PLATE, POLISHED, TRAPDOOR, WALL, WALL_SIGN, CUSTOM_WALL_HANGING_SIGN, WALL_HANGING_SIGN, BRICKS, COBBLED, TILES, PILLAR;
+        public String getRecipeGroup();
+        public String getPrefixedRecipeGroup(String prefix);
+        public Variant getBaseVariantForCrafting();
+    }
+    public static class Builder {
+        public Builder(Block baseBlock);
+        public BlockFamily getFamily();
+        public Builder button(Block button);
+        public Builder carpet(Block carpet);
+        public Builder chiseled(Block chiseled);
+        public Builder mosaic(Block mosaic);
+        public Builder cracked(Block cracked);
+        public Builder tiles(Block tiles);
+        public Builder pillar(Block pillar);
+        public Builder cut(Block cut);
+        public Builder door(Block door);
+        public Builder customFence(Block fence);
+        public Builder fence(Block fence);
+        public Builder customFenceGate(Block fenceGate);
+        public Builder fenceGate(Block fenceGate);
+        public Builder sign(Block sign, Block wallSign);
+        public Builder customHangingSign(Block sign, Block wallSign);
+        public Builder hangingSign(Block sign, Block wallSign);
+        public Builder log(Block log);
+        public Builder strippedLog(Block strippedLog);
+        public Builder slab(Block slab);
+        public Builder stairs(Block stairs);
+        public Builder pressurePlate(Block pressurePlate);
+        public Builder polished(Block polished);
+        public Builder trapdoor(Block trapdoor);
+        public Builder wall(Block wall);
+        public Builder cobbled(Block cobble);
+        public Builder bricks(Block bricks);
+        public Builder dontGenerateModel();
+        public Builder dontGenerateCraftingRecipe();
+        public Builder dontGenerateSmeltingRecipe();
+        public Builder generateStonecutterRecipe();
+        public Builder recipeGroupPrefix(String recipeGroupPrefix);
+        public Builder recipeUnlockedBy(String recipeUnlockedBy);
+    }
+}
+//// CachedOutput.java
+import com.google.common.hash.HashCode;
+import java.io.IOException;
+import java.nio.file.Path;
+public interface CachedOutput {
+    CachedOutput NO_CACHE;
+    void writeIfNeeded(Path path, byte[] input, HashCode hash) throws IOException;
+}
+//// DataGenerator.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.Set;
+import net.minecraft.WorldVersion;
+public abstract class DataGenerator {
+    protected final PackOutput vanillaPackOutput;
+    protected final Set<String> allProviderIds;
+    protected final Map<String, DataProvider> providersToRun;
+    public DataGenerator(Path output);
+    public abstract void run() throws IOException;
+    public PackGenerator getVanillaPack(boolean toRun);
+    public PackGenerator getBuiltinDatapack(boolean toRun, String packId);
+    public static class Cached extends DataGenerator {
+        public Cached(Path output, WorldVersion version, boolean alwaysGenerate);
+        public void run() throws IOException;
+    }
+    public static class Uncached extends DataGenerator {
+        public Uncached(Path output);
+        public void run() throws IOException;
+    }
+    public class PackGenerator {
+        private PackGenerator(boolean toRun, String providerPrefix, PackOutput output);
+        public <T extends DataProvider> T addProvider(DataProvider.Factory<T> factory);
+    }
+}
+//// DataProvider.java
+import com.google.gson.JsonElement;
+import com.mojang.serialization.Codec;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.resources.Identifier;
+import org.slf4j.Logger;
+public interface DataProvider {
+    ToIntFunction<String> FIXED_ORDER_FIELDS;
+    Comparator<String> KEY_COMPARATOR;
+    Logger LOGGER;
+    CompletableFuture<?> run(CachedOutput cache);
+    String getName();
+    static <T> CompletableFuture<?> saveAll(CachedOutput cache, Codec<T> codec, PackOutput.PathProvider pathProvider, Map<Identifier, T> entries);
+    static <T, E> CompletableFuture<?> saveAll(CachedOutput cache, Codec<E> codec, Function<T, Path> pathGetter, Map<T, E> contents);
+    static <T, E> CompletableFuture<?> saveAll(CachedOutput cache, Function<E, JsonElement> serializer, Function<T, Path> pathGetter, Map<T, E> contents);
+    static <T> CompletableFuture<?> saveStable(CachedOutput cache, HolderLookup.Provider registries, Codec<T> codec, T value, Path path);
+    static <T> CompletableFuture<?> saveStable(CachedOutput cache, Codec<T> codec, T value, Path path);
+    static CompletableFuture<?> saveStable(CachedOutput cache, JsonElement root, Path path);
+    public interface Factory<T extends DataProvider> {
+        T create(PackOutput output);
+    }
+}
+//// HashCache.java
+import com.google.common.collect.ImmutableMap;
+import com.google.common.hash.HashCode;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
+import net.minecraft.WorldVersion;
+public class HashCache {
+    public HashCache(Path rootDir, Collection<String> providerIds, WorldVersion version) throws IOException;
+    public boolean shouldRunInThisVersion(String providerId);
+    public CompletableFuture<UpdateResult> generateUpdate(String providerId, UpdateFunction function);
+    public void applyUpdate(UpdateResult result);
+    public void purgeStaleAndWrite() throws IOException;
+    static record ProviderCache(String version, ImmutableMap<Path, HashCode> data) {
+        public HashCode get(Path path);
+        public int count();
+        public static ProviderCache load(Path rootDir, Path cacheFile) throws IOException;
+        public void save(Path rootDir, Path cacheFile, String extraHeaderInfo);
+    }
+    static record ProviderCacheBuilder(String version, ConcurrentMap<Path, HashCode> data) {
+        public ProviderCacheBuilder(String version);
+        public void put(Path path, HashCode hash);
+        public ProviderCache build();
+    }
+    static class CacheUpdater implements CachedOutput {
+        private CacheUpdater(String provider, String newVersionId, ProviderCache oldCache);
+        public void writeIfNeeded(Path path, byte[] input, HashCode hash) throws IOException;
+        public UpdateResult close();
+    }
+    public static record UpdateResult(String providerId, ProviderCache cache, int writes) {
+    }
+    public interface UpdateFunction {
+        CompletableFuture<?> update(CachedOutput output);
+    }
+}
+//// Main.java
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Collection;
+public class Main {
+    public static void main(String[] args) throws IOException;
+    public static void addServerConverters(DataGenerator generator, Collection<Path> input, boolean server, boolean dev);
+    public static void addServerDefinitionProviders(DataGenerator generator, boolean server, boolean reports);
+}
+//// PackOutput.java
+import java.nio.file.Path;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+public class PackOutput {
+    public PackOutput(Path outputFolder);
+    public Path getOutputFolder();
+    public Path getOutputFolder(Target target);
+    public PathProvider createPathProvider(Target target, String kind);
+    public PathProvider createRegistryElementsPathProvider(ResourceKey<? extends Registry<?>> registryKey);
+    public PathProvider createRegistryTagsPathProvider(ResourceKey<? extends Registry<?>> registryKey);
+    public PathProvider createRegistryComponentPathProvider(ResourceKey<? extends Registry<?>> registryKey);
+    public static enum Target {
+        DATA_PACK, RESOURCE_PACK, REPORTS;
+    }
+    public static class PathProvider {
+        private PathProvider(PackOutput output, Target target, String kind);
+        public Path file(Identifier element, String extension);
+        public Path json(Identifier element);
+        public Path json(ResourceKey<?> element);
+    }
+}

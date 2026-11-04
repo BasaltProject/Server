@@ -4,6 +4,18 @@ public final class LeftoverNatives {
     private LeftoverNatives() {}
 
     public static native String[] structureIds();
+    public static native String[] stopwatchIds();
+    public static native double stopwatch(String operation, String id);
+    public static native String[] functionIds();
+    public static native String[] functionTagIds();
+    /** A file of the enabled data packs by its full name, top pack first; null when no pack has it. */
+    public static native byte[] resourceRead(String name);
+
+    public static native String[] resourcesUnder(String prefix);
+
+    /** The id of the pack a file comes from, or null. */
+    public static native String resourcePack(String name);
+
     public static native byte[] structureRead(String id);
     public static native boolean structureStore(String id, byte[] nbt, boolean toDisk);
     public static native boolean structureRemove(String id, boolean fromDisk);

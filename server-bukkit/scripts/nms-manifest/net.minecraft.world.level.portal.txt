@@ -1,0 +1,63 @@
+//// PortalForcer.java
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.BlockUtil;
+import net.minecraft.world.level.border.WorldBorder;
+public class PortalForcer {
+    public static final int TICKET_RADIUS = 3;
+    public PortalForcer(ServerLevel level);
+    public Optional<BlockPos> findClosestPortalPosition(BlockPos approximateExitPos, boolean toNether, WorldBorder worldBorder);
+    public Optional<BlockUtil.FoundRectangle> createPortal(BlockPos origin, Direction.Axis portalAxis);
+}
+//// PortalShape.java
+import java.util.Optional;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.BlockUtil;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+public class PortalShape {
+    public static final int MAX_WIDTH = 21;
+    public static final int MAX_HEIGHT = 21;
+    public static final Predicate<BlockState> FRAME;
+    private PortalShape(Direction.Axis axis, int portalBlockCount, Direction rightDir, BlockPos bottomLeft, int width, int height);
+    public static Optional<PortalShape> findEmptyPortalShape(LevelAccessor level, BlockPos pos, Direction.Axis preferredAxis);
+    public static Optional<PortalShape> findPortalShape(LevelAccessor level, BlockPos pos, Predicate<PortalShape> isValid, Direction.Axis preferredAxis);
+    public static PortalShape findAnyShape(BlockGetter level, BlockPos pos, Direction.Axis axis);
+    public boolean isValid();
+    public void createPortalBlocks(LevelAccessor level);
+    public boolean isComplete();
+    public static Vec3 getRelativePosition(BlockUtil.FoundRectangle largestRectangleAround, Direction.Axis axis, Vec3 position, EntityDimensions dimensions);
+    public static Vec3 findCollisionFreePosition(Vec3 bottomCenter, ServerLevel serverLevel, Entity entity, EntityDimensions dimensions);
+}
+//// TeleportTransition.java
+import java.util.Set;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Relative;
+import net.minecraft.world.phys.Vec3;
+public record TeleportTransition(ServerLevel newLevel, Vec3 position, Vec3 deltaMovement, float yRot, float xRot, boolean missingRespawnBlock, boolean asPassenger, Set<Relative> relatives, PostTeleportTransition postTeleportTransition) {
+    public static final PostTeleportTransition DO_NOTHING;
+    public static final PostTeleportTransition PLAY_PORTAL_SOUND;
+    public static final PostTeleportTransition PLACE_PORTAL_TICKET;
+    public TeleportTransition(ServerLevel newLevel, Vec3 pos, Vec3 speed, float yRot, float xRot, PostTeleportTransition postTeleportTransition);
+    public TeleportTransition(ServerLevel newLevel, Vec3 pos, Vec3 speed, float yRot, float xRot, Set<Relative> relatives, PostTeleportTransition postTeleportTransition);
+    public static TeleportTransition createDefault(ServerPlayer player, PostTeleportTransition postTeleportTransition);
+    public static TeleportTransition missingRespawnBlock(ServerPlayer player, PostTeleportTransition postTeleportTransition);
+    public TeleportTransition withRotation(float yRot, float xRot);
+    public TeleportTransition withPosition(Vec3 position);
+    public TeleportTransition transitionAsPassenger();
+    public interface PostTeleportTransition {
+        void onTransition(Entity entity);
+        default PostTeleportTransition then(PostTeleportTransition postTeleportTransition);
+    }
+}

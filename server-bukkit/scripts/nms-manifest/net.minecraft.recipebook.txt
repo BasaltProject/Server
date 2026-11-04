@@ -1,0 +1,27 @@
+//// PlaceRecipeHelper.java
+import net.minecraft.world.item.crafting.Recipe;
+public interface PlaceRecipeHelper {
+    static <T> void placeRecipe(int gridWidth, int gridHeight, Recipe<?> recipe, Iterable<T> entries, Output<T> output);
+    static <T> void placeRecipe(int gridWidth, int gridHeight, int recipeWidth, int recipeHeight, Iterable<T> entries, Output<T> output);
+    public interface Output<T> {
+        void addItemToSlot(T item, int gridIndex, int gridXPos, int gridYPos);
+    }
+}
+//// ServerPlaceRecipe.java
+import java.util.List;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.StackedItemContents;
+import net.minecraft.world.inventory.RecipeBookMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.RecipeInput;
+public class ServerPlaceRecipe<R extends Recipe<?>> {
+    public static <I extends RecipeInput, R extends Recipe<I>> RecipeBookMenu.PostPlaceAction placeRecipe(CraftingMenuAccess<R> menu, int gridWidth, int gridHeight, List<Slot> inputGridSlots, List<Slot> slotsToClear, Inventory inventory, RecipeHolder<R> recipe, boolean useMaxItems, boolean allowDroppingItemsToClear);
+    private ServerPlaceRecipe(CraftingMenuAccess<R> menu, Inventory inventory, boolean useMaxItems, int gridWidth, int gridHeight, List<Slot> inputGridSlots, List<Slot> slotsToClear);
+    public interface CraftingMenuAccess<T extends Recipe<?>> {
+        void fillCraftSlotsStackedContents(StackedItemContents stackedContents);
+        void clearCraftingContent();
+        boolean recipeMatches(RecipeHolder<T> recipe);
+    }
+}

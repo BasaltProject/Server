@@ -15,6 +15,54 @@ jobjectArray JNICALL nativeStructureIds(JNIEnv* env, jclass) {
     return jni::stringArrayOf(env, jni::onServer<std::vector<std::string>>({}, [] { return structures().ids(); }));
 }
 
+jobjectArray JNICALL nativeStopwatchIds(JNIEnv* env, jclass) {
+    return jni::stringArrayOf(env, jni::onServer<std::vector<std::string>>({}, [] {
+                                  return BukkitBridge::current().services().serverControl().stopwatchIds();
+                              }));
+}
+
+jdouble JNICALL nativeStopwatch(JNIEnv* env, jclass, jstring operation, jstring id) {
+    const std::string what = toStd(env, operation);
+    const std::string name = toStd(env, id);
+    return jni::onServer<jdouble>(-1.0, [&] {
+        const std::optional<double> value = BukkitBridge::current().services().serverControl().stopwatch(what, name);
+        return value.has_value() ? static_cast<jdouble>(*value) : -1.0;
+    });
+}
+
+jobjectArray JNICALL nativeFunctionIds(JNIEnv* env, jclass) {
+    return jni::stringArrayOf(env, jni::onServer<std::vector<std::string>>({}, [] {
+                                  return BukkitBridge::current().services().datapacks().functionIds();
+                              }));
+}
+
+jobjectArray JNICALL nativeFunctionTagIds(JNIEnv* env, jclass) {
+    return jni::stringArrayOf(env, jni::onServer<std::vector<std::string>>({}, [] {
+                                  return BukkitBridge::current().services().datapacks().functionTagIds();
+                              }));
+}
+
+jbyteArray JNICALL nativeResourceRead(JNIEnv* env, jclass, jstring name) {
+    const std::string path = toStd(env, name);
+    return jni::byteArrayOf(env, jni::onServer<Blob>(std::nullopt, [&] {
+                                return BukkitBridge::current().services().datapacks().resource(path);
+                            }));
+}
+
+jobjectArray JNICALL nativeResourcesUnder(JNIEnv* env, jclass, jstring prefix) {
+    const std::string start = toStd(env, prefix);
+    return jni::stringArrayOf(env, jni::onServer<std::vector<std::string>>({}, [&] {
+                                  return BukkitBridge::current().services().datapacks().resourcesUnder(start);
+                              }));
+}
+
+jstring JNICALL nativeResourcePack(JNIEnv* env, jclass, jstring name) {
+    const std::string path = toStd(env, name);
+    const std::string pack = jni::onServer<std::string>(
+        {}, [&] { return BukkitBridge::current().services().datapacks().resourcePack(path); });
+    return pack.empty() ? nullptr : env->NewStringUTF(pack.c_str());
+}
+
 jbyteArray JNICALL nativeStructureRead(JNIEnv* env, jclass, jstring id) {
     const std::string name = toStd(env, id);
     return jni::byteArrayOf(env, jni::onServer<Blob>(std::nullopt, [&] { return structures().read(name); }));
@@ -152,6 +200,14 @@ void registerLeftoverNatives(JNIEnv* env, jclass natives) {
     };
     const std::array methods{
         method("structureIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeStructureIds)),
+        method("stopwatchIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeStopwatchIds)),
+        method("stopwatch", "(Ljava/lang/String;Ljava/lang/String;)D", reinterpret_cast<void*>(&nativeStopwatch)),
+        method("functionIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeFunctionIds)),
+        method("functionTagIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeFunctionTagIds)),
+        method("resourceRead", "(Ljava/lang/String;)[B", reinterpret_cast<void*>(&nativeResourceRead)),
+        method("resourcesUnder", "(Ljava/lang/String;)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeResourcesUnder)),
+        method("resourcePack", "(Ljava/lang/String;)Ljava/lang/String;", reinterpret_cast<void*>(&nativeResourcePack)),
         method("structureRead", "(Ljava/lang/String;)[B", reinterpret_cast<void*>(&nativeStructureRead)),
         method("structureStore", "(Ljava/lang/String;[BZ)Z", reinterpret_cast<void*>(&nativeStructureStore)),
         method("structureRemove", "(Ljava/lang/String;Z)Z", reinterpret_cast<void*>(&nativeStructureRemove)),

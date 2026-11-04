@@ -1,0 +1,118 @@
+//// BlockInput.java
+import java.util.Set;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.pattern.BlockInWorld;
+import net.minecraft.world.level.block.state.properties.Property;
+public class BlockInput implements Predicate<BlockInWorld> {
+    public BlockInput(BlockState state, Set<Property<?>> properties, CompoundTag tag);
+    public BlockState getState();
+    public Set<Property<?>> getDefinedProperties();
+    public boolean test(BlockInWorld blockInWorld);
+    public boolean test(ServerLevel level, BlockPos pos);
+    public boolean place(ServerLevel level, BlockPos pos, int update);
+}
+//// BlockPredicateArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderSet;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.pattern.BlockInWorld;
+import net.minecraft.world.level.block.state.properties.Property;
+public class BlockPredicateArgument implements ArgumentType<Result> {
+    public BlockPredicateArgument(CommandBuildContext context);
+    public static BlockPredicateArgument blockPredicate(CommandBuildContext context);
+    public Result parse(StringReader reader) throws CommandSyntaxException;
+    public static Result parse(HolderLookup<Block> blocks, StringReader reader) throws CommandSyntaxException;
+    public static Predicate<BlockInWorld> getBlockPredicate(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException;
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+    static class BlockPredicate implements Result {
+        public BlockPredicate(BlockState state, Set<Property<?>> properties, CompoundTag nbt);
+        public boolean test(BlockInWorld blockInWorld);
+        public boolean requiresNbt();
+    }
+    static class TagPredicate implements Result {
+        private TagPredicate(HolderSet<Block> tag, Map<String, String> vagueProperties, CompoundTag nbt);
+        public boolean test(BlockInWorld blockInWorld);
+        public boolean requiresNbt();
+    }
+    public interface Result extends Predicate<BlockInWorld> {
+        boolean requiresNbt();
+    }
+}
+//// BlockStateArgument.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+public class BlockStateArgument implements ArgumentType<BlockInput> {
+    public BlockStateArgument(CommandBuildContext context);
+    public static BlockStateArgument block(CommandBuildContext context);
+    public BlockInput parse(StringReader reader) throws CommandSyntaxException;
+    public static BlockInput getBlock(CommandContext<CommandSourceStack> context, String name);
+    public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder);
+    public Collection<String> getExamples();
+}
+//// BlockStateParser.java
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.Dynamic2CommandExceptionType;
+import com.mojang.brigadier.exceptions.Dynamic3CommandExceptionType;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.mojang.datafixers.util.Either;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderSet;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
+public class BlockStateParser {
+    public static final SimpleCommandExceptionType ERROR_NO_TAGS_ALLOWED;
+    public static final DynamicCommandExceptionType ERROR_UNKNOWN_BLOCK;
+    public static final Dynamic2CommandExceptionType ERROR_UNKNOWN_PROPERTY;
+    public static final Dynamic2CommandExceptionType ERROR_DUPLICATE_PROPERTY;
+    public static final Dynamic3CommandExceptionType ERROR_INVALID_VALUE;
+    public static final Dynamic2CommandExceptionType ERROR_EXPECTED_VALUE;
+    public static final SimpleCommandExceptionType ERROR_EXPECTED_END_OF_PROPERTIES;
+    public static final DynamicCommandExceptionType ERROR_UNKNOWN_TAG;
+    private BlockStateParser(HolderLookup<Block> blocks, StringReader reader, boolean forTesting, boolean allowNbt);
+    public static BlockResult parseForBlock(HolderLookup<Block> blocks, String value, boolean allowNbt) throws CommandSyntaxException;
+    public static BlockResult parseForBlock(HolderLookup<Block> blocks, StringReader reader, boolean allowNbt) throws CommandSyntaxException;
+    public static Either<BlockResult, TagResult> parseForTesting(HolderLookup<Block> blocks, String value, boolean allowNbt) throws CommandSyntaxException;
+    public static Either<BlockResult, TagResult> parseForTesting(HolderLookup<Block> blocks, StringReader reader, boolean allowNbt) throws CommandSyntaxException;
+    public static CompletableFuture<Suggestions> fillSuggestions(HolderLookup<Block> blocks, SuggestionsBuilder builder, boolean forTesting, boolean allowNbt);
+    public static String serialize(BlockState state);
+    public static record BlockResult(BlockState blockState, Map<Property<?>, Comparable<?>> properties, CompoundTag nbt) {
+    }
+    public static record TagResult(HolderSet<Block> tag, Map<String, String> vagueProperties, CompoundTag nbt) {
+    }
+}

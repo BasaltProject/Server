@@ -120,4 +120,31 @@ bool ServerControl::setSetting(const std::string_view key, const std::string_vie
     return hooks_.settings != nullptr && hooks_.settings->set(key, value);
 }
 
+std::vector<std::string> ServerControl::stopwatchIds() {
+    std::vector<std::string> out;
+    if (command::commands::Stopwatches* watches = hooks_.stopwatches ? hooks_.stopwatches() : nullptr;
+        watches != nullptr) {
+        for (const wire::common::Identifier& id : watches->ids()) {
+            out.push_back(id.toString());
+        }
+    }
+    return out;
+}
+
+std::optional<double> ServerControl::stopwatch(const std::string_view operation, const std::string_view id) {
+    command::commands::Stopwatches* watches = hooks_.stopwatches ? hooks_.stopwatches() : nullptr;
+    const auto name = wire::common::Identifier::parse(std::string{id});
+    if (watches == nullptr || !name.has_value()) {
+        return std::nullopt;
+    }
+    if (operation == "elapsed") {
+        return watches->elapsedSeconds(*name);
+    }
+    const bool done = operation == "create"    ? watches->create(*name)
+                      : operation == "restart" ? watches->restart(*name)
+                      : operation == "remove"  ? watches->remove(*name)
+                                               : false;
+    return done ? std::optional<double>{1.0} : std::nullopt;
+}
+
 } // namespace basalt::server::runtime::plugins

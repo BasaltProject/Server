@@ -132,7 +132,95 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
         return 0;
     });
     lua.setField("refresh");
+    wire::lua::pushHostFunction(lua, "datapacks.functions", [server](LuaArgs& args) {
+        pushNames(args, server->services().datapacks().functionIds());
+        return 1;
+    });
+    lua.setField("functions");
+    wire::lua::pushHostFunction(lua, "datapacks.function_tags", [server](LuaArgs& args) {
+        pushNames(args, server->services().datapacks().functionTagIds());
+        return 1;
+    });
+    lua.setField("function_tags");
+    wire::lua::pushHostFunction(lua, "datapacks.scheduled", [server](LuaArgs& args) {
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const PluginScheduledFunction& each : server->services().datapacks().scheduled()) {
+            args.pushTable();
+            args.pushString(each.name);
+            args.setField("name");
+            args.pushInteger(each.triggerTime);
+            args.setField("trigger_time");
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("scheduled");
+    wire::lua::pushHostFunction(lua, "datapacks.schedule", [server](LuaArgs& args) {
+        const std::string function = args.checkString(1);
+        const std::int64_t delay = args.checkInteger(2);
+        const bool replace = args.booleanOr(3, true);
+        args.pushBoolean(server->services().datapacks().schedule(function, delay, replace));
+        return 1;
+    });
+    lua.setField("schedule");
+    wire::lua::pushHostFunction(lua, "datapacks.unschedule", [server](LuaArgs& args) {
+        args.pushInteger(server->services().datapacks().unschedule(args.checkString(1)));
+        return 1;
+    });
+    lua.setField("unschedule");
+    wire::lua::pushHostFunction(lua, "datapacks.resource", [server](LuaArgs& args) {
+        const auto bytes = server->services().datapacks().resource(args.checkString(1));
+        if (bytes.has_value()) {
+            args.pushString(std::string_view{reinterpret_cast<const char*>(bytes->data()), bytes->size()});
+        } else {
+            args.pushNil();
+        }
+        return 1;
+    });
+    lua.setField("resource");
+    wire::lua::pushHostFunction(lua, "datapacks.resources", [server](LuaArgs& args) {
+        pushNames(args, server->services().datapacks().resourcesUnder(args.stringOrNull(1).value_or("")));
+        return 1;
+    });
+    lua.setField("resources");
+    wire::lua::pushHostFunction(lua, "datapacks.resource_pack", [server](LuaArgs& args) {
+        const std::string pack = server->services().datapacks().resourcePack(args.checkString(1));
+        if (pack.empty()) {
+            args.pushNil();
+        } else {
+            args.pushString(pack);
+        }
+        return 1;
+    });
+    lua.setField("resource_pack");
     lua.setGlobal("datapacks");
+
+    lua.pushTable();
+    wire::lua::pushHostFunction(lua, "stopwatches.list", [control](LuaArgs& args) {
+        pushNames(args, control().stopwatchIds());
+        return 1;
+    });
+    lua.setField("list");
+    for (const char* operation : {"create", "restart", "remove"}) {
+        const std::string name = operation;
+        wire::lua::pushHostFunction(lua, std::string{"stopwatches."} + name, [control, name](LuaArgs& args) {
+            args.pushBoolean(control().stopwatch(name, args.checkString(1)).has_value());
+            return 1;
+        });
+        lua.setField(operation);
+    }
+    wire::lua::pushHostFunction(lua, "stopwatches.elapsed", [control](LuaArgs& args) {
+        const std::optional<double> seconds = control().stopwatch("elapsed", args.checkString(1));
+        if (seconds.has_value()) {
+            args.pushNumber(*seconds);
+        } else {
+            args.pushNil();
+        }
+        return 1;
+    });
+    lua.setField("elapsed");
+    lua.setGlobal("stopwatches");
 
     lua.pushTable();
     wire::lua::pushHostFunction(lua, "advancements.ids", [server](LuaArgs& args) {
@@ -164,6 +252,8 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
         args.setField("frame");
         args.pushString(info->iconItem);
         args.setField("icon");
+        args.pushString(info->json);
+        args.setField("json");
         return 1;
     });
     lua.setField("info");
@@ -181,6 +271,33 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
             });
         lua.setField(granting ? "grant" : "revoke");
     }
+    wire::lua::pushHostFunction(lua, "advancements.trigger", [server](LuaArgs& args) {
+        const std::shared_ptr<PluginPlayerRef> player = playerFrom(args, 1, server->services().players());
+        if (player == nullptr) {
+            args.raise("advancements.trigger(player, trigger, facts) needs an online player");
+        }
+        PluginTriggerFacts facts;
+        if (args.isTable(3)) {
+            const auto x = args.fieldAsText(3, "x");
+            const auto y = args.fieldAsText(3, "y");
+            const auto z = args.fieldAsText(3, "z");
+            if (x.has_value() && y.has_value() && z.has_value()) {
+                facts.block = std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::stol(*x)),
+                                                          static_cast<std::int32_t>(std::stol(*y)),
+                                                          static_cast<std::int32_t>(std::stol(*z))};
+            }
+            facts.item = args.fieldAsText(3, "item").value_or("");
+            if (const auto count = args.fieldAsText(3, "count"); count.has_value()) {
+                facts.count = static_cast<std::int32_t>(std::stol(*count));
+            }
+            if (const auto distance = args.fieldAsText(3, "distance"); distance.has_value()) {
+                facts.distance = std::stod(*distance);
+            }
+        }
+        args.pushBoolean(server->services().advancements().trigger(player->uuid(), args.checkString(2), facts));
+        return 1;
+    });
+    lua.setField("trigger");
     wire::lua::pushHostFunction(lua, "advancements.progress", [server](LuaArgs& args) {
         const std::shared_ptr<PluginPlayerRef> player = playerFrom(args, 1, server->services().players());
         args.pushTable();

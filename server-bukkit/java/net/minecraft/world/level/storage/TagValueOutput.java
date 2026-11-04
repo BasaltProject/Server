@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.storage;
 
 import com.mojang.serialization.Codec;
@@ -9,6 +10,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.util.ProblemReporter;
+import com.mojang.serialization.DataResult;
 
 public class TagValueOutput implements ValueOutput {
     private final DynamicOps<Tag> ops;
@@ -160,5 +162,48 @@ public class TagValueOutput implements ValueOutput {
     @Override
     public boolean isEmpty() {
         return output.isEmpty();
+    }
+    private TagValueOutput(ProblemReporter problemReporter, DynamicOps<Tag> ops, CompoundTag output) {
+        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput#<init>");
+    }
+    static class ListWrapper implements ValueOutput.ValueOutputList {
+        private ListWrapper(String fieldName, ProblemReporter problemReporter, DynamicOps<Tag> ops, ListTag output) {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.ListWrapper#<init>");
+        }
+        public ValueOutput addChild() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.ListWrapper#addChild");
+        }
+        public void discardLast() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.ListWrapper#discardLast");
+        }
+        public boolean isEmpty() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.ListWrapper#isEmpty");
+        }
+    }
+    static class TypedListWrapper<T> implements ValueOutput.TypedOutputList<T> {
+        private TypedListWrapper(ProblemReporter problemReporter, String name, DynamicOps<Tag> ops, Codec<T> codec, ListTag output) {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.TypedListWrapper#<init>");
+        }
+        public void add(T value) {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.TypedListWrapper#add");
+        }
+        public boolean isEmpty() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.TypedListWrapper#isEmpty");
+        }
+    }
+    public static record EncodeToFieldFailedProblem(String name, Object value, DataResult.Error<?> error) implements ProblemReporter.Problem {
+        public String description() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.EncodeToFieldFailedProblem#description");
+        }
+    }
+    public static record EncodeToListFailedProblem(String name, Object value, DataResult.Error<?> error) implements ProblemReporter.Problem {
+        public String description() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.EncodeToListFailedProblem#description");
+        }
+    }
+    public static record EncodeToMapFailedProblem(Object value, DataResult.Error<?> error) implements ProblemReporter.Problem {
+        public String description() {
+            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueOutput.EncodeToMapFailedProblem#description");
+        }
     }
 }

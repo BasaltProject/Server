@@ -1,0 +1,39 @@
+//// ClientIntent.java
+public enum ClientIntent {
+    STATUS, LOGIN, TRANSFER;
+    public static ClientIntent byId(int id);
+    public int id();
+}
+//// ClientIntentionPacket.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+public record ClientIntentionPacket(int protocolVersion, String hostName, int port, ClientIntent intention) implements Packet<ServerHandshakePacketListener> {
+    public static final StreamCodec<FriendlyByteBuf, ClientIntentionPacket> STREAM_CODEC;
+    public ClientIntentionPacket(int protocolVersion, String hostName, int port, ClientIntent intention);
+    private ClientIntentionPacket(FriendlyByteBuf input);
+    public PacketType<ClientIntentionPacket> type();
+    public void handle(ServerHandshakePacketListener listener);
+    public boolean isTerminal();
+}
+//// HandshakePacketTypes.java
+import net.minecraft.network.protocol.PacketType;
+public class HandshakePacketTypes {
+    public static final PacketType<ClientIntentionPacket> CLIENT_INTENTION;
+}
+//// HandshakeProtocols.java
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.ProtocolInfo;
+import net.minecraft.network.protocol.SimpleUnboundProtocol;
+public class HandshakeProtocols {
+    public static final SimpleUnboundProtocol<ServerHandshakePacketListener, FriendlyByteBuf> SERVERBOUND_TEMPLATE;
+    public static final ProtocolInfo<ServerHandshakePacketListener> SERVERBOUND;
+}
+//// ServerHandshakePacketListener.java
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.game.ServerPacketListener;
+public interface ServerHandshakePacketListener extends ServerPacketListener {
+    default ConnectionProtocol protocol();
+    void handleIntention(ClientIntentionPacket packet);
+}

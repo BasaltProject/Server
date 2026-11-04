@@ -1,0 +1,130 @@
+//// MaterialRuleContext.java
+import java.util.Set;
+import java.util.function.DoubleSupplier;
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySamplerSet;
+import net.minecraft.world.level.levelgen.densityfunction.DensityVolume;
+import net.minecraft.world.level.levelgen.material.condition.ConditionEvaluator;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public final class MaterialRuleContext {
+    MaterialRuleContext(MaterialSystem system, RandomState randomState, DensityVolume expectedVolume, DensitySamplerSet densitySamplers, Function<BlockPos, Holder<Biome>> biomeGetter, WorldGenerationContext context, Set<Holder<Biome>> possibleBiomes);
+    void updateXZ(int blockX, int blockZ, int surfaceGradientX, int surfaceGradientZ);
+    void updateY(int stoneDepthAbove, int stoneDepthBelow, int waterHeight, int blockY);
+    public double getSurfaceSecondary();
+    public Holder<Biome> getBiome();
+    public int getSeaLevel();
+    public int getMinSurfaceLevel();
+    public DoubleSupplier getNoiseSampler(ResourceKey<NormalNoise> noiseId, boolean is3d);
+    public PositionalRandomFactory getOrCreateRandomFactory(Identifier name);
+    public MaterialRules.DensityGetter getDensitiesInChunk(DensityFunction function, boolean prefill);
+    public Set<Holder<Biome>> possibleBiomes();
+    public int stoneDepthAbove();
+    public int stoneDepthBelow();
+    public int surfaceDepth();
+    public int waterHeight();
+    public int blockX();
+    public int blockY();
+    public int blockZ();
+    public BlockPos blockPos();
+    public int surfaceGradientX();
+    public int surfaceGradientZ();
+    public int resolveAnchorY(VerticalAnchor anchor);
+    public BlockState getBand(int x, int y, int z);
+    public static abstract class LazyXZCondition implements ConditionEvaluator {
+        protected final MaterialRuleContext context;
+        protected LazyXZCondition(MaterialRuleContext context);
+        public boolean test();
+        protected abstract boolean compute();
+    }
+    public static abstract class LazyYCondition implements ConditionEvaluator {
+        protected final MaterialRuleContext context;
+        protected LazyYCondition(MaterialRuleContext context);
+        public boolean test();
+        protected abstract boolean compute();
+    }
+}
+//// MaterialRules.java
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.Registry;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.material.condition.MaterialCondition;
+import net.minecraft.world.level.levelgen.material.rule.MaterialRule;
+import net.minecraft.world.level.levelgen.placement.CaveSurface;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+public class MaterialRules {
+    public static MaterialRule registerAndWrap(BootstrapContext<MaterialRule> context, ResourceKey<MaterialRule> key, MaterialRule rule);
+    public static MaterialCondition registerAndWrap(BootstrapContext<MaterialCondition> context, ResourceKey<MaterialCondition> key, MaterialCondition condition);
+    public static MaterialRule getRule(HolderGetter<MaterialRule> rules, ResourceKey<MaterialRule> key);
+    public static MaterialCondition getCondition(HolderGetter<MaterialCondition> conditions, ResourceKey<MaterialCondition> key);
+    public static MaterialCondition stoneDepthCheck(int offset, boolean addSurfaceDepth1, CaveSurface surfaceType);
+    public static MaterialCondition stoneDepthCheck(int offset, boolean addSurfaceDepth1, int secondaryDepthRange, CaveSurface surfaceType);
+    public static MaterialCondition not(MaterialCondition target);
+    public static MaterialCondition yBlockCheck(VerticalAnchor anchor, int surfaceDepthMultiplier);
+    public static MaterialCondition yStartCheck(VerticalAnchor anchor, int surfaceDepthMultiplier);
+    public static MaterialCondition waterBlockCheck(int offset, int surfaceDepthMultiplier);
+    public static MaterialCondition waterStartCheck(int offset, int surfaceDepthMultiplier);
+    public static MaterialCondition isBiome(HolderGetter<Biome> biomes, ResourceKey<Biome>... target);
+    public static MaterialCondition noiseCondition2d(ResourceKey<NormalNoise> noise, double minRange);
+    public static MaterialCondition noiseCondition2d(ResourceKey<NormalNoise> noise, double minRange, double maxRange);
+    public static MaterialCondition noiseCondition3d(ResourceKey<NormalNoise> noise, double minRange);
+    public static MaterialCondition noiseCondition3d(ResourceKey<NormalNoise> noise, double minRange, double maxRange);
+    public static MaterialCondition verticalGradient(String randomName, VerticalAnchor trueAtAndBelow, VerticalAnchor falseAtAndAbove);
+    public static MaterialCondition steep();
+    public static MaterialCondition hole();
+    public static MaterialCondition abovePreliminarySurface();
+    public static MaterialCondition temperature();
+    public static MaterialRule ifTrue(MaterialCondition condition, MaterialRule next);
+    public static MaterialRule sequence(MaterialRule... rules);
+    public static MaterialRule sequence(List<MaterialRule> rules);
+    public static MaterialRule state(BlockState state);
+    public static MaterialRule bandlands();
+    public static MapCodec<? extends MaterialRule> bootstrapRules(Registry<MapCodec<? extends MaterialRule>> registry);
+    public static MapCodec<? extends MaterialCondition> bootstrapConditions(Registry<MapCodec<? extends MaterialCondition>> registry);
+    public interface DensityGetter {
+        float get();
+    }
+}
+//// MaterialSystem.java
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.levelgen.NoiseChunk;
+import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
+import net.minecraft.world.level.levelgen.densityfunction.DensityFunction;
+import net.minecraft.world.level.levelgen.densityfunction.DensitySamplerSet;
+import net.minecraft.world.level.levelgen.material.rule.MaterialRule;
+public class MaterialSystem {
+    public MaterialSystem(RandomState randomState, BlockState defaultBlock, int seaLevel, DensityFunction preliminarySurfaceFunction, PositionalRandomFactory noiseRandom);
+    public void buildSurface(RandomState randomState, BiomeManager biomeManager, WorldGenerationContext generationContext, ChunkAccess protoChunk, NoiseChunk noiseChunk, MaterialRule ruleSource, Set<Holder<Biome>> possibleBiomes);
+    protected int getSurfaceDepth(int blockX, int blockZ);
+    protected double getSurfaceSecondary(int blockX, int blockZ);
+    public int getSeaLevel();
+    public Optional<BlockState> topMaterial(MaterialRule ruleSource, RandomState randomState, WorldGenerationContext worldGenerationContext, Function<BlockPos, Holder<Biome>> biomeGetter, ChunkAccess chunk, DensitySamplerSet densitySamplers, BlockPos pos, boolean underFluid);
+    protected BlockState getBand(int worldX, int y, int worldZ);
+    public DensityFunction preliminarySurfaceFunction();
+}

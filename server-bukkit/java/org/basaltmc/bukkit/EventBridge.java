@@ -126,6 +126,8 @@ final class EventBridge {
 
     private EventBridge() {}
 
+    static void ready() {}
+
     static void map(String basalt, Class<? extends Event> produced, Function<Fields, Event> build) {
         map(basalt, produced, build, null);
     }
@@ -165,6 +167,7 @@ final class EventBridge {
         DialogEvents.install();
         HookPlayerEvents.install();
         HookWorldEvents.install();
+        VibrationDispatch.install();
         HookVehicleEvents.install();
         HookInventoryEvents.install();
         WorldEvents.install();

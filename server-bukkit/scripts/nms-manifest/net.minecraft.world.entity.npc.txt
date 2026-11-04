@@ -1,0 +1,45 @@
+//// CatSpawner.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.CustomSpawner;
+public class CatSpawner implements CustomSpawner {
+    public void tick(ServerLevel level, boolean spawnEnemies);
+}
+//// ClientSideMerchant.java
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.Merchant;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
+public class ClientSideMerchant implements Merchant {
+    public ClientSideMerchant(Player source);
+    public Player getTradingPlayer();
+    public void setTradingPlayer(Player player);
+    public MerchantOffers getOffers();
+    public void overrideOffers(MerchantOffers offers);
+    public void notifyTrade(MerchantOffer offer);
+    public void notifyTradeUpdated(ItemStack itemStack);
+    public boolean isClientSide();
+    public boolean stillValid(Player player);
+    public int getVillagerXp();
+    public void overrideXp(int xp);
+    public boolean showProgressBar();
+    public SoundEvent getNotifyTradeSound();
+}
+//// InventoryCarrier.java
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+public interface InventoryCarrier {
+    String TAG_INVENTORY;
+    SimpleContainer getInventory();
+    static void pickUpItem(ServerLevel level, Mob mob, InventoryCarrier inventoryCarrier, ItemEntity itemEntity);
+    default void readInventoryFromTag(ValueInput input);
+    default void writeInventoryToTag(ValueOutput output);
+}
+//// Npc.java
+public interface Npc {
+}

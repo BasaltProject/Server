@@ -1,0 +1,76 @@
+//// AirAndWaterRandomPos.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class AirAndWaterRandomPos {
+    public static Vec3 getPos(PathfinderMob mob, int horizontalDist, int verticalDist, int flyingHeight, double xDir, double zDir, double maxXzRadiansDifference);
+    public static BlockPos generateRandomPos(PathfinderMob mob, int horizontalDist, int verticalDist, int flyingHeight, double xDir, double zDir, double maxXzRadiansDifference, boolean restrict);
+}
+//// AirRandomPos.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class AirRandomPos {
+    public static Vec3 getPosTowards(PathfinderMob mob, int horizontalDist, int verticalDist, int flyingHeight, Vec3 towardsPos, double maxXzRadiansFromDir);
+}
+//// DefaultRandomPos.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class DefaultRandomPos {
+    public static Vec3 getPos(PathfinderMob mob, int horizontalDist, int verticalDist);
+    public static Vec3 getPosTowards(PathfinderMob mob, int horizontalDist, int verticalDist, Vec3 towardsPos, double maxXzRadiansFromDir);
+    public static Vec3 getPosAway(PathfinderMob mob, int horizontalDist, int verticalDist, Vec3 avoidPos);
+}
+//// GoalUtils.java
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.phys.Vec3;
+public class GoalUtils {
+    public static boolean hasGroundPathNavigation(Mob mob);
+    public static boolean mobRestricted(PathfinderMob mob, double horizontalDist);
+    public static boolean isOutsideLimits(BlockPos pos, PathfinderMob mob);
+    public static boolean isRestricted(boolean restrict, PathfinderMob mob, BlockPos pos);
+    public static boolean isRestricted(boolean restrict, PathfinderMob mob, Vec3 pos);
+    public static boolean isNotStable(PathNavigation navigation, BlockPos pos);
+    public static boolean isWater(PathfinderMob mob, BlockPos pos);
+    public static boolean hasMalus(PathfinderMob mob, BlockPos pos);
+    public static boolean isSolid(PathfinderMob mob, BlockPos pos);
+}
+//// HoverRandomPos.java
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class HoverRandomPos {
+    public static Vec3 getPos(PathfinderMob mob, int horizontalDist, int verticalDist, double xDir, double zDir, float maxXzRadiansDifference, int hoverMaxHeight, int hoverMinHeight);
+}
+//// LandRandomPos.java
+import java.util.function.ToDoubleFunction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class LandRandomPos {
+    public static Vec3 getPos(PathfinderMob mob, int horizontalDist, int verticalDist);
+    public static Vec3 getPos(PathfinderMob mob, int horizontalDist, int verticalDist, ToDoubleFunction<BlockPos> positionWeight);
+    public static Vec3 getPosTowards(PathfinderMob mob, int horizontalDist, int verticalDist, Vec3 towardsPos);
+    public static Vec3 getPosAway(PathfinderMob mob, int horizontalDist, int verticalDist, Vec3 avoidPos);
+    public static Vec3 getPosAway(PathfinderMob mob, double minHorizontalDist, double maxHorizontalDist, int verticalDist, Vec3 avoidPos);
+    public static BlockPos movePosUpOutOfSolid(PathfinderMob mob, BlockPos pos);
+    public static BlockPos generateRandomPosTowardDirection(PathfinderMob mob, double horizontalDist, boolean restrict, BlockPos direction);
+}
+//// RandomPos.java
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.ToDoubleFunction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.phys.Vec3;
+public class RandomPos {
+    public static BlockPos generateRandomDirection(RandomSource random, int horizontalDist, int verticalDist);
+    public static BlockPos generateRandomDirectionWithinRadians(RandomSource random, double minHorizontalDist, double maxHorizontalDist, int verticalDist, int flyingHeight, double xDir, double zDir, double maxXzRadiansFromDir);
+    public static BlockPos moveUpOutOfSolid(BlockPos pos, int maxY, Predicate<BlockPos> solidityTester);
+    public static BlockPos moveUpToAboveSolid(BlockPos pos, int aboveSolidAmount, int maxY, Predicate<BlockPos> solidityTester);
+    public static Vec3 generateRandomPos(PathfinderMob mob, Supplier< BlockPos> posSupplier);
+    public static Vec3 generateRandomPos(Supplier< BlockPos> posSupplier, ToDoubleFunction<BlockPos> positionWeightFunction);
+    public static BlockPos generateRandomPosTowardDirection(PathfinderMob mob, double xzDist, RandomSource random, BlockPos direction);
+}

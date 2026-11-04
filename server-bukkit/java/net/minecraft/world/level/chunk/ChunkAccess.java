@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.chunk;
 
 import ca.spottedleaf.moonrise.patches.starlight.light.SWMRNibbleArray;
@@ -43,57 +44,81 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.ticks.TickContainerAccess;
 import org.basaltmc.bukkit.Unsupported;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.ticks.SavedTick;
 public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeResolver {
+    private final Map<Structure, it.unimi.dsi.fastutil.longs.LongSet> kReferences = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<Structure, StructureStart> kStarts = new java.util.concurrent.ConcurrentHashMap<>();
+    private final ShortList[] kPostProcessing = new ShortList[32];
+
     protected final ChunkPos chunkPos;
     protected final LevelChunkSection[] sections;
     protected volatile boolean unsaved;
     protected volatile boolean lightCorrect;
+    private final LevelHeightAccessor heightAccessor;
+    protected UpgradeData upgradeData;
+    private long inhabitedTime;
 
     public ChunkAccess(ChunkPos chunkPos, UpgradeData upgradeData, LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory, long value, LevelChunkSection[] levelChunkSections, BlendingData blendingData) {
         this.chunkPos = chunkPos;
         this.sections = levelChunkSections;
+        this.heightAccessor = levelHeightAccessor;
+        this.upgradeData = upgradeData;
+        this.inhabitedTime = value;
     }
     public void addEntity(Entity entity) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.addEntity");
     }
     public void addPackedPostProcess(ShortList packedOffsets, int sectionIndex) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.addPackedPostProcess");
+        getOrCreateOffsetList(kPostProcessing, sectionIndex).addAll(packedOffsets);
     }
     public void addReferenceForStructure(Structure structure, long reference) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.addReferenceForStructure");
+        getReferencesForStructure(structure).add(reference);
     }
     public boolean canBeSerialized() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.canBeSerialized");
+        return true;
     }
     public BiomeGenerationSettings carverBiome(Supplier source) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.carverBiome");
     }
     public BlockHitResult clip(ClipContext clipContext) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.clip");
+        return heightAccessor instanceof net.minecraft.world.level.BlockGetter getter ? getter.clip(clipContext)
+            : BlockHitResult.miss(clipContext.getTo(), net.minecraft.core.Direction.UP, BlockPos.containing(clipContext.getTo()));
     }
     public BlockHitResult clip(ClipContext clipContext, Predicate predicate) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.clip");
+        return clip(clipContext);
     }
     public BlockHitResult clip(ClipContext clipContext, BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.clip");
+        return clip(clipContext);
     }
     public BlockHitResult clip(ClipContext clipContext, BlockPos blockPos, Predicate predicate) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.clip");
+        return clip(clipContext);
     }
     public BlockHitResult clipWithInteractionOverride(Vec3 vec3, Vec3 vec32, BlockPos blockPos, VoxelShape voxelShape, BlockState blockState) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.clipWithInteractionOverride");
+        return voxelShape == null ? null : voxelShape.clip(vec3, vec32, blockPos);
     }
     public void fillBiomesFromNoise(BiomeResolver biomeResolver) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.fillBiomesFromNoise");
     }
-    public void findBlocks(Predicate predicate, BiConsumer consumer) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.findBlocks");
+    public void findBlocks(Predicate<net.minecraft.world.level.block.state.BlockState> predicate, BiConsumer<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState> consumer) {
+        for (int y = getMinY(); y <= getMaxY(); y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    BlockPos at = new BlockPos(getPos().getMinBlockX() + x, y, getPos().getMinBlockZ() + z);
+                    net.minecraft.world.level.block.state.BlockState state = getBlockState(at);
+                    if (predicate.test(state)) {
+                        consumer.accept(at, state);
+                    }
+                }
+            }
+        }
     }
-    public Map getAllReferences() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getAllReferences");
+    public Map<net.minecraft.world.level.levelgen.structure.Structure, it.unimi.dsi.fastutil.longs.LongSet> getAllReferences() {
+        return kReferences;
     }
-    public Map getAllStarts() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getAllStarts");
+    public Map<net.minecraft.world.level.levelgen.structure.Structure, net.minecraft.world.level.levelgen.structure.StructureStart> getAllStarts() {
+        return java.util.Collections.unmodifiableMap(kStarts);
     }
     public BelowZeroRetrogen getBelowZeroRetrogen() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBelowZeroRetrogen");
@@ -108,7 +133,8 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockEntity");
     }
     public Optional getBlockEntity(BlockPos blockPos, BlockEntityType blockEntityType) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockEntity");
+        BlockEntity found = getBlockEntity(blockPos);
+        return found != null && found.getType() == blockEntityType ? Optional.of(found) : Optional.empty();
     }
     public CompoundTag getBlockEntityNbt(BlockPos blockPos) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockEntityNbt");
@@ -117,85 +143,114 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockEntityNbtForSaving");
     }
     public double getBlockFloorHeight(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockFloorHeight");
+        return getBlockFloorHeight(getBlockState(blockPos).getCollisionShape(this, blockPos),
+            () -> getBlockState(blockPos.below()).getCollisionShape(this, blockPos.below()));
     }
     public double getBlockFloorHeight(VoxelShape voxelShape, Supplier supplier) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockFloorHeight");
+        if (!voxelShape.isEmpty()) {
+            return voxelShape.max(net.minecraft.core.Direction.Axis.Y);
+        }
+        VoxelShape below = (VoxelShape) supplier.get();
+        return below.isEmpty() ? Double.NEGATIVE_INFINITY : below.max(net.minecraft.core.Direction.Axis.Y) - 1.0;
     }
     public Block getBlockIfLoaded(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockIfLoaded");
+        return getBlockState(blockPos).getBlock();
     }
     public BlockState getBlockState(int value, int value2, int value3) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockState");
+        return getBlockState(new BlockPos(value, value2, value3));
     }
     public BlockState getBlockState(BlockPos blockPos) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockState");
     }
     public BlockState getBlockStateIfLoaded(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockStateIfLoaded");
+        return getBlockState(blockPos);
     }
     public Stream getBlockStates(AABB aABB) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockStates");
+        java.util.List<BlockState> found = new java.util.ArrayList<>();
+        for (int x = (int) Math.floor(aABB.minX); x <= (int) Math.floor(aABB.maxX); x++) {
+            for (int y = (int) Math.floor(aABB.minY); y <= (int) Math.floor(aABB.maxY); y++) {
+                for (int z = (int) Math.floor(aABB.minZ); z <= (int) Math.floor(aABB.maxZ); z++) {
+                    found.add(getBlockState(new BlockPos(x, y, z)));
+                }
+            }
+        }
+        return found.stream();
     }
     public TickContainerAccess getBlockTicks() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockTicks");
     }
     public FluidState getFluidIfLoaded(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getFluidIfLoaded");
+        return getBlockState(blockPos).getFluidState();
     }
     public FluidState getFluidState(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getFluidState");
+        return getBlockState(blockPos).getFluidState();
     }
     public TickContainerAccess getFluidTicks() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getFluidTicks");
     }
     public int getHeight() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getHeight");
+        return heightAccessor != null ? heightAccessor.getHeight() : sections.length * 16;
     }
     public int getHeight(Heightmap.Types type, int x, int z) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getHeight");
     }
     public LevelHeightAccessor getHeightAccessorForGeneration() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getHeightAccessorForGeneration");
+        return this;
     }
     public Collection getHeightmaps() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getHeightmaps");
+        java.util.List<Heightmap> maps = new java.util.ArrayList<>();
+        for (Heightmap.Types type : Heightmap.Types.values()) {
+            maps.add(getOrCreateHeightmapUnprimed(type));
+        }
+        return maps;
     }
     public int getHighestFilledSectionIndex() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getHighestFilledSectionIndex");
+        for (int i = sections.length - 1; i >= 0; i--) {
+            if (sections[i] != null && !sections[i].hasOnlyAir()) {
+                return i;
+            }
+        }
+        return -1;
     }
     public ChunkStatus getHighestGeneratedStatus() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getHighestGeneratedStatus");
+        return getPersistedStatus();
     }
     public int getHighestSectionPosition() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getHighestSectionPosition");
+        int index = getHighestFilledSectionIndex();
+        return index == -1 ? getMinY() : getSectionYFromSectionIndex(index) << 4;
     }
     public long getInhabitedTime() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getInhabitedTime");
+        return inhabitedTime;
     }
     public int getLightEmission(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getLightEmission");
+        return getBlockState(blockPos).getLightEmission();
     }
     public GameEventListenerRegistry getListenerRegistry(int section) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getListenerRegistry");
     }
     public int getMaxSectionY() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getMaxSectionY");
+        return getMaxY() >> 4;
     }
     public int getMaxY() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getMaxY");
+        return getMinY() + getHeight() - 1;
     }
     public int getMinSectionY() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getMinSectionY");
+        return getMinY() >> 4;
     }
     public int getMinY() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getMinY");
+        return heightAccessor != null ? heightAccessor.getMinY() : 0;
     }
     public Holder getNoiseBiome(int quartX, int quartY, int quartZ) {
+        if (heightAccessor instanceof net.minecraft.world.level.LevelReader reader) {
+            return reader.getNoiseBiome(quartX, quartY, quartZ);
+        }
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getNoiseBiome");
     }
     public Heightmap getOrCreateHeightmapUnprimed(Heightmap.Types type) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getOrCreateHeightmapUnprimed");
+        if (this instanceof LevelChunk chunk) {
+            return (Heightmap) chunk.heightmaps.get(type);
+        }
+        throw new UnsupportedOperationException("Heightmaps are bound to a level chunk");
     }
     public ChunkStatus getPersistedStatus() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getPersistedStatus");
@@ -204,22 +259,22 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         return chunkPos;
     }
     public ShortList[] getPostProcessing() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getPostProcessing");
+        return kPostProcessing;
     }
     public LongSet getReferencesForStructure(Structure structure) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getReferencesForStructure");
+        return kReferences.computeIfAbsent(structure, ignored -> new it.unimi.dsi.fastutil.longs.LongOpenHashSet());
     }
     public LevelChunkSection getSection(int sectionIndex) {
         return getSections()[sectionIndex];
     }
     public int getSectionIndex(int value) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSectionIndex");
+        return getSectionIndexFromSectionY(value >> 4);
     }
     public int getSectionIndexFromSectionY(int value) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSectionIndexFromSectionY");
+        return value - getMinSectionY();
     }
     public int getSectionYFromSectionIndex(int value) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSectionYFromSectionIndex");
+        return value + getMinSectionY();
     }
     public LevelChunkSection[] getSections() {
         return sections;
@@ -231,19 +286,19 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSkyLightSources");
     }
     public StructureStart getStartForStructure(Structure structure) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getStartForStructure");
+        return kStarts.get(structure);
     }
     public ChunkAccess.PackedTicks getTicksForSerialization(long currentTick) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getTicksForSerialization");
     }
     public UpgradeData getUpgradeData() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getUpgradeData");
+        return upgradeData;
     }
     public boolean hasPrimedHeightmap(Heightmap.Types type) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.hasPrimedHeightmap");
+        return this instanceof LevelChunk;
     }
     public void incrementInhabitedTime() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.incrementInhabitedTime");
+        inhabitedTime++;
     }
     public void initializeLightSources() {
         return;
@@ -252,43 +307,52 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isBlockInLine");
     }
     public boolean isInsideBuildHeight(int value) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isInsideBuildHeight");
+        return value >= getMinY() && value <= getMaxY();
     }
     public boolean isLightCorrect() {
         return lightCorrect;
     }
     public boolean isOldNoiseGeneration() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isOldNoiseGeneration");
+        return false;
     }
     public boolean isOutsideBuildHeight(int value) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isOutsideBuildHeight");
+        return !isInsideBuildHeight(value);
     }
     public boolean isOutsideBuildHeight(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isOutsideBuildHeight");
+        return isOutsideBuildHeight(blockPos.getY());
     }
     public boolean isUnsaved() {
         return unsaved;
     }
     public boolean isUpgrading() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isUpgrading");
+        return false;
     }
     public boolean isYSpaceEmpty(int yStartInclusive, int yEndInclusive) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isYSpaceEmpty");
+        int from = getSectionIndex(yStartInclusive);
+        int to = getSectionIndex(yEndInclusive);
+        for (int i = Math.max(0, from); i <= Math.min(sections.length - 1, to); i++) {
+            if (sections[i] != null && !sections[i].hasOnlyAir()) {
+                return false;
+            }
+        }
+        return true;
     }
     public void markUnsaved() {
         unsaved = true;
     }
     public ProblemReporter.PathElement problemPath() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.problemPath");
+        return problemPath(chunkPos);
     }
     public void removeBlockEntity(BlockPos pos) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.removeBlockEntity");
+
     }
-    public void setAllReferences(Map data) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setAllReferences");
+    public void setAllReferences(Map<net.minecraft.world.level.levelgen.structure.Structure, it.unimi.dsi.fastutil.longs.LongSet> data) {
+        kReferences.clear();
+        kReferences.putAll(data);
     }
-    public void setAllStarts(Map starts) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setAllStarts");
+    public void setAllStarts(Map<net.minecraft.world.level.levelgen.structure.Structure, net.minecraft.world.level.levelgen.structure.StructureStart> starts) {
+        kStarts.clear();
+        kStarts.putAll(starts);
     }
     public void setBlockEntity(BlockEntity blockEntity) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setBlockEntity");
@@ -306,13 +370,13 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setHeightmap");
     }
     public void setInhabitedTime(long inhabitedTime) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setInhabitedTime");
+        this.inhabitedTime = inhabitedTime;
     }
     public void setLightCorrect(boolean isLightCorrect) {
         lightCorrect = isLightCorrect;
     }
     public void setStartForStructure(Structure structure, StructureStart structureStart) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setStartForStructure");
+        kStarts.put(structure, structureStart);
     }
     public boolean[] starlight$getBlockEmptinessMap() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$getBlockEmptinessMap");
@@ -339,9 +403,50 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$setSkyNibbles");
     }
     public boolean tryMarkSaved() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.tryMarkSaved");
+        return true;
     }
 
     public record PackedTicks(List blocks, List fluids) {
+    }
+    public static final int NO_FILLED_SECTION = -1;
+    protected final ShortList[] postProcessing = null;
+    protected final BlendingData blendingData = null;
+    protected final Map<Heightmap.Types, Heightmap> heightmaps = null;
+    protected ChunkSkyLightSources skyLightSources;
+    protected final Map<BlockPos, CompoundTag> pendingBlockEntities = null;
+    protected final Map<BlockPos, BlockEntity> blockEntities = null;
+    protected final LevelHeightAccessor levelHeightAccessor = null;
+    public void markPosForPostProcessing(BlockPos blockPos) {
+        int section = (blockPos.getY() - getMinY()) >> 4;
+        getOrCreateOffsetList(kPostProcessing, section).add((short) ((blockPos.getX() & 15) | ((blockPos.getY() & 15) << 4)
+            | ((blockPos.getZ() & 15) << 8)));
+    }
+    public void findBlockLightSources(BiConsumer<BlockPos, BlockState> consumer) {
+        findBlocks(state -> state.getLightEmission() > 0, consumer);
+    }
+    public void collectBiomesInPalette(Set<Holder<Biome>> output) {
+        int minQuartY = net.minecraft.core.QuartPos.fromBlock(getMinY());
+        int maxQuartY = net.minecraft.core.QuartPos.fromBlock(getMaxY());
+        for (int qx = 0; qx < 4; qx++) {
+            for (int qz = 0; qz < 4; qz++) {
+                for (int qy = minQuartY; qy <= maxQuartY; qy++) {
+                    output.add(getNoiseBiome(chunkPos.x() * 4 + qx, qy, chunkPos.z() * 4 + qz));
+                }
+            }
+        }
+    }
+    public static ShortList getOrCreateOffsetList(ShortList[] list, int sectionIndex) {
+        if (list[sectionIndex] == null) {
+            list[sectionIndex] = new it.unimi.dsi.fastutil.shorts.ShortArrayList();
+        }
+        return list[sectionIndex];
+    }
+    public static ProblemReporter.PathElement problemPath(ChunkPos pos) {
+        return new ChunkPathElement(pos);
+    }
+    static record ChunkPathElement(ChunkPos pos) implements ProblemReporter.PathElement {
+        public String get() {
+            return "chunk@" + pos;
+        }
     }
 }

@@ -1,0 +1,33 @@
+//// TreeGrower.java
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import java.util.List;
+import java.util.OptionalInt;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.feature.Feature;
+public final class TreeGrower {
+    public static final Codec<TreeGrower> CODEC;
+    public static final TreeGrower OAK;
+    public static final TreeGrower SPRUCE;
+    public static final TreeGrower MANGROVE;
+    public static final TreeGrower AZALEA;
+    public static final TreeGrower BIRCH;
+    public static final TreeGrower JUNGLE;
+    public static final TreeGrower ACACIA;
+    public static final TreeGrower CHERRY;
+    public static final TreeGrower DARK_OAK;
+    public static final TreeGrower PALE_OAK;
+    public static final TreeGrower POPLAR;
+    public TreeGrower(String name, WeightedList<ResourceKey<Feature>> trees, WeightedList<ResourceKey<Feature>> megaTrees, WeightedList<ResourceKey<Feature>> flowerTrees, ResourceKey<Feature> shortestTreeType);
+    public boolean growTree(ServerLevel level, ChunkGenerator generator, BlockPos pos, BlockState state, RandomSource random);
+    public OptionalInt getMinimumHeight(ServerLevel level);
+    public boolean canGrow(ServerLevel level, BlockPos pos, BlockState state);
+    static record TwoByTwoSaplingPos(int offsetX, int offsetZ, List<Pair<BlockState, BlockPos>> groundLevelSurroundingBlocks) {
+    }
+}

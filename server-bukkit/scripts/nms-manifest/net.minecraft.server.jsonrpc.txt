@@ -1,0 +1,244 @@
+//// Connection.java
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.Holder;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+public class Connection extends SimpleChannelInboundHandler<JsonElement> {
+    public Connection(Channel channel, ManagementServer managementServer, MinecraftApi minecraftApi, JsonRpcLogger jsonrpcLogger);
+    public void tick();
+    public void channelActive(ChannelHandlerContext ctx) throws Exception;
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception;
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception;
+    protected void channelRead0(ChannelHandlerContext channelHandlerContext, JsonElement jsonElement);
+    public void sendNotification(Holder.Reference<? extends OutgoingRpcMethod<Void, ?>> method);
+    public <Params> void sendNotification(Holder.Reference<? extends OutgoingRpcMethod<Params, ?>> method, Params params);
+    public <Result> CompletableFuture<Result> sendRequest(Holder.Reference<? extends OutgoingRpcMethod<Void, Result>> method);
+    public <Params, Result> CompletableFuture<Result> sendRequest(Holder.Reference<? extends OutgoingRpcMethod<Params, Result>> method, Params params);
+    JsonObject handleJsonObject(JsonObject jsonObject);
+    public JsonElement dispatchIncomingRequest(String method, JsonElement params);
+}
+//// IncomingRpcMethod.java
+import com.google.gson.JsonElement;
+import java.util.function.Function;
+import net.minecraft.core.Registry;
+import net.minecraft.server.jsonrpc.api.MethodInfo;
+import net.minecraft.server.jsonrpc.api.Schema;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+public interface IncomingRpcMethod<Params, Result> {
+    MethodInfo<Params, Result> info();
+    Attributes attributes();
+    JsonElement apply(MinecraftApi minecraftApi, JsonElement paramsJson, ClientInfo clientInfo);
+    static <Result> IncomingRpcMethodBuilder<Void, Result> method(ParameterlessRpcMethodFunction<Result> function);
+    static <Params, Result> IncomingRpcMethodBuilder<Params, Result> method(RpcMethodFunction<Params, Result> function);
+    static <Result> IncomingRpcMethodBuilder<Void, Result> method(Function<MinecraftApi, Result> supplier);
+    public static record Attributes(boolean runOnMainThread, boolean discoverable, boolean allowPreServerInit) {
+    }
+    public static record ParameterlessMethod<Params, Result>(MethodInfo<Params, Result> info, Attributes attributes, ParameterlessRpcMethodFunction<Result> supplier) implements IncomingRpcMethod<Params, Result> {
+        public JsonElement apply(MinecraftApi minecraftApi, JsonElement paramsJson, ClientInfo clientInfo);
+    }
+    public static record Method<Params, Result>(MethodInfo<Params, Result> info, Attributes attributes, RpcMethodFunction<Params, Result> function) implements IncomingRpcMethod<Params, Result> {
+        public JsonElement apply(MinecraftApi minecraftApi, JsonElement paramsJson, ClientInfo clientInfo);
+    }
+    public static class IncomingRpcMethodBuilder<Params, Result> {
+        public IncomingRpcMethodBuilder(ParameterlessRpcMethodFunction<Result> function);
+        public IncomingRpcMethodBuilder(RpcMethodFunction<Params, Result> function);
+        public IncomingRpcMethodBuilder(Function<MinecraftApi, Result> supplier);
+        public IncomingRpcMethodBuilder<Params, Result> description(String description);
+        public IncomingRpcMethodBuilder<Params, Result> response(String resultName, Schema<Result> resultSchema);
+        public IncomingRpcMethodBuilder<Params, Result> param(String paramName, Schema<Params> paramSchema);
+        public IncomingRpcMethodBuilder<Params, Result> undiscoverable();
+        public IncomingRpcMethodBuilder<Params, Result> notOnMainThread();
+        public IncomingRpcMethodBuilder<Params, Result> allowPreServerInit();
+        public IncomingRpcMethod<Params, Result> build();
+        public IncomingRpcMethod<?, ?> register(Registry<IncomingRpcMethod<?, ?>> methodRegistry, String key);
+    }
+    public interface ParameterlessRpcMethodFunction<Result> {
+        Result apply(MinecraftApi api, ClientInfo clientInfo);
+    }
+    public interface RpcMethodFunction<Params, Result> {
+        Result apply(MinecraftApi api, Params params, ClientInfo clientInfo);
+    }
+}
+//// IncomingRpcMethods.java
+import net.minecraft.core.Registry;
+public class IncomingRpcMethods {
+    public static IncomingRpcMethod<?, ?> bootstrap(Registry<IncomingRpcMethod<?, ?>> methodRegistry);
+}
+//// JsonRPCErrors.java
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+public enum JsonRPCErrors {
+    PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR;
+    public JsonObject createWithUnknownId(String data);
+    public JsonObject createWithoutData(JsonElement id);
+    public JsonObject create(JsonElement id, String data);
+}
+//// JsonRPCUtils.java
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import java.util.List;
+import net.minecraft.resources.Identifier;
+public class JsonRPCUtils {
+    public static final String JSON_RPC_VERSION = "2.0";
+    public static final String OPEN_RPC_VERSION = "1.3.2";
+    public static JsonObject createSuccessResult(JsonElement id, JsonElement result);
+    public static JsonObject createRequest(Integer id, Identifier method, List<JsonElement> params);
+    public static JsonObject createRequest(Integer id, String method, List<JsonElement> params);
+    public static JsonObject createError(JsonElement id, String message, int errorCode, String data);
+    public static JsonElement getRequestId(JsonObject jsonObject);
+    public static String getMethodName(JsonObject jsonObject);
+    public static JsonElement getParams(JsonObject jsonObject);
+    public static JsonElement getResult(JsonObject jsonObject);
+    public static JsonObject getError(JsonObject jsonObject);
+}
+//// JsonRpc.java
+import net.minecraft.server.dedicated.DedicatedServerSettings;
+import net.minecraft.server.notifications.NotificationManager;
+public class JsonRpc {
+    public static ManagementServer create(DedicatedServerSettings settings, NotificationManager notificationManager);
+}
+//// JsonRpcLogger.java
+import net.minecraft.server.jsonrpc.methods.ClientInfo;
+public class JsonRpcLogger {
+    public void log(ClientInfo clientInfo, String message, Object... args);
+}
+//// JsonRpcNotificationService.java
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.notifications.NotificationService;
+import net.minecraft.server.players.IpBanListEntry;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.ServerOpListEntry;
+import net.minecraft.server.players.UserBanListEntry;
+import net.minecraft.world.level.gamerules.GameRule;
+public class JsonRpcNotificationService implements NotificationService {
+    public JsonRpcNotificationService(MinecraftApi minecraftApi, ManagementServer managementServer);
+    public void playerJoined(ServerPlayer player);
+    public void playerLeft(ServerPlayer player);
+    public void serverStarted();
+    public void serverShuttingDown();
+    public void serverSaveStarted();
+    public void serverSaveCompleted();
+    public void serverActivityOccured();
+    public void worldUpgradeStarted();
+    public void worldUpgradeProgress(float progressPercentage);
+    public void worldUpgradeFinished();
+    public void worldUpgradeFailed(String reason);
+    public void playerOped(ServerOpListEntry operator);
+    public void playerDeoped(ServerOpListEntry operator);
+    public void playerAddedToAllowlist(NameAndId player);
+    public void playerRemovedFromAllowlist(NameAndId player);
+    public void ipBanned(IpBanListEntry ban);
+    public void ipUnbanned(String ip);
+    public void playerBanned(UserBanListEntry ban);
+    public void playerUnbanned(NameAndId player);
+    public <T> void onGameRuleChanged(GameRule<T> gameRule, T value);
+    public void statusHeartbeat();
+}
+//// ManagementServer.java
+import com.google.common.net.HostAndPort;
+import io.netty.channel.EventLoopGroup;
+import io.netty.handler.ssl.SslContext;
+import java.util.function.Consumer;
+import net.minecraft.server.jsonrpc.internalapi.MinecraftApi;
+import net.minecraft.server.jsonrpc.security.AuthenticationHandler;
+import net.minecraft.server.notifications.NotificationManager;
+public class ManagementServer {
+    public ManagementServer(HostAndPort hostAndPort, AuthenticationHandler authenticationHandler);
+    public ManagementServer(HostAndPort hostAndPort, AuthenticationHandler authenticationHandler, EventLoopGroup eventLoopGroup);
+    public boolean scheduleHeartbeat(NotificationManager notificationManager, long period);
+    public void onConnected(Connection connection);
+    public void onDisconnected(Connection connection);
+    public void startWithoutTls(MinecraftApi minecraftApi);
+    public void startWithTls(MinecraftApi minecraftApi, SslContext sslContext);
+    public void stop(boolean closeNioEventLoopGroup) throws InterruptedException;
+    public void tick();
+    public int getPort();
+    void forEachConnection(Consumer<Connection> action);
+}
+//// OutgoingRpcMethod.java
+import com.google.gson.JsonElement;
+import net.minecraft.core.Holder;
+import net.minecraft.server.jsonrpc.api.MethodInfo;
+import net.minecraft.server.jsonrpc.api.Schema;
+public interface OutgoingRpcMethod<Params, Result> {
+    String NOTIFICATION_PREFIX;
+    MethodInfo<Params, Result> info();
+    Attributes attributes();
+    default JsonElement encodeParams(Params params);
+    default Result decodeResult(JsonElement result);
+    static OutgoingRpcMethodBuilder<Void, Void> notification();
+    static <Params> OutgoingRpcMethodBuilder<Params, Void> notificationWithParams();
+    static <Result> OutgoingRpcMethodBuilder<Void, Result> request();
+    static <Params, Result> OutgoingRpcMethodBuilder<Params, Result> requestWithParams();
+    public static record Attributes(boolean discoverable, boolean allowPreServerInit) {
+    }
+    public static record ParmeterlessNotification(MethodInfo<Void, Void> info, Attributes attributes) implements OutgoingRpcMethod<Void, Void> {
+    }
+    public static record Notification<Params>(MethodInfo<Params, Void> info, Attributes attributes) implements OutgoingRpcMethod<Params, Void> {
+        public JsonElement encodeParams(Params params);
+    }
+    public static record ParameterlessMethod<Result>(MethodInfo<Void, Result> info, Attributes attributes) implements OutgoingRpcMethod<Void, Result> {
+        public Result decodeResult(JsonElement result);
+    }
+    public static record Method<Params, Result>(MethodInfo<Params, Result> info, Attributes attributes) implements OutgoingRpcMethod<Params, Result> {
+        public JsonElement encodeParams(Params params);
+        public Result decodeResult(JsonElement result);
+    }
+    public static class OutgoingRpcMethodBuilder<Params, Result> {
+        public static final Attributes DEFAULT_ATTRIBUTES;
+        public OutgoingRpcMethodBuilder(Factory<Params, Result> method);
+        public OutgoingRpcMethodBuilder<Params, Result> description(String description);
+        public OutgoingRpcMethodBuilder<Params, Result> response(String resultName, Schema<Result> resultSchema);
+        public OutgoingRpcMethodBuilder<Params, Result> param(String paramName, Schema<Params> paramSchema);
+        public OutgoingRpcMethodBuilder<Params, Result> allowPreServerInit();
+        public Holder.Reference<OutgoingRpcMethod<Params, Result>> register(String key);
+    }
+    public interface Factory<Params, Result> {
+        OutgoingRpcMethod<Params, Result> create(MethodInfo<Params, Result> info, Attributes attributes);
+    }
+}
+//// OutgoingRpcMethods.java
+import net.minecraft.core.Holder;
+import net.minecraft.server.jsonrpc.api.PlayerDto;
+import net.minecraft.server.jsonrpc.methods.BanlistService;
+import net.minecraft.server.jsonrpc.methods.GameRulesService;
+import net.minecraft.server.jsonrpc.methods.IpBanlistService;
+import net.minecraft.server.jsonrpc.methods.OperatorService;
+import net.minecraft.server.jsonrpc.methods.ServerStateService;
+public class OutgoingRpcMethods {
+    public static final Holder.Reference<OutgoingRpcMethod<Void, Void>> SERVER_STARTED;
+    public static final Holder.Reference<OutgoingRpcMethod<Void, Void>> SERVER_SHUTTING_DOWN;
+    public static final Holder.Reference<OutgoingRpcMethod<Void, Void>> SERVER_SAVE_STARTED;
+    public static final Holder.Reference<OutgoingRpcMethod<Void, Void>> SERVER_SAVE_COMPLETED;
+    public static final Holder.Reference<OutgoingRpcMethod<Void, Void>> SERVER_ACTIVITY_OCCURRED;
+    public static final Holder.Reference<OutgoingRpcMethod<Void, Void>> WORLD_UPGRADE_STARTED;
+    public static final Holder.Reference<OutgoingRpcMethod<Float, Void>> WORLD_UPGRADE_PROGRESS;
+    public static final Holder.Reference<OutgoingRpcMethod<Void, Void>> WORLD_UPGRADE_FINISHED;
+    public static final Holder.Reference<OutgoingRpcMethod<String, Void>> WORLD_UPGRADE_FAILED;
+    public static final Holder.Reference<OutgoingRpcMethod<PlayerDto, Void>> PLAYER_JOINED;
+    public static final Holder.Reference<OutgoingRpcMethod<PlayerDto, Void>> PLAYER_LEFT;
+    public static final Holder.Reference<OutgoingRpcMethod<OperatorService.OperatorDto, Void>> PLAYER_OPED;
+    public static final Holder.Reference<OutgoingRpcMethod<OperatorService.OperatorDto, Void>> PLAYER_DEOPED;
+    public static final Holder.Reference<OutgoingRpcMethod<PlayerDto, Void>> PLAYER_ADDED_TO_ALLOWLIST;
+    public static final Holder.Reference<OutgoingRpcMethod<PlayerDto, Void>> PLAYER_REMOVED_FROM_ALLOWLIST;
+    public static final Holder.Reference<OutgoingRpcMethod<IpBanlistService.IpBanDto, Void>> IP_BANNED;
+    public static final Holder.Reference<OutgoingRpcMethod<String, Void>> IP_UNBANNED;
+    public static final Holder.Reference<OutgoingRpcMethod<BanlistService.UserBanDto, Void>> PLAYER_BANNED;
+    public static final Holder.Reference<OutgoingRpcMethod<PlayerDto, Void>> PLAYER_UNBANNED;
+    public static final Holder.Reference<OutgoingRpcMethod<GameRulesService.GameRuleUpdate<?>, Void>> GAMERULE_CHANGED;
+    public static final Holder.Reference<OutgoingRpcMethod<ServerStateService.ServerState, Void>> STATUS_HEARTBEAT;
+}
+//// PendingRpcRequest.java
+import com.google.gson.JsonElement;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.Holder;
+public record PendingRpcRequest<Result>(Holder.Reference<? extends OutgoingRpcMethod<?, ? extends Result>> method, CompletableFuture<Result> resultFuture, long timeoutTime) {
+    public void accept(JsonElement response);
+    public boolean timedOut(long currentTime);
+}

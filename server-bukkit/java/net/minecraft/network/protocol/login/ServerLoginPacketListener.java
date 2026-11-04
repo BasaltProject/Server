@@ -1,0 +1,13 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.protocol.login;
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.cookie.ServerCookiePacketListener;
+public interface ServerLoginPacketListener extends ServerCookiePacketListener {
+    default ConnectionProtocol protocol() {
+        return ConnectionProtocol.LOGIN;
+    }
+    void handleHello(ServerboundHelloPacket packet);
+    void handleKey(ServerboundKeyPacket packet);
+    void handleCustomQueryPacket(ServerboundCustomQueryAnswerPacket packet);
+    void handleLoginAcknowledgement(ServerboundLoginAcknowledgedPacket packet);
+}

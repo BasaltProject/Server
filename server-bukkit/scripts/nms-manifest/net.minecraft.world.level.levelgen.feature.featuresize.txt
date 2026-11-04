@@ -1,0 +1,41 @@
+//// FeatureSize.java
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.OptionalInt;
+public abstract class FeatureSize {
+    public static final Codec<FeatureSize> CODEC;
+    protected static final int MAX_WIDTH = 16;
+    protected final OptionalInt minClippedHeight;
+    protected static <S extends FeatureSize> RecordCodecBuilder<S, OptionalInt> minClippedHeightCodec();
+    public FeatureSize(OptionalInt minClippedHeight);
+    protected abstract FeatureSizeType<?> type();
+    public abstract int getSizeAtHeight(int treeHeight, int yo);
+    public OptionalInt minClippedHeight();
+}
+//// FeatureSizeType.java
+import com.mojang.serialization.MapCodec;
+public class FeatureSizeType<P extends FeatureSize> {
+    public static final FeatureSizeType<TwoLayersFeatureSize> TWO_LAYERS_FEATURE_SIZE;
+    public static final FeatureSizeType<ThreeLayersFeatureSize> THREE_LAYERS_FEATURE_SIZE;
+    private FeatureSizeType(MapCodec<P> codec);
+    public MapCodec<P> codec();
+}
+//// ThreeLayersFeatureSize.java
+import com.mojang.serialization.MapCodec;
+import java.util.OptionalInt;
+public class ThreeLayersFeatureSize extends FeatureSize {
+    public static final MapCodec<ThreeLayersFeatureSize> CODEC;
+    public ThreeLayersFeatureSize(int limit, int upperLimit, int lowerSize, int middleSize, int upperSize, OptionalInt minClippedHeight);
+    protected FeatureSizeType<?> type();
+    public int getSizeAtHeight(int treeHeight, int yo);
+}
+//// TwoLayersFeatureSize.java
+import com.mojang.serialization.MapCodec;
+import java.util.OptionalInt;
+public class TwoLayersFeatureSize extends FeatureSize {
+    public static final MapCodec<TwoLayersFeatureSize> CODEC;
+    public TwoLayersFeatureSize(int limit, int lowerSize, int upperSize);
+    public TwoLayersFeatureSize(int limit, int lowerSize, int upperSize, OptionalInt minClippedHeight);
+    protected FeatureSizeType<?> type();
+    public int getSizeAtHeight(int treeHeight, int yo);
+}

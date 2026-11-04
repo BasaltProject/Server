@@ -1,3 +1,4 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.nbt;
 
 import java.io.DataOutput;
@@ -82,5 +83,24 @@ public final class LongTag implements NumericTag {
     @Override
     public String toString() {
         return value + "L";
+    }
+    public static final TagType<LongTag> TYPE = org.basaltmc.bukkit.facade.NbtSupport.type("LONG", "TAG_Long",
+        (in, acc) -> {
+            acc.accountBytes(16);
+            return LongTag.valueOf(in.readLong());
+        });
+    public int sizeInBytes() {
+        return 16;
+    }
+    public TagType<LongTag> getType() {
+        return TYPE;
+    }
+    public void accept(TagVisitor visitor) {
+        visitor.visitLong(this);
+    }
+    public StreamTagVisitor.ValueResult accept(StreamTagVisitor visitor) {
+        return visitor.visit(value);
+    }
+    static class Cache {
     }
 }

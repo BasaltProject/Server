@@ -28,6 +28,8 @@ public:
     [[nodiscard]] std::string creakingHeart(std::string_view action, std::int32_t x, std::int32_t y,
                                             std::int32_t z) override;
     bool raidBar(std::int32_t id, std::string_view action, std::string_view text, std::int32_t value) override;
+    std::int32_t raidControl(std::int32_t id, std::string_view action, const std::array<std::int32_t, 4>& arguments,
+                             std::int32_t value) override;
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> raidValues(std::int32_t id) override;
     bool setRaidValues(std::int32_t id, std::span<const std::uint8_t> nbt) override;
     [[nodiscard]] server::plugins::PluginBorder border() override;
@@ -49,6 +51,9 @@ public:
                                                                                      std::int32_t chunkZ) override;
     [[nodiscard]] std::vector<server::plugins::PluginRaid> raids() override;
     bool setRaid(std::int32_t id, std::int32_t omenLevel, std::int32_t totalGroups) override;
+    [[nodiscard]] server::plugins::PluginClock clock() override;
+    bool setClockRate(float rate) override;
+    std::int32_t moveToTimeMarker(std::string_view marker) override;
     [[nodiscard]] server::plugins::PluginFluid fluidAt(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::array<double, 3> fluidFlow(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::optional<std::array<std::int32_t, 3>> lightningTarget(std::int32_t x, std::int32_t z) override;
@@ -60,6 +65,10 @@ public:
                                                                            std::int32_t occupancy) override;
     [[nodiscard]] std::optional<std::vector<server::plugins::PluginPlacedBlock>>
     placeTree(std::string_view tree, std::int32_t x, std::int32_t y, std::int32_t z, bool apply) override;
+    [[nodiscard]] std::optional<std::vector<server::plugins::PluginPlacedBlock>>
+    placeFeature(std::string_view feature, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed,
+                 bool apply) override;
+    [[nodiscard]] std::vector<std::string> featureIds() override;
     bool randomTick(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::int32_t tickableBlockEntityCount() override;
     [[nodiscard]] std::optional<double> tunable(std::string_view key) override;
@@ -73,6 +82,7 @@ public:
     void setChunkForced(std::int32_t chunkX, std::int32_t chunkZ, bool forced) override;
     [[nodiscard]] std::array<std::int32_t, 3> weatherTimes() override;
     void setWeatherTimes(std::int32_t rain, std::int32_t thunder, std::int32_t clear) override;
+    std::int64_t randomSequence(std::string_view id, std::int32_t operation, std::int64_t argument) override;
     [[nodiscard]] std::int64_t inhabitedTime(std::int32_t chunkX, std::int32_t chunkZ) override;
     void setInhabitedTime(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t ticks) override;
     bool useChunkFill(ChunkFill fill) override;
