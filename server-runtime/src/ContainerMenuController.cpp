@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/CopperChests.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DoubleChests.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
@@ -54,7 +55,8 @@ std::string containerTitleKey(const std::string& block, bool paired) {
     if (paired) {
         return "container.chestDouble";
     }
-    if (block == "chest" || block == "trapped_chest") {
+    // parity: copper chests share `ChestBlockEntity.DEFAULT_NAME`.
+    if (block == "chest" || block == "trapped_chest" || world::copperChests::isCopperChest(block)) {
         return "container.chest";
     }
     return "container." + block;
