@@ -105,6 +105,11 @@ public final class PathTranslator {
         if (PROTECTED.contains(head.toLowerCase(Locale.ROOT))) {
             return denied("protected");
         }
+        if (head.equals(".basalt")) {
+            boolean runtime = rel.getNameCount() >= 2 && rel.getName(1).toString().equals("bukkit");
+            return runtime ? new Resolved(root.resolve(rel), Access.READ_ONLY, "bukkit-runtime")
+                : denied("protected");
+        }
         switch (head) {
             case "plugins":
                 return new Resolved(root.resolve(rel), Access.READ_WRITE, "plugins");
