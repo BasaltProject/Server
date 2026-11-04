@@ -10,7 +10,8 @@ import org.basaltmc.bukkit.fs.PathTranslator.Resolved;
 public final class PathMapping {
     private static final int WRITE = 1;
     private static final String[] READABLE = {"/dev/random", "/dev/urandom", "/dev/zero", "/etc/localtime",
-        "/usr/share/zoneinfo", "/var/db/timezone", "/private/var/db/timezone"};
+        "/usr/share/zoneinfo", "/var/db/timezone", "/private/var/db/timezone", "/etc/ssl", "/private/etc/ssl",
+        "/etc/pki", "/etc/openssl", "/usr/local/share/certs"};
 
     private static volatile PathTranslator translator;
 

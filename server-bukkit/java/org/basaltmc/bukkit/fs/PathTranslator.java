@@ -22,7 +22,7 @@ public final class PathTranslator {
         }
     }
 
-    public static final String SHADOW = ".bukkit-shadow";
+    public static final String SHADOW = ".basalt/bukkit/shadow";
 
     private static final Set<String> WORLD_STATE = Set.of("level.dat", "level.dat_old", "uid.dat", "session.lock",
         "playerdata", "stats", "advancements");
@@ -106,6 +106,9 @@ public final class PathTranslator {
             return denied("protected");
         }
         if (head.equals(".basalt")) {
+            if (rel.startsWith(SHADOW)) {
+                return new Resolved(root.resolve(rel), Access.READ_WRITE, "shadow");
+            }
             boolean runtime = rel.getNameCount() >= 2 && rel.getName(1).toString().equals("bukkit");
             return runtime ? new Resolved(root.resolve(rel), Access.READ_ONLY, "bukkit-runtime")
                 : denied("protected");
@@ -115,8 +118,6 @@ public final class PathTranslator {
                 return new Resolved(root.resolve(rel), Access.READ_WRITE, "plugins");
             case "generated":
                 return new Resolved(root.resolve(rel), Access.READ_WRITE, "generated");
-            case SHADOW:
-                return new Resolved(root.resolve(rel), Access.READ_WRITE, "shadow");
             case "logs":
                 return new Resolved(root.resolve(rel), Access.READ_ONLY, "logs");
             case "server-icon.png":
