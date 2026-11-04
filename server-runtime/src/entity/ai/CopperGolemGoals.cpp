@@ -542,6 +542,7 @@ private:
     }
 
     void stopTargeting() {
+        closeChest();
         state_.ticksSinceReaching = 0;
         state_.target.reset();
         navigation::stop(ctx_.mob);

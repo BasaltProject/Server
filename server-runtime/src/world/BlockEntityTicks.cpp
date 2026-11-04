@@ -395,6 +395,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 if (watching) {
                     before = stand;
                 }
+                const bool finishedBrew = stand.brewTime == 1 && brewingStands::isBrewable(stand);
                 if (brewingStands::tick(stand, [&hooks, x, y, z](const server::world::loot::ItemStack& remainder) {
                         if (hooks.onDropped) {
                             hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = remainder});
@@ -411,8 +412,19 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 // parity: the bottle bits are compared **every** turn, outside everything the brew.
                 const std::optional<std::int32_t> turned =
                     bottleChange(world, x, y, z, brewingStands::bottleBits(stand));
-                if (turned.has_value()) {
-                    changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
+                if (turned.has_value() || finishedBrew) {
+                    std::vector<BlockEffect> effects;
+                    if (finishedBrew) {
+                        effects.push_back(blockEffect::Sound{.name = "block.brewing_stand.brew",
+                                                             .source = wire::protocol::play::SoundSource::Blocks,
+                                                             .volume = 1.0F,
+                                                             .pitch = 1.0F});
+                    }
+                    changes.push_back(BlockChange{.x = x,
+                                                  .y = y,
+                                                  .z = z,
+                                                  .stateId = turned.value_or(world.blockState(x, y, z).value_or(0)),
+                                                  .effects = std::move(effects)});
                 }
                 continue;
             }

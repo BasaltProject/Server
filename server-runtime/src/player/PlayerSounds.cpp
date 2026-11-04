@@ -26,4 +26,27 @@ void playSoundFor(const PlayerSession& player, const std::string_view sound,
     }
 }
 
+void playLevelUpSoundIfDue(PlayerSession& player, const std::span<PlayerSession* const> watchers,
+                           const std::int64_t seed) {
+    const std::optional<std::int32_t> level = player.experience.takeLevelUp();
+    if (!level.has_value() || player.lastLevelUpSoundTick > player.aliveTicks - 100) {
+        return;
+    }
+    player.lastLevelUpSoundTick = player.aliveTicks;
+    const float volume = (*level > 30 ? 1.0F : static_cast<float>(*level) / 30.0F) * 0.75F;
+    bool sentToSelf = false;
+    for (const PlayerSession* watcher : watchers) {
+        if (watcher == nullptr || watcher->worldName != player.worldName) {
+            continue;
+        }
+        sentToSelf = sentToSelf || watcher->entityId() == player.entityId();
+        playSoundFor(*watcher, "entity.player.levelup", wire::protocol::play::SoundSource::Players, player.x, player.y,
+                     player.z, volume, 1.0F, seed);
+    }
+    if (!sentToSelf) {
+        playSoundFor(player, "entity.player.levelup", wire::protocol::play::SoundSource::Players, player.x, player.y,
+                     player.z, volume, 1.0F, seed);
+    }
+}
+
 } // namespace basalt::server::runtime::player

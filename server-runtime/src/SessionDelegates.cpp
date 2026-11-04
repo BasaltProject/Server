@@ -289,8 +289,15 @@ void ClientSession::tryPickupNearbyItems() {
         sendInventoryAll();
         const play::TakeItemEntityPacket collected{
             .collectedEntityId = arrow.entityId, .collectorEntityId = session->entityId(), .pickupItemCount = 1};
-        sendTo(playersInSameWorld(), play::TakeItemEntityPacket::kId,
-               [&collected](wire::io::ByteBuffer& buffer) { collected.write(buffer); });
+        for (const PlayerSession* watcher : playersInSameWorld()) {
+            if (watcher->connection().sendPlayPacket) {
+                watcher->connection().sendPlayPacket(
+                    play::TakeItemEntityPacket::kId,
+                    [&collected](wire::io::ByteBuffer& buffer) { collected.write(buffer); });
+            } else if (watcher->connection().sendPickupAnimation) {
+                watcher->connection().sendPickupAnimation(arrow.entityId, session->entityId());
+            }
+        }
     }
     const std::vector<player::PickedItem> taken =
         player::pickupNearbyItems(*session, world(), options_.plugins.pickupAllowed);
@@ -313,8 +320,15 @@ void ClientSession::tryPickupNearbyItems() {
         const play::TakeItemEntityPacket collected{.collectedEntityId = row.item.entityId,
                                                    .collectorEntityId = session->entityId(),
                                                    .pickupItemCount = row.picked};
-        sendTo(watchers, play::TakeItemEntityPacket::kId,
-               [&collected](wire::io::ByteBuffer& buffer) { collected.write(buffer); });
+        for (const PlayerSession* watcher : watchers) {
+            if (watcher->connection().sendPlayPacket) {
+                watcher->connection().sendPlayPacket(
+                    play::TakeItemEntityPacket::kId,
+                    [&collected](wire::io::ByteBuffer& buffer) { collected.write(buffer); });
+            } else if (watcher->connection().sendPickupAnimation) {
+                watcher->connection().sendPickupAnimation(row.item.entityId, session->entityId());
+            }
+        }
         // parity: `ServerPlayer.onItemPickup`.
         if (world::LoadedWorld* loaded = currentWorld(); loaded != nullptr) {
             world::thrownItems::pickedUpByPlayer(options_.advancementTriggers, *loaded, watchers, row.item,

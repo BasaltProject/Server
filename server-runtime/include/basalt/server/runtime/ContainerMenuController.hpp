@@ -367,6 +367,8 @@ private:
 
     [[nodiscard]] std::int32_t halfSize() const;
 
+    void closeOpenedContainer(const player::PlayerSession* session);
+
     ClientSession* owner_;
     Hooks hooks_;
     Options options_;
@@ -386,10 +388,14 @@ private:
     std::string closeReason_;
     bool pluginEditable_ = false;
     std::optional<wire::protocol::play::BlockPos> openedAt_;
+    std::optional<wire::protocol::play::BlockPos> openedSecondAt_;
+    std::string openedWorld_;
+    std::string openedBlock_;
 
     bool openStonecutter_ = false;
     std::optional<storage::StoredItemStack> stonecutterInput_;
     std::optional<storage::StoredItemStack> stonecutterResult_;
+    std::int64_t stonecutterSoundTime_ = -1;
 
     bool openSmithing_ = false;
     /// parity: `ResultContainer.recipeUsed`, the recipe that filled the result slot.

@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/BlockExperience.hpp>
 #include <basalt/server/runtime/world/BlockPickData.hpp>
+#include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -503,6 +504,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     }
 
     const std::vector<PlayerSession*> watchers = playersIn(context, world.name());
+    world::containerOpeners::clear(world.name(), x, y, z);
     for (const PlayerSession* watcher : watchers) {
         sendBlockChangeTo(*watcher, x, y, z, leaves);
     }

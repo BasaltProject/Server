@@ -441,6 +441,7 @@ bool PlayerLifecycle::switchWorld(world::LoadedWorld& target, double x, double y
         return false;
     }
 
+    owner_->menus().closeOpenMenu(*session, "teleport");
     const std::array<double, 3> left{session->x, session->y, session->z};
     owner_->currentWorld_ = &target;
     session->worldName = target.name();

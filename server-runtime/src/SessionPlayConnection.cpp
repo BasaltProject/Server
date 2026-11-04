@@ -107,6 +107,12 @@ player::PlayerConnection ClientSession::playerConnection() {
         const play::LevelEventPacket packet{.event = type, .pos = play::BlockPos{x, y, z}, .data = data};
         sendPlayPacket(play::LevelEventPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     };
+    connection.sendPickupAnimation = [this](const std::int32_t itemEntityId, const std::int32_t collectorEntityId) {
+        const play::TakeItemEntityPacket packet{
+            .collectedEntityId = itemEntityId, .collectorEntityId = collectorEntityId, .pickupItemCount = 1};
+        sendPlayPacket(play::TakeItemEntityPacket::kId,
+                       [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    };
     connection.resendChunk = [this](std::int32_t chunkX, std::int32_t chunkZ) { resendChunk(chunkX, chunkZ); };
     connection.handOverToRegion = [this](world::LoadedWorld& world) { handOverToRegionOf(world); };
     connection.sendBiomes = [this](const std::vector<std::pair<std::int32_t, std::int32_t>>& columns) {

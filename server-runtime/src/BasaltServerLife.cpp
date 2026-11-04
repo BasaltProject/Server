@@ -63,6 +63,7 @@
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
+#include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
@@ -543,6 +544,10 @@ player::DamageContext BasaltServer::damageContext() {
 
 // A double chest counts as two, because a lid is per block entity.
 void BasaltServer::openersChanged(world::LoadedWorld& world, const bedrock::OpenWindow& window, const bool opened) {
+    if (window.block != "ender_chest" && (!world::containers::isPlain(window.block) || window.block == "hopper" ||
+                                          window.block == "dispenser" || window.block == "dropper")) {
+        return;
+    }
     player::OpenersContext context;
     context.blocks = breakContext();
     context.nextFloat = [] { return std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom()); };
@@ -1613,6 +1618,9 @@ void BasaltServer::startBedrockListener() {
                         if (std::optional<bedrock::OpenWindow> window =
                                 bedrock::windowFor(*found->second, hit.x, hit.y, hit.z);
                             window.has_value()) {
+                            if (windows->open.has_value()) {
+                                openersChanged(*found->second, *windows->open, false);
+                            }
                             windows->nextContainerId =
                                 windows->nextContainerId >= bedrock::kMaxContainerId ? 1 : windows->nextContainerId + 1;
                             window->containerId = windows->nextContainerId;
@@ -1841,13 +1849,15 @@ void BasaltServer::startBedrockListener() {
         // Whatever was being dragged goes back in the bag rather than staying in a closed window.
         context.closeWindow = [this](player::PlayerSession& player, std::shared_ptr<bedrock::BedrockWindows> windows) {
             const wire::common::Uuid uuid = player.uuid();
-            worldRegistry_->scheduler().global().submit([this, uuid, windows = std::move(windows)] {
-                player::PlayerSession* session = playerRegistry_.get(uuid);
-                if (session == nullptr || windows == nullptr) {
+            const std::string worldName = player.worldName;
+            worldRegistry_->scheduler().global().submit([this, uuid, worldName, windows = std::move(windows)] {
+                if (windows == nullptr) {
                     return;
                 }
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                const std::string targetWorld = session != nullptr ? session->worldName : worldName;
                 const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
-                const auto found = worlds.find(session->worldName);
+                const auto found = worlds.find(targetWorld);
                 if (windows->open.has_value() && found != worlds.end() && found->second != nullptr) {
                     openersChanged(*found->second, *windows->open, false);
                 }
@@ -1855,6 +1865,9 @@ void BasaltServer::startBedrockListener() {
                 windows->trades.reset();
                 windows->saidSlots.clear();
                 windows->saidNumbers.reset();
+                if (session == nullptr) {
+                    return;
+                }
                 // parity: `AbstractContainerMenu.removed`.
                 bool returned = false;
                 for (std::optional<storage::StoredItemStack>& cell : windows->grid) {
@@ -2101,10 +2114,9 @@ void BasaltServer::startBedrockListener() {
                         }
                     }
                     // parity: `AnvilMenu.onTake`.
-                    const bool gone = !free && where != nullptr &&
-                                      player::wearAnvilAt(
-                                          breakContext(), *where, windows->open->x, windows->open->y, windows->open->z,
-                                          std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom()));
+                    const float roll = free ? 1.0F : std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom());
+                    const bool gone = where != nullptr && player::wearAnvilAt(breakContext(), *where, windows->open->x,
+                                                                              windows->open->y, windows->open->z, roll);
                     if (gone) {
                         windows->open.reset();
                         windows->saidSlots.clear();

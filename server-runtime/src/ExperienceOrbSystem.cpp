@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
@@ -325,15 +326,29 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
                                     })) {
             continue;
         }
+        float pickupPitch = 1.0F;
+        std::int64_t soundSeed = 0;
         {
             const std::scoped_lock guard{lock_};
             if (const std::int32_t delay = world.state().gameplay().player.expPickupDelayTicks; delay > 0) {
                 takeDelays_[player->entityId()] = delay;
             }
+            // parity: `ClientPacketListener.handleTakeItemEntity` pitch for `EXPERIENCE_ORB_PICKUP`.
+            pickupPitch = ((random_.nextFloat() - random_.nextFloat()) * 0.35F) + 0.9F;
+            soundSeed = random_.nextLong();
         }
         for (PlayerSession* watcher : watchers) {
+            const bool clientTracksOrb =
+                watcher->connection().tracksEntity && watcher->connection().tracksEntity(orb.entityId());
             if (watcher->connection().sendPickupAnimation) {
                 watcher->connection().sendPickupAnimation(orb.entityId(), player->entityId());
+            }
+            // A Java client plays `EXPERIENCE_ORB_PICKUP` from `TakeItemEntityPacket` only if the orb was already
+            // spawned in its client level; an orb collected on its spawn tick or by a Bedrock client needs the sound.
+            if (!clientTracksOrb) {
+                player::playSoundFor(*watcher, "entity.experience_orb.pickup",
+                                     wire::protocol::play::SoundSource::Players, orb.x, orb.y, orb.z, 0.1F, pickupPitch,
+                                     soundSeed);
             }
         }
         bool repaired = false;
@@ -350,6 +365,7 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
         }
         if (remaining > 0) {
             player->experience.givePoints(remaining);
+            player::playLevelUpSoundIfDue(*player, watchers, soundSeed);
         }
         if (player->connection().syncExperience) {
             player->connection().syncExperience();

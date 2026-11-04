@@ -4,6 +4,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Items.hpp>
+#include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
@@ -221,6 +222,15 @@ void ContainerMenuController::takeSmithingResult() {
             stack->count -= 1;
         }
     }
+    // parity: `SmithingMenu.onTake` plays `SoundEvents.SMITHING_TABLE_USE` at the block position.
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr && openBlock.has_value()) {
+        owner_->blockInteraction().broadcastEffects(
+            *openBlock, world->state().blockState(openBlock->x, openBlock->y, openBlock->z).value_or(0),
+            {world::blockEffect::Sound{.name = "block.smithing_table.use",
+                                       .source = wire::protocol::play::SoundSource::Blocks,
+                                       .volume = 1.0F,
+                                       .pitch = 1.0F}});
+    }
     recomputeSmithingResult();
 }
 
@@ -257,6 +267,17 @@ void ContainerMenuController::takeStonecutterResult() {
         recipeUsed_.reset();
     } else {
         stonecutterInput_->count -= 1;
+    }
+    // parity: `StonecutterMenu.ResultSlot.onTake` plays the sound at most once a game tick.
+    if (world::LoadedWorld* world = owner_->currentWorld();
+        world != nullptr && openBlock.has_value() && stonecutterSoundTime_ != world->gameTime()) {
+        stonecutterSoundTime_ = world->gameTime();
+        owner_->blockInteraction().broadcastEffects(
+            *openBlock, world->state().blockState(openBlock->x, openBlock->y, openBlock->z).value_or(0),
+            {world::blockEffect::Sound{.name = "ui.stonecutter.take_result",
+                                       .source = wire::protocol::play::SoundSource::Blocks,
+                                       .volume = 1.0F,
+                                       .pitch = 1.0F}});
     }
 }
 

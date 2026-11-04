@@ -66,6 +66,7 @@ ContainerMenuController::ContainerMenuController(ClientSession& owner, Hooks hoo
     : owner_(&owner), hooks_(std::move(hooks)), options_(std::move(options)) {}
 
 std::int32_t ContainerMenuController::allocateContainerId() {
+    closeOpenedContainer(owner_->playerSession());
     nextContainerId =
         nextContainerId >= ClientSession::kMaxContainerId ? ClientSession::kFirstBlockContainerId : nextContainerId + 1;
     return nextContainerId;
@@ -135,10 +136,12 @@ void ContainerMenuController::openEnderChest(PlayerSession& session, const Block
             .write(buffer);
     });
     sendInventory();
-    owner_->blockInteraction().broadcastEffects(
-        pos, world->state().blockState(pos.x, pos.y, pos.z).value_or(0),
-        {world::blockEffect::Sound{
-            .name = "block.ender_chest.open", .source = SoundSource::Blocks, .volume = 0.5F, .pitch = 1.0F}});
+    openedAt_ = pos;
+    openedSecondAt_.reset();
+    openedWorld_ = session.worldName;
+    openedBlock_ = "ender_chest";
+    announceOpeners(pos, "ender_chest", world::containerOpeners::open(session.worldName, pos.x, pos.y, pos.z),
+                    session.uuid());
 }
 
 void ContainerMenuController::openChest(PlayerSession& session, const BlockPos& pos, const std::string& block) {
@@ -178,22 +181,38 @@ void ContainerMenuController::openChest(PlayerSession& session, const BlockPos& 
             world->state().unpackLoot(openBlockSecond->x, openBlockSecond->y, openBlockSecond->z, session.uuid());
         }
     }
-    openMenu = paired ? Menu::doubleChest(containerId) : Menu::chest(containerId);
-    openBlockSize = paired ? Menu::kDoubleChestSize : Menu::kChestSize;
+    constexpr std::int32_t kGeneric3x3 = 6;
+    constexpr std::int32_t kHopper = 16;
+    const bool isHopper = block == "hopper";
+    const bool is3x3 = block == "dispenser" || block == "dropper";
+    openBlockSize = isHopper ? 5 : is3x3 ? 9 : paired ? Menu::kDoubleChestSize : Menu::kChestSize;
+    openMenu = isHopper || is3x3 ? Menu::blocks(containerId, openBlockSize)
+               : paired          ? Menu::doubleChest(containerId)
+                                 : Menu::chest(containerId);
     openBlockData_ = {-1, -1, -1, -1};
+    const std::int32_t menuType = isHopper ? kHopper
+                                  : is3x3  ? kGeneric3x3
+                                  : paired ? wire::protocol::play::menuType::kGeneric9x6
+                                           : wire::protocol::play::menuType::kGeneric9x3;
     owner_->sendCompressed(OpenScreenPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         OpenScreenPacket{.containerId = openMenu.containerId(),
-                         .menuType = paired ? wire::protocol::play::menuType::kGeneric9x6
-                                            : wire::protocol::play::menuType::kGeneric9x3,
+                         .menuType = menuType,
                          .title = Component::translatable(containerTitleKey(block, paired))}
             .write(buffer);
     });
     sendInventory();
+    if (isHopper || is3x3) {
+        return;
+    }
     openedAt_ = pos;
+    openedSecondAt_.reset();
+    openedWorld_ = session.worldName;
+    openedBlock_ = block;
     announceOpeners(pos, block, world::containerOpeners::open(session.worldName, pos.x, pos.y, pos.z), session.uuid());
     // parity: `ChestBlock`'s lid is per block entity, so both halves of a double chest open.
     if (openBlockSecond.has_value()) {
         const BlockPos at = openBlock == pos ? *openBlockSecond : *openBlock;
+        openedSecondAt_ = at;
         announceOpeners(at, block, world::containerOpeners::open(session.worldName, at.x, at.y, at.z), session.uuid());
     }
 }
@@ -421,21 +440,6 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session, std::string_
     returnCraftingGrid(session);
     owner_->trades().menuClosed();
     openMerchant_ = false;
-    const std::optional<BlockPos> closing = openedAt_;
-    std::optional<BlockPos> closingSecond;
-    if (openBlockSecond.has_value()) {
-        closingSecond = openBlock == closing ? openBlockSecond : openBlock;
-    }
-    std::optional<std::string> closingBlock;
-    if (closing.has_value() && owner_->currentWorld() != nullptr) {
-        const std::optional<std::int32_t> stateId =
-            owner_->currentWorld()->state().blockState(closing->x, closing->y, closing->z);
-        const wire::common::Identifier* block =
-            stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
-        if (block != nullptr && world::containers::isPlain(block->path())) {
-            closingBlock = std::string{block->path()};
-        }
-    }
     openMenu = Menu::playerInventory();
     openBlock.reset();
     openBlockSecond.reset();
@@ -574,20 +578,44 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session, std::string_
         stonecutterResult_.reset();
         openStonecutter_ = false;
     }
-    if (closing.has_value() && closingBlock.has_value()) {
-        announceOpeners(*closing, *closingBlock,
-                        world::containerOpeners::close(session.worldName, closing->x, closing->y, closing->z),
-                        session.uuid());
-        if (closingSecond.has_value()) {
-            announceOpeners(
-                *closingSecond, *closingBlock,
-                world::containerOpeners::close(session.worldName, closingSecond->x, closingSecond->y, closingSecond->z),
-                session.uuid());
-        }
-    }
-    openedAt_.reset();
+    closeOpenedContainer(&session);
     recomputeCraftingResult();
     sendInventory();
+}
+
+void ContainerMenuController::closeOpenedContainer(const PlayerSession* session) {
+    if (!openedAt_.has_value()) {
+        return;
+    }
+    const BlockPos closing = *openedAt_;
+    const std::optional<BlockPos> closingSecond = openedSecondAt_;
+    const std::string worldName = !openedWorld_.empty() ? openedWorld_
+                                  : session != nullptr  ? session->worldName
+                                                        : std::string{};
+    std::string block = openedBlock_;
+    openedAt_.reset();
+    openedSecondAt_.reset();
+    openedWorld_.clear();
+    openedBlock_.clear();
+    if (worldName.empty()) {
+        return;
+    }
+    if (block.empty() && owner_->currentWorld() != nullptr) {
+        const std::optional<std::int32_t> stateId =
+            owner_->currentWorld()->state().blockState(closing.x, closing.y, closing.z);
+        const wire::common::Identifier* id =
+            stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+        if (id != nullptr) {
+            block = std::string{id->path()};
+        }
+    }
+    const std::optional<wire::common::Uuid> opener = session != nullptr ? std::optional{session->uuid()} : std::nullopt;
+    announceOpeners(closing, block, world::containerOpeners::close(worldName, closing.x, closing.y, closing.z), opener);
+    if (closingSecond.has_value()) {
+        announceOpeners(*closingSecond, block,
+                        world::containerOpeners::close(worldName, closingSecond->x, closingSecond->y, closingSecond->z),
+                        opener);
+    }
 }
 
 void ContainerMenuController::clickContainerButton(std::int32_t button) {

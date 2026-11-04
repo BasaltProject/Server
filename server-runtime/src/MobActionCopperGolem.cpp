@@ -173,6 +173,12 @@ void MobActionSystem::tickCopperGolem(world::LoadedWorld& world, ServerEntity& g
 }
 
 void MobActionSystem::turnToStatue(world::LoadedWorld& world, ServerEntity& golem, random::RandomSource& random) {
+    golems::GolemState& state = golems::stateOf(golem, random);
+    if (state.openedChest.has_value()) {
+        const golems::Position at = *state.openedChest;
+        state.openedChest.reset();
+        golemOpensChest(golem, at[0], at[1], at[2], false);
+    }
     const std::int32_t x = blockOf(golem.x);
     const std::int32_t y = blockOf(golem.y);
     const std::int32_t z = blockOf(golem.z);
