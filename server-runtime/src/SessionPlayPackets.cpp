@@ -59,12 +59,14 @@
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <expected>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -148,6 +150,30 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         } else if (command->action == play::ClientCommandPacket::Action::RequestStats) {
             uiState_->sendStats();
         }
+        return;
+    }
+    // parity: `ServerGamePacketListenerImpl.handleChangeGameMode`, sent by F3+N and the F3+F4 switcher.
+    if (packetId == kServerboundChangeGameModeId) {
+        const std::int32_t id = wire::protocol::varInt::read(body);
+        command::CommandDispatcher* dispatcher = options_.commands;
+        if (session == nullptr || dispatcher == nullptr || body.failed()) {
+            return;
+        }
+        // parity: `GameType.BY_ID` falls back to survival for an unknown id.
+        static constexpr std::array<std::string_view, 4> kModes{"survival", "creative", "adventure", "spectator"};
+        const std::string mode{id >= 0 && id < static_cast<std::int32_t>(kModes.size())
+                                   ? kModes[static_cast<std::size_t>(id)]
+                                   : kModes[0]};
+        const command::PlayerCommandSource source{*session, dispatcher->environment().groups()};
+        if (source.permissionLevel() < command::permissionLevel::kGamemasters) {
+            logger_.warn([session, mode] {
+                return "Player " + session->name() + " tried to change game mode to " + mode +
+                       " without required permissions";
+            });
+            return;
+        }
+        // parity: `GameModeCommand.setGameMode` with the player's own source, so the feedback matches the command.
+        dispatcher->execute(source, "gamemode " + mode);
         return;
     }
     if (packetId == play::ServerboundPlayerAbilitiesPacket::kId) {
