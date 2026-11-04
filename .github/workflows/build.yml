@@ -233,6 +233,7 @@ jobs:
         with:
           api-level: 29
           arch: x86_64
+          disk-size: 3072M
           script: .github/scripts/test-android.sh build/android-x64
       - uses: actions/upload-artifact@v4
         with:
