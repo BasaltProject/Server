@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
@@ -240,6 +241,8 @@ void UiStateSync::syncExperience() {
     if (session == nullptr) {
         return;
     }
+    const std::vector<PlayerSession*> watchers = owner_->playersInSameWorld();
+    player::playLevelUpSoundIfDue(*session, watchers);
     if (session->experience.level() != owner_->lastSyncedLevel) {
         const std::int32_t was = owner_->lastSyncedLevel;
         owner_->lastSyncedLevel = session->experience.level();

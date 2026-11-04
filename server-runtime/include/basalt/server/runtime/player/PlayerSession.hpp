@@ -182,6 +182,8 @@ public:
     /// parity: the `powder_snow` movement speed modifier `LivingEntity.tryAddFrost` adds.
     float frostSlowdown = 0.0F;
     std::int64_t aliveTicks = 0;
+    /// parity: `Player.lastLevelUpTime`, initialized negative so a level-up in the first five seconds still plays.
+    std::int64_t lastLevelUpSoundTick = -100;
     /// parity: `CombatTracker.inCombat`.
     bool inCombat = false;
 

@@ -36,6 +36,10 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     if (session.connection().syncHealth) {
         session.connection().syncHealth();
     }
+    // parity: `ServerPlayer.die` closes the open container before dropping death loot.
+    if (session.connection().closeOpenMenu) {
+        session.connection().closeOpenMenu();
+    }
 
     // parity: `DamageSource.getLocalizedDeathMessage`.
     std::vector<Component> arguments{Component::text(session.name())};

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+#include <utility>
 
 namespace basalt::server::runtime::player {
 
@@ -31,11 +33,17 @@ public:
 
     void reset();
 
+    /// parity: `Player.giveExperienceLevels` rings the level-up chime when crossing a multiple of five.
+    [[nodiscard]] std::optional<std::int32_t> takeLevelUp() noexcept {
+        return std::exchange(pendingLevelUp_, std::nullopt);
+    }
+
 private:
     std::int32_t level_ = 0;
     float progress_ = 0.0F;
     std::int32_t total_ = 0;
     std::int32_t score_ = 0;
+    std::optional<std::int32_t> pendingLevelUp_;
 };
 
 } // namespace basalt::server::runtime::player

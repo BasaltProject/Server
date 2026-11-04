@@ -4,9 +4,11 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
@@ -319,6 +321,16 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     }
     // parity: `ItemStack.useOn`, a block item that went down counts as used.
     statAwards::used(player, held.id);
+    // parity: `BlockItem.place` plays the placement sound for everyone except the placer.
+    const reg::BlockSoundTypeEntry& soundType = reg::blockSounds::of(settledStateId);
+    const std::int64_t placeSeed = seedOf(context.blocks);
+    for (const PlayerSession* other : playersIn(context.blocks, world.name())) {
+        if (other->entityId() == session->entityId()) {
+            continue;
+        }
+        playSoundFor(*other, soundType.placeSound, play::SoundSource::Blocks, placeAt.x + 0.5, placeAt.y + 0.5,
+                     placeAt.z + 0.5, (soundType.volume + 1.0F) * 0.5F, soundType.pitch * 0.8F, placeSeed);
+    }
     // parity: `GameEvent.BLOCK_PLACE`.
     heardBySculk(context.blocks, world, "block_place", placeAt.x, placeAt.y, placeAt.z, {.entity = player.uuid()});
     // parity: `SignBlock.setPlacedBy` opens the editor only on an unwaxed sign whose front a player could have typed.

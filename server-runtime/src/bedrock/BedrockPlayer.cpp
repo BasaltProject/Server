@@ -193,9 +193,20 @@ BedrockPlayer::~BedrockPlayer() {
     if (session_ == nullptr) {
         return;
     }
-    if (windows_->cursor.has_value()) {
-        static_cast<void>(session_->inventory.add(*windows_->cursor));
-        windows_->cursor.reset();
+    if (windows_ != nullptr) {
+        for (std::optional<storage::StoredItemStack>& cell : windows_->grid) {
+            if (cell.has_value()) {
+                static_cast<void>(session_->inventory.add(*cell));
+                cell.reset();
+            }
+        }
+        if (windows_->cursor.has_value()) {
+            static_cast<void>(session_->inventory.add(*windows_->cursor));
+            windows_->cursor.reset();
+        }
+        if (windows_->open.has_value() && context_.closeWindow) {
+            context_.closeWindow(*session_, windows_);
+        }
     }
     // parity: `PlayerList.remove` awards it before the player is saved.
     player::statAwards::award(*session_, "leave_game");

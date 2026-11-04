@@ -14,6 +14,8 @@ std::int32_t close(std::string_view world, std::int32_t x, std::int32_t y, std::
 
 [[nodiscard]] std::int32_t count(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z);
 
+void clear(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z);
+
 void clear();
 
 } // namespace containerOpeners

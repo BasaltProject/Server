@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecords.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
@@ -995,6 +996,9 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (session_ == nullptr) {
             return;
         }
+        const std::vector<player::PlayerSession*> watchers =
+            context_.registry != nullptr ? context_.registry->snapshot() : std::vector<player::PlayerSession*>{};
+        player::playLevelUpSoundIfDue(*session_, watchers);
         const std::array<wire::bedrock::AttributeValue, 2> values{{
             {"minecraft:player.experience", 0.0F, 1.0F, session_->experience.progress(), 0.0F},
             {"minecraft:player.level", 0.0F, 24791.0F, static_cast<float>(session_->experience.level()), 0.0F},

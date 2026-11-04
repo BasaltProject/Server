@@ -2,7 +2,10 @@
 
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
+#include <basalt/server/runtime/ExperienceOrbSystem.hpp>
+#include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
@@ -53,6 +56,8 @@ struct Fixture {
     std::unique_ptr<LoadedWorld> world;
     std::unique_ptr<PlayerSession> player;
     std::vector<std::int32_t> packets;
+    std::vector<std::string> sounds;
+    std::int32_t pickupAnimations = 0;
     std::map<std::string, std::string> lootFiles;
 
     explicit Fixture(const std::string& root)
@@ -65,12 +70,19 @@ struct Fixture {
             basalt::wire::io::ByteBuffer buffer;
             write(buffer);
             packets.push_back(id);
+            if (id == play::SoundPacket::kId) {
+                basalt::wire::io::ByteBuffer in = basalt::wire::io::ByteBuffer::wrap(buffer.toVector());
+                if (const auto sound = play::SoundPacket::read(in); sound.has_value()) {
+                    sounds.push_back(sound->sound);
+                }
+            }
         };
         connection.sendBlockEvent = [this](std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t,
                                            std::int32_t) { packets.push_back(play::BlockEventPacket::kId); };
         connection.sendLevelEvent = [this](std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t) {
             packets.push_back(play::LevelEventPacket::kId);
         };
+        connection.sendPickupAnimation = [this](std::int32_t, std::int32_t) { ++pickupAnimations; };
         player = std::make_unique<PlayerSession>(Uuid{1, 1}, "Steve", 1, std::move(connection));
         player->worldName = "world";
         registry.add(player.get());
@@ -146,4 +158,78 @@ TEST_CASE("a plugin that refuses a piston stops it moving anything at all") {
     BlockChangeBroadcaster broadcaster{fixture.registry, tables, refuse, {}};
 
     CHECK(broadcaster.finishPiston(*fixture.world, {1, 64, 1}, fixture.watchers()).empty());
+}
+
+TEST_CASE("container openers play the matching sound family and animate lids") {
+    Fixture fixture{scratch("broadcaster-containers")};
+    RealLootTables tables{fixture.jar()};
+    BlockChangeBroadcaster broadcaster{fixture.registry, tables, {}, {}};
+
+    basalt::server::runtime::player::OpenersContext context;
+    context.blocks.registry = &fixture.registry;
+    context.blocks.blocks = &broadcaster;
+    context.nextFloat = [] { return 0.5F; };
+    context.nextSeed = [] { return std::int64_t{7}; };
+
+    SUBCASE("chest, copper chest variants, ender chest and shulker box emit open and close sounds") {
+        REQUIRE(fixture.world->state().setBlockState(2, 64, 2, stateOf("chest")));
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 2, 64, 2, "chest", 1);
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 2, 64, 2, "chest", 0);
+
+        REQUIRE(fixture.world->state().setBlockState(3, 64, 2, stateOf("weathered_copper_chest")));
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 3, 64, 2, "weathered_copper_chest",
+                                                         1);
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 3, 64, 2, "weathered_copper_chest",
+                                                         0);
+
+        REQUIRE(fixture.world->state().setBlockState(4, 64, 2, stateOf("ender_chest")));
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 4, 64, 2, "ender_chest", 1);
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 4, 64, 2, "ender_chest", 0);
+
+        REQUIRE(fixture.world->state().setBlockState(5, 64, 2, stateOf("shulker_box")));
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 5, 64, 2, "shulker_box", 1);
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 5, 64, 2, "shulker_box", 0);
+
+        const std::vector<std::string> expected = {"block.chest.open",
+                                                   "block.chest.close",
+                                                   "block.copper_chest_weathered.open",
+                                                   "block.copper_chest_weathered.close",
+                                                   "block.ender_chest.open",
+                                                   "block.ender_chest.close",
+                                                   "block.shulker_box.open",
+                                                   "block.shulker_box.close"};
+        CHECK(fixture.sounds == expected);
+    }
+
+    SUBCASE("non-lidded containers emit neither lid events nor open sounds") {
+        REQUIRE(fixture.world->state().setBlockState(2, 64, 2, stateOf("hopper")));
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 2, 64, 2, "hopper", 1);
+        basalt::server::runtime::player::announceOpeners(context, *fixture.world, 2, 64, 2, "hopper", 0);
+        CHECK(fixture.sounds.empty());
+        CHECK(fixture.packets.empty());
+    }
+}
+
+TEST_CASE("experience orb collection and level milestones emit their sounds") {
+    Fixture fixture{scratch("broadcaster-xp")};
+    fixture.player->x = 1.0;
+    fixture.player->y = 64.0;
+    fixture.player->z = 1.0;
+
+    basalt::server::runtime::ExperienceOrbSystem orbs{fixture.registry, {}};
+    orbs.spawn(*fixture.world, 1.0, 64.0, 1.0, 160);
+    const std::vector<basalt::server::runtime::entity::ServerEntity*> spawned = fixture.world->state().entities();
+    REQUIRE(spawned.size() == 1);
+    orbs.tick(*fixture.world, fixture.watchers(), {}, *spawned.front());
+
+    CHECK(fixture.pickupAnimations == 1);
+    CHECK(std::ranges::find(fixture.sounds, "entity.experience_orb.pickup") != fixture.sounds.end());
+    CHECK(std::ranges::find(fixture.sounds, "entity.player.levelup") != fixture.sounds.end());
+
+    fixture.sounds.clear();
+    fixture.player->aliveTicks = 200;
+    fixture.player->experience.giveLevels(5);
+    const std::vector<PlayerSession*> watchers = fixture.watchers();
+    basalt::server::runtime::player::playLevelUpSoundIfDue(*fixture.player, watchers, 7);
+    CHECK(std::ranges::find(fixture.sounds, "entity.player.levelup") != fixture.sounds.end());
 }

@@ -80,6 +80,23 @@ std::int32_t count(std::string_view world, std::int32_t x, std::int32_t y, std::
     return at == inWorld->second.end() ? 0 : at->second;
 }
 
+void clear(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    if (!anyOpen().load()) {
+        return;
+    }
+    const std::lock_guard<std::mutex> held{lock()};
+    auto& all = state();
+    const auto inWorld = all.find(world);
+    if (inWorld == all.end()) {
+        return;
+    }
+    inWorld->second.erase(packed(x, y, z));
+    if (inWorld->second.empty()) {
+        all.erase(inWorld);
+    }
+    anyOpen().store(!all.empty());
+}
+
 void clear() {
     const std::lock_guard<std::mutex> held{lock()};
     state().clear();

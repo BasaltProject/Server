@@ -29,6 +29,9 @@ void ExperienceData::giveLevels(std::int32_t amount) {
         progress_ = 0.0F;
         total_ = 0;
     }
+    if (amount > 0 && level_ % 5 == 0) {
+        pendingLevelUp_ = level_;
+    }
 }
 
 void ExperienceData::givePoints(std::int32_t points) {
@@ -75,6 +78,7 @@ void ExperienceData::reset() {
     progress_ = 0.0F;
     total_ = 0;
     score_ = 0;
+    pendingLevelUp_.reset();
 }
 
 } // namespace basalt::server::runtime::player

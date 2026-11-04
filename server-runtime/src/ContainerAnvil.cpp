@@ -124,6 +124,9 @@ void ContainerMenuController::takeAnvilResult(PlayerSession& session) {
     anvilCost_ = 0;
     if (!free) {
         wearAnvil();
+    } else if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr && openBlock.has_value()) {
+        static_cast<void>(player::wearAnvilAt(owner_->blockInteraction().breakContext(), *world, openBlock->x,
+                                              openBlock->y, openBlock->z, 1.0F));
     }
     recomputeAnvilResult();
 }
