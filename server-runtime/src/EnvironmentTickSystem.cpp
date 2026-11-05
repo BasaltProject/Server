@@ -74,6 +74,9 @@ constexpr double kBlockEventRange = 64.0;
 /// parity: `LevelEvent.SOUND_PORTAL_TRAVEL`.
 constexpr std::int32_t kPortalTravelEvent = 1032;
 
+/// parity: `Player.getDimensionChangingDelay`; the 300 ticks of `Entity` are for every other entity.
+constexpr std::int32_t kPlayerPortalCooldown = 10;
+
 /// parity: `TeleportTransition.PLAY_PORTAL_SOUND`, heard by the traveller alone once it has arrived.
 void playPortalTravelSound(const PlayerSession& player) {
     if (player.connection().sendLevelEvent) {
@@ -310,14 +313,18 @@ void EnvironmentTickSystem::tickPortals(world::LoadedWorld& world) {
             travelThroughGateway(world, *player, *gateway);
             continue;
         }
-        if (player->portalCooldown > 0) {
-            player->portalCooldown--;
-            player->portalTicks = 0;
-            continue;
-        }
         const std::optional<std::int32_t> state = world.state().blockState(
             static_cast<std::int32_t>(std::floor(player->x)), static_cast<std::int32_t>(std::floor(player->y)),
             static_cast<std::int32_t>(std::floor(player->z)));
+        if (player->portalCooldown > 0) {
+            // parity: `Entity.setAsInsidePortal` keeps the cooldown full while the player stands in a portal, so it
+            // has to step out before the next trip.
+            const bool inPortal = state.has_value() && (world::endPortals::isEndPortal(*state) ||
+                                                        server::world::portal::PortalShape::axisOf(*state).has_value());
+            player->portalCooldown = inPortal ? kPlayerPortalCooldown : player->portalCooldown - 1;
+            player->portalTicks = 0;
+            continue;
+        }
         if (state.has_value() && world::endPortals::isEndPortal(*state)) {
             // parity: `Portal.getPortalTransitionTime`.
             travelThroughEndPortal(world, *player);
@@ -590,7 +597,7 @@ void EnvironmentTickSystem::travelThroughPortal(world::LoadedWorld& world, Playe
         return;
     }
     player.portalTicks = 0;
-    player.portalCooldown = world::netherPortals::kTravelCooldownTicks;
+    player.portalCooldown = kPlayerPortalCooldown;
     if (player.connection().switchWorld && player.connection().switchWorld(*target, exit->x, exit->y, exit->z)) {
         playPortalTravelSound(player);
     }
@@ -625,7 +632,7 @@ void EnvironmentTickSystem::travelThroughEndPortal(world::LoadedWorld& world, Pl
         return;
     }
     player.portalTicks = 0;
-    player.portalCooldown = world::netherPortals::kTravelCooldownTicks;
+    player.portalCooldown = kPlayerPortalCooldown;
     // parity: `EndPortalBlock.entityInside` and `ServerPlayer.showEndCredits`, once per player.
     if (world.declaration().dimension == config::WorldDimension::End && !player.seenCredits &&
         !world.settings().rules.tuning.disableEndCredits && player.connection().sendPlayPacket) {
