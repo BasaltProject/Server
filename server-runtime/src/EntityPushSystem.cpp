@@ -207,12 +207,14 @@ bool EntityPushSystem::isPushable(world::LoadedWorld& world, const Body& body) c
 
 bool EntityPushSystem::pushableBy(world::LoadedWorld& world, const Body& pusher, const Body& input) const {
     // parity: `EntitySelector.pushableBy`.
-    const scoreboard::Team* own = options_.teams == nullptr ? nullptr : options_.teams->teamOf(memberOf(pusher));
+    // Without a single team nobody has a rule, and naming a mob means turning its uuid into text.
+    const bool teamed = options_.teams != nullptr && !options_.teams->empty();
+    const scoreboard::Team* own = teamed ? options_.teams->teamOf(memberOf(pusher)) : nullptr;
     const CollisionRule ownRule = own == nullptr ? CollisionRule::Always : own->collisionRule;
     if (ownRule == CollisionRule::Never || isSpectator(input) || !isPushable(world, input)) {
         return false;
     }
-    const scoreboard::Team* theirs = options_.teams == nullptr ? nullptr : options_.teams->teamOf(memberOf(input));
+    const scoreboard::Team* theirs = teamed ? options_.teams->teamOf(memberOf(input)) : nullptr;
     const CollisionRule theirRule = theirs == nullptr ? CollisionRule::Always : theirs->collisionRule;
     if (theirRule == CollisionRule::Never) {
         return false;

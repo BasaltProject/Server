@@ -29,6 +29,9 @@ public:
 
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> chunksWithEntities() const;
 
+    /// Throws away the per-chunk index so the next `entitiesIn` rebuilds it from where everything stands now.
+    void beginTick() noexcept;
+
     void forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ);
 
     void addPendingEntities(std::vector<wire::nbt::NbtCompound> saved);
@@ -49,6 +52,16 @@ private:
     std::vector<std::unique_ptr<entity::ServerEntity>> entities_;
     std::unordered_map<std::int32_t, entity::ServerEntity*> byId_;
     std::vector<wire::nbt::NbtCompound> pendingEntities_;
+
+    struct Indexed {
+        entity::ServerEntity* entity;
+        std::size_t order;
+    };
+
+    /// Entities by the chunk they stood in when it was built. Stale by at most a tick, which `entitiesIn` makes up
+    /// for by reading the neighbours and checking each hit against where it stands now. Guarded by `mutex_`.
+    mutable std::unordered_map<std::int64_t, std::vector<Indexed>> index_;
+    mutable bool indexValid_ = false;
 };
 
 } // namespace basalt::server::runtime::world

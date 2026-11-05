@@ -35,13 +35,41 @@ bool EntityRegistry::hasNaturalSpawnObstruction(const entity::Aabb& spawnBox, co
     return false;
 }
 
+void EntityRegistry::beginTick() noexcept { indexValid_ = false; }
+
 std::vector<entity::ServerEntity*> EntityRegistry::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ) const {
     const WorldWriteLock lock{*mutex_};
-    std::vector<entity::ServerEntity*> found;
-    for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
-        if (!entity->removed && chunkOf(entity->x) == chunkX && chunkOf(entity->z) == chunkZ) {
-            found.push_back(entity.get());
+    if (!indexValid_) {
+        index_.clear();
+        for (std::size_t order = 0; order < entities_.size(); ++order) {
+            entity::ServerEntity* entity = entities_[order].get();
+            const std::int64_t bucket =
+                (static_cast<std::int64_t>(chunkOf(entity->x)) << 32) | static_cast<std::uint32_t>(chunkOf(entity->z));
+            index_[bucket].push_back({entity, order});
         }
+        indexValid_ = true;
+    }
+    // Nothing moves a chunk's width in one tick, so the neighbours hold whatever walked in since the build.
+    std::vector<Indexed> candidates;
+    for (std::int32_t dx = -1; dx <= 1; ++dx) {
+        for (std::int32_t dz = -1; dz <= 1; ++dz) {
+            const auto bucket =
+                index_.find((static_cast<std::int64_t>(chunkX + dx) << 32) | static_cast<std::uint32_t>(chunkZ + dz));
+            if (bucket == index_.end()) {
+                continue;
+            }
+            for (const Indexed& held : bucket->second) {
+                if (!held.entity->removed && chunkOf(held.entity->x) == chunkX && chunkOf(held.entity->z) == chunkZ) {
+                    candidates.push_back(held);
+                }
+            }
+        }
+    }
+    std::ranges::sort(candidates, {}, &Indexed::order);
+    std::vector<entity::ServerEntity*> found;
+    found.reserve(candidates.size());
+    for (const Indexed& held : candidates) {
+        found.push_back(held.entity);
     }
     return found;
 }
@@ -63,6 +91,7 @@ std::vector<std::pair<std::int32_t, std::int32_t>> EntityRegistry::chunksWithEnt
 
 void EntityRegistry::forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ) {
     const WorldWriteLock lock{*mutex_};
+    indexValid_ = false;
     // Removed or not: the chunk is going, and what was in it has just been written to disk.
     std::erase_if(entities_, [this, chunkX, chunkZ](const std::unique_ptr<entity::ServerEntity>& entity) {
         if (chunkOf(entity->x) != chunkX || chunkOf(entity->z) != chunkZ) {
@@ -101,6 +130,7 @@ entity::ServerEntity& EntityRegistry::spawnEntity(std::unique_ptr<entity::Server
     entity::cubeMobs::applySize(*entity);
     const std::int32_t id = entity->entityId();
     if (byId_.erase(id) != 0) {
+        indexValid_ = false;
         std::erase_if(entities_, [id](const std::unique_ptr<entity::ServerEntity>& existing) {
             return existing->entityId() == id;
         });
@@ -108,6 +138,10 @@ entity::ServerEntity& EntityRegistry::spawnEntity(std::unique_ptr<entity::Server
     entity::ServerEntity& spawned = *entity;
     entities_.push_back(std::move(entity));
     byId_.emplace(id, &spawned);
+    if (indexValid_) {
+        index_[(static_cast<std::int64_t>(chunkOf(spawned.x)) << 32) | static_cast<std::uint32_t>(chunkOf(spawned.z))]
+            .push_back({&spawned, entities_.size() - 1});
+    }
     return spawned;
 }
 
@@ -116,6 +150,7 @@ std::vector<std::int32_t> EntityRegistry::collectRemovedEntities() {
     std::vector<std::int32_t> gone;
     for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
         if (entity->removed) {
+            indexValid_ = false;
             gone.push_back(entity->entityId());
         }
     }

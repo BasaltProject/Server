@@ -388,6 +388,9 @@ public:
 
     void forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ);
 
+    /// Called as an entity turn starts, so per-chunk lookups read where everything stands now.
+    void beginEntityTick() noexcept { entityRegistry_.beginTick(); }
+
     void addPendingEntities(std::vector<wire::nbt::NbtCompound> saved);
 
     [[nodiscard]] std::vector<wire::nbt::NbtCompound> takePendingEntities();

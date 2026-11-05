@@ -43,6 +43,8 @@ public:
     [[nodiscard]] std::vector<Team*> all();
     [[nodiscard]] std::vector<const Team*> all() const;
 
+    [[nodiscard]] bool empty() const noexcept { return teams_.empty(); }
+
     [[nodiscard]] Team* get(std::string_view name);
     [[nodiscard]] const Team* get(std::string_view name) const;
 
