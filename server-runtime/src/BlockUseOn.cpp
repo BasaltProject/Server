@@ -68,6 +68,7 @@
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/Waxing.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <array>
@@ -143,6 +144,32 @@ void BlockInteractionHandler::placeEnderEye(PlayerSession& session, const BlockP
     }
     for (const world::BlockChange& change : changed) {
         broadcastBlockUpdate(BlockPos{change.x, change.y, change.z}, change.stateId);
+    }
+    // parity: `EnderEyeItem.useOn`'s `levelEvent(END_PORTAL_FRAME_FILL)`, the fill sound and smoke within 64 blocks.
+    constexpr std::int32_t kFrameFillEvent = 1503;
+    constexpr std::int32_t kPortalSpawnEvent = 1038;
+    constexpr double kLevelEventRange = 64.0;
+    for (const PlayerSession* watcher : owner_->playersInSameWorld()) {
+        const double dx = watcher->x - (pos.x + 0.5);
+        const double dy = watcher->y - (pos.y + 0.5);
+        const double dz = watcher->z - (pos.z + 0.5);
+        if (watcher->connection().sendLevelEvent &&
+            (dx * dx) + (dy * dy) + (dz * dz) < kLevelEventRange * kLevelEventRange) {
+            watcher->connection().sendLevelEvent(kFrameFillEvent, pos.x, pos.y, pos.z, 0);
+        }
+    }
+    // parity: `globalLevelEvent(SOUND_END_PORTAL_SPAWN)` at the portal's centre once the ring is complete; the
+    // eye's frame comes first and then the nine portal blocks, so the centre is the fifth of those.
+    if (changed.size() == 10 && owner_->options().playerRegistry != nullptr) {
+        const world::BlockChange& centre = changed[5];
+        const wire::protocol::play::LevelEventPacket event{
+            .event = kPortalSpawnEvent, .pos = BlockPos{centre.x, centre.y, centre.z}, .data = 0, .global = true};
+        for (PlayerSession* player : owner_->options().playerRegistry->snapshot()) {
+            if (player->connection().sendPlayPacket) {
+                player->connection().sendPlayPacket(wire::protocol::play::LevelEventPacket::kId,
+                                                    [&event](wire::io::ByteBuffer& buffer) { event.write(buffer); });
+            }
+        }
     }
     if (session.gamemode == Gamemode::Creative) {
         return;
