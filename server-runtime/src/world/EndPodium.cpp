@@ -2,7 +2,6 @@
 #include <basalt/server/runtime/world/EndPodium.hpp>
 
 #include <algorithm>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -69,12 +68,15 @@ constexpr std::array<Torch, 4> kTorches{{
     const std::int32_t air = registry::blocks::air().stateId;
     for (std::int32_t x = -kPodiumRadius; x <= kPodiumRadius; ++x) {
         for (std::int32_t z = -kPodiumRadius; z <= kPodiumRadius; ++z) {
-            const double distance = std::sqrt(static_cast<double>(x * x + z * z));
-            const bool insideRim = distance <= kRimRadius;
-            if (!insideRim && distance > kOuterRadius) {
-                continue;
-            }
             for (std::int32_t y = origin - 1; y <= origin + kCeiling; ++y) {
+                // parity: `Vec3i.closerThan` measures in three dimensions, so above the portal only a dome about
+                // three blocks high is cleared, not a shaft up to the ceiling.
+                const std::int32_t dy = y - origin;
+                const auto distanceSqr = static_cast<double>((x * x) + (dy * dy) + (z * z));
+                const bool insideRim = distanceSqr < kRimRadius * kRimRadius;
+                if (!insideRim && distanceSqr >= kOuterRadius * kOuterRadius) {
+                    continue;
+                }
                 std::int32_t stateId = air;
                 if (y < origin) {
                     stateId = insideRim ? bedrock : endStone();
@@ -110,7 +112,16 @@ bool isActive(const WorldState& world, std::int32_t originY) { return world.bloc
 
 std::int32_t exitPortalY(WorldState& world, server::world::ChunkHeight bounds) { return originY(world, bounds); }
 
-void placeAt(WorldState& world, std::int32_t originY, bool active) { static_cast<void>(place(world, originY, active)); }
+void placeAt(WorldState& world, std::int32_t originY, bool active) {
+    // parity: `EndPodiumFeature` writes through the level, which loads each chunk it touches; a write to a chunk that
+    // is not loaded here is dropped, which left only the part of the podium inside chunk 0, 0.
+    for (std::int32_t chunkX = -1; chunkX <= 0; ++chunkX) {
+        for (std::int32_t chunkZ = -1; chunkZ <= 0; ++chunkZ) {
+            world.getOrGenerateChunk(chunkX, chunkZ);
+        }
+    }
+    static_cast<void>(place(world, originY, active));
+}
 
 bool exists(const WorldState& world, server::world::ChunkHeight bounds) {
     for (std::int32_t y = bounds.minY(); y <= bounds.maxY(); ++y) {
