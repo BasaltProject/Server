@@ -73,6 +73,31 @@
 namespace basalt::server::runtime {
 using namespace sessionPlay;
 
+// Not vanilla: Paper's `prevent-moving-into-unloaded-chunks`. A 26.3 client counts every chunk as present and falls
+// through one it has not been sent, so only the drop is refused until the chunk arrives.
+double ClientSession::heldHeight(const double x, const double y, const double z) {
+    const PlayerSession* session = playerSession_.get();
+    if (session == nullptr || y >= session->y ||
+        chunkStreamer().sentToClient(static_cast<std::int32_t>(std::floor(x)) >> 4,
+                                     static_cast<std::int32_t>(std::floor(z)) >> 4)) {
+        return y;
+    }
+    // `Relative` X, Z, Y_ROT, X_ROT, DELTA_X and DELTA_Z at zero: the height and the fall speed are put back, and the
+    // client keeps walking and looking. No teleport is awaited here, so its confirmation is ignored.
+    constexpr std::int32_t kOnlyHeight = (1 << 0) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 7);
+    std::int32_t teleportId = 0;
+    {
+        const std::lock_guard<std::mutex> guard{teleportMutex_};
+        teleportId = awaitingTeleport_;
+    }
+    sendCompressed(play::PlayerPositionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        const play::PlayerPositionPacket packet{
+            .teleportId = teleportId, .y = session->y, .relativeFlags = kOnlyHeight};
+        packet.write(buffer);
+    });
+    return session->y;
+}
+
 void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body) {
     PlayerSession* session = playerSession_.get();
     if (session != nullptr && !kPassivePackets.contains(packetId)) {
@@ -81,8 +106,9 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
     if (packetId == play::ServerboundPositionPacket::kId) {
         const std::optional<play::ServerboundPositionPacket> move = play::ServerboundPositionPacket::read(body);
         if (move.has_value() && !updateAwaitingTeleport()) {
-            updatePosition(move->x, move->y, move->z, session == nullptr ? 0.0F : session->yaw,
-                           session == nullptr ? 0.0F : session->pitch, move->onGround);
+            updatePosition(move->x, heldHeight(move->x, move->y, move->z), move->z,
+                           session == nullptr ? 0.0F : session->yaw, session == nullptr ? 0.0F : session->pitch,
+                           move->onGround);
         }
         return;
     }
@@ -93,7 +119,8 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
             session->yaw = move->yaw;
             session->pitch = move->pitch;
         } else if (move.has_value()) {
-            updatePosition(move->x, move->y, move->z, move->yaw, move->pitch, move->onGround);
+            updatePosition(move->x, heldHeight(move->x, move->y, move->z), move->z, move->yaw, move->pitch,
+                           move->onGround);
         }
         return;
     }

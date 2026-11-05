@@ -42,6 +42,9 @@ public:
 
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> sentChunks() const;
 
+    /// Whether the client holds this chunk: tracked and no longer waiting to be sent.
+    [[nodiscard]] bool sentToClient(std::int32_t chunkX, std::int32_t chunkZ) const;
+
     /// A plugin's own distance for this player, in place of the server's until it is cleared.
     void overrideViewDistance(std::optional<std::int32_t> distance);
 

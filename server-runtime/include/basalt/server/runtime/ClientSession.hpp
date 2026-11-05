@@ -386,6 +386,10 @@ public:
     /// parity: `updateAwaitingTeleport`.
     [[nodiscard]] bool updateAwaitingTeleport();
 
+    /// Not vanilla: Paper's `prevent-moving-into-unloaded-chunks`; the height to take, the current one while the
+    /// client would drop through a chunk it has not been sent.
+    [[nodiscard]] double heldHeight(double x, double y, double z);
+
     /// parity: `ServerPlayer.tick`'s own pickup pass.
     void tryPickupNearbyItems();
 
