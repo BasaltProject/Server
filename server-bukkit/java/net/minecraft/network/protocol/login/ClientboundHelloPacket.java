@@ -41,7 +41,7 @@ public class ClientboundHelloPacket implements Packet<ClientLoginPacketListener>
         return serverId;
     }
     public PublicKey getPublicKey() throws CryptException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.login.ClientboundHelloPacket#getPublicKey");
+        return Crypt.byteToPublicKey(publicKey);
     }
     public byte[] getChallenge() {
         return challenge;

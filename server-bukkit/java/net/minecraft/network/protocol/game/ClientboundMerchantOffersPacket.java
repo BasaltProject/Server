@@ -14,7 +14,12 @@ public class ClientboundMerchantOffersPacket implements Packet<ClientGamePacketL
     private final boolean canRestock;
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundMerchantOffersPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundMerchantOffersPacket", () -> Packet.codec(ClientboundMerchantOffersPacket::write, ClientboundMerchantOffersPacket::new));
     public ClientboundMerchantOffersPacket(int containerId, MerchantOffers offers, int merchantLevel, int merchantXp, boolean showProgress, boolean canRestock) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundMerchantOffersPacket#<init>");
+        this.containerId = containerId;
+        this.offers = offers.copy();
+        this.villagerLevel = merchantLevel;
+        this.villagerXp = merchantXp;
+        this.showProgress = showProgress;
+        this.canRestock = canRestock;
     }
     private ClientboundMerchantOffersPacket(RegistryFriendlyByteBuf input) {
         this.containerId = input.readContainerId();

@@ -14,7 +14,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 public record ClientboundChunksBiomesPacket(List<ChunkBiomeData> chunkBiomeData) implements Packet<ClientGamePacketListener> {
     public static final StreamCodec<ByteBuf, ClientboundChunksBiomesPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundChunksBiomesPacket.STREAM_CODEC", () -> StreamCodec.composite(ClientboundChunksBiomesPacket.ChunkBiomeData.STREAM_CODEC.apply(ByteBufCodecs.list()), ClientboundChunksBiomesPacket::chunkBiomeData, ClientboundChunksBiomesPacket::new));
     public static ClientboundChunksBiomesPacket forChunks(List<LevelChunk> chunks) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundChunksBiomesPacket#forChunks");
+        return new ClientboundChunksBiomesPacket(chunks.stream().map(ChunkBiomeData::new).toList());
     }
     public PacketType<ClientboundChunksBiomesPacket> type() {
         return GamePacketTypes.CLIENTBOUND_CHUNKS_BIOMES;
@@ -25,13 +25,25 @@ public record ClientboundChunksBiomesPacket(List<ChunkBiomeData> chunkBiomeData)
     public static record ChunkBiomeData(ChunkPos pos, byte[] buffer) {
         public static final StreamCodec<ByteBuf, ChunkBiomeData> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundChunksBiomesPacket.ChunkBiomeData.STREAM_CODEC", () -> StreamCodec.composite(ChunkPos.STREAM_CODEC, ChunkBiomeData::pos, ByteBufCodecs.byteArray(2097152), ChunkBiomeData::buffer, ChunkBiomeData::new));
         public ChunkBiomeData(LevelChunk chunk) {
-            this((ChunkPos) null, (byte[]) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundChunksBiomesPacket.ChunkBiomeData#<init>");
+            this(chunk.getPos(), new byte[biomeBytes(chunk)]);
+            ByteBuf sink = Unpooled.wrappedBuffer(buffer);
+            sink.writerIndex(0);
+            extractChunkData(new FriendlyByteBuf(sink), chunk);
+        }
+        private static int biomeBytes(LevelChunk chunk) {
+            int total = 0;
+            for (LevelChunkSection section : chunk.getSections()) {
+                total += section.getBiomes().getSerializedSize();
+            }
+            return total;
         }
         public FriendlyByteBuf getReadBuffer() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundChunksBiomesPacket.ChunkBiomeData#getReadBuffer");
+            return new FriendlyByteBuf(Unpooled.wrappedBuffer(buffer));
         }
         public static void extractChunkData(FriendlyByteBuf buffer, LevelChunk chunk) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundChunksBiomesPacket.ChunkBiomeData#extractChunkData");
+            for (LevelChunkSection section : chunk.getSections()) {
+                section.getBiomes().write(buffer);
+            }
         }
     }
 }

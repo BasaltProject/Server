@@ -27,16 +27,28 @@ public class ClientboundAddEntityPacket implements Packet<ClientGamePacketListen
     private final int data;
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundAddEntityPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundAddEntityPacket", () -> Packet.codec(ClientboundAddEntityPacket::write, ClientboundAddEntityPacket::new));
     public ClientboundAddEntityPacket(Entity entity, ServerEntity serverEntity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundAddEntityPacket#<init>");
+        this(entity, serverEntity, 0);
     }
     public ClientboundAddEntityPacket(Entity entity, ServerEntity serverEntity, int data) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundAddEntityPacket#<init>");
+        this(entity.getId(), entity.getUUID(), entity.getX(), entity.getY(), entity.getZ(), entity.getXRot(), entity.getYRot(),
+            entity.getType(), data, entity.getDeltaMovement(), entity.getYHeadRot());
     }
     public ClientboundAddEntityPacket(Entity entity, int data, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundAddEntityPacket#<init>");
+        this(entity.getId(), entity.getUUID(), pos.getX(), pos.getY(), pos.getZ(), entity.getXRot(), entity.getYRot(),
+            entity.getType(), data, entity.getDeltaMovement(), entity.getYHeadRot());
     }
     public ClientboundAddEntityPacket(int id, UUID uuid, double x, double y, double z, float xRot, float yRot, EntityType<?> type, int data, Vec3 movement, double yHeadRot) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundAddEntityPacket#<init>");
+        this.id = id;
+        this.uuid = uuid;
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.movement = movement;
+        this.xRot = Mth.packDegrees(xRot);
+        this.yRot = Mth.packDegrees(yRot);
+        this.yHeadRot = Mth.packDegrees((float) yHeadRot);
+        this.type = type;
+        this.data = data;
     }
     private ClientboundAddEntityPacket(RegistryFriendlyByteBuf input) {
         this.id = input.readVarInt();
@@ -92,13 +104,13 @@ public class ClientboundAddEntityPacket implements Packet<ClientGamePacketListen
         return movement;
     }
     public float getXRot() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundAddEntityPacket#getXRot");
+        return Mth.unpackDegrees(xRot);
     }
     public float getYRot() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundAddEntityPacket#getYRot");
+        return Mth.unpackDegrees(yRot);
     }
     public float getYHeadRot() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundAddEntityPacket#getYHeadRot");
+        return Mth.unpackDegrees(yHeadRot);
     }
     public int getData() {
         return data;

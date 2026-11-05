@@ -9,7 +9,7 @@ public class ClientboundSetBorderWarningDistancePacket implements Packet<ClientG
     private final int warningBlocks;
     public static final StreamCodec<FriendlyByteBuf, ClientboundSetBorderWarningDistancePacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSetBorderWarningDistancePacket", () -> Packet.codec(ClientboundSetBorderWarningDistancePacket::write, ClientboundSetBorderWarningDistancePacket::new));
     public ClientboundSetBorderWarningDistancePacket(WorldBorder border) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSetBorderWarningDistancePacket#<init>");
+        this.warningBlocks = border.getWarningBlocks();
     }
     private ClientboundSetBorderWarningDistancePacket(FriendlyByteBuf input) {
         this.warningBlocks = input.readVarInt();

@@ -19,6 +19,6 @@ public record ClientboundMoveMinecartPacket(int entityId, List<NewMinecartBehavi
         listener.handleMinecartAlongTrack(this);
     }
     public Entity getEntity(Level level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundMoveMinecartPacket#getEntity");
+        return level.getEntity(entityId);
     }
 }

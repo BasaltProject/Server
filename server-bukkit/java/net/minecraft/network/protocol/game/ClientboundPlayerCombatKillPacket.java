@@ -16,6 +16,6 @@ public record ClientboundPlayerCombatKillPacket(int playerId, Component message)
         listener.handlePlayerCombatKill(this);
     }
     public boolean isSkippable() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundPlayerCombatKillPacket#isSkippable");
+        return true;
     }
 }

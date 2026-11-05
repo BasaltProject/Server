@@ -17,6 +17,6 @@ public class ClientboundStartConfigurationPacket implements Packet<ClientGamePac
         listener.handleConfigurationStart(this);
     }
     public boolean isTerminal() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundStartConfigurationPacket#isTerminal");
+        return true;
     }
 }

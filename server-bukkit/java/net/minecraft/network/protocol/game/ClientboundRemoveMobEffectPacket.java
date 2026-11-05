@@ -19,6 +19,6 @@ public record ClientboundRemoveMobEffectPacket(int entityId, Holder<MobEffect> e
         listener.handleRemoveMobEffect(this);
     }
     public Entity getEntity(Level level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundRemoveMobEffectPacket#getEntity");
+        return level.getEntity(entityId);
     }
 }

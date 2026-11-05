@@ -17,6 +17,6 @@ public class ServerboundConfigurationAcknowledgedPacket implements Packet<Server
         listener.handleConfigurationAcknowledged(this);
     }
     public boolean isTerminal() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundConfigurationAcknowledgedPacket#isTerminal");
+        return true;
     }
 }

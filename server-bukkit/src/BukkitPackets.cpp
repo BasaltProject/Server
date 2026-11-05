@@ -1,6 +1,8 @@
 #include "BridgeInternal.hpp"
 
 #include <basalt/server/plugins/PluginPackets.hpp>
+#include <basalt/wire/io/ByteBuffer.hpp>
+#include <basalt/wire/protocol/play/LowPrecisionVec3.hpp>
 
 #include <array>
 #include <map>
@@ -235,6 +237,33 @@ jlong JNICALL nativeConnectionOf(JNIEnv* env, jclass, jstring uuid) {
     }
     return static_cast<jlong>(endpoint->connectionId());
 }
+
+jbyteArray JNICALL nativeLpVec3Encode(JNIEnv* env, jclass, jdouble x, jdouble y, jdouble z) {
+    wire::io::ByteBuffer buffer{16};
+    wire::protocol::play::lowPrecisionVec3::write(buffer, x, y, z);
+    const auto bytes = buffer.readable();
+    const jbyteArray result = env->NewByteArray(static_cast<jsize>(bytes.size()));
+    env->SetByteArrayRegion(result, 0, static_cast<jsize>(bytes.size()), reinterpret_cast<const jbyte*>(bytes.data()));
+    return result;
+}
+
+// Returns {x, y, z, bytesConsumed}, or null when the bytes do not hold a whole value.
+jdoubleArray JNICALL nativeLpVec3Decode(JNIEnv* env, jclass, jbyteArray data, jint offset) {
+    auto bytes = bytesOf(env, data);
+    if (offset < 0 || static_cast<std::size_t>(offset) > bytes.size()) {
+        return nullptr;
+    }
+    bytes.erase(bytes.begin(), bytes.begin() + offset);
+    auto buffer = wire::io::ByteBuffer::wrap(std::move(bytes));
+    const auto value = wire::protocol::play::lowPrecisionVec3::read(buffer);
+    if (buffer.failed()) {
+        return nullptr;
+    }
+    const std::array<jdouble, 4> out{value[0], value[1], value[2], static_cast<jdouble>(buffer.readerIndex())};
+    const jdoubleArray result = env->NewDoubleArray(4);
+    env->SetDoubleArrayRegion(result, 0, 4, out.data());
+    return result;
+}
 } // namespace
 
 void registerPacketNatives(JNIEnv* env, jclass natives) {
@@ -249,6 +278,10 @@ void registerPacketNatives(JNIEnv* env, jclass natives) {
                         reinterpret_cast<void*>(&nativePlayerReceive)},
         JNINativeMethod{const_cast<char*>("packetClose"), const_cast<char*>("(J)V"),
                         reinterpret_cast<void*>(&nativeClose)},
+        JNINativeMethod{const_cast<char*>("lpVec3Encode"), const_cast<char*>("(DDD)[B"),
+                        reinterpret_cast<void*>(&nativeLpVec3Encode)},
+        JNINativeMethod{const_cast<char*>("lpVec3Decode"), const_cast<char*>("([BI)[D"),
+                        reinterpret_cast<void*>(&nativeLpVec3Decode)},
         JNINativeMethod{const_cast<char*>("packetConnectionOf"), const_cast<char*>("(Ljava/lang/String;)J"),
                         reinterpret_cast<void*>(&nativeConnectionOf)},
     };

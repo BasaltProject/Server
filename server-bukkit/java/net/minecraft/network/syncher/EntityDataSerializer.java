@@ -17,7 +17,19 @@ public interface EntityDataSerializer<T> {
         return value;
     }
     static <T> EntityDataSerializer<T> forValueType(StreamCodec<? super RegistryFriendlyByteBuf, T> codec) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.syncher.EntityDataSerializer#forValueType");
+        return new EntityDataSerializer<T>() {
+            public int id() {
+                return -1;
+            }
+
+            public void write(io.netty.buffer.ByteBuf out, T value) {
+                codec.encode((RegistryFriendlyByteBuf) out, value);
+            }
+
+            public T read(io.netty.buffer.ByteBuf in) {
+                return codec.decode((RegistryFriendlyByteBuf) in);
+            }
+        };
     }
     public interface ForValueType<T> extends EntityDataSerializer<T> {
         default T copy(T value) {

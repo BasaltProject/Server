@@ -17,6 +17,6 @@ public class ServerboundFinishConfigurationPacket implements Packet<ServerConfig
         listener.handleConfigurationFinished(this);
     }
     public boolean isTerminal() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.configuration.ServerboundFinishConfigurationPacket#isTerminal");
+        return true;
     }
 }

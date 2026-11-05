@@ -25,7 +25,7 @@ public record ClientboundUpdateAdvancementsPacket(boolean shouldReset, List<Posi
     public static record PositionedAdvancement(AdvancementHolder advancement, float x, float y) {
         public static final StreamCodec<RegistryFriendlyByteBuf, PositionedAdvancement> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundUpdateAdvancementsPacket.PositionedAdvancement.STREAM_CODEC", () -> StreamCodec.composite(AdvancementHolder.STREAM_CODEC, PositionedAdvancement::advancement, ByteBufCodecs.FLOAT, PositionedAdvancement::x, ByteBufCodecs.FLOAT, PositionedAdvancement::y, PositionedAdvancement::new));
         public static PositionedAdvancement fromNode(AdvancementNode node) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateAdvancementsPacket.PositionedAdvancement#fromNode");
+            return new PositionedAdvancement(node.holder(), node.x(), node.y());
         }
     }
 }

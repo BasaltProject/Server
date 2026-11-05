@@ -9,10 +9,10 @@ import net.minecraft.world.entity.PositionPath;
 public record ClientboundEntityPositionSyncPacket(int id, PositionPath position, float yRot, float xRot, boolean onGround) implements MovementPacket<ClientGamePacketListener> {
     public static final StreamCodec<FriendlyByteBuf, ClientboundEntityPositionSyncPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundEntityPositionSyncPacket.STREAM_CODEC", () -> StreamCodec.composite(ByteBufCodecs.VAR_INT, ClientboundEntityPositionSyncPacket::id, PositionPath.STREAM_CODEC, ClientboundEntityPositionSyncPacket::position, ByteBufCodecs.FLOAT, ClientboundEntityPositionSyncPacket::yRot, ByteBufCodecs.FLOAT, ClientboundEntityPositionSyncPacket::xRot, ByteBufCodecs.BOOL, ClientboundEntityPositionSyncPacket::onGround, ClientboundEntityPositionSyncPacket::new));
     public static ClientboundEntityPositionSyncPacket of(Entity entity, PositionPath position) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundEntityPositionSyncPacket#of");
+        return new ClientboundEntityPositionSyncPacket(entity.getId(), position, entity.getYRot(), entity.getXRot(), entity.onGround());
     }
     public static ClientboundEntityPositionSyncPacket of(Entity entity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundEntityPositionSyncPacket#of");
+        return of(entity, PositionPath.of(entity.trackingPosition()));
     }
     public PacketType<ClientboundEntityPositionSyncPacket> type() {
         return GamePacketTypes.CLIENTBOUND_ENTITY_POSITION_SYNC;
@@ -21,9 +21,9 @@ public record ClientboundEntityPositionSyncPacket(int id, PositionPath position,
         listener.handleEntityPositionSync(this);
     }
     public boolean hasPosition() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundEntityPositionSyncPacket#hasPosition");
+        return true;
     }
     public boolean hasRotation() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundEntityPositionSyncPacket#hasRotation");
+        return true;
     }
 }

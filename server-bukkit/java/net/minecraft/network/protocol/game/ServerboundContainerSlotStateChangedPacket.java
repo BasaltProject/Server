@@ -11,7 +11,7 @@ public record ServerboundContainerSlotStateChangedPacket(int slotId, int contain
             output.writeBoolean(packet.newState());
         }, input -> new ServerboundContainerSlotStateChangedPacket(input.readVarInt(), input.readContainerId(), input.readBoolean())));
     private ServerboundContainerSlotStateChangedPacket(FriendlyByteBuf input) {
-        this((int) 0, (int) 0, false); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundContainerSlotStateChangedPacket#<init>");
+        this(input.readVarInt(), input.readContainerId(), input.readBoolean());
     }
     public PacketType<ServerboundContainerSlotStateChangedPacket> type() {
         return GamePacketTypes.SERVERBOUND_CONTAINER_SLOT_STATE_CHANGED;

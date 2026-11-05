@@ -17,6 +17,6 @@ public class RegistryFriendlyByteBuf extends FriendlyByteBuf {
         return access;
     }
     public static Function<ByteBuf, RegistryFriendlyByteBuf> decorator(RegistryAccess registryAccess) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.RegistryFriendlyByteBuf#decorator");
+        return buf -> new RegistryFriendlyByteBuf(buf, registryAccess);
     }
 }

@@ -36,7 +36,8 @@ public class ServerboundSetCommandMinecartPacket implements Packet<ServerGamePac
         listener.handleSetCommandMinecart(this);
     }
     public BaseCommandBlock getCommandBlock(Level level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundSetCommandMinecartPacket#getCommandBlock");
+        Entity found = level.getEntity(entity);
+        return found instanceof MinecartCommandBlock cart ? cart.getCommandBlock() : null;
     }
     public String getCommand() {
         return command;

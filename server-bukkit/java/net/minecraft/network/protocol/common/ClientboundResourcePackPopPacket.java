@@ -12,7 +12,7 @@ public record ClientboundResourcePackPopPacket(Optional<UUID> id) implements Pac
             output.writeOptional(packet.id(), UUIDUtil.STREAM_CODEC);
         }, input -> new ClientboundResourcePackPopPacket(input.readOptional(UUIDUtil.STREAM_CODEC))));
     private ClientboundResourcePackPopPacket(FriendlyByteBuf input) {
-        this((Optional) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.common.ClientboundResourcePackPopPacket#<init>");
+        this(input.readOptional(UUIDUtil.STREAM_CODEC));
     }
     public PacketType<ClientboundResourcePackPopPacket> type() {
         return CommonPacketTypes.CLIENTBOUND_RESOURCE_PACK_POP;

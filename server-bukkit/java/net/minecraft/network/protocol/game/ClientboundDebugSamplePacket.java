@@ -11,7 +11,7 @@ public record ClientboundDebugSamplePacket(long[] sample, RemoteDebugSampleType 
             output.writeEnum(packet.debugSampleType());
         }, input -> new ClientboundDebugSamplePacket(input.readLongArray(), input.readEnum(RemoteDebugSampleType.class))));
     private ClientboundDebugSamplePacket(FriendlyByteBuf input) {
-        this((long[]) null, (RemoteDebugSampleType) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundDebugSamplePacket#<init>");
+        this(input.readLongArray(), input.readEnum(RemoteDebugSampleType.class));
     }
     public PacketType<ClientboundDebugSamplePacket> type() {
         return GamePacketTypes.CLIENTBOUND_DEBUG_SAMPLE;

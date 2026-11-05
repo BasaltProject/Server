@@ -6,8 +6,8 @@ import net.minecraft.ReportedException;
 import net.minecraft.network.protocol.Packet;
 import org.slf4j.Logger;
 public interface ServerPacketListener extends ServerboundPacketListener {
-    Logger LOGGER = null;
+    Logger LOGGER = org.slf4j.LoggerFactory.getLogger(ServerPacketListener.class);
     default void onPacketError(Packet packet, Exception e) throws ReportedException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerPacketListener#onPacketError");
+        LOGGER.error("Failed to handle packet {}, suppressing error", packet, e);
     }
 }

@@ -43,6 +43,9 @@ public record ClientboundDamageEventPacket(int entityId, Holder<DamageType> sour
         listener.handleDamageEvent(this);
     }
     public DamageSource getSource(Level level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundDamageEventPacket#getSource");
+        Entity direct = level.getEntity(sourceDirectId);
+        Entity cause = level.getEntity(sourceCauseId);
+        return sourcePosition.isPresent() ? new DamageSource(sourceType, sourcePosition.get())
+            : new DamageSource(sourceType, direct, cause);
     }
 }

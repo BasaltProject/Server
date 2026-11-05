@@ -27,6 +27,6 @@ public class ServerboundTeleportToEntityPacket implements Packet<ServerGamePacke
         listener.handleTeleportToEntityPacket(this);
     }
     public Entity getEntity(ServerLevel level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundTeleportToEntityPacket#getEntity");
+        return level.getEntity(uuid);
     }
 }

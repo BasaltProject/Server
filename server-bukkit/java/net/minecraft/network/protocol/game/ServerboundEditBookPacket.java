@@ -10,7 +10,10 @@ import net.minecraft.network.protocol.PacketType;
 public record ServerboundEditBookPacket(int slot, List<String> pages, Optional<String> title) implements Packet<ServerGamePacketListener> {
     public static final StreamCodec<FriendlyByteBuf, ServerboundEditBookPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ServerboundEditBookPacket.STREAM_CODEC", () -> StreamCodec.composite(ByteBufCodecs.VAR_INT, ServerboundEditBookPacket::slot, ByteBufCodecs.stringUtf8(1024).apply(ByteBufCodecs.list(100)), ServerboundEditBookPacket::pages, ByteBufCodecs.stringUtf8(32).apply(ByteBufCodecs::optional), ServerboundEditBookPacket::title, ServerboundEditBookPacket::new));
     public ServerboundEditBookPacket(int slot, List<String> pages, Optional<String> title) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundEditBookPacket#<init>");
+        pages = java.util.List.copyOf(pages);
+        this.slot = slot;
+        this.pages = pages;
+        this.title = title;
     }
     public PacketType<ServerboundEditBookPacket> type() {
         return GamePacketTypes.SERVERBOUND_EDIT_BOOK;

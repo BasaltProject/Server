@@ -10,7 +10,7 @@ public record ClientboundTransferPacket(String host, int port) implements Packet
             output.writeVarInt(packet.port());
         }, input -> new ClientboundTransferPacket(input.readUtf(), input.readVarInt())));
     private ClientboundTransferPacket(FriendlyByteBuf input) {
-        this((String) null, (int) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.common.ClientboundTransferPacket#<init>");
+        this(input.readUtf(), input.readVarInt());
     }
     public PacketType<ClientboundTransferPacket> type() {
         return CommonPacketTypes.CLIENTBOUND_TRANSFER;

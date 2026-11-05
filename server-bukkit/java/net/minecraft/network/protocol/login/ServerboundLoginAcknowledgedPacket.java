@@ -17,6 +17,6 @@ public class ServerboundLoginAcknowledgedPacket implements Packet<ServerLoginPac
         listener.handleLoginAcknowledgement(this);
     }
     public boolean isTerminal() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.login.ServerboundLoginAcknowledgedPacket#isTerminal");
+        return true;
     }
 }

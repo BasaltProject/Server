@@ -9,7 +9,7 @@ public record ClientboundBlockChangedAckPacket(int sequence) implements Packet<C
             output.writeVarInt(packet.sequence());
         }, input -> new ClientboundBlockChangedAckPacket(input.readVarInt())));
     private ClientboundBlockChangedAckPacket(FriendlyByteBuf input) {
-        this((int) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundBlockChangedAckPacket#<init>");
+        this(input.readVarInt());
     }
     public PacketType<ClientboundBlockChangedAckPacket> type() {
         return GamePacketTypes.CLIENTBOUND_BLOCK_CHANGED_ACK;

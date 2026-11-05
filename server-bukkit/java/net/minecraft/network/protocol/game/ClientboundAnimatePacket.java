@@ -13,7 +13,8 @@ public class ClientboundAnimatePacket implements Packet<ClientGamePacketListener
     public static final int CRITICAL_HIT = 1;
     public static final int MAGIC_CRITICAL_HIT = 2;
     public ClientboundAnimatePacket(Entity entity, int action) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundAnimatePacket#<init>");
+        this.id = entity.getId();
+        this.action = action;
     }
     private ClientboundAnimatePacket(FriendlyByteBuf input) {
         this.id = input.readVarInt();

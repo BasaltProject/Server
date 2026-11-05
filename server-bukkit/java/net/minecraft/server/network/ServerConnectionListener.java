@@ -51,7 +51,7 @@ public class ServerConnectionListener {
         public LatencySimulator(int delay, int jitter) {
         }
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.network.ServerConnectionListener.LatencySimulator#channelRead");
+            ctx.fireChannelRead(msg);
         }
         static record DelayedMessage(ChannelHandlerContext ctx, Object msg) {
         }

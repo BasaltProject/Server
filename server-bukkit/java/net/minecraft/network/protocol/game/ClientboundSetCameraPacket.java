@@ -11,7 +11,7 @@ public class ClientboundSetCameraPacket implements Packet<ClientGamePacketListen
     private final int cameraId;
     public static final StreamCodec<FriendlyByteBuf, ClientboundSetCameraPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSetCameraPacket", () -> Packet.codec(ClientboundSetCameraPacket::write, ClientboundSetCameraPacket::new));
     public ClientboundSetCameraPacket(Entity camera) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSetCameraPacket#<init>");
+        this.cameraId = camera.getId();
     }
     private ClientboundSetCameraPacket(FriendlyByteBuf input) {
         this.cameraId = input.readVarInt();
@@ -26,6 +26,6 @@ public class ClientboundSetCameraPacket implements Packet<ClientGamePacketListen
         listener.handleSetCamera(this);
     }
     public Entity getEntity(Level level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSetCameraPacket#getEntity");
+        return level.getEntity(cameraId);
     }
 }

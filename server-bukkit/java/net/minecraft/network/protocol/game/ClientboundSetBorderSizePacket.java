@@ -9,7 +9,7 @@ public class ClientboundSetBorderSizePacket implements Packet<ClientGamePacketLi
     private final double size;
     public static final StreamCodec<FriendlyByteBuf, ClientboundSetBorderSizePacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSetBorderSizePacket", () -> Packet.codec(ClientboundSetBorderSizePacket::write, ClientboundSetBorderSizePacket::new));
     public ClientboundSetBorderSizePacket(WorldBorder border) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSetBorderSizePacket#<init>");
+        this.size = border.getSize();
     }
     private ClientboundSetBorderSizePacket(FriendlyByteBuf input) {
         this.size = input.readDouble();

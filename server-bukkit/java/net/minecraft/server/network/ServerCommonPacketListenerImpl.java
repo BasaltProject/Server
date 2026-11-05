@@ -17,6 +17,7 @@ import net.minecraft.network.protocol.common.ServerboundPongPacket;
 import net.minecraft.network.protocol.common.ServerboundResourcePackPacket;
 import net.minecraft.network.protocol.cookie.ServerboundCookieResponsePacket;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.network.protocol.common.ServerboundClientInformationPacket;
 import net.minecraft.server.level.ClientInformation;
 
 public class ServerCommonPacketListenerImpl implements ServerCommonPacketListener {
@@ -39,6 +40,9 @@ public class ServerCommonPacketListenerImpl implements ServerCommonPacketListene
     public void onPacketError(Packet packet, Exception e) throws ReportedException {
         throw new IllegalStateException("Packet error", e);
     }
+    public void handleClientInformation(ServerboundClientInformationPacket packet) {
+        forward(packet);
+    }
     public void handleKeepAlive(ServerboundKeepAlivePacket packet) {
     }
     public void handlePong(ServerboundPongPacket serverboundPongPacket) {
@@ -56,7 +60,7 @@ public class ServerCommonPacketListenerImpl implements ServerCommonPacketListene
         forward(packet);
     }
     protected void forward(Packet<?> packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.network.ServerCommonPacketListenerImpl#forward");
+        org.basaltmc.bukkit.net.ChannelBridge.receiveFrom(connection.getChannel(), packet);
     }
     protected void keepConnectionAlive() {
     }
@@ -77,7 +81,7 @@ public class ServerCommonPacketListenerImpl implements ServerCommonPacketListene
         return false;
     }
     protected GameProfile playerProfile() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.network.ServerCommonPacketListenerImpl#playerProfile");
+        return null;
     }
     public GameProfile getOwner() {
         return playerProfile();

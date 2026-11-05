@@ -11,7 +11,11 @@ public class ClientboundSetPassengersPacket implements Packet<ClientGamePacketLi
     private final int[] passengers;
     public static final StreamCodec<FriendlyByteBuf, ClientboundSetPassengersPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSetPassengersPacket", () -> Packet.codec(ClientboundSetPassengersPacket::write, ClientboundSetPassengersPacket::new));
     public ClientboundSetPassengersPacket(Entity vehicle) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSetPassengersPacket#<init>");
+        this.vehicle = vehicle.getId();
+        this.passengers = new int[vehicle.getPassengers().size()];
+        for (int i = 0; i < passengers.length; i++) {
+            passengers[i] = vehicle.getPassengers().get(i).getId();
+        }
     }
     private ClientboundSetPassengersPacket(FriendlyByteBuf input) {
         this.vehicle = input.readVarInt();

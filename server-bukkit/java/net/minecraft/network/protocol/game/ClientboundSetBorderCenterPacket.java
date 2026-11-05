@@ -10,7 +10,8 @@ public class ClientboundSetBorderCenterPacket implements Packet<ClientGamePacket
     private final double newCenterZ;
     public static final StreamCodec<FriendlyByteBuf, ClientboundSetBorderCenterPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSetBorderCenterPacket", () -> Packet.codec(ClientboundSetBorderCenterPacket::write, ClientboundSetBorderCenterPacket::new));
     public ClientboundSetBorderCenterPacket(WorldBorder border) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSetBorderCenterPacket#<init>");
+        this.newCenterX = border.getCenterX();
+        this.newCenterZ = border.getCenterZ();
     }
     private ClientboundSetBorderCenterPacket(FriendlyByteBuf input) {
         this.newCenterX = input.readDouble();

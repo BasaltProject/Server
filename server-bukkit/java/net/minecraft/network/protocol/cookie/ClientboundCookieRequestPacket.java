@@ -10,7 +10,7 @@ public record ClientboundCookieRequestPacket(Identifier key) implements Packet<C
             output.writeIdentifier(packet.key());
         }, input -> new ClientboundCookieRequestPacket(input.readIdentifier())));
     private ClientboundCookieRequestPacket(FriendlyByteBuf input) {
-        this((Identifier) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.cookie.ClientboundCookieRequestPacket#<init>");
+        this(input.readIdentifier());
     }
     public PacketType<ClientboundCookieRequestPacket> type() {
         return CookiePacketTypes.CLIENTBOUND_COOKIE_REQUEST;

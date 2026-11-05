@@ -15,7 +15,8 @@ public class ServerboundKeyPacket implements Packet<ServerLoginPacketListener> {
     private final byte[] encryptedChallenge;
     public static final StreamCodec<FriendlyByteBuf, ServerboundKeyPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ServerboundKeyPacket", () -> Packet.codec(ServerboundKeyPacket::write, ServerboundKeyPacket::new));
     public ServerboundKeyPacket(SecretKey secretKey, PublicKey publicKey, byte[] challenge) throws CryptException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.login.ServerboundKeyPacket#<init>");
+        this.keybytes = Crypt.encryptUsingKey(publicKey, secretKey.getEncoded());
+        this.encryptedChallenge = Crypt.encryptUsingKey(publicKey, challenge);
     }
     private ServerboundKeyPacket(FriendlyByteBuf input) {
         this.keybytes = input.readByteArray();
@@ -32,9 +33,13 @@ public class ServerboundKeyPacket implements Packet<ServerLoginPacketListener> {
         listener.handleKey(this);
     }
     public SecretKey getSecretKey(PrivateKey privateKey) throws CryptException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.login.ServerboundKeyPacket#getSecretKey");
+        return Crypt.decryptByteToSecretKey(privateKey, keybytes);
     }
     public boolean isChallengeValid(byte[] challenge, PrivateKey privateKey) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.login.ServerboundKeyPacket#isChallengeValid");
+        try {
+            return java.util.Arrays.equals(challenge, Crypt.decryptUsingKey(privateKey, encryptedChallenge));
+        } catch (CryptException e) {
+            return false;
+        }
     }
 }

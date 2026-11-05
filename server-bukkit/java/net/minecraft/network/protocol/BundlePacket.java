@@ -15,7 +15,5 @@ public abstract class BundlePacket<T extends PacketListener> implements Packet<T
     public Iterable<Packet<? super T>> subPackets() {
         return packets;
     }
-    public PacketType<? extends BundlePacket<T>> type() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.BundlePacket#type");
-    }
+    public abstract PacketType<? extends BundlePacket<T>> type();
 }

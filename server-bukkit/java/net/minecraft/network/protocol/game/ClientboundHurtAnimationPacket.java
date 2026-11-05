@@ -11,10 +11,10 @@ public record ClientboundHurtAnimationPacket(int id, float yaw) implements Packe
             output.writeFloat(packet.yaw());
         }, input -> new ClientboundHurtAnimationPacket(input.readVarInt(), input.readFloat())));
     public ClientboundHurtAnimationPacket(LivingEntity entity) {
-        this((int) 0, (float) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket#<init>");
+        this(entity.getId(), entity.getHurtDir());
     }
     private ClientboundHurtAnimationPacket(FriendlyByteBuf input) {
-        this((int) 0, (float) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket#<init>");
+        this(input.readVarInt(), input.readFloat());
     }
     public PacketType<ClientboundHurtAnimationPacket> type() {
         return GamePacketTypes.CLIENTBOUND_HURT_ANIMATION;
