@@ -195,7 +195,10 @@ public:
     [[nodiscard]] std::size_t countMissing(const std::vector<std::pair<std::int32_t, std::int32_t>>& positions) const;
 
     /// Skips chunks that became dirty again since the caller saved them: evicting one throws away the player's edits.
-    std::size_t evictClean(const std::vector<server::world::Chunk*>& chunks);
+    /// With a `sink`, the evicted chunks are handed over instead of destroyed here, so the caller frees them off the
+    /// tick thread.
+    std::size_t evictClean(const std::vector<server::world::Chunk*>& chunks,
+                           std::vector<std::unique_ptr<server::world::Chunk>>* sink = nullptr);
 
     [[nodiscard]] std::vector<std::int64_t> loadedChunkKeys() const;
 

@@ -20,6 +20,7 @@
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/MapSystem.hpp>
+#include <basalt/server/runtime/MemoryReleaser.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
@@ -279,6 +280,7 @@ private:
     std::unique_ptr<world::SpawnEquipmentFinalizer> spawnEquipment_;
     wire::common::Timings timings_;
     wire::common::NativeSampler nativeSampler_{timings_};
+    MemoryReleaser memoryReleaser_;
     std::chrono::steady_clock::time_point serverClock_ = std::chrono::steady_clock::now();
 
     std::unique_ptr<storage::PlayerStore> playerStore_;

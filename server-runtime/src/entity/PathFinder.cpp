@@ -9,7 +9,9 @@
 #include <cstdint>
 #include <limits>
 #include <map>
+#include <set>
 #include <string_view>
+#include <unordered_map>
 
 namespace basalt::server::runtime::entity::pathFinder {
 namespace {
@@ -231,6 +233,8 @@ std::optional<Route> findRoute(world::WorldState& world, std::int32_t fromX, std
         float f = 0.0F;
         float walked = 0.0F;
         bool closed = false;
+        bool open = false;
+        std::uint32_t order = 0;
     };
 
     struct Best {
@@ -246,7 +250,7 @@ std::optional<Route> findRoute(world::WorldState& world, std::int32_t fromX, std
         return std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
     };
     const auto unpack = [](std::int64_t key) { return Position{unpackX(key), unpackY(key), unpackZ(key)}; };
-    std::map<std::int64_t, Node> nodes;
+    std::unordered_map<std::int64_t, Node> nodes;
     std::vector<Best> best(targets.size());
     // parity: `getBestH`, which also remembers the node nearest each target.
     const auto bestH = [&](std::int64_t key) {
@@ -264,20 +268,36 @@ std::optional<Route> findRoute(world::WorldState& world, std::int32_t fromX, std
     };
     const Position from{fromX, fromY, fromZ};
     const std::int64_t start = pack(fromX, fromY, fromZ);
-    nodes[start].f = bestH(start);
-    std::vector<std::int64_t> open{start};
+
+    // The open set picks the lowest `f` and, among equals, whichever was queued first: a sorted set of (f, order).
+    struct OpenKey {
+        float f;
+        std::uint32_t order;
+        std::int64_t key;
+
+        bool operator<(const OpenKey& other) const { return f != other.f ? f < other.f : order < other.order; }
+    };
+
+    std::set<OpenKey> open;
+    std::uint32_t queued = 0;
+    {
+        Node& first = nodes[start];
+        first.f = bestH(start);
+        first.open = true;
+        first.order = queued++;
+        open.insert({first.f, first.order, start});
+    }
     std::int32_t count = 0;
     bool anyReached = false;
     while (!open.empty()) {
         if (++count >= options.maxVisited) {
             break;
         }
-        const auto cheapest = std::ranges::min_element(
-            open, [&nodes](std::int64_t one, std::int64_t other) { return nodes[one].f < nodes[other].f; });
-        const std::int64_t current = *cheapest;
-        open.erase(cheapest);
+        const std::int64_t current = open.begin()->key;
+        open.erase(open.begin());
         Node& node = nodes[current];
         node.closed = true;
+        node.open = false;
         const Position at = unpack(current);
         for (std::size_t index = 0; index < targets.size(); ++index) {
             const Position& target = targets[index];
@@ -307,19 +327,23 @@ std::optional<Route> findRoute(world::WorldState& world, std::int32_t fromX, std
                                          : malus(world, neighbour[0], neighbour[1], neighbour[2]);
             const float tentative = g + distance + static_cast<float>(stepMalus);
             const auto known = nodes.find(next);
-            const bool inOpen = std::ranges::find(open, next) != open.end();
+            const bool inOpen = known != nodes.end() && known->second.open;
             if (nextWalked >= options.maxPathLength ||
                 (known != nodes.end() && (known->second.closed || (inOpen && tentative >= known->second.g)))) {
                 continue;
             }
             Node& entry = nodes[next];
+            if (inOpen) {
+                open.erase({entry.f, entry.order, next});
+            } else {
+                entry.order = queued++;
+                entry.open = true;
+            }
             entry.cameFrom = current;
             entry.g = tentative;
             entry.walked = nextWalked;
             entry.f = tentative + (bestH(next) * static_cast<float>(kHeuristicWeight));
-            if (!inOpen) {
-                open.push_back(next);
-            }
+            open.insert({entry.f, entry.order, next});
         }
     }
     const auto build = [&](std::size_t index) {

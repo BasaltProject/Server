@@ -34,6 +34,9 @@ struct HoglinState {
     std::int32_t lookTicker = 0;
     std::int32_t idleTicks = 0;
     std::int32_t attackAnimation = 0;
+    /// parity: `HoglinSpecificSensor` scans every twenty ticks and the memory lasts until the next scan.
+    std::optional<ai::brainKit::Block> repellent;
+    std::int64_t repellentScanAt = 0;
 };
 
 [[nodiscard]] HoglinState& stateOf(ServerEntity& hoglin);

@@ -22,6 +22,9 @@ using hoglins::HoglinState;
 
 [[nodiscard]] bool isBaby(const ServerEntity& mob) { return mob.age < 0; }
 
+/// parity: `Sensor`'s default scan rate.
+constexpr std::int64_t kSensorScanRate = 20;
+
 struct HoglinSense {
     std::optional<kit::Block> repellent;
     std::optional<std::int32_t> adultPiglin;
@@ -88,10 +91,15 @@ void MobActionSystem::tickHoglin(world::LoadedWorld& world, entity::ai::MobConte
     const std::int64_t now = context.gameTime;
     // parity: `HoglinSpecificSensor`.
     HoglinSense sense;
-    sense.repellent = kit::nearestBlock(context, 8, 4, [this](std::int32_t stateId) {
-        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-        return block != nullptr && blockTagged("minecraft:hoglin_repellents", *block).value_or(false);
-    });
+    if (now >= state.repellentScanAt) {
+        state.repellentScanAt = now + kSensorScanRate;
+        const std::set<wire::common::Identifier>* repellents = blockTagMembers("minecraft:hoglin_repellents");
+        state.repellent = kit::nearestBlock(context, 8, 4, [repellents](std::int32_t stateId) {
+            const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+            return block != nullptr && repellents != nullptr && repellents->contains(*block);
+        });
+    }
+    sense.repellent = state.repellent;
     for (const kit::Seen& seen : kit::nearby(context, hoglin.attributeWithModifiers("minecraft:follow_range"))) {
         if (seen.player != nullptr) {
             if (seen.player->targetable && !sense.attackablePlayer.has_value()) {

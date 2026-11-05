@@ -267,7 +267,9 @@ void TimingsReport::sampleIfDue(std::int64_t nowNanos) const {
 
     Sample sample;
     sample.atSeconds = (nowNanos - origin) / TickDurations::kNanosPerSecond;
-    const std::vector<wire::common::TickBucket> bucket = tickDurations_->timeline(nowNanos, 1);
+    // The previous second: the tick in progress is not recorded yet, so the current one always reads a tick short.
+    const std::vector<wire::common::TickBucket> bucket =
+        tickDurations_->timeline(nowNanos - TickDurations::kNanosPerSecond, 1);
     if (!bucket.empty()) {
         sample.ticks = bucket.front().ticks;
         sample.msptMean = bucket.front().meanMillis;

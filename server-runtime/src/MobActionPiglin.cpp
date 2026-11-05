@@ -197,7 +197,15 @@ void MobActionSystem::piglinSense(world::LoadedWorld& world, entity::ai::MobCont
     }
     // parity: `findNearestRepellent`, eight across and four up by manhattan distance.
     const piglins::Pos own{mth::floor(piglin.x), mth::floor(piglin.y), mth::floor(piglin.z)};
-    for (std::int32_t depth = 0; depth <= 20 && !sense.repellent.has_value(); ++depth) {
+    const bool scanRepellent = context.gameTime >= state.repellentScanAt;
+    const std::set<wire::common::Identifier>* repellents =
+        scanRepellent ? blockTagMembers("minecraft:piglin_repellents") : nullptr;
+    if (scanRepellent) {
+        state.repellentScanAt = context.gameTime + 20;
+    } else {
+        sense.repellent = state.repellent;
+    }
+    for (std::int32_t depth = 0; scanRepellent && depth <= 20 && !sense.repellent.has_value(); ++depth) {
         for (std::int32_t dx = -std::min(8, depth); dx <= std::min(8, depth) && !sense.repellent.has_value(); ++dx) {
             const std::int32_t restX = depth - std::abs(dx);
             for (std::int32_t dy = -std::min(4, restX); dy <= std::min(4, restX) && !sense.repellent.has_value();
@@ -214,7 +222,7 @@ void MobActionSystem::piglinSense(world::LoadedWorld& world, entity::ai::MobCont
                     const std::optional<std::int32_t> stateId = world.state().blockState(at[0], at[1], at[2]);
                     const wire::common::Identifier* block =
                         stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
-                    if (block == nullptr || !blockTagged("minecraft:piglin_repellents", *block).value_or(false)) {
+                    if (block == nullptr || repellents == nullptr || !repellents->contains(*block)) {
                         continue;
                     }
                     // parity: a soul campfire only repels while it burns.
@@ -229,6 +237,9 @@ void MobActionSystem::piglinSense(world::LoadedWorld& world, entity::ai::MobCont
                 }
             }
         }
+    }
+    if (scanRepellent) {
+        state.repellent = sense.repellent;
     }
     // parity: `NearestItemSensor`: the nearest item within thirty-two it wants.
     if (!state.brute) {
