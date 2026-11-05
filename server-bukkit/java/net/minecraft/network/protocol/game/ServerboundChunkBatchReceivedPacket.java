@@ -9,7 +9,7 @@ public record ServerboundChunkBatchReceivedPacket(float desiredChunksPerTick) im
             output.writeFloat(packet.desiredChunksPerTick());
         }, input -> new ServerboundChunkBatchReceivedPacket(input.readFloat())));
     private ServerboundChunkBatchReceivedPacket(FriendlyByteBuf input) {
-        this((float) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundChunkBatchReceivedPacket#<init>");
+        this(input.readFloat());
     }
     public PacketType<ServerboundChunkBatchReceivedPacket> type() {
         return GamePacketTypes.SERVERBOUND_CHUNK_BATCH_RECEIVED;

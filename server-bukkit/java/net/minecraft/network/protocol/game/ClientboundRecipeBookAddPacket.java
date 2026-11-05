@@ -20,13 +20,13 @@ public record ClientboundRecipeBookAddPacket(List<Entry> entries, boolean replac
         public static final byte FLAG_HIGHLIGHT = (byte) 2;
         public static final StreamCodec<RegistryFriendlyByteBuf, Entry> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundRecipeBookAddPacket.Entry.STREAM_CODEC", () -> StreamCodec.composite(RecipeDisplayEntry.STREAM_CODEC, Entry::contents, ByteBufCodecs.BYTE, Entry::flags, Entry::new));
         public Entry(RecipeDisplayEntry contents, boolean notification, boolean highlight) {
-            this((RecipeDisplayEntry) null, (byte) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundRecipeBookAddPacket.Entry#<init>");
+            this(contents, (byte) ((notification ? FLAG_NOTIFICATION : 0) | (highlight ? FLAG_HIGHLIGHT : 0)));
         }
         public boolean notification() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundRecipeBookAddPacket.Entry#notification");
+            return (flags & FLAG_NOTIFICATION) != 0;
         }
         public boolean highlight() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundRecipeBookAddPacket.Entry#highlight");
+            return (flags & FLAG_HIGHLIGHT) != 0;
         }
     }
 }

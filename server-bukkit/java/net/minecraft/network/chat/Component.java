@@ -71,7 +71,12 @@ public interface Component extends FormattedText, Message {
     }
 
     default FormattedCharSequence getVisualOrderText() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.chat.Component#getVisualOrderText");
+        java.util.List<FormattedCharSequence> parts = new ArrayList<>();
+        visit((style, text) -> {
+            parts.add(FormattedCharSequence.forward(text, style));
+            return Optional.empty();
+        }, Style.EMPTY);
+        return FormattedCharSequence.composite(parts);
     }
 
     @Override
@@ -173,7 +178,7 @@ public interface Component extends FormattedText, Message {
 
     static MutableComponent nbt(CompilableString<NbtPathArgument.NbtPath> nbtPath, boolean interpreting, boolean plain,
         Optional<Component> separator, DataSource dataSource) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.chat.Component#nbt");
+        return MutableComponent.create(new net.minecraft.network.chat.contents.NbtContents(nbtPath, interpreting, plain, separator, dataSource));
     }
 
     static MutableComponent score(CompilableString<EntitySelector> pattern, String objective) {
@@ -189,11 +194,11 @@ public interface Component extends FormattedText, Message {
     }
 
     static MutableComponent object(ObjectInfo info) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.chat.Component#object");
+        return MutableComponent.create(new net.minecraft.network.chat.contents.ObjectContents(info, Optional.empty()));
     }
 
     static MutableComponent object(ObjectInfo info, Component fallback) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.chat.Component#object");
+        return MutableComponent.create(new net.minecraft.network.chat.contents.ObjectContents(info, Optional.of(fallback)));
     }
 
     static Component translationArg(Date date) {

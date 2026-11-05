@@ -106,6 +106,18 @@ public final class ChannelBridge {
         return link == null ? null : link.channel;
     }
 
+    /** Hands a facade packet to the pipeline of a live connection as if the client had sent it. */
+    public static void receiveFrom(io.netty.channel.Channel channel, net.minecraft.network.protocol.Packet<?> packet) {
+        if (channel == null) {
+            return;
+        }
+        WirePacket wire = PacketEncoding.toWire(packet);
+        ByteBuf frame = io.netty.buffer.Unpooled.buffer();
+        writeVarInt(frame, wire.packetId());
+        wire.write(frame);
+        channel.pipeline().fireChannelRead(frame);
+    }
+
     static int readVarInt(byte[] data) {
         int value = 0;
         int shift = 0;

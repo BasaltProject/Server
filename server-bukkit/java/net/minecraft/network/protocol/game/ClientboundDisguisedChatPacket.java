@@ -16,6 +16,6 @@ public record ClientboundDisguisedChatPacket(Component message, ChatType.Bound c
         listener.handleDisguisedChat(this);
     }
     public boolean isSkippable() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundDisguisedChatPacket#isSkippable");
+        return true;
     }
 }

@@ -6,180 +6,64 @@ import net.minecraft.network.protocol.ping.ServerPingPacketListener;
 import net.minecraft.network.ConnectionProtocol;
 public interface ServerGamePacketListener extends ServerCommonPacketListener, ServerPingPacketListener {
     default ConnectionProtocol protocol() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#protocol");
+        return ConnectionProtocol.PLAY;
     }
-    default void handlePunch(ServerboundPunchPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handlePunch");
-    }
-    default void handleChat(ServerboundChatPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleChat");
-    }
-    default void handleChatCommand(ServerboundChatCommandPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleChatCommand");
-    }
-    default void handleSignedChatCommand(ServerboundChatCommandSignedPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSignedChatCommand");
-    }
-    default void handleChatAck(ServerboundChatAckPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleChatAck");
-    }
-    default void handleClientCommand(ServerboundClientCommandPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleClientCommand");
-    }
-    default void handleContainerButtonClick(ServerboundContainerButtonClickPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleContainerButtonClick");
-    }
-    default void handleContainerClick(ServerboundContainerClickPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleContainerClick");
-    }
-    default void handlePlaceRecipe(ServerboundPlaceRecipePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handlePlaceRecipe");
-    }
-    default void handleContainerClose(ServerboundContainerClosePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleContainerClose");
-    }
-    default void handleAttack(ServerboundAttackPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleAttack");
-    }
-    default void handleInteract(ServerboundInteractPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleInteract");
-    }
-    default void handleSpectatorAction(ServerboundSpectatorActionPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSpectatorAction");
-    }
-    default void handleMovePlayer(ServerboundMovePlayerPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleMovePlayer");
-    }
-    default void handlePlayerAbilities(ServerboundPlayerAbilitiesPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handlePlayerAbilities");
-    }
-    default void handlePlayerAction(ServerboundPlayerActionPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handlePlayerAction");
-    }
-    default void handlePlayerCommand(ServerboundPlayerCommandPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handlePlayerCommand");
-    }
-    default void handlePlayerInput(ServerboundPlayerInputPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handlePlayerInput");
-    }
-    default void handleSetCarriedItem(ServerboundSetCarriedItemPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSetCarriedItem");
-    }
-    default void handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSetCreativeModeSlot");
-    }
-    default void handleSignUpdate(ServerboundSignUpdatePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSignUpdate");
-    }
-    default void handleUseItemOn(ServerboundUseItemOnPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleUseItemOn");
-    }
-    default void handleUseItem(ServerboundUseItemPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleUseItem");
-    }
-    default void handleTeleportToEntityPacket(ServerboundTeleportToEntityPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleTeleportToEntityPacket");
-    }
-    default void handlePaddleBoat(ServerboundPaddleBoatPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handlePaddleBoat");
-    }
-    default void handleMoveVehicle(ServerboundMoveVehiclePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleMoveVehicle");
-    }
-    default void handleAcceptTeleportPacket(ServerboundAcceptTeleportationPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleAcceptTeleportPacket");
-    }
-    default void handleAcceptPlayerLoad(ServerboundPlayerLoadedPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleAcceptPlayerLoad");
-    }
-    default void handleRecipeBookSeenRecipePacket(ServerboundRecipeBookSeenRecipePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleRecipeBookSeenRecipePacket");
-    }
-    default void handleBundleItemSelectedPacket(ServerboundSelectBundleItemPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleBundleItemSelectedPacket");
-    }
-    default void handleRecipeBookChangeSettingsPacket(ServerboundRecipeBookChangeSettingsPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleRecipeBookChangeSettingsPacket");
-    }
-    default void handleSeenAdvancements(ServerboundSeenAdvancementsPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSeenAdvancements");
-    }
-    default void handleCustomCommandSuggestions(ServerboundCommandSuggestionPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleCustomCommandSuggestions");
-    }
-    default void handleSetCommandBlock(ServerboundSetCommandBlockPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSetCommandBlock");
-    }
-    default void handleSetCommandMinecart(ServerboundSetCommandMinecartPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSetCommandMinecart");
-    }
-    default void handlePickItemFromBlock(ServerboundPickItemFromBlockPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handlePickItemFromBlock");
-    }
-    default void handlePickItemFromEntity(ServerboundPickItemFromEntityPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handlePickItemFromEntity");
-    }
-    default void handleRenameItem(ServerboundRenameItemPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleRenameItem");
-    }
-    default void handleSetBeaconPacket(ServerboundSetBeaconPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSetBeaconPacket");
-    }
-    default void handleSetGameRule(ServerboundSetGameRulePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSetGameRule");
-    }
-    default void handleSetStructureBlock(ServerboundSetStructureBlockPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSetStructureBlock");
-    }
-    default void handleSetTestBlock(ServerboundSetTestBlockPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSetTestBlock");
-    }
-    default void handleTestInstanceBlockAction(ServerboundTestInstanceBlockActionPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleTestInstanceBlockAction");
-    }
-    default void handleSelectTrade(ServerboundSelectTradePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSelectTrade");
-    }
-    default void handleEditBook(ServerboundEditBookPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleEditBook");
-    }
-    default void handleEntityTagQuery(ServerboundEntityTagQueryPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleEntityTagQuery");
-    }
-    default void handleContainerSlotStateChanged(ServerboundContainerSlotStateChangedPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleContainerSlotStateChanged");
-    }
-    default void handleBlockEntityTagQuery(ServerboundBlockEntityTagQueryPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleBlockEntityTagQuery");
-    }
-    default void handleSetJigsawBlock(ServerboundSetJigsawBlockPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleSetJigsawBlock");
-    }
-    default void handleJigsawGenerate(ServerboundJigsawGeneratePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleJigsawGenerate");
-    }
-    default void handleChangeDifficulty(ServerboundChangeDifficultyPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleChangeDifficulty");
-    }
-    default void handleChangeGameMode(ServerboundChangeGameModePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleChangeGameMode");
-    }
-    default void handleLockDifficulty(ServerboundLockDifficultyPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleLockDifficulty");
-    }
-    default void handleChatSessionUpdate(ServerboundChatSessionUpdatePacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleChatSessionUpdate");
-    }
-    default void handleConfigurationAcknowledged(ServerboundConfigurationAcknowledgedPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleConfigurationAcknowledged");
-    }
-    default void handleChunkBatchReceived(ServerboundChunkBatchReceivedPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleChunkBatchReceived");
-    }
-    default void handleDebugSubscriptionRequest(ServerboundDebugSubscriptionRequestPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleDebugSubscriptionRequest");
-    }
-    default void handleClientTickEnd(ServerboundClientTickEndPacket packet) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerGamePacketListener#handleClientTickEnd");
-    }
+    void handlePunch(ServerboundPunchPacket packet);
+    void handleChat(ServerboundChatPacket packet);
+    void handleChatCommand(ServerboundChatCommandPacket packet);
+    void handleSignedChatCommand(ServerboundChatCommandSignedPacket packet);
+    void handleChatAck(ServerboundChatAckPacket packet);
+    void handleClientCommand(ServerboundClientCommandPacket packet);
+    void handleContainerButtonClick(ServerboundContainerButtonClickPacket packet);
+    void handleContainerClick(ServerboundContainerClickPacket packet);
+    void handlePlaceRecipe(ServerboundPlaceRecipePacket packet);
+    void handleContainerClose(ServerboundContainerClosePacket packet);
+    void handleAttack(ServerboundAttackPacket packet);
+    void handleInteract(ServerboundInteractPacket packet);
+    void handleSpectatorAction(ServerboundSpectatorActionPacket packet);
+    void handleMovePlayer(ServerboundMovePlayerPacket packet);
+    void handlePlayerAbilities(ServerboundPlayerAbilitiesPacket packet);
+    void handlePlayerAction(ServerboundPlayerActionPacket packet);
+    void handlePlayerCommand(ServerboundPlayerCommandPacket packet);
+    void handlePlayerInput(ServerboundPlayerInputPacket packet);
+    void handleSetCarriedItem(ServerboundSetCarriedItemPacket packet);
+    void handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket packet);
+    void handleSignUpdate(ServerboundSignUpdatePacket packet);
+    void handleUseItemOn(ServerboundUseItemOnPacket packet);
+    void handleUseItem(ServerboundUseItemPacket packet);
+    void handleTeleportToEntityPacket(ServerboundTeleportToEntityPacket packet);
+    void handlePaddleBoat(ServerboundPaddleBoatPacket packet);
+    void handleMoveVehicle(ServerboundMoveVehiclePacket packet);
+    void handleAcceptTeleportPacket(ServerboundAcceptTeleportationPacket packet);
+    void handleAcceptPlayerLoad(ServerboundPlayerLoadedPacket packet);
+    void handleRecipeBookSeenRecipePacket(ServerboundRecipeBookSeenRecipePacket packet);
+    void handleBundleItemSelectedPacket(ServerboundSelectBundleItemPacket packet);
+    void handleRecipeBookChangeSettingsPacket(ServerboundRecipeBookChangeSettingsPacket packet);
+    void handleSeenAdvancements(ServerboundSeenAdvancementsPacket packet);
+    void handleCustomCommandSuggestions(ServerboundCommandSuggestionPacket packet);
+    void handleSetCommandBlock(ServerboundSetCommandBlockPacket packet);
+    void handleSetCommandMinecart(ServerboundSetCommandMinecartPacket packet);
+    void handlePickItemFromBlock(ServerboundPickItemFromBlockPacket packet);
+    void handlePickItemFromEntity(ServerboundPickItemFromEntityPacket packet);
+    void handleRenameItem(ServerboundRenameItemPacket packet);
+    void handleSetBeaconPacket(ServerboundSetBeaconPacket packet);
+    void handleSetGameRule(ServerboundSetGameRulePacket packet);
+    void handleSetStructureBlock(ServerboundSetStructureBlockPacket packet);
+    void handleSetTestBlock(ServerboundSetTestBlockPacket packet);
+    void handleTestInstanceBlockAction(ServerboundTestInstanceBlockActionPacket packet);
+    void handleSelectTrade(ServerboundSelectTradePacket packet);
+    void handleEditBook(ServerboundEditBookPacket packet);
+    void handleEntityTagQuery(ServerboundEntityTagQueryPacket packet);
+    void handleContainerSlotStateChanged(ServerboundContainerSlotStateChangedPacket packet);
+    void handleBlockEntityTagQuery(ServerboundBlockEntityTagQueryPacket packet);
+    void handleSetJigsawBlock(ServerboundSetJigsawBlockPacket packet);
+    void handleJigsawGenerate(ServerboundJigsawGeneratePacket packet);
+    void handleChangeDifficulty(ServerboundChangeDifficultyPacket packet);
+    void handleChangeGameMode(ServerboundChangeGameModePacket packet);
+    void handleLockDifficulty(ServerboundLockDifficultyPacket packet);
+    void handleChatSessionUpdate(ServerboundChatSessionUpdatePacket packet);
+    void handleConfigurationAcknowledged(ServerboundConfigurationAcknowledgedPacket packet);
+    void handleChunkBatchReceived(ServerboundChunkBatchReceivedPacket packet);
+    void handleDebugSubscriptionRequest(ServerboundDebugSubscriptionRequestPacket packet);
+    void handleClientTickEnd(ServerboundClientTickEndPacket packet);
 }

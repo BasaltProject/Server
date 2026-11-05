@@ -186,3 +186,4 @@ K wolf/variant|@net.minecraft.world.entity.animal.wolf.WolfVariant#STREAM_CODEC
 K writable_book_content|@net.minecraft.world.item.component.WritableBookContent#STREAM_CODEC
 K written_book_content|@net.minecraft.world.item.component.WrittenBookContent#STREAM_CODEC
 K zombie_nautilus/variant|@net.minecraft.world.entity.animal.nautilus.ZombieNautilusVariant#STREAM_CODEC
+C net.minecraft.network.protocol.game.CommonPlayerSpawnInfo#STREAM_CODEC|dimensionType:holder:DIMENSION_TYPE;dimension:rkey:net.minecraft.core.registries.Registries#DIMENSION;seed:long;gameType:@net.minecraft.world.level.GameType#STREAM_CODEC;previousGameType:@net.minecraft.world.level.GameType#OPTIONAL_STREAM_CODEC;isDebug:bool;isFlat:bool;lastDeathLocation:opt(@net.minecraft.core.GlobalPos#STREAM_CODEC);portalCooldown:varint;seaLevel:varint

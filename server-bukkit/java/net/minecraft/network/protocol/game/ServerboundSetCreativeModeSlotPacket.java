@@ -9,7 +9,7 @@ import net.minecraft.world.item.ItemStack;
 public record ServerboundSetCreativeModeSlotPacket(short slotNum, ItemStack itemStack) implements Packet<ServerGamePacketListener> {
     public static final StreamCodec<RegistryFriendlyByteBuf, ServerboundSetCreativeModeSlotPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ServerboundSetCreativeModeSlotPacket.STREAM_CODEC", () -> StreamCodec.composite(ByteBufCodecs.SHORT, ServerboundSetCreativeModeSlotPacket::slotNum, ItemStack.validatedStreamCodec(ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC), ServerboundSetCreativeModeSlotPacket::itemStack, ServerboundSetCreativeModeSlotPacket::new));
     public ServerboundSetCreativeModeSlotPacket(int slotNum, ItemStack itemStack) {
-        this((short) 0, (ItemStack) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundSetCreativeModeSlotPacket#<init>");
+        this((short) slotNum, itemStack);
     }
     public PacketType<ServerboundSetCreativeModeSlotPacket> type() {
         return GamePacketTypes.SERVERBOUND_SET_CREATIVE_MODE_SLOT;

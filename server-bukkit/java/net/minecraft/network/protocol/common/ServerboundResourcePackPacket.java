@@ -11,7 +11,7 @@ public record ServerboundResourcePackPacket(UUID id, Action action) implements P
             output.writeEnum(packet.action());
         }, input -> new ServerboundResourcePackPacket(input.readUUID(), input.readEnum(Action.class))));
     private ServerboundResourcePackPacket(FriendlyByteBuf input) {
-        this((UUID) null, (Action) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.common.ServerboundResourcePackPacket#<init>");
+        this(input.readUUID(), input.readEnum(Action.class));
     }
     public PacketType<ServerboundResourcePackPacket> type() {
         return CommonPacketTypes.SERVERBOUND_RESOURCE_PACK;
@@ -22,7 +22,7 @@ public record ServerboundResourcePackPacket(UUID id, Action action) implements P
     public static enum Action {
         SUCCESSFULLY_LOADED, DECLINED, FAILED_DOWNLOAD, ACCEPTED, DOWNLOADED, INVALID_URL, FAILED_RELOAD, DISCARDED;
         public boolean isTerminal() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.common.ServerboundResourcePackPacket.Action#isTerminal");
+            return this != ACCEPTED && this != DOWNLOADED;
         }
     }
 }

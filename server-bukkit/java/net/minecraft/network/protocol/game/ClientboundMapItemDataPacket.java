@@ -16,7 +16,7 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 public record ClientboundMapItemDataPacket(MapId mapId, byte scale, boolean locked, Optional<List<MapDecoration>> decorations, Optional<MapItemSavedData.MapPatch> colorPatch) implements Packet<ClientGamePacketListener> {
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundMapItemDataPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundMapItemDataPacket.STREAM_CODEC", () -> StreamCodec.composite(MapId.STREAM_CODEC, ClientboundMapItemDataPacket::mapId, ByteBufCodecs.BYTE, ClientboundMapItemDataPacket::scale, ByteBufCodecs.BOOL, ClientboundMapItemDataPacket::locked, MapDecoration.STREAM_CODEC.apply(ByteBufCodecs.list()).apply(ByteBufCodecs::optional), ClientboundMapItemDataPacket::decorations, MapItemSavedData.MapPatch.STREAM_CODEC, ClientboundMapItemDataPacket::colorPatch, ClientboundMapItemDataPacket::new));
     public ClientboundMapItemDataPacket(MapId mapId, byte scale, boolean locked, Collection<MapDecoration> decorations, MapItemSavedData. MapPatch colorPatch) {
-        this((MapId) null, (byte) 0, false, (Optional) null, (Optional) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundMapItemDataPacket#<init>");
+        this(mapId, scale, locked, decorations != null ? Optional.of(List.copyOf(decorations)) : Optional.empty(), Optional.ofNullable(colorPatch));
     }
     public PacketType<ClientboundMapItemDataPacket> type() {
         return GamePacketTypes.CLIENTBOUND_MAP_ITEM_DATA;
@@ -25,6 +25,7 @@ public record ClientboundMapItemDataPacket(MapId mapId, byte scale, boolean lock
         listener.handleMapItemData(this);
     }
     public void applyToMap(MapItemSavedData map) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundMapItemDataPacket#applyToMap");
+        decorations.ifPresent(map::addClientSideDecorations);
+        colorPatch.ifPresent(patch -> patch.applyToMap(map));
     }
 }

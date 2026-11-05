@@ -9,7 +9,7 @@ public record ClientboundPongResponsePacket(long time) implements Packet<ClientP
             output.writeLong(packet.time());
         }, input -> new ClientboundPongResponsePacket(input.readLong())));
     private ClientboundPongResponsePacket(FriendlyByteBuf input) {
-        this((long) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.ping.ClientboundPongResponsePacket#<init>");
+        this(input.readLong());
     }
     public PacketType<ClientboundPongResponsePacket> type() {
         return PingPacketTypes.CLIENTBOUND_PONG_RESPONSE;

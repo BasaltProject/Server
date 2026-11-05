@@ -16,12 +16,19 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 public class ClientboundUpdateAttributesPacket implements Packet<ClientGamePacketListener> {
+    private final int entityId;
+    private final List<AttributeSnapshot> attributes;
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundUpdateAttributesPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundUpdateAttributesPacket.STREAM_CODEC", () -> StreamCodec.composite(ByteBufCodecs.VAR_INT, ClientboundUpdateAttributesPacket::getEntityId, ClientboundUpdateAttributesPacket.AttributeSnapshot.STREAM_CODEC.apply(ByteBufCodecs.list(128)), ClientboundUpdateAttributesPacket::getValues, ClientboundUpdateAttributesPacket::new));
     public ClientboundUpdateAttributesPacket(int entityId, Collection<AttributeInstance> values) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket#<init>");
+        this.entityId = entityId;
+        this.attributes = new java.util.ArrayList<>(values.size());
+        for (AttributeInstance instance : values) {
+            attributes.add(new AttributeSnapshot(instance.getAttribute(), instance.getBaseValue(), instance.getModifiers()));
+        }
     }
     private ClientboundUpdateAttributesPacket(int entityId, List<AttributeSnapshot> attributes) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket#<init>");
+        this.entityId = entityId;
+        this.attributes = attributes;
     }
     public PacketType<ClientboundUpdateAttributesPacket> type() {
         return GamePacketTypes.CLIENTBOUND_UPDATE_ATTRIBUTES;
@@ -30,10 +37,10 @@ public class ClientboundUpdateAttributesPacket implements Packet<ClientGamePacke
         listener.handleUpdateAttributes(this);
     }
     public int getEntityId() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket#getEntityId");
+        return entityId;
     }
     public List<AttributeSnapshot> getValues() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket#getValues");
+        return attributes;
     }
     public static record AttributeSnapshot(Holder<Attribute> attribute, double base, Collection<AttributeModifier> modifiers) {
         public static final StreamCodec<ByteBuf, AttributeModifier> MODIFIER_STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundUpdateAttributesPacket.AttributeSnapshot.MODIFIER_STREAM_CODEC", () -> StreamCodec.composite(Identifier.STREAM_CODEC, AttributeModifier::id, ByteBufCodecs.DOUBLE, AttributeModifier::amount, AttributeModifier.Operation.STREAM_CODEC, AttributeModifier::operation, AttributeModifier::new));

@@ -11,7 +11,8 @@ public class ClientboundSetEntityLinkPacket implements Packet<ClientGamePacketLi
     private final int destId;
     public static final StreamCodec<FriendlyByteBuf, ClientboundSetEntityLinkPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSetEntityLinkPacket", () -> Packet.codec(ClientboundSetEntityLinkPacket::write, ClientboundSetEntityLinkPacket::new));
     public ClientboundSetEntityLinkPacket(Entity sourceEntity, Entity destEntity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSetEntityLinkPacket#<init>");
+        this.sourceId = sourceEntity.getId();
+        this.destId = destEntity != null ? destEntity.getId() : 0;
     }
     private ClientboundSetEntityLinkPacket(FriendlyByteBuf input) {
         this.sourceId = input.readInt();

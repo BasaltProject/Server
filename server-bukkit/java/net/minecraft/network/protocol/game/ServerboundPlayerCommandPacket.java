@@ -11,10 +11,12 @@ public class ServerboundPlayerCommandPacket implements Packet<ServerGamePacketLi
     private final int data;
     public static final StreamCodec<FriendlyByteBuf, ServerboundPlayerCommandPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ServerboundPlayerCommandPacket", () -> Packet.codec(ServerboundPlayerCommandPacket::write, ServerboundPlayerCommandPacket::new));
     public ServerboundPlayerCommandPacket(Entity entity, Action action) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket#<init>");
+        this(entity, action, 0);
     }
     public ServerboundPlayerCommandPacket(Entity entity, Action action, int data) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket#<init>");
+        this.id = entity.getId();
+        this.action = action;
+        this.data = data;
     }
     private ServerboundPlayerCommandPacket(FriendlyByteBuf input) {
         this.id = input.readVarInt();

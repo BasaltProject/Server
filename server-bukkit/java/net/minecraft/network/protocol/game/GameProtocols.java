@@ -10,12 +10,8 @@ public class GameProtocols {
     }
 
     public interface Context {
-            default boolean hasInfiniteMaterials() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.GameProtocols.Context#hasInfiniteMaterials");
-        }
-        default boolean canUseCommandBlocks() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.GameProtocols.Context#canUseCommandBlocks");
-        }
+            boolean hasInfiniteMaterials();
+        boolean canUseCommandBlocks();
 }
     public static final CodecModifier<RegistryFriendlyByteBuf, ServerboundSetCreativeModeSlotPacket, Context> HAS_INFINITE_MATERIALS = null;
     public static final UnboundProtocol<ServerGamePacketListener, RegistryFriendlyByteBuf, Context> SERVERBOUND_TEMPLATE = null;

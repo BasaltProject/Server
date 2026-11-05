@@ -106,7 +106,7 @@ public class MutableComponent implements Component {
 
     @Override
     public FormattedCharSequence getVisualOrderText() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.chat.MutableComponent#getVisualOrderText");
+        return Component.super.getVisualOrderText();
     }
 
     @Override

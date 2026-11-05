@@ -23,6 +23,6 @@ public record ClientboundPlayerChatPacket(int globalIndex, UUID sender, int inde
         listener.handlePlayerChat(this);
     }
     public boolean isSkippable() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundPlayerChatPacket#isSkippable");
+        return true;
     }
 }

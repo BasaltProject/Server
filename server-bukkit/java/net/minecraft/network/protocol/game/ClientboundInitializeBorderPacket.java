@@ -26,7 +26,14 @@ public class ClientboundInitializeBorderPacket implements Packet<ClientGamePacke
         this.warningTime = input.readVarInt();
     }
     public ClientboundInitializeBorderPacket(WorldBorder border) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundInitializeBorderPacket#<init>");
+        this.newCenterX = border.getCenterX();
+        this.newCenterZ = border.getCenterZ();
+        this.oldSize = border.getSize();
+        this.newSize = border.getLerpTarget();
+        this.lerpTime = border.getLerpTime();
+        this.newAbsoluteMaxSize = border.getAbsoluteMaxSize();
+        this.warningBlocks = border.getWarningBlocks();
+        this.warningTime = border.getWarningTime();
     }
     private void write(FriendlyByteBuf output) {
         output.writeDouble(this.newCenterX);

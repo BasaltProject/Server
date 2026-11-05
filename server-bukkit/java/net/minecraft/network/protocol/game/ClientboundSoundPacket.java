@@ -19,7 +19,14 @@ public class ClientboundSoundPacket implements Packet<ClientGamePacketListener> 
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundSoundPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSoundPacket", () -> Packet.codec(ClientboundSoundPacket::write, ClientboundSoundPacket::new));
     public static final float LOCATION_ACCURACY = 8.0F;
     public ClientboundSoundPacket(Holder<SoundEvent> sound, SoundSource source, double x, double y, double z, float volume, float pitch, long seed) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSoundPacket#<init>");
+        this.sound = sound;
+        this.source = source;
+        this.x = (int) (x * LOCATION_ACCURACY);
+        this.y = (int) (y * LOCATION_ACCURACY);
+        this.z = (int) (z * LOCATION_ACCURACY);
+        this.volume = volume;
+        this.pitch = pitch;
+        this.seed = seed;
     }
     private ClientboundSoundPacket(RegistryFriendlyByteBuf input) {
         this.sound = SoundEvent.STREAM_CODEC.decode(input);
@@ -54,13 +61,13 @@ public class ClientboundSoundPacket implements Packet<ClientGamePacketListener> 
         return source;
     }
     public double getX() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSoundPacket#getX");
+        return x / LOCATION_ACCURACY;
     }
     public double getY() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSoundPacket#getY");
+        return y / LOCATION_ACCURACY;
     }
     public double getZ() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSoundPacket#getZ");
+        return z / LOCATION_ACCURACY;
     }
     public float getVolume() {
         return volume;

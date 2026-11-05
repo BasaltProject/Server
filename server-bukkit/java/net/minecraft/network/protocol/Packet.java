@@ -7,12 +7,8 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.StreamDecoder;
 import net.minecraft.network.codec.StreamMemberEncoder;
 public interface Packet<T extends PacketListener> {
-    default PacketType<? extends Packet<T>> type() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.Packet#type");
-    }
-    default void handle(T listener) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.Packet#handle");
-    }
+    PacketType<? extends Packet<T>> type();
+    void handle(T listener);
     default boolean isSkippable() {
         return false;
     }

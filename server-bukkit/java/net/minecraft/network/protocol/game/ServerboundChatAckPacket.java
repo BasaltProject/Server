@@ -9,7 +9,7 @@ public record ServerboundChatAckPacket(int offset) implements Packet<ServerGameP
             output.writeVarInt(packet.offset());
         }, input -> new ServerboundChatAckPacket(input.readVarInt())));
     private ServerboundChatAckPacket(FriendlyByteBuf input) {
-        this((int) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ServerboundChatAckPacket#<init>");
+        this(input.readVarInt());
     }
     public PacketType<ServerboundChatAckPacket> type() {
         return GamePacketTypes.SERVERBOUND_CHAT_ACK;

@@ -13,7 +13,8 @@ public class ClientboundRotateHeadPacket implements Packet<ClientGamePacketListe
     private final byte yHeadRot;
     public static final StreamCodec<FriendlyByteBuf, ClientboundRotateHeadPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundRotateHeadPacket", () -> Packet.codec(ClientboundRotateHeadPacket::write, ClientboundRotateHeadPacket::new));
     public ClientboundRotateHeadPacket(Entity entity, byte yHeadRot) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundRotateHeadPacket#<init>");
+        this.entityId = entity.getId();
+        this.yHeadRot = yHeadRot;
     }
     private ClientboundRotateHeadPacket(FriendlyByteBuf input) {
         this.entityId = input.readVarInt();
@@ -30,9 +31,9 @@ public class ClientboundRotateHeadPacket implements Packet<ClientGamePacketListe
         listener.handleRotateMob(this);
     }
     public Entity getEntity(Level level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundRotateHeadPacket#getEntity");
+        return level.getEntity(entityId);
     }
     public float getYHeadRot() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundRotateHeadPacket#getYHeadRot");
+        return Mth.unpackDegrees(yHeadRot);
     }
 }

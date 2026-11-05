@@ -9,7 +9,7 @@ public class ClientboundPlayerCombatEndPacket implements Packet<ClientGamePacket
     private final int duration;
     public static final StreamCodec<FriendlyByteBuf, ClientboundPlayerCombatEndPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundPlayerCombatEndPacket", () -> Packet.codec(ClientboundPlayerCombatEndPacket::write, ClientboundPlayerCombatEndPacket::new));
     public ClientboundPlayerCombatEndPacket(CombatTracker tracker) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundPlayerCombatEndPacket#<init>");
+        this(tracker.getCombatDuration());
     }
     public ClientboundPlayerCombatEndPacket(int duration) {
         this.duration = duration;

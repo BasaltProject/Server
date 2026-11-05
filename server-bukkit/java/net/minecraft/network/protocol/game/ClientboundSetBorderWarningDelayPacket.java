@@ -9,7 +9,7 @@ public class ClientboundSetBorderWarningDelayPacket implements Packet<ClientGame
     private final int warningDelay;
     public static final StreamCodec<FriendlyByteBuf, ClientboundSetBorderWarningDelayPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSetBorderWarningDelayPacket", () -> Packet.codec(ClientboundSetBorderWarningDelayPacket::write, ClientboundSetBorderWarningDelayPacket::new));
     public ClientboundSetBorderWarningDelayPacket(WorldBorder border) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSetBorderWarningDelayPacket#<init>");
+        this.warningDelay = border.getWarningTime();
     }
     private ClientboundSetBorderWarningDelayPacket(FriendlyByteBuf input) {
         this.warningDelay = input.readVarInt();

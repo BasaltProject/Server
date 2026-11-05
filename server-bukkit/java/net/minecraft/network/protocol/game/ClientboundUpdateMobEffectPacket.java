@@ -13,9 +13,30 @@ public class ClientboundUpdateMobEffectPacket implements Packet<ClientGamePacket
     private final int effectAmplifier;
     private final int effectDurationTicks;
     private final byte flags;
+    private static final int FLAG_AMBIENT = 1;
+    private static final int FLAG_VISIBLE = 2;
+    private static final int FLAG_SHOW_ICON = 4;
+    private static final int FLAG_BLEND = 8;
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundUpdateMobEffectPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundUpdateMobEffectPacket", () -> Packet.codec(ClientboundUpdateMobEffectPacket::write, ClientboundUpdateMobEffectPacket::new));
     public ClientboundUpdateMobEffectPacket(int entityId, MobEffectInstance effect, boolean blend) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket#<init>");
+        this.entityId = entityId;
+        this.effect = effect.getEffect();
+        this.effectAmplifier = effect.getAmplifier();
+        this.effectDurationTicks = effect.getDuration();
+        byte bits = 0;
+        if (effect.isAmbient()) {
+            bits |= FLAG_AMBIENT;
+        }
+        if (effect.isVisible()) {
+            bits |= FLAG_VISIBLE;
+        }
+        if (effect.showIcon()) {
+            bits |= FLAG_SHOW_ICON;
+        }
+        if (blend) {
+            bits |= FLAG_BLEND;
+        }
+        this.flags = bits;
     }
     private ClientboundUpdateMobEffectPacket(RegistryFriendlyByteBuf input) {
         this.entityId = input.readVarInt();
@@ -50,15 +71,15 @@ public class ClientboundUpdateMobEffectPacket implements Packet<ClientGamePacket
         return effectDurationTicks;
     }
     public boolean isEffectVisible() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket#isEffectVisible");
+        return (flags & FLAG_VISIBLE) != 0;
     }
     public boolean isEffectAmbient() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket#isEffectAmbient");
+        return (flags & FLAG_AMBIENT) != 0;
     }
     public boolean effectShowsIcon() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket#effectShowsIcon");
+        return (flags & FLAG_SHOW_ICON) != 0;
     }
     public boolean shouldBlend() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket#shouldBlend");
+        return (flags & FLAG_BLEND) != 0;
     }
 }

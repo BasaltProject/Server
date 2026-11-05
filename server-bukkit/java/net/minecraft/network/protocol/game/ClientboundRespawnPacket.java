@@ -17,6 +17,6 @@ public record ClientboundRespawnPacket(CommonPlayerSpawnInfo commonPlayerSpawnIn
         listener.handleRespawn(this);
     }
     public boolean shouldKeep(byte mask) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundRespawnPacket#shouldKeep");
+        return (dataToKeep & mask) != 0;
     }
 }

@@ -10,9 +10,14 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
 import net.minecraft.world.inventory.MenuType;
 public class ClientboundOpenScreenPacket implements Packet<ClientGamePacketListener> {
+    private final int containerId;
+    private final MenuType<?> type;
+    private final Component title;
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundOpenScreenPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundOpenScreenPacket.STREAM_CODEC", () -> StreamCodec.composite(ByteBufCodecs.CONTAINER_ID, ClientboundOpenScreenPacket::getContainerId, ByteBufCodecs.registry(Registries.MENU), ClientboundOpenScreenPacket::getType, ComponentSerialization.TRUSTED_STREAM_CODEC, ClientboundOpenScreenPacket::getTitle, ClientboundOpenScreenPacket::new));
     public ClientboundOpenScreenPacket(int containerId, MenuType<?> type, Component title) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundOpenScreenPacket#<init>");
+        this.containerId = containerId;
+        this.type = type;
+        this.title = title;
     }
     public PacketType<ClientboundOpenScreenPacket> type() {
         return GamePacketTypes.CLIENTBOUND_OPEN_SCREEN;
@@ -21,12 +26,12 @@ public class ClientboundOpenScreenPacket implements Packet<ClientGamePacketListe
         listener.handleOpenScreen(this);
     }
     public int getContainerId() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundOpenScreenPacket#getContainerId");
+        return containerId;
     }
     public MenuType<?> getType() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundOpenScreenPacket#getType");
+        return type;
     }
     public Component getTitle() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundOpenScreenPacket#getTitle");
+        return title;
     }
 }

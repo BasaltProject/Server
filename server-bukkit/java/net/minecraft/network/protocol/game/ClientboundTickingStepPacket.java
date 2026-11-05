@@ -10,10 +10,10 @@ public record ClientboundTickingStepPacket(int tickSteps) implements Packet<Clie
             output.writeVarInt(packet.tickSteps());
         }, input -> new ClientboundTickingStepPacket(input.readVarInt())));
     private ClientboundTickingStepPacket(FriendlyByteBuf input) {
-        this((int) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundTickingStepPacket#<init>");
+        this(input.readVarInt());
     }
     public static ClientboundTickingStepPacket from(TickRateManager manager) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundTickingStepPacket#from");
+        return new ClientboundTickingStepPacket(manager.frozenTicksToRun());
     }
     public PacketType<ClientboundTickingStepPacket> type() {
         return GamePacketTypes.CLIENTBOUND_TICKING_STEP;

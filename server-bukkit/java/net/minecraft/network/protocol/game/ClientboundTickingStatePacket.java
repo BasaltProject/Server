@@ -11,10 +11,10 @@ public record ClientboundTickingStatePacket(float tickRate, boolean isFrozen) im
             output.writeBoolean(packet.isFrozen());
         }, input -> new ClientboundTickingStatePacket(input.readFloat(), input.readBoolean())));
     private ClientboundTickingStatePacket(FriendlyByteBuf input) {
-        this((float) 0, false); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundTickingStatePacket#<init>");
+        this(input.readFloat(), input.readBoolean());
     }
     public static ClientboundTickingStatePacket from(TickRateManager manager) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundTickingStatePacket#from");
+        return new ClientboundTickingStatePacket(manager.tickrate(), manager.isFrozen());
     }
     public PacketType<ClientboundTickingStatePacket> type() {
         return GamePacketTypes.CLIENTBOUND_TICKING_STATE;

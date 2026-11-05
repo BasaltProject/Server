@@ -17,6 +17,6 @@ public record ClientboundLoginFinishedPacket(GameProfile gameProfile, UUID sessi
         listener.handleLoginFinished(this);
     }
     public boolean isTerminal() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.login.ClientboundLoginFinishedPacket#isTerminal");
+        return true;
     }
 }

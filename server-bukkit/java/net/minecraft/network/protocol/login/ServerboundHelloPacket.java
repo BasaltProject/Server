@@ -11,7 +11,7 @@ public record ServerboundHelloPacket(String name, UUID profileId) implements Pac
             output.writeUUID(packet.profileId());
         }, input -> new ServerboundHelloPacket(input.readUtf(16), input.readUUID())));
     private ServerboundHelloPacket(FriendlyByteBuf input) {
-        this((String) null, (UUID) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.login.ServerboundHelloPacket#<init>");
+        this(input.readUtf(16), input.readUUID());
     }
     public PacketType<ServerboundHelloPacket> type() {
         return LoginPacketTypes.SERVERBOUND_HELLO;

@@ -11,7 +11,9 @@ public class ClientboundSetBorderLerpSizePacket implements Packet<ClientGamePack
     private final long lerpTime;
     public static final StreamCodec<FriendlyByteBuf, ClientboundSetBorderLerpSizePacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSetBorderLerpSizePacket", () -> Packet.codec(ClientboundSetBorderLerpSizePacket::write, ClientboundSetBorderLerpSizePacket::new));
     public ClientboundSetBorderLerpSizePacket(WorldBorder border) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSetBorderLerpSizePacket#<init>");
+        this.oldSize = border.getSize();
+        this.newSize = border.getLerpTarget();
+        this.lerpTime = border.getLerpTime();
     }
     private ClientboundSetBorderLerpSizePacket(FriendlyByteBuf input) {
         this.oldSize = input.readDouble();

@@ -34,6 +34,6 @@ public class ClientboundTagQueryPacket implements Packet<ClientGamePacketListene
         return tag;
     }
     public boolean isSkippable() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundTagQueryPacket#isSkippable");
+        return true;
     }
 }

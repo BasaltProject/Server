@@ -17,7 +17,12 @@ public class ClientboundSoundEntityPacket implements Packet<ClientGamePacketList
     private final long seed;
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundSoundEntityPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundSoundEntityPacket", () -> Packet.codec(ClientboundSoundEntityPacket::write, ClientboundSoundEntityPacket::new));
     public ClientboundSoundEntityPacket(Holder<SoundEvent> sound, SoundSource source, Entity sourceEntity, float volume, float pitch, long seed) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundSoundEntityPacket#<init>");
+        this.sound = sound;
+        this.source = source;
+        this.id = sourceEntity.getId();
+        this.volume = volume;
+        this.pitch = pitch;
+        this.seed = seed;
     }
     private ClientboundSoundEntityPacket(RegistryFriendlyByteBuf input) {
         this.sound = SoundEvent.STREAM_CODEC.decode(input);

@@ -9,7 +9,7 @@ public record ClientboundChunkBatchFinishedPacket(int batchSize) implements Pack
             output.writeVarInt(packet.batchSize());
         }, input -> new ClientboundChunkBatchFinishedPacket(input.readVarInt())));
     private ClientboundChunkBatchFinishedPacket(FriendlyByteBuf input) {
-        this((int) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundChunkBatchFinishedPacket#<init>");
+        this(input.readVarInt());
     }
     public PacketType<ClientboundChunkBatchFinishedPacket> type() {
         return GamePacketTypes.CLIENTBOUND_CHUNK_BATCH_FINISHED;

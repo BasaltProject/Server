@@ -12,7 +12,10 @@ public class ClientboundContainerSetSlotPacket implements Packet<ClientGamePacke
     private final ItemStack itemStack;
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundContainerSetSlotPacket> STREAM_CODEC = org.basaltmc.bukkit.net.GuardedCodecs.guard("ClientboundContainerSetSlotPacket", () -> Packet.codec(ClientboundContainerSetSlotPacket::write, ClientboundContainerSetSlotPacket::new));
     public ClientboundContainerSetSlotPacket(int containerId, int stateId, int slot, ItemStack itemStack) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket#<init>");
+        this.containerId = containerId;
+        this.stateId = stateId;
+        this.slot = slot;
+        this.itemStack = itemStack.copy();
     }
     private ClientboundContainerSetSlotPacket(RegistryFriendlyByteBuf input) {
         this.containerId = input.readContainerId();
