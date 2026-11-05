@@ -437,12 +437,13 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
     if (candidates.empty()) {
         return 0;
     }
-    std::vector<Chunk*> withEntities;
+    // Coordinates, not pointers: eviction destroys the chunks.
+    std::vector<std::pair<std::int32_t, std::int32_t>> withEntities;
     std::vector<Chunk*> toSave;
     for (Chunk* chunk : candidates) {
         const bool carries = !state_.entitiesIn(chunk->chunkX(), chunk->chunkZ()).empty();
         if (carries) {
-            withEntities.push_back(chunk);
+            withEntities.emplace_back(chunk->chunkX(), chunk->chunkZ());
         }
         if (chunk->isDirty() || carries) {
             toSave.push_back(chunk);
@@ -451,8 +452,11 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
     save(toSave);
     return onOwner<std::size_t>(owner(), [this, &candidates, &withEntities] {
         const std::size_t evicted = state_.evictClean(candidates);
-        for (const Chunk* chunk : withEntities) {
-            state_.forgetEntitiesIn(chunk->chunkX(), chunk->chunkZ());
+        for (const auto& [chunkX, chunkZ] : withEntities) {
+            // A chunk dirtied again since the save stays loaded, and so do its entities.
+            if (state_.chunkIfLoaded(chunkX, chunkZ) == nullptr) {
+                state_.forgetEntitiesIn(chunkX, chunkZ);
+            }
         }
         return evicted;
     });
