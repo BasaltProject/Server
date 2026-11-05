@@ -30,6 +30,10 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
 #include <basalt/server/runtime/entity/ai/MobGoals.hpp>
+#include <basalt/server/runtime/entity/brain/BrainBehaviors.hpp>
+#include <basalt/server/runtime/entity/brain/BrainPublish.hpp>
+#include <basalt/server/runtime/entity/brain/BrainSensors.hpp>
+#include <basalt/server/runtime/entity/brain/BrainState.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
@@ -336,11 +340,54 @@ void MobActionSystem::retarget(world::LoadedWorld& world, ServerEntity& mob,
     }
 }
 
+entity::ai::MobContext MobActionSystem::mobContext(world::LoadedWorld& world, ServerEntity& mob,
+                                                   const std::vector<entity::ai::PlayerView>& views,
+                                                   const std::vector<ServerEntity*>& living,
+                                                   random::RandomSource& random, bool raider) {
+    return entity::ai::MobContext{.world = world.state(),
+                                  .mob = mob,
+                                  .random = random,
+                                  // One snapshot per tick for the whole world: per mob it copied the entity list.
+                                  .entities = living,
+                                  .players = views,
+                                  .actions = *this,
+                                  .light = lightAt(world, entity::mobCombat::blockPosition(mob)),
+                                  .night = world::beds::isNight(world.clock().totalTicks()),
+                                  .dayTime = world.clock().totalTicks(),
+                                  .gameTime = world.gameTime(),
+                                  .universalAnger = world.gameRules().get(world::gameRules::kUniversalAnger),
+                                  .raid = raider ? raids_->raidOf(world, mob) : std::nullopt,
+                                  .speed = mob.attributeWithModifiers(entity::attribute::kMovementSpeed),
+                                  .skyDarken = world.skyDarken(),
+                                  .hasSkylight = config::dimensionFacts(world.declaration().dimension).hasSkylight,
+                                  .ambientLight = config::dimensionFacts(world.declaration().dimension).ambientLight,
+                                  .seaLevel = config::dimensionFacts(world.declaration().dimension).seaLevel,
+                                  .minY = config::dimensionFacts(world.declaration().dimension).chunkHeight.minY()};
+}
+
+void MobActionSystem::tickBrainOnly(world::LoadedWorld& world, ServerEntity& mob,
+                                    const std::vector<entity::ai::PlayerView>& views,
+                                    const std::vector<ServerEntity*>& living, random::RandomSource& random) {
+    if (mob.brainState == nullptr) {
+        return;
+    }
+    mob.brainState->tick(world.gameTime(), world.clock().totalTicks(), mob.age < 0);
+    entity::ai::MobContext context = mobContext(world, mob, views, living, random, false);
+    entity::brain::runSensors(context, *mob.brainState);
+    entity::brain::runBehaviors(context, *mob.brainState);
+}
+
 void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                 const std::vector<entity::ai::PlayerView>& views,
                                 const std::vector<ServerEntity*>& living, random::RandomSource& random) {
+    if (mob.brainState != nullptr) {
+        mob.brainState->tick(world.gameTime(), world.clock().totalTicks(), mob.age < 0);
+    }
     if (mob.type().path() == "villager") {
         tickVillager(world, mob, views, living, random);
+        if (mob.brainState != nullptr) {
+            entity::brain::publishVillager(mob, *mob.brainState);
+        }
         return;
     }
     if (mob.goals == nullptr) {
@@ -367,34 +414,30 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
         mob.misc->boosting = false;
     }
     const BrainTick brain = brainOf(mob.type());
-    if (mob.goals == nullptr && brain == nullptr) {
+    if (mob.goals == nullptr && brain == nullptr && mob.brainState == nullptr) {
         travelMob(world, mob, mob.attributeWithModifiers(entity::attribute::kMovementSpeed), &random);
         return;
     }
-    entity::ai::MobContext context{.world = world.state(),
-                                   .mob = mob,
-                                   .random = random,
-                                   // One snapshot per tick for the whole world: per mob it copied the entity list.
-                                   .entities = living,
-                                   .players = views,
-                                   .actions = *this,
-                                   .light = lightAt(world, entity::mobCombat::blockPosition(mob)),
-                                   .night = world::beds::isNight(world.clock().totalTicks()),
-                                   .dayTime = world.clock().totalTicks(),
-                                   .gameTime = world.gameTime(),
-                                   .universalAnger = world.gameRules().get(world::gameRules::kUniversalAnger),
-                                   .raid = raider ? raids_->raidOf(world, mob) : std::nullopt,
-                                   .speed = mob.attributeWithModifiers(entity::attribute::kMovementSpeed),
-                                   .skyDarken = world.skyDarken(),
-                                   .hasSkylight = config::dimensionFacts(world.declaration().dimension).hasSkylight,
-                                   .ambientLight = config::dimensionFacts(world.declaration().dimension).ambientLight,
-                                   .seaLevel = config::dimensionFacts(world.declaration().dimension).seaLevel,
-                                   .minY = config::dimensionFacts(world.declaration().dimension).chunkHeight.minY()};
+    entity::ai::MobContext context = mobContext(world, mob, views, living, random, raider);
+    if (mob.brainState != nullptr) {
+        entity::brain::runSensors(context, *mob.brainState);
+        entity::brain::runBehaviors(context, *mob.brainState);
+    }
+    if (mob.goals == nullptr && brain == nullptr) {
+        if (mob.brainState != nullptr) {
+            entity::brain::publish(context, *mob.brainState);
+        }
+        travelMob(world, mob, context.speed, &random);
+        return;
+    }
     // parity: `Allay.customServerAiStep`.
     const bool goalsToo =
         mob.goals != nullptr && (mob.type().path() == "tadpole" || (brain != nullptr && mob.goals->hasPluginGoals()));
     if (brain != nullptr && !goalsToo) {
         (this->*brain)(world, context);
+        if (mob.brainState != nullptr) {
+            entity::brain::publish(context, *mob.brainState);
+        }
         travelMob(world, mob, context.speed, &random);
         return;
     }
@@ -406,6 +449,9 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     }
     if (goalsToo) {
         (this->*brain)(world, context);
+        if (mob.brainState != nullptr) {
+            entity::brain::publish(context, *mob.brainState);
+        }
     }
     // parity: the target a vex faces and a blaze rises to, as it stands after the goals.
     std::optional<std::array<double, 3>> target;

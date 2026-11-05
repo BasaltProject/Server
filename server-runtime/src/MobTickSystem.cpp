@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/WanderingTraderLifetime.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
+#include <basalt/server/runtime/entity/brain/BrainState.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
@@ -261,6 +262,8 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     }
     if (driver != nullptr) {
         actions_->tickRidden(world, entity, *driver);
+    } else if (entity.noAi && entity.brainState != nullptr && entity.brainState->takeDrive()) {
+        actions_->tickBrainOnly(world, entity, views, living, random);
     } else if (!entity.noAi && !steered) {
         const std::optional<std::int32_t> targeted = entity.targetId;
         actions_->tickMobAi(world, entity, views, living, random);

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/brain/BrainBehaviors.hpp>
 #include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -27,6 +28,9 @@ void MobActionSystem::tickVillager(world::LoadedWorld& world, entity::ServerEnti
     entity::villager::villagerBrain::stateOf(villager).dimension =
         config::dimensionRegistryKey(world.declaration().dimension);
     entity::villager::villagerBrain::tick(context, villagersIn(world));
+    if (villager.brainState != nullptr) {
+        entity::brain::runBehaviors(context, *villager.brainState);
+    }
     travelMob(world, villager, context.speed);
 }
 

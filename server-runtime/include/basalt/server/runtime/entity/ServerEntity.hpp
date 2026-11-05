@@ -131,6 +131,10 @@ struct ShulkerState;
 struct BulletState;
 } // namespace shulkers
 
+namespace brain {
+class BrainState;
+} // namespace brain
+
 namespace ai {
 class GoalSelector;
 
@@ -407,6 +411,7 @@ public:
     std::int32_t stingerCount = 0;
     std::int32_t removeStingerTime = 0;
     std::shared_ptr<ai::brainKit::SensorScan> sensorScan;
+    std::shared_ptr<brain::BrainState> brainState;
     std::optional<std::array<double, 3>> emittedFrom;
     float moveDist = 0.0F;
     float flyDist = 0.0F;

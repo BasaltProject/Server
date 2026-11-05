@@ -1,3 +1,4 @@
+#include <basalt/server/entity/Breeding.hpp>
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -133,23 +134,10 @@ void inherit(ServerEntity& baby, const ServerEntity& horse, const ServerEntity& 
 }
 
 double offspringAttribute(double parentA, double parentB, double min, double max, random::RandomSource& random) {
-    const double a = std::clamp(parentA, min, max);
-    const double b = std::clamp(parentB, min, max);
-    const double margin = 0.15 * (max - min);
-    const double range = std::abs(a - b) + (margin * 2.0);
-    const double average = (a + b) / 2.0;
     const double first = random.nextDouble();
     const double second = random.nextDouble();
     const double third = random.nextDouble();
-    const double quality = ((first + second + third) / 3.0) - 0.5;
-    const double value = average + (range * quality);
-    if (value > max) {
-        return max - (value - max);
-    }
-    if (value < min) {
-        return min + (min - value);
-    }
-    return value;
+    return server::entity::breeding::offspringAttribute(parentA, parentB, min, max, first, second, third);
 }
 
 } // namespace basalt::server::runtime::entity::horses

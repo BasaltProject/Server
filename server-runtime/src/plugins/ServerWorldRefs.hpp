@@ -140,6 +140,10 @@ public:
                       std::function<void(bool)> done) override;
     bool holdChunks(std::string_view token, std::span<const std::int32_t> chunks) override;
     void releaseChunks(std::string_view token) override;
+    void releaseChunkPairs(std::string_view token, std::span<const std::int32_t> chunks) override;
+    [[nodiscard]] std::vector<std::int32_t> heldChunks(std::string_view token) const override;
+    [[nodiscard]] std::vector<std::string> chunkHolders(std::int32_t chunkX, std::int32_t chunkZ,
+                                                        bool all) const override;
     std::int32_t settleBlocks(std::span<const std::int32_t> positions, std::span<const std::int32_t> previous,
                               std::uint32_t effects) override;
     std::int32_t neighborChanged(std::span<const std::int32_t> positions,

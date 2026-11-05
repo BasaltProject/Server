@@ -24,6 +24,11 @@ public:
     [[nodiscard]] climate::BiomeName biomeAtQuart(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ,
                                                   densityfunction::SamplerContext* cache = nullptr) const;
 
+    [[nodiscard]] climate::TargetPoint climateAtQuart(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ,
+                                                      densityfunction::SamplerContext* cache = nullptr) const {
+        return sampler_.sample(quartX, quartY, quartZ, cache);
+    }
+
     /// parity: `BiomeManager.getBiome`, used by block-position gameplay and worldgen filters.
     [[nodiscard]] climate::BiomeName blockBiomeAt(std::int32_t x, std::int32_t y, std::int32_t z,
                                                   densityfunction::SamplerContext* cache = nullptr) const;

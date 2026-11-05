@@ -430,6 +430,54 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                     args.setField("falling");
                     return 1;
                 })
+        .method("climate",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    std::optional<std::array<std::int64_t, 6>> point;
+                    if (env != nullptr) {
+                        point = env->climateAtQuart(static_cast<std::int32_t>(args.checkInteger(base)) >> 2,
+                                                    static_cast<std::int32_t>(args.checkInteger(base + 1)) >> 2,
+                                                    static_cast<std::int32_t>(args.checkInteger(base + 2)) >> 2);
+                    }
+                    if (!point.has_value()) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    constexpr std::array<const char*, 6> kNames{"temperature", "humidity", "continentalness",
+                                                                "erosion",     "depth",    "weirdness"};
+                    args.pushTable();
+                    for (std::size_t at = 0; at < kNames.size(); ++at) {
+                        args.pushNumber(static_cast<double>((*point)[at]) / 10000.0);
+                        args.setField(kNames[at]);
+                    }
+                    return 1;
+                })
+        .method("beacon_scan",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    PluginBeacon scan;
+                    if (env != nullptr) {
+                        scan = env->beaconScan(static_cast<std::int32_t>(args.checkInteger(base)),
+                                               static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                               static_cast<std::int32_t>(args.checkInteger(base + 2)));
+                    }
+                    args.pushTable();
+                    args.pushInteger(scan.levels);
+                    args.setField("levels");
+                    args.pushTable();
+                    for (std::size_t at = 0; at < scan.sections.size(); ++at) {
+                        args.pushTable();
+                        args.pushInteger(scan.sections[at][0]);
+                        args.setField("color");
+                        args.pushInteger(scan.sections[at][1]);
+                        args.setField("height");
+                        args.setIndex(static_cast<std::int64_t>(at) + 1);
+                    }
+                    args.setField("sections");
+                    return 1;
+                })
         .method("fluid_flow",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);

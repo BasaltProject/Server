@@ -85,6 +85,59 @@ bool beamReachesSky(const PassesBeam& passes, const std::int32_t x, const std::i
     return true;
 }
 
+std::int32_t tintOf(const std::string_view block) {
+    constexpr std::array<std::pair<std::string_view, std::int32_t>, 16> kDyes{{{"white", 16383998},
+                                                                               {"orange", 16351261},
+                                                                               {"magenta", 13061821},
+                                                                               {"light_blue", 3847130},
+                                                                               {"yellow", 16701501},
+                                                                               {"lime", 8439583},
+                                                                               {"pink", 15961002},
+                                                                               {"gray", 4673362},
+                                                                               {"light_gray", 10329495},
+                                                                               {"cyan", 1481884},
+                                                                               {"purple", 8991416},
+                                                                               {"blue", 3949738},
+                                                                               {"brown", 8606770},
+                                                                               {"green", 6192150},
+                                                                               {"red", 11546150},
+                                                                               {"black", 1908001}}};
+    const std::size_t stained = block.find("_stained");
+    const std::string_view dye = stained == std::string_view::npos ? block : block.substr(0, stained);
+    for (const auto& [name, rgb] : kDyes) {
+        if (name == dye) {
+            return rgb;
+        }
+    }
+    return kDyes[0].second;
+}
+
+std::vector<BeamPiece> beamPieces(const std::span<const BeamCell> column, const std::span<const std::int32_t> tints) {
+    std::vector<BeamPiece> pieces;
+    std::size_t tint = 0;
+    for (const BeamCell cell : column) {
+        if (cell == BeamCell::Tinted) {
+            const std::int32_t rgb = tint < tints.size() ? tints[tint++] : 0xFFFFFF;
+            if (pieces.empty()) {
+                pieces.push_back({rgb, 1});
+                continue;
+            }
+            std::int32_t mixed = 0;
+            for (std::int32_t shift = 0; shift <= 16; shift += 8) {
+                mixed |= ((((pieces.back().color >> shift) & 0xFF) + ((rgb >> shift) & 0xFF)) / 2) << shift;
+            }
+            pieces.push_back({mixed, 1});
+        } else if (cell == BeamCell::Blocked) {
+            break;
+        } else if (pieces.empty()) {
+            pieces.push_back({0xFFFFFF, 1});
+        } else {
+            ++pieces.back().height;
+        }
+    }
+    return pieces;
+}
+
 bool allows(const std::string_view primary, const std::string_view secondary, const std::int32_t levels) {
     if (!secondary.empty() && levels < kMaxLevels) {
         return false;

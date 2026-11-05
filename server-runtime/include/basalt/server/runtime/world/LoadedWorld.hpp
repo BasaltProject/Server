@@ -294,6 +294,14 @@ public:
 
     void releaseChunks(const std::string& token);
 
+    void releaseChunkKeys(const std::string& token, const std::vector<std::int64_t>& keys);
+
+    [[nodiscard]] std::vector<std::int64_t> heldBy(const std::string& token) const;
+
+    [[nodiscard]] std::vector<std::string> holdersOf(std::int32_t chunkX, std::int32_t chunkZ) const;
+
+    [[nodiscard]] std::vector<std::string> holderTokens() const;
+
     [[nodiscard]] bool isHeld(std::int32_t chunkX, std::int32_t chunkZ) const;
 
     /// Not the same as the clock: `/time set` moves one, not the other.

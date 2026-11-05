@@ -66,6 +66,9 @@ public:
     /// In the order the tag lists them.
     [[nodiscard]] const std::vector<VillagerTrade>& forProfession(std::string_view profession, std::int32_t level);
 
+    /// A trade file by id, parsed on every call; nothing when it is missing or does not parse.
+    [[nodiscard]] std::optional<VillagerTrade> byId(const wire::common::Identifier& id);
+
     /// parity: `VillagerProfession.getTrades(level)`, the level's `trade_set` file.
     [[nodiscard]] const TradeSet& tradeSet(std::string_view profession, std::int32_t level);
 

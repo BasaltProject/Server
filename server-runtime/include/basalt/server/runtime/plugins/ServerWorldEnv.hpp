@@ -46,6 +46,9 @@ public:
                                           bool direct) override;
     [[nodiscard]] double temperature(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] double humidity(std::int32_t x, std::int32_t y, std::int32_t z) override;
+    [[nodiscard]] std::optional<std::array<std::int64_t, 6>> climateAtQuart(std::int32_t quartX, std::int32_t quartY,
+                                                                            std::int32_t quartZ) override;
+    [[nodiscard]] server::plugins::PluginBeacon beaconScan(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] double breakSpeed(std::string_view player, std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::vector<server::plugins::PluginStructureStart> structureStarts(std::int32_t chunkX,
                                                                                      std::int32_t chunkZ) override;

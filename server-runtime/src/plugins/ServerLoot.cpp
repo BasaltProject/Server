@@ -1,7 +1,10 @@
+#include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/plugins/ServerLoot.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/nbt/Snbt.hpp>
 
+#include <algorithm>
 #include <random>
 
 namespace basalt::server::runtime::plugins {
@@ -24,10 +27,101 @@ bool ServerLoot::has(std::string_view table) {
 std::optional<std::vector<server::plugins::PluginLootItem>>
 ServerLoot::roll(std::string_view table, const server::plugins::PluginLootRoll& rolled) {
     const auto id = wire::common::Identifier::parse(std::string{table});
-    world::LoadedWorld* world = hooks_.worldFor ? hooks_.worldFor(rolled.world) : nullptr;
     const server::world::loot::LootTable* found =
         hooks_.tables == nullptr || !id.has_value() ? nullptr : hooks_.tables->byId(*id);
-    if (found == nullptr || world == nullptr) {
+    if (found == nullptr) {
+        return std::nullopt;
+    }
+    return generate(*found, rolled);
+}
+
+std::optional<std::vector<server::plugins::PluginLootItem>>
+ServerLoot::rollJson(std::string_view json, const server::plugins::PluginLootRoll& rolled) {
+    if (hooks_.tables == nullptr) {
+        return std::nullopt;
+    }
+    const auto parsed = server::world::loot::lootTableJson::parse(json, &hooks_.tables->references());
+    if (!parsed.has_value()) {
+        return std::nullopt;
+    }
+    return generate(*parsed, rolled);
+}
+
+namespace {
+
+server::plugins::PluginLootItem flatten(const server::world::loot::ItemStack& stack) {
+    return server::plugins::PluginLootItem{
+        .item = stack.item.toString(),
+        .count = stack.count,
+        .components = stack.components.empty()
+                          ? std::string{}
+                          : wire::nbt::snbt::stringify(wire::nbt::NbtTag::ofCompound(stack.components))};
+}
+
+} // namespace
+
+std::optional<std::vector<server::plugins::PluginTradeOffer>>
+ServerLoot::trades(std::string_view profession, std::int32_t level, const server::plugins::PluginTradeRoll& roll) {
+    world::LoadedWorld* world = hooks_.worldFor ? hooks_.worldFor(roll.world) : nullptr;
+    const auto known = entity::villagers::professions();
+    if (world == nullptr || hooks_.villagerTrades == nullptr ||
+        (roll.listed.empty() && std::find(known.begin(), known.end(), profession) == known.end())) {
+        return std::nullopt;
+    }
+    const std::int64_t seed = roll.seed != 0 ? roll.seed : static_cast<std::int64_t>(std::random_device{}());
+    const std::array<double, 3> origin{roll.x, roll.y, roll.z};
+    std::vector<world::trades::Offer> rolled;
+    if (roll.listed.empty()) {
+        rolled = entity::villagers::rollOffers(
+            *hooks_.villagerTrades, profession,
+            std::clamp(level, entity::villagers::kFirstLevel, entity::villagers::kMaxLevel), *world, origin,
+            roll.variant, roll.amount < 0 ? std::nullopt : std::optional<std::int32_t>{roll.amount}, seed);
+    } else {
+        std::vector<wire::common::Identifier> ids;
+        for (const std::string& name : roll.listed) {
+            if (const auto id = wire::common::Identifier::parse(name); id.has_value()) {
+                ids.push_back(*id);
+            }
+        }
+        rolled = entity::villagers::rollListed(*hooks_.villagerTrades, ids, roll.amount < 0 ? 1 : roll.amount, *world,
+                                               origin, roll.variant, seed);
+    }
+    std::vector<server::plugins::PluginTradeOffer> out;
+    for (const world::trades::Offer& offer : rolled) {
+        server::plugins::PluginTradeOffer made{.result = flatten(offer.result),
+                                               .maxUses = offer.maxUses,
+                                               .experience = offer.experience,
+                                               .priceMultiplier = offer.priceMultiplier};
+        made.costA = flatten(offer.costA);
+        if (offer.costB.has_value()) {
+            made.costB = flatten(*offer.costB);
+        }
+        out.push_back(std::move(made));
+    }
+    return out;
+}
+
+std::optional<double> ServerLoot::number(std::string_view json, bool asFloat, std::int64_t seed) {
+    const auto parsed = wire::common::parseJson(json);
+    if (!parsed.has_value()) {
+        return std::nullopt;
+    }
+    server::world::loot::LootReferences* references = hooks_.tables == nullptr ? nullptr : &hooks_.tables->references();
+    random::RandomSource random =
+        random::RandomSource::legacy(seed != 0 ? seed : static_cast<std::int64_t>(std::random_device{}()));
+    const server::world::loot::LootContext context;
+    if (asFloat) {
+        const auto provider = server::world::loot::lootTableJson::parseFloatProvider(*parsed, references);
+        return provider.has_value() ? std::optional<double>{provider->get(random, context)} : std::nullopt;
+    }
+    const auto provider = server::world::loot::lootTableJson::parseIntProvider(*parsed, references);
+    return provider.has_value() ? std::optional<double>{provider->get(random, context)} : std::nullopt;
+}
+
+std::optional<std::vector<server::plugins::PluginLootItem>>
+ServerLoot::generate(const server::world::loot::LootTable& found, const server::plugins::PluginLootRoll& rolled) {
+    world::LoadedWorld* world = hooks_.worldFor ? hooks_.worldFor(rolled.world) : nullptr;
+    if (world == nullptr) {
         return std::nullopt;
     }
     server::world::loot::LootContext context;
@@ -47,7 +141,7 @@ ServerLoot::roll(std::string_view table, const server::plugins::PluginLootRoll& 
     random::RandomSource random = random::RandomSource::legacy(
         rolled.seed != 0 ? rolled.seed : static_cast<std::int64_t>(std::random_device{}()));
     std::vector<server::plugins::PluginLootItem> out;
-    for (const server::world::loot::ItemStack& stack : found->generate(random, rolled.luck, std::nullopt, context)) {
+    for (const server::world::loot::ItemStack& stack : found.generate(random, rolled.luck, std::nullopt, context)) {
         out.push_back(server::plugins::PluginLootItem{
             .item = stack.item.toString(),
             .count = stack.count,

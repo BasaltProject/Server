@@ -1,3 +1,4 @@
+#include <basalt/server/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/DragonNavigation.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -136,20 +137,6 @@ private:
     std::vector<std::int32_t> heap_;
 };
 
-/// parity: `Mth.ASIN_TAB` and `Mth.COS_TAB`.
-struct AtanTables {
-    std::array<double, 257> asin{};
-    std::array<double, 257> cos{};
-
-    AtanTables() {
-        for (std::size_t index = 0; index < 257; ++index) {
-            const double value = static_cast<double>(index) / 256.0;
-            asin[index] = std::asin(value);
-            cos[index] = std::cos(asin[index]);
-        }
-    }
-};
-
 } // namespace
 
 Phase phaseById(std::int32_t id) noexcept {
@@ -198,49 +185,7 @@ double wrapDegrees(double degrees) noexcept {
     return wrapped;
 }
 
-double vanillaAtan2(double y, double x) {
-    // parity: `Mth.atan2`, a table lookup and a cubic correction rather than the libm one.
-    static const AtanTables kTables;
-    const double squared = (x * x) + (y * y);
-    if (std::isnan(squared)) {
-        return std::numeric_limits<double>::quiet_NaN();
-    }
-    const bool negY = y < 0.0;
-    if (negY) {
-        y = -y;
-    }
-    const bool negX = x < 0.0;
-    if (negX) {
-        x = -x;
-    }
-    const bool steep = y > x;
-    if (steep) {
-        std::swap(x, y);
-    }
-    const double inverse = wire::common::mth::fastInvSqrt(squared);
-    x *= inverse;
-    y *= inverse;
-    // 2^44 has a ulp of 1/256, so adding it rounds y to the table's step and the low bits are the index.
-    constexpr double kFracBias = 17592186044416.0;
-    const double biased = kFracBias + y;
-    const auto index = static_cast<std::size_t>(static_cast<std::uint32_t>(std::bit_cast<std::uint64_t>(biased)));
-    const double phi = kTables.asin[index];
-    const double cosPhi = kTables.cos[index];
-    const double sinPhi = biased - kFracBias;
-    const double sd = (y * cosPhi) - (x * sinPhi);
-    const double correction = (6.0 + (sd * sd)) * sd * 0.16666666666666666;
-    double theta = phi + correction;
-    if (steep) {
-        theta = (std::numbers::pi / 2) - theta;
-    }
-    if (negX) {
-        theta = std::numbers::pi - theta;
-    }
-    if (negY) {
-        theta = -theta;
-    }
-    return theta;
-}
+double vanillaAtan2(double y, double x) { return ::basalt::server::entity::projectile::atan2(y, x); }
 
 void buildNodes(DragonState& state, const std::function<std::int32_t(std::int32_t x, std::int32_t z)>& heightNoLeaves) {
     if (state.nodesReady) {

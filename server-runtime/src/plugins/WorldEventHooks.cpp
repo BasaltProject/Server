@@ -387,6 +387,20 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
         const bool* answer = event == nullptr ? nullptr : std::get_if<bool>(&event->get("result"));
         return answer != nullptr && *answer;
     };
+    hooks.pluginBehavior = [&sink](const world::LoadedWorld& world, const entity::ServerEntity& mob,
+                                   std::string_view key, entity::ai::PluginGoalPhase phase) {
+        constexpr std::string_view kPhases[] = {"can_use", "can_continue", "start", "stop", "tick"};
+        const server::plugins::PluginEvent* event = sink.ask(&entityBehavior, [&](PluginEvent& filled) {
+            filled.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
+            filled.set("entity_type", mob.type().toString());
+            filled.set("world", world.name());
+            filled.set("key", std::string{key});
+            filled.set("phase", std::string{kPhases[static_cast<std::size_t>(phase)]});
+            filled.set("result", false);
+        });
+        const bool* answer = event == nullptr ? nullptr : std::get_if<bool>(&event->get("result"));
+        return answer != nullptr && *answer;
+    };
     hooks.deathDrops = [&sink, worldOf](const world::LoadedWorld& world, const entity::ServerEntity& mob,
                                         std::vector<server::world::loot::ItemStack>& drops, std::int32_t& experience) {
         std::string lines;

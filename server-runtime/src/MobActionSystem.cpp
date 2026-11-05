@@ -439,6 +439,11 @@ bool MobActionSystem::pluginGoal(ServerEntity& mob, std::string_view key, entity
     return world != nullptr && hooks_.pluginGoal(*world, mob, key, phase);
 }
 
+bool MobActionSystem::pluginBehavior(ServerEntity& mob, std::string_view key, entity::ai::PluginGoalPhase phase) {
+    const world::LoadedWorld* world = hooks_.pluginBehavior ? worldOf(mob) : nullptr;
+    return world != nullptr && hooks_.pluginBehavior(*world, mob, key, phase);
+}
+
 void MobActionSystem::poseChanged(ServerEntity& mob) {
     world::LoadedWorld* world = worldOf(mob);
     if (world == nullptr) {

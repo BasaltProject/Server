@@ -1,10 +1,11 @@
-#include <basalt/server/runtime/player/Combat.hpp>
+#include <basalt/server/entity/Combat.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 
-namespace basalt::server::runtime::player::combat {
+namespace basalt::server::entity::combat {
 namespace {
 
 constexpr float kProtectionDivider = 25.0F;
@@ -121,4 +122,18 @@ float afterResistance(float damage, std::int32_t amplifier) {
     return std::max(damage * static_cast<float>(remaining) / kProtectionDivider, 0.0F);
 }
 
-} // namespace basalt::server::runtime::player::combat
+bool scalesWithDifficulty(std::string_view scaling, bool causedByLivingNonPlayer) {
+    const auto is = [scaling](std::string_view name) {
+        return std::ranges::equal(scaling, name, [](char a, char b) {
+            return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+        });
+    };
+    return is("always") || (is("when_caused_by_living_non_player") && causedByLivingNonPlayer);
+}
+
+Absorbed absorb(float damage, float absorption) {
+    const float rest = std::max(damage - absorption, 0.0F);
+    return {rest, absorption - (damage - rest)};
+}
+
+} // namespace basalt::server::entity::combat

@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/BossBarView.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
+#include <basalt/server/runtime/entity/DragonNavigation.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
@@ -517,6 +518,37 @@ void addBosses(Operations& operations) {
             }
         }
         return boxes;
+    };
+    operations["dragon_closest_node"] = [](const Environment&, ServerEntity& entity,
+                                           const Arguments& arguments) -> std::optional<Value> {
+        if (entity.dragon == nullptr) {
+            return static_cast<std::int64_t>(-1);
+        }
+        return static_cast<std::int64_t>(
+            entity::enderDragon::closestNode(*entity.dragon, asReal(at(arguments, 0)), asReal(at(arguments, 1)),
+                                             asReal(at(arguments, 2)), asBool(at(arguments, 3))));
+    };
+    operations["dragon_find_path"] = [](const Environment&, ServerEntity& entity,
+                                        const Arguments& arguments) -> std::optional<Value> {
+        if (entity.dragon == nullptr) {
+            return std::vector<std::string>{};
+        }
+        std::optional<std::array<std::int32_t, 3>> final;
+        if (arguments.size() >= 6) {
+            final = std::array<std::int32_t, 3>{static_cast<std::int32_t>(asInt(at(arguments, 3))),
+                                                static_cast<std::int32_t>(asInt(at(arguments, 4))),
+                                                static_cast<std::int32_t>(asInt(at(arguments, 5)))};
+        }
+        const std::optional<entity::enderDragon::Path> path = entity::enderDragon::findPath(
+            *entity.dragon, static_cast<std::int32_t>(asInt(at(arguments, 0))),
+            static_cast<std::int32_t>(asInt(at(arguments, 1))), final, asBool(at(arguments, 2)));
+        std::vector<std::string> rows;
+        if (path.has_value()) {
+            for (const auto& node : path->nodes) {
+                rows.push_back(std::to_string(node[0]) + "," + std::to_string(node[1]) + "," + std::to_string(node[2]));
+            }
+        }
+        return rows;
     };
     operations["wither_target"] = [](const Environment&, ServerEntity& entity,
                                      const Arguments& arguments) -> std::optional<Value> {
