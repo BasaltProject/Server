@@ -71,6 +71,15 @@ constexpr double kInsideMargin = 1.0E-5;
 constexpr std::int8_t kHoneySlideEvent = 53;
 /// parity: `PlayerList.broadcast` for a block event, sixty-four blocks.
 constexpr double kBlockEventRange = 64.0;
+/// parity: `LevelEvent.SOUND_PORTAL_TRAVEL`.
+constexpr std::int32_t kPortalTravelEvent = 1032;
+
+/// parity: `TeleportTransition.PLAY_PORTAL_SOUND`, heard by the traveller alone once it has arrived.
+void playPortalTravelSound(const PlayerSession& player) {
+    if (player.connection().sendLevelEvent) {
+        player.connection().sendLevelEvent(kPortalTravelEvent, 0, 0, 0, 0);
+    }
+}
 
 } // namespace
 
@@ -582,8 +591,8 @@ void EnvironmentTickSystem::travelThroughPortal(world::LoadedWorld& world, Playe
     }
     player.portalTicks = 0;
     player.portalCooldown = world::netherPortals::kTravelCooldownTicks;
-    if (player.connection().switchWorld) {
-        static_cast<void>(player.connection().switchWorld(*target, exit->x, exit->y, exit->z));
+    if (player.connection().switchWorld && player.connection().switchWorld(*target, exit->x, exit->y, exit->z)) {
+        playPortalTravelSound(player);
     }
 }
 
@@ -631,8 +640,10 @@ void EnvironmentTickSystem::travelThroughEndPortal(world::LoadedWorld& world, Pl
             });
         return;
     }
-    if (player.connection().switchWorld) {
-        static_cast<void>(player.connection().switchWorld(*target, exitX, exitY, exitZ));
+    // parity: leaving the End goes through `findRespawnPositionAndUseSpawnBlock` with `DO_NOTHING`, so no sound.
+    if (player.connection().switchWorld && player.connection().switchWorld(*target, exitX, exitY, exitZ) &&
+        world.declaration().dimension != config::WorldDimension::End) {
+        playPortalTravelSound(player);
     }
 }
 
