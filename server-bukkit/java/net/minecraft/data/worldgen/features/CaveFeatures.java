@@ -36,6 +36,6 @@ public class CaveFeatures {
     public static final ResourceKey<Object> SCULK_PATCH_ANCIENT_CITY = FeatureUtils.createKey("sculk_patch_ancient_city");
     public static final ResourceKey<Object> SCULK_VEIN = FeatureUtils.createKey("sculk_vein");
     public static void bootstrap(BootstrapContext<Feature> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.CaveFeatures#bootstrap");
+        // registries come from the native datapack loader, so there is nothing to bootstrap
     }
 }

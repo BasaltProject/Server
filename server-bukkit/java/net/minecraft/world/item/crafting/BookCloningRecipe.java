@@ -11,8 +11,17 @@ import net.minecraft.world.level.Level;
 public class BookCloningRecipe extends CustomRecipe {
     public static final MinMaxBounds.Ints ALLOWED_BOOK_GENERATION_RANGES = MinMaxBounds.Ints.between(0, 2);
     public static final MinMaxBounds.Ints DEFAULT_BOOK_GENERATION_RANGES = MinMaxBounds.Ints.between(0, 1);
-    public static final MapCodec<BookCloningRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.BookCloningRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, BookCloningRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.BookCloningRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<BookCloningRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Ingredient.CODEC.fieldOf("source").forGetter(o -> o.source),
+        Ingredient.CODEC.fieldOf("material").forGetter(o -> o.material),
+        MinMaxBounds.Ints.CODEC.optionalFieldOf("allowed_generations", DEFAULT_BOOK_GENERATION_RANGES).forGetter(o -> o.allowedGenerations),
+        ItemStackTemplate.CODEC.fieldOf("result").forGetter(o -> o.result)).apply(i, BookCloningRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, BookCloningRecipe> STREAM_CODEC = StreamCodec.composite(
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.source,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.material,
+        MinMaxBounds.Ints.STREAM_CODEC, o -> o.allowedGenerations,
+        ItemStackTemplate.STREAM_CODEC, o -> o.result,
+        BookCloningRecipe::new);
     public static final RecipeSerializer<BookCloningRecipe> SERIALIZER = null;
     private final Ingredient source;
     private final Ingredient material;

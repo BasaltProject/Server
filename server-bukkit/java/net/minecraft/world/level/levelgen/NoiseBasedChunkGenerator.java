@@ -23,25 +23,28 @@ import net.minecraft.world.level.levelgen.blending.Blender;
 import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
 public class NoiseBasedChunkGenerator extends ChunkGenerator {
     protected NoiseBasedChunkGenerator() {
+        this.settings = null;
     }
+    private final Holder<NoiseGeneratorSettings> settings;
     public static final MapCodec<NoiseBasedChunkGenerator> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator.class, "CODEC");
     public NoiseBasedChunkGenerator(BiomeSource biomeSource, Holder<NoiseGeneratorSettings> settings) {
-        super((net.minecraft.world.level.biome.BiomeSource) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#<init>");
+        super(biomeSource);
+        this.settings = settings;
     }
     protected BiomeResolver decorateBiomeResolver(Blender blender, ChunkAccess protoChunk, BiomeResolver biomeResolver) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#decorateBiomeResolver");
+        return biomeResolver;
     }
     public ChunkPos getOrigin(RandomState randomState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#getOrigin");
+        return ChunkPos.ZERO;
     }
     protected MapCodec<? extends ChunkGenerator> codec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#codec");
+        return CODEC;
     }
     public Holder<NoiseGeneratorSettings> generatorSettings() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#generatorSettings");
+        return settings;
     }
     public boolean stable(ResourceKey<NoiseGeneratorSettings> expectedPreset) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#stable");
+        return settings.is(expectedPreset);
     }
     public int getBaseHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState) {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#getBaseHeight");
@@ -50,10 +53,10 @@ public class NoiseBasedChunkGenerator extends ChunkGenerator {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#getBaseColumn");
     }
     public void addDebugScreenInfo(List<String> result, RandomState randomState, BlockPos feetPos, SamplerContext samplerContext) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#addDebugScreenInfo");
+
     }
     public CompletableFuture<ChunkAccess> buildTerrain(ChunkAccess chunk, Blender blender, RandomState randomState, StructureManager structureManager, BiomeManager biomeManager, WorldGenRegion carverBiomeRegion, Set<Holder<Biome>> possibleBiomes) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#buildTerrain");
+        return CompletableFuture.completedFuture(chunk);
     }
     public int getGenDepth() {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#getGenDepth");
@@ -65,6 +68,6 @@ public class NoiseBasedChunkGenerator extends ChunkGenerator {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#getMinY");
     }
     public void spawnOriginalMobs(WorldGenRegion worldGenRegion) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator#spawnOriginalMobs");
+
     }
 }

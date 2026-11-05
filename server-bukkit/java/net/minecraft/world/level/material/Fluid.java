@@ -49,10 +49,13 @@ public abstract class Fluid {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.Fluid#getStateDefinition");
     }
     protected void registerDefaultState(FluidState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.Fluid#registerDefaultState");
+
     }
     public Item getBucket() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.Fluid#getBucket");
+        var key = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(this);
+        String path = key.getPath().startsWith("flowing_") ? key.getPath().substring(8) : key.getPath();
+        return net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(net.minecraft.resources.Identifier.withDefaultNamespace(path + "_bucket"))
+            .orElse(net.minecraft.world.item.Items.AIR);
     }
     protected void animateTick(Level level, BlockPos pos, FluidState fluidState, RandomSource random) {
         
@@ -112,6 +115,6 @@ public abstract class Fluid {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.Fluid#getPickupSound");
     }
     public Holder.Reference<Fluid> builtInRegistryHolder() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.Fluid#builtInRegistryHolder");
+        return (Holder.Reference<Fluid>) net.minecraft.core.registries.BuiltInRegistries.FLUID.wrapAsHolder(this);
     }
 }

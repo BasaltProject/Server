@@ -46,6 +46,6 @@ public interface PalettedContainerRO<T> {
         }
     }
     default void forEachInPalette(Consumer<T> consumer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.PalettedContainerRO#forEachInPalette");
+        count((value, amount) -> consumer.accept(value));
     }
 }

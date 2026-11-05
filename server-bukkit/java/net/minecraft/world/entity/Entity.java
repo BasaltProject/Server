@@ -764,21 +764,10 @@ public class Entity implements Nameable, EntityAccess, ScoreHolder, SyncedDataHo
                 stepBox = stepBox.expandTowards(0.0, -1.0E-5, 0.0);
             }
             List<VoxelShape> colliders = collectAllColliders(this, level(), stepBox);
-            java.util.TreeSet<Double> heights = new java.util.TreeSet<>();
-            heights.add((double) maxUpStep());
-            for (VoxelShape shape : colliders) {
-                for (AABB part : shape.toAabbs()) {
-                    double rise = part.maxY - grounded.minY;
-                    if (rise > 0.0 && rise <= maxUpStep()) {
-                        heights.add(rise);
-                    }
-                }
-            }
-            for (double height : heights) {
-                Vec3 stepped = collideWithShapes(new Vec3(movement.x, height, movement.z), grounded, colliders);
-                if (stepped.horizontalDistanceSqr() > result.horizontalDistanceSqr()) {
-                    return stepped.add(0.0, grounded.minY - box.minY, 0.0);
-                }
+            double[] stepped = org.basaltmc.bukkit.MechanicsNatives.stepUp(flatten(colliders), corners(grounded),
+                grounded.minY - box.minY, movement.x, movement.y, movement.z, maxUpStep(), result.horizontalDistanceSqr());
+            if (stepped != null) {
+                return new Vec3(stepped[0], stepped[1], stepped[2]);
             }
         }
         return result;
@@ -787,43 +776,28 @@ public class Entity implements Nameable, EntityAccess, ScoreHolder, SyncedDataHo
         if (shapes.isEmpty()) {
             return movement;
         }
-        double x = movement.x;
-        double y = movement.y;
-        double z = movement.z;
-        AABB moving = box;
-        if (y != 0.0) {
-            y = collideAxis(Direction.Axis.Y, moving, shapes, y);
-            if (y != 0.0) {
-                moving = moving.move(0.0, y, 0.0);
-            }
-        }
-        boolean zFirst = Math.abs(x) < Math.abs(z);
-        if (zFirst && z != 0.0) {
-            z = collideAxis(Direction.Axis.Z, moving, shapes, z);
-            if (z != 0.0) {
-                moving = moving.move(0.0, 0.0, z);
-            }
-        }
-        if (x != 0.0) {
-            x = collideAxis(Direction.Axis.X, moving, shapes, x);
-            if (!zFirst && x != 0.0) {
-                moving = moving.move(x, 0.0, 0.0);
-            }
-        }
-        if (!zFirst && z != 0.0) {
-            z = collideAxis(Direction.Axis.Z, moving, shapes, z);
-        }
-        return new Vec3(x, y, z);
+        double[] swept = org.basaltmc.bukkit.MechanicsNatives.collide(flatten(shapes), corners(box), movement.x, movement.y, movement.z);
+        return new Vec3(swept[0], swept[1], swept[2]);
     }
-    private static double collideAxis(Direction.Axis axis, AABB moving, List<VoxelShape> shapes, double distance) {
-        double remaining = distance;
-        for (VoxelShape shape : shapes) {
-            remaining = shape.collide(axis, moving, remaining);
-            if (Math.abs(remaining) < 1.0E-7) {
-                return 0.0;
+    private static double[] corners(AABB box) {
+        return new double[] {box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ};
+    }
+    private static double[] flatten(List<VoxelShape> shapes) {
+        java.util.ArrayList<AABB> parts = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> owners = new java.util.ArrayList<>();
+        for (int shape = 0; shape < shapes.size(); shape++) {
+            for (AABB part : shapes.get(shape).toAabbs()) {
+                parts.add(part);
+                owners.add(shape);
             }
         }
-        return remaining;
+        double[] out = new double[parts.size() * 7];
+        for (int at = 0; at < parts.size(); at++) {
+            AABB part = parts.get(at);
+            System.arraycopy(corners(part), 0, out, at * 7, 6);
+            out[at * 7 + 6] = owners.get(at);
+        }
+        return out;
     }
     public void recordMovement(MoverType moverType, Vec3 movement) {
     }

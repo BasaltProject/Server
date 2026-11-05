@@ -9,6 +9,6 @@ public record ScaleExponentially(LevelBasedValue base, LevelBasedValue exponent)
         return inputValue * (float) Math.pow(base.calculate(enchantmentLevel), exponent.calculate(enchantmentLevel));
     }
     public MapCodec<ScaleExponentially> codec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.effects.ScaleExponentially#codec");
+        return CODEC;
     }
 }

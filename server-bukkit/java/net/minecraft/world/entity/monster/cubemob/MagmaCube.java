@@ -31,10 +31,12 @@ public class MagmaCube extends AbstractCubeMob implements Enemy {
         return true;
     }
     public void setSize(int size, boolean updateHealth) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.cubemob.MagmaCube#setSize");
+        if (live() instanceof org.bukkit.entity.Slime api) {
+            api.setSize(size);
+        }
     }
     protected ParticleOptions getParticleType() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.cubemob.MagmaCube#getParticleType");
+        return net.minecraft.core.particles.ParticleTypes.FLAME;
     }
     protected int getJumpDelay() {
         return 0;

@@ -65,19 +65,45 @@ public class CropBlock extends VegetationBlock implements BonemealableBlock {
         return 2 + java.util.concurrent.ThreadLocalRandom.current().nextInt(4);
     }
     protected static float getGrowthSpeed(Block type, BlockGetter level, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.CropBlock#getGrowthSpeed");
+        float speed = 1.0F;
+        BlockPos below = pos.below();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockState ground = level.getBlockState(below.offset(dx, 0, dz));
+                float share = 0.0F;
+                if (ground.is(net.minecraft.tags.BlockTags.GROWS_CROPS)) {
+                    share = ground.getValueOrElse(FarmlandBlock.MOISTURE, 0) > 0 ? 3.0F : 1.0F;
+                }
+                speed += dx == 0 && dz == 0 ? share : share / 4.0F;
+            }
+        }
+        BlockPos west = pos.west();
+        BlockPos east = pos.east();
+        BlockPos north = pos.north();
+        BlockPos south = pos.south();
+        boolean alongX = level.getBlockState(west).is(type) || level.getBlockState(east).is(type);
+        boolean alongZ = level.getBlockState(north).is(type) || level.getBlockState(south).is(type);
+        boolean diagonal = level.getBlockState(west.north()).is(type) || level.getBlockState(east.north()).is(type)
+            || level.getBlockState(east.south()).is(type) || level.getBlockState(west.south()).is(type);
+        return (alongX && alongZ) || diagonal ? speed / 2.0F : speed;
     }
     protected boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {
         return super.canSurvive(state, level, pos);
     }
     protected static boolean hasSufficientLight(LevelReader level, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.CropBlock#hasSufficientLight");
+        return level.getRawBrightness(pos, 0) >= 8;
     }
     protected void entityInside(BlockState state, Level level, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier, boolean isPrecise) {
         super.entityInside(state, level, pos, entity, effectApplier, isPrecise);
     }
     protected ItemLike getBaseSeedId() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.CropBlock#getBaseSeedId");
+        String name = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(this).getPath();
+        return switch (name) {
+            case "carrots" -> net.minecraft.world.item.Items.CARROT;
+            case "potatoes" -> net.minecraft.world.item.Items.POTATO;
+            case "beetroots" -> net.minecraft.world.item.Items.BEETROOT_SEEDS;
+            default -> net.minecraft.world.item.Items.WHEAT_SEEDS;
+        };
     }
     protected ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData) {
         return super.getCloneItemStack(level, pos, state, includeData);

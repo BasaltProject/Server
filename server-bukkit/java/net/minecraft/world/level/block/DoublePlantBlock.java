@@ -56,7 +56,16 @@ public class DoublePlantBlock extends VegetationBlock {
         super.playerDestroy(level, player, pos, state, blockEntity, destroyedWith);
     }
     protected static void preventDropFromBottomPart(Level level, BlockPos pos, BlockState state, Player player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.DoublePlantBlock#preventDropFromBottomPart");
+        if (state.getValue(HALF) != DoubleBlockHalf.UPPER) {
+            return;
+        }
+        BlockPos below = pos.below();
+        BlockState lower = level.getBlockState(below);
+        if (lower.is(state.getBlock()) && lower.getValue(HALF) == DoubleBlockHalf.LOWER) {
+            boolean wet = lower.getFluidState().is(net.minecraft.world.level.material.Fluids.WATER);
+            level.setBlock(below, (wet ? Blocks.WATER : Blocks.AIR).defaultBlockState(), 35);
+            level.levelEvent(player, 2001, below, Block.getId(lower));
+        }
     }
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         super.createBlockStateDefinition(builder);

@@ -44,7 +44,7 @@ public enum TeamColor implements StringRepresentable {
     public static final StringRepresentable.EnumCodec<TeamColor> CODEC = StringRepresentable.fromEnum(TeamColor::values);
     public static final StreamCodec<ByteBuf, TeamColor> STREAM_CODEC = net.minecraft.network.codec.ByteBufCodecs.idMapper(i -> values()[i], TeamColor::id);
     public TextColor textColor() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.scores.TeamColor#textColor");
+        return net.minecraft.network.chat.TextColor.fromRgb(rgb());
     }
     public DisplaySlot displaySlot() {
         return DisplaySlot.valueOf("TEAM_" + name());

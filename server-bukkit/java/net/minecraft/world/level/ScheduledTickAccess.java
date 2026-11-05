@@ -8,28 +8,20 @@ import net.minecraft.world.ticks.LevelTickAccess;
 import net.minecraft.world.ticks.ScheduledTick;
 import net.minecraft.world.ticks.TickPriority;
 public interface ScheduledTickAccess {
-    default <T> ScheduledTick<T> createTick(BlockPos pos, T type, int tickDelay, TickPriority priority) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.ScheduledTickAccess#createTick");
-    }
-    default <T> ScheduledTick<T> createTick(BlockPos pos, T type, int tickDelay) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.ScheduledTickAccess#createTick");
-    }
-    default LevelTickAccess<Block> getBlockTicks() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.ScheduledTickAccess#getBlockTicks");
-    }
+    <T> ScheduledTick<T> createTick(BlockPos pos, T type, int tickDelay, TickPriority priority);
+    <T> ScheduledTick<T> createTick(BlockPos pos, T type, int tickDelay);
+    LevelTickAccess<Block> getBlockTicks();
     default void scheduleTick(BlockPos pos, Block type, int tickDelay, TickPriority priority) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.ScheduledTickAccess#scheduleTick");
+        getBlockTicks().schedule(createTick(pos, type, tickDelay, priority));
     }
     default void scheduleTick(BlockPos pos, Block type, int tickDelay) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.ScheduledTickAccess#scheduleTick");
+        getBlockTicks().schedule(createTick(pos, type, tickDelay));
     }
-    default LevelTickAccess<Fluid> getFluidTicks() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.ScheduledTickAccess#getFluidTicks");
-    }
+    LevelTickAccess<Fluid> getFluidTicks();
     default void scheduleTick(BlockPos pos, Fluid type, int tickDelay, TickPriority priority) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.ScheduledTickAccess#scheduleTick");
+        getFluidTicks().schedule(createTick(pos, type, tickDelay, priority));
     }
     default void scheduleTick(BlockPos pos, Fluid type, int tickDelay) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.ScheduledTickAccess#scheduleTick");
+        getFluidTicks().schedule(createTick(pos, type, tickDelay));
     }
 }

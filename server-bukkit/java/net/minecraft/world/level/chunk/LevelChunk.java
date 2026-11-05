@@ -58,6 +58,8 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     public boolean mustNotSave = false;
 
     private final ServerLevel level;
+    private final java.util.Map<Integer, GameEventListenerRegistry> sectionListeners = new java.util.concurrent.ConcurrentHashMap<>();
+    private UnsavedListener unsavedListener;
     private final String world;
     private final int handle;
     private final int minSection;
@@ -343,6 +345,9 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     public void markUnsaved() {
         flush();
         unsaved = true;
+        if (unsavedListener != null) {
+            unsavedListener.setUnsaved(getPos());
+        }
     }
 
     private void removeGameEventListener(BlockEntity blockEntity, ServerLevel serverLevel) {}
@@ -395,28 +400,32 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         IMMEDIATE, QUEUED, CHECK;
     }
     public LevelChunk(Level level, ChunkPos pos) {
-        super((net.minecraft.world.level.ChunkPos) null, (net.minecraft.world.level.chunk.UpgradeData) null, (net.minecraft.world.level.LevelHeightAccessor) null, (net.minecraft.world.level.chunk.PalettedContainerFactory) null, (long) 0, (net.minecraft.world.level.chunk.LevelChunkSection[]) null, (net.minecraft.world.level.levelgen.blending.BlendingData) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#<init>");
+        this((ServerLevel) level, pos.x(), pos.z());
     }
     public LevelChunk(Level level, ChunkPos pos, UpgradeData upgradeData, LevelChunkTicks<Block> blockTicks, LevelChunkTicks<Fluid> fluidTicks, long inhabitedTime, LevelChunkSection [] sections, PostLoadProcessor postLoad, BlendingData blendingData) {
-        super((net.minecraft.world.level.ChunkPos) null, (net.minecraft.world.level.chunk.UpgradeData) null, (net.minecraft.world.level.LevelHeightAccessor) null, (net.minecraft.world.level.chunk.PalettedContainerFactory) null, (long) 0, (net.minecraft.world.level.chunk.LevelChunkSection[]) null, (net.minecraft.world.level.levelgen.blending.BlendingData) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#<init>");
+        this((ServerLevel) level, pos.x(), pos.z());
+        setInhabitedTime(inhabitedTime);
     }
     public LevelChunk(ServerLevel level, ProtoChunk protoChunk, PostLoadProcessor postLoad) {
-        super((net.minecraft.world.level.ChunkPos) null, (net.minecraft.world.level.chunk.UpgradeData) null, (net.minecraft.world.level.LevelHeightAccessor) null, (net.minecraft.world.level.chunk.PalettedContainerFactory) null, (long) 0, (net.minecraft.world.level.chunk.LevelChunkSection[]) null, (net.minecraft.world.level.levelgen.blending.BlendingData) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#<init>");
+        this(level, protoChunk.getPos().x(), protoChunk.getPos().z());
+        if (postLoad != null) {
+            postLoad.run(this);
+        }
     }
     public void setUnsavedListener(UnsavedListener unsavedListener) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#setUnsavedListener");
+        this.unsavedListener = unsavedListener;
     }
     public TickContainerAccess<Block> getBlockTicks() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#getBlockTicks");
+        return new net.minecraft.world.ticks.NativeTickView<>(world, false, level::getGameTime);
     }
     public TickContainerAccess<Fluid> getFluidTicks() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#getFluidTicks");
+        return new net.minecraft.world.ticks.NativeTickView<>(world, true, level::getGameTime);
     }
     public ChunkAccess.PackedTicks getTicksForSerialization(long currentTick) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#getTicksForSerialization");
+        return new ChunkAccess.PackedTicks(java.util.List.of(), java.util.List.of());
     }
     public GameEventListenerRegistry getListenerRegistry(int section) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#getListenerRegistry");
+        return sectionListeners.computeIfAbsent(section, key -> new net.minecraft.world.level.gameevent.SectionListeners(level));
     }
     public FluidState getFluidState(BlockPos pos) {
         return getBlockState(pos).getFluidState();
@@ -475,40 +484,49 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
 
     }
     class BoundTickingBlockEntity<T extends BlockEntity> implements TickingBlockEntity {
+        private final T blockEntity;
+        private final BlockEntityTicker<T> ticker;
         private BoundTickingBlockEntity(T blockEntity, BlockEntityTicker<T> ticker) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.BoundTickingBlockEntity#<init>");
+            this.blockEntity = blockEntity;
+            this.ticker = ticker;
         }
         public void tick() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.BoundTickingBlockEntity#tick");
+            if (!blockEntity.isRemoved() && blockEntity.hasLevel()) {
+                ticker.tick(level, blockEntity.getBlockPos(), blockEntity.getBlockState(), blockEntity);
+            }
         }
         public boolean isRemoved() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.BoundTickingBlockEntity#isRemoved");
+            return blockEntity.isRemoved();
         }
         public BlockPos getPos() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.BoundTickingBlockEntity#getPos");
+            return blockEntity.getBlockPos();
         }
         public String getType() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.BoundTickingBlockEntity#getType");
+            return String.valueOf(blockEntity.getType());
         }
         public String toString() {
             return super.toString();
         }
     }
     static class RebindableTickingBlockEntityWrapper implements TickingBlockEntity {
+        private TickingBlockEntity ticker;
         private RebindableTickingBlockEntityWrapper(TickingBlockEntity ticker) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.RebindableTickingBlockEntityWrapper#<init>");
+            this.ticker = ticker;
+        }
+        void rebind(TickingBlockEntity ticker) {
+            this.ticker = ticker;
         }
         public void tick() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.RebindableTickingBlockEntityWrapper#tick");
+            ticker.tick();
         }
         public boolean isRemoved() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.RebindableTickingBlockEntityWrapper#isRemoved");
+            return ticker.isRemoved();
         }
         public BlockPos getPos() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.RebindableTickingBlockEntityWrapper#getPos");
+            return ticker.getPos();
         }
         public String getType() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk.RebindableTickingBlockEntityWrapper#getType");
+            return ticker.getType();
         }
         public String toString() {
             return super.toString();

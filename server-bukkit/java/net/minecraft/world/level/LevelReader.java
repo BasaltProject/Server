@@ -22,12 +22,7 @@ import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 public interface LevelReader extends BlockAndLightGetter, CollisionGetter, SignalGetter, BiomeResolver {
-    default ChunkAccess getChunk(int chunkX, int chunkZ, ChunkStatus targetStatus, boolean loadOrGenerate) {
-        if (this instanceof Level level) {
-            return level.getChunk(chunkX, chunkZ);
-        }
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#getChunk");
-    }
+    ChunkAccess getChunk(int chunkX, int chunkZ, ChunkStatus targetStatus, boolean loadOrGenerate);
     default boolean hasChunk(int chunkX, int chunkZ) {
         return this instanceof net.minecraft.server.level.ServerLevel server
             && org.basaltmc.bukkit.WorldNatives.chunkLoaded(server.getWorld().getName(), chunkX, chunkZ);
@@ -36,7 +31,12 @@ public interface LevelReader extends BlockAndLightGetter, CollisionGetter, Signa
         if (this instanceof net.minecraft.server.level.ServerLevel level) {
             return level.getChunkSource().getGenerator().getBaseHeight(x, z, type, level, null);
         }
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#getHeight");
+        for (int y = getMinY() + getHeight() - 1; y >= getMinY(); y--) {
+            if (!getBlockState(new BlockPos(x, y, z)).isAir()) {
+                return y + 1;
+            }
+        }
+        return getMinY();
     }
     default int getHeight(Heightmap.Types type, BlockPos pos) {
         return getHeight(type, pos.getX(), pos.getZ());
@@ -44,9 +44,7 @@ public interface LevelReader extends BlockAndLightGetter, CollisionGetter, Signa
     default int getSkyDarken() {
         return 0;
     }
-    default BiomeManager getBiomeManager() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#getBiomeManager");
-    }
+    BiomeManager getBiomeManager();
     default Holder<Biome> getBiome(BlockPos pos) {
         return getBiomeManager().getBiome(pos);
     }
@@ -67,27 +65,16 @@ public interface LevelReader extends BlockAndLightGetter, CollisionGetter, Signa
     default Holder<Biome> getNoiseBiome(int quartX, int quartY, int quartZ) {
         return getUncachedNoiseBiome(quartX, quartY, quartZ);
     }
-    default Holder<Biome> getUncachedNoiseBiome(int quartX, int quartY, int quartZ) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#getUncachedNoiseBiome");
-    }
+    Holder<Biome> getUncachedNoiseBiome(int quartX, int quartY, int quartZ);
     default boolean isClientSide() {
         return false;
     }
     default int getSeaLevel() {
         return this instanceof Level level ? level.getSeaLevel() : 63;
     }
-    default DimensionType dimensionType() {
-        if (this instanceof Level level) {
-            return level.dimensionType();
-        }
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#dimensionType");
-    }
-    default int getMinY() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#getMinY");
-    }
-    default int getHeight() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#getHeight");
-    }
+    DimensionType dimensionType();
+    int getMinY();
+    int getHeight();
     default BlockPos getHeightmapPos(Heightmap.Types type, BlockPos pos) {
         return new BlockPos(pos.getX(), getHeight(type, pos.getX(), pos.getZ()), pos.getZ());
     }
@@ -153,22 +140,22 @@ public interface LevelReader extends BlockAndLightGetter, CollisionGetter, Signa
         return Math.max(getBrightness(LightLayer.SKY, pos) - getSkyDarken(), 0);
     }
     default BlockMatcher findBlocksIn(AABB box) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#findBlocksIn");
+        return new net.minecraft.world.level.blockscan.BoxBlockMatcher(this, BlockPos.containing(box.minX, box.minY, box.minZ), BlockPos.containing(box.maxX - 1.0E-7, box.maxY - 1.0E-7, box.maxZ - 1.0E-7));
     }
     default BlockMatcher findBlocksIn(BlockPos from, BlockPos to) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#findBlocksIn");
+        return new net.minecraft.world.level.blockscan.BoxBlockMatcher(this, from, to);
     }
     default OrderedBlockMatcher findBlocksIn(Iterable<BlockPos> positions) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#findBlocksIn");
+        return new OrderedBlockMatcher(this, positions);
     }
     default OrderedBlockMatcher findBlocksInBoxByManhattanDistance(BlockPos origin, int range) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#findBlocksInBoxByManhattanDistance");
+        return findBlocksInBoxByManhattanDistance(origin, range, range);
     }
     default OrderedBlockMatcher findBlocksInBoxByManhattanDistance(BlockPos origin, int rangeXZ, int rangeY) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#findBlocksInBoxByManhattanDistance");
+        return new OrderedBlockMatcher(this, BlockPos.withinBoxByManhattanDistance(origin, rangeXZ, rangeY, rangeXZ));
     }
     default OrderedBlockMatcher findBlocksInManhattan(BlockPos origin, int range) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#findBlocksInManhattan");
+        return new OrderedBlockMatcher(this, BlockPos.withinManhattan(origin, range));
     }
     default boolean hasChunkAt(int blockX, int blockZ) {
         return hasChunk(blockX >> 4, blockZ >> 4);
@@ -196,22 +183,12 @@ public interface LevelReader extends BlockAndLightGetter, CollisionGetter, Signa
         }
         return true;
     }
-    default RegistryAccess registryAccess() {
-        if (this instanceof Level level) {
-            return level.registryAccess();
-        }
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#registryAccess");
-    }
+    RegistryAccess registryAccess();
     default FeatureFlagSet enabledFeatures() {
         return net.minecraft.world.flag.FeatureFlagSet.of();
     }
     default <T> HolderLookup<T> holderLookup(ResourceKey<? extends Registry<? extends T>> key) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#holderLookup");
+        return registryAccess().lookupOrThrow(key);
     }
-    default EnvironmentAttributeReader environmentAttributes() {
-        if (this instanceof Level level) {
-            return level.environmentAttributes();
-        }
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelReader#environmentAttributes");
-    }
+    EnvironmentAttributeReader environmentAttributes();
 }

@@ -7,7 +7,6 @@ import io.papermc.paper.world.chunk.ChunkGenerationState;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +34,6 @@ import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
 public abstract class WorldGeo extends WorldExtras {
-    private final Map<Plugin, Set<Long>> tickets = new LinkedHashMap<>();
-
     private static int slot(SpawnCategory category) {
         return switch (category) {
             case MONSTER -> 0;
@@ -264,73 +261,76 @@ public abstract class WorldGeo extends WorldExtras {
         return out;
     }
 
-    private void hold(Plugin plugin) {
-        Set<Long> keys = tickets.getOrDefault(plugin, Set.of());
-        String token = "plugin:" + plugin.getName();
-        if (keys.isEmpty()) {
-            WorldNatives.releaseChunks(getName(), token);
-            return;
-        }
-        int[] flat = new int[keys.size() * 2];
-        int at = 0;
-        for (long key : keys) {
-            flat[at++] = (int) (key >> 32);
-            flat[at++] = (int) key;
-        }
-        WorldNatives.holdChunks(getName(), token, flat);
+    private static final String kTicketPrefix = "plugin:";
+
+    private static String token(Plugin plugin) {
+        return kTicketPrefix + plugin.getName();
     }
 
-    private static long key(int x, int z) {
-        return ((long) x << 32) | (z & 0xFFFFFFFFL);
+    private boolean holds(int x, int z, Plugin plugin) {
+        int[] held = WorldNatives.heldChunks(getName(), token(plugin));
+        for (int i = 0; held != null && i + 1 < held.length; i += 2) {
+            if (held[i] == x && held[i + 1] == z) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    @Override
-    public synchronized boolean addPluginChunkTicket(int x, int z, Plugin plugin) {
-        boolean added = tickets.computeIfAbsent(plugin, ignored -> new HashSet<>()).add(key(x, z));
-        if (added) {
-            hold(plugin);
-            WorldNatives.loadChunk(getName(), x, z, true);
-        }
-        return added;
+    private static Plugin pluginOf(String token) {
+        return token.startsWith(kTicketPrefix) ? org.bukkit.Bukkit.getPluginManager().getPlugin(token.substring(kTicketPrefix.length())) : null;
     }
 
     @Override
-    public synchronized boolean removePluginChunkTicket(int x, int z, Plugin plugin) {
-        Set<Long> keys = tickets.get(plugin);
-        boolean removed = keys != null && keys.remove(key(x, z));
-        if (removed) {
-            hold(plugin);
+    public boolean addPluginChunkTicket(int x, int z, Plugin plugin) {
+        if (holds(x, z, plugin)) {
+            return false;
         }
-        return removed;
+        WorldNatives.holdChunks(getName(), token(plugin), new int[] {x, z});
+        WorldNatives.loadChunk(getName(), x, z, true);
+        return true;
     }
 
     @Override
-    public synchronized void removePluginChunkTickets(Plugin plugin) {
-        if (tickets.remove(plugin) != null) {
-            WorldNatives.releaseChunks(getName(), "plugin:" + plugin.getName());
+    public boolean removePluginChunkTicket(int x, int z, Plugin plugin) {
+        if (!holds(x, z, plugin)) {
+            return false;
         }
+        WorldNatives.releaseChunkPairs(getName(), token(plugin), new int[] {x, z});
+        return true;
     }
 
     @Override
-    public synchronized Collection<Plugin> getPluginChunkTickets(int x, int z) {
+    public void removePluginChunkTickets(Plugin plugin) {
+        WorldNatives.releaseChunks(getName(), token(plugin));
+    }
+
+    @Override
+    public Collection<Plugin> getPluginChunkTickets(int x, int z) {
         List<Plugin> out = new ArrayList<>();
-        for (Map.Entry<Plugin, Set<Long>> entry : tickets.entrySet()) {
-            if (entry.getValue().contains(key(x, z))) {
-                out.add(entry.getKey());
+        for (String holder : WorldNatives.chunkHolders(getName(), x, z, false)) {
+            Plugin plugin = pluginOf(holder);
+            if (plugin != null) {
+                out.add(plugin);
             }
         }
         return out;
     }
 
     @Override
-    public synchronized Map<Plugin, Collection<Chunk>> getPluginChunkTickets() {
+    public Map<Plugin, Collection<Chunk>> getPluginChunkTickets() {
         Map<Plugin, Collection<Chunk>> out = new LinkedHashMap<>();
-        for (Map.Entry<Plugin, Set<Long>> entry : tickets.entrySet()) {
-            List<Chunk> chunks = new ArrayList<>();
-            for (long key : entry.getValue()) {
-                chunks.add(getChunkAt((int) (key >> 32), (int) key, false));
+        for (String holder : WorldNatives.chunkHolders(getName(), 0, 0, true)) {
+            Plugin plugin = pluginOf(holder);
+            if (plugin == null) {
+                continue;
             }
-            out.put(entry.getKey(), chunks);
+            List<Chunk> chunks = new ArrayList<>();
+            int[] held = WorldNatives.heldChunks(getName(), holder);
+            for (int i = 0; i + 1 < held.length; i += 2) {
+                chunks.add(getChunkAt(held[i], held[i + 1], false));
+            }
+            out.put(plugin, chunks);
         }
         return out;
     }

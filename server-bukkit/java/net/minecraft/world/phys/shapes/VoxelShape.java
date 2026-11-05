@@ -105,10 +105,22 @@ public class VoxelShape {
         return empty ? EMPTY : ofBoxes(List.of(bounds()));
     }
     protected double get(Direction.Axis axis, int i) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.phys.shapes.VoxelShape#get");
+        return getCoords(axis).getDouble(i);
     }
     public DoubleList getCoords(Direction.Axis axis) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.phys.shapes.VoxelShape#getCoords");
+        java.util.TreeSet<Double> cuts = new java.util.TreeSet<>();
+        for (AABB box : boxes) {
+            cuts.add(box.min(axis));
+            cuts.add(box.max(axis));
+        }
+        if (cuts.isEmpty()) {
+            cuts.add(0.0);
+        }
+        it.unimi.dsi.fastutil.doubles.DoubleArrayList coords = new it.unimi.dsi.fastutil.doubles.DoubleArrayList(cuts.size());
+        for (double cut : cuts) {
+            coords.add(cut);
+        }
+        return coords;
     }
     public VoxelShape move(Vec3 delta) {
         return move(delta.x, delta.y, delta.z);
@@ -123,10 +135,24 @@ public class VoxelShape {
         return this;
     }
     public void forAllEdges(Shapes.DoubleLineConsumer consumer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.phys.shapes.VoxelShape#forAllEdges");
+        java.util.Set<java.util.List<Double>> seen = new java.util.HashSet<>();
+        for (AABB box : boxes) {
+            double[] xs = {box.minX, box.maxX};
+            double[] ys = {box.minY, box.maxY};
+            double[] zs = {box.minZ, box.maxZ};
+            for (int a = 0; a < 2; a++) {
+                for (int b = 0; b < 2; b++) {
+                    emitEdge(seen, consumer, xs[0], ys[a], zs[b], xs[1], ys[a], zs[b]);
+                    emitEdge(seen, consumer, xs[a], ys[0], zs[b], xs[a], ys[1], zs[b]);
+                    emitEdge(seen, consumer, xs[a], ys[b], zs[0], xs[a], ys[b], zs[1]);
+                }
+            }
+        }
     }
     public void forAllBoxes(Shapes.DoubleLineConsumer consumer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.phys.shapes.VoxelShape#forAllBoxes");
+        for (AABB box : boxes) {
+            consumer.consume(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ);
+        }
     }
     public List<AABB> toAabbs() {
         return boxes;
@@ -152,7 +178,12 @@ public class VoxelShape {
         return found;
     }
     protected int findIndex(Direction.Axis axis, double coord) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.phys.shapes.VoxelShape#findIndex");
+        it.unimi.dsi.fastutil.doubles.DoubleList coords = getCoords(axis);
+        int passed = 0;
+        while (passed < coords.size() && coord >= coords.getDouble(passed)) {
+            passed++;
+        }
+        return passed - 1;
     }
     public BlockHitResult clip(Vec3 from, Vec3 to, BlockPos pos) {
         BlockHitResult best = null;
@@ -218,7 +249,20 @@ public class VoxelShape {
         return Optional.ofNullable(best);
     }
     public VoxelShape getFaceShape(Direction direction) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.phys.shapes.VoxelShape#getFaceShape");
+        if (empty || this == BLOCK) {
+            return this;
+        }
+        Direction.Axis axis = direction.getAxis();
+        double plane = direction.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 0.9999999 : 1.0E-7;
+        List<AABB> slice = new java.util.ArrayList<>();
+        boolean spansAxis = true;
+        for (AABB box : boxes) {
+            spansAxis &= box.min(axis) <= 0.0 && box.max(axis) >= 1.0;
+            if (box.min(axis) <= plane && box.max(axis) > plane) {
+                slice.add(flatten(box, axis));
+            }
+        }
+        return spansAxis ? this : ofBoxes(slice);
     }
     protected boolean isCubeLike() {
         return fullBlock;
@@ -240,7 +284,26 @@ public class VoxelShape {
         return result;
     }
     protected double collideX(AxisCycle transform, AABB moving, double distance) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.phys.shapes.VoxelShape#collideX");
+        if (empty) {
+            return distance;
+        }
+        if (Math.abs(distance) < 1.0E-7) {
+            return 0.0;
+        }
+        return collide(transform.inverse().cycle(Direction.Axis.X), moving, distance);
+    }
+    private static void emitEdge(java.util.Set<java.util.List<Double>> seen, Shapes.DoubleLineConsumer consumer, double x1, double y1,
+        double z1, double x2, double y2, double z2) {
+        if (seen.add(java.util.List.of(x1, y1, z1, x2, y2, z2))) {
+            consumer.consume(x1, y1, z1, x2, y2, z2);
+        }
+    }
+    private static AABB flatten(AABB box, Direction.Axis axis) {
+        return switch (axis) {
+            case X -> new AABB(0.0, box.minY, box.minZ, 1.0, box.maxY, box.maxZ);
+            case Y -> new AABB(box.minX, 0.0, box.minZ, box.maxX, 1.0, box.maxZ);
+            case Z -> new AABB(box.minX, box.minY, 0.0, box.maxX, box.maxY, 1.0);
+        };
     }
     public boolean equals(Object obj) {
         return obj instanceof VoxelShape other && boxes.equals(other.boxes);

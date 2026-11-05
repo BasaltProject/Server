@@ -67,6 +67,11 @@ public final class WorldNatives {
     public static native void requestChunk(String world, int chunkX, int chunkZ, boolean generate, int priority, java.util.concurrent.CompletableFuture<Boolean> done);
     public static native boolean holdChunks(String world, String token, int[] chunks);
     public static native void releaseChunks(String world, String token);
+    public static native void releaseChunkPairs(String world, String token, int[] chunks);
+    /** The chunks (x, z pairs) a holder keeps loaded. */
+    public static native int[] heldChunks(String world, String token);
+    /** The holders of one chunk, or every holder when {@code all} is set. */
+    public static native String[] chunkHolders(String world, int x, int z, boolean all);
     public static native int updateNeighbors(String world, int[] positions, int effects);
     public static native int applyChanges(String world, int[] positions, int[] states, int effects);
     public static native int useItemOn(String world, int x, int y, int z, int face, String item, float yaw, float pitch);

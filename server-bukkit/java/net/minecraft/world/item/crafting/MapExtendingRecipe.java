@@ -6,8 +6,15 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 public class MapExtendingRecipe extends CustomRecipe {
-    public static final MapCodec<MapExtendingRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.MapExtendingRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, MapExtendingRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.MapExtendingRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<MapExtendingRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Ingredient.CODEC.fieldOf("map").forGetter(o -> o.map),
+        Ingredient.CODEC.fieldOf("material").forGetter(o -> o.material),
+        TransmuteResult.CODEC.fieldOf("result").forGetter(o -> o.result)).apply(i, MapExtendingRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, MapExtendingRecipe> STREAM_CODEC = StreamCodec.composite(
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.map,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.material,
+        TransmuteResult.STREAM_CODEC, o -> o.result,
+        MapExtendingRecipe::new);
     public static final RecipeSerializer<MapExtendingRecipe> SERIALIZER = null;
     private final ShapedRecipePattern pattern;
     private final Ingredient map;

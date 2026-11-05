@@ -9,18 +9,18 @@ public enum EmptyBlockGetter implements BlockGetter {
     INSTANCE;
 ;
     public BlockEntity getBlockEntity(BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.EmptyBlockGetter#getBlockEntity");
+        return null;
     }
     public BlockState getBlockState(BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.EmptyBlockGetter#getBlockState");
+        return net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
     }
     public FluidState getFluidState(BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.EmptyBlockGetter#getFluidState");
+        return net.minecraft.world.level.material.Fluids.EMPTY.defaultFluidState();
     }
     public int getMinY() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.EmptyBlockGetter#getMinY");
+        return 0;
     }
     public int getHeight() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.EmptyBlockGetter#getHeight");
+        return 0;
     }
 }

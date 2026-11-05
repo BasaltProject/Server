@@ -42,30 +42,30 @@ public class SculkSensorBlockEntity extends BlockEntity {
 
     protected class VibrationUser implements VibrationSystem.User {
         public static final int LISTENER_RANGE = 8;
-        protected final BlockPos blockPos = null;
+        protected final BlockPos blockPos;
         public VibrationUser(BlockPos blockPos) {
-            
+            this.blockPos = blockPos;
         }
         public int getListenerRadius() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkSensorBlockEntity.VibrationUser#getListenerRadius");
+            return getListenerRange();
         }
         public PositionSource getPositionSource() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkSensorBlockEntity.VibrationUser#getPositionSource");
+            return new net.minecraft.world.level.gameevent.BlockPositionSource(blockPos);
         }
         public boolean canTriggerAvoidVibration() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkSensorBlockEntity.VibrationUser#canTriggerAvoidVibration");
+            return true;
         }
         public boolean canReceiveVibration(ServerLevel level, BlockPos pos, Holder<GameEvent> event, GameEvent. Context context) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkSensorBlockEntity.VibrationUser#canReceiveVibration");
+            return !pos.equals(blockPos);
         }
         public void onReceiveVibration(ServerLevel level, BlockPos pos, Holder<GameEvent> event, Entity sourceEntity, Entity projectileOwner, float receivingDistance) {
             throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkSensorBlockEntity.VibrationUser#onReceiveVibration");
         }
         public void onDataChanged() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkSensorBlockEntity.VibrationUser#onDataChanged");
+            setChanged();
         }
         public boolean requiresAdjacentChunksToBeTicking() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkSensorBlockEntity.VibrationUser#requiresAdjacentChunksToBeTicking");
+            return true;
         }
     }
 }

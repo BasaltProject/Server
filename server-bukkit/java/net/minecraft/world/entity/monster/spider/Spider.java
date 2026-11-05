@@ -62,11 +62,12 @@ public class Spider extends Monster {
     public boolean canBeAffected(MobEffectInstance newEffect) {
         return super.canBeAffected(newEffect);
     }
+    private boolean climbingFlag;
     public boolean isClimbing() {
-        return live() instanceof org.bukkit.entity.Spider api ? (boolean) api.isClimbing() : false;
+        return live() instanceof org.bukkit.entity.Spider api ? api.isClimbing() : climbingFlag;
     }
     public void setClimbing(boolean value) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.spider.Spider#setClimbing");
+        climbingFlag = value;
     }
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData) {
         return groupData;
@@ -74,7 +75,9 @@ public class Spider extends Monster {
     public static class SpiderEffectsGroupData implements SpawnGroupData {
         public Holder<MobEffect> effect;
         public void setRandomEffect(RandomSource random) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.spider.Spider.SpiderEffectsGroupData#setRandomEffect");
+            int pick = random.nextInt(5);
+            effect = pick <= 1 ? net.minecraft.world.effect.MobEffects.SPEED : pick == 2 ? net.minecraft.world.effect.MobEffects.STRENGTH
+                : pick == 3 ? net.minecraft.world.effect.MobEffects.REGENERATION : net.minecraft.world.effect.MobEffects.INVISIBILITY;
         }
     }
     static class SpiderAttackGoal extends MeleeAttackGoal {

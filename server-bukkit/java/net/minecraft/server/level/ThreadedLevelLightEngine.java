@@ -98,6 +98,12 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
         int layer = index(lightLayer);
         return new LayerLightEventListener() {
             @Override
+            public int getLightValue(BlockPos pos) {
+                flush();
+                return Math.max(0, WorldNatives.lightAt(world, pos.getX(), pos.getY(), pos.getZ(), layer));
+            }
+
+            @Override
             public DataLayer getDataLayerData(SectionPos pos) {
                 flush();
                 byte[] bytes = WorldNatives.readLight(world, pos.getX(), pos.getY(), pos.getZ(), layer, false);
@@ -135,8 +141,9 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
         return chunks.length;
     }
     public static final int DEFAULT_BATCH_SIZE = 1000;
-    public ThreadedLevelLightEngine(LightChunkGetter lightChunkGetter, ChunkMap chunkMap, boolean hasSkyLight, ConsecutiveExecutor consecutiveExecutor, ChunkTaskDispatcher taskDispatcher) {
-        super((net.minecraft.world.level.chunk.LightChunkGetter) null, false, false); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ThreadedLevelLightEngine#<init>");
+    public ThreadedLevelLightEngine(LightChunkGetter lightChunkGetter, ChunkMap chunkMap, boolean hasSkyLight,
+            ConsecutiveExecutor consecutiveExecutor, ChunkTaskDispatcher taskDispatcher) {
+        this(((ServerLevel) lightChunkGetter.getLevel()).getWorld().getName(), (ServerLevel) lightChunkGetter.getLevel());
     }
     public void close() {
         flush();

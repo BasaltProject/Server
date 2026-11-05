@@ -53,6 +53,6 @@ public class Enchantments {
     public static final ResourceKey<Enchantment> MENDING = key("mending");
     public static final ResourceKey<Enchantment> VANISHING_CURSE = key("vanishing_curse");
     public static void bootstrap(BootstrapContext<Enchantment> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantments#bootstrap");
+        org.basaltmc.bukkit.facade.Bootstraps.replay(context, net.minecraft.core.registries.Registries.ENCHANTMENT, Enchantments.class);
     }
 }

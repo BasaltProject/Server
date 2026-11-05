@@ -26,7 +26,9 @@ public class Pufferfish extends AbstractFish {
         return live() instanceof org.bukkit.entity.PufferFish api ? api.getPuffState() : 0;
     }
     public void setPuffState(int state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.Pufferfish#setPuffState");
+        if (live() instanceof org.bukkit.entity.PufferFish api) {
+            api.setPuffState(state);
+        }
     }
     public void onSyncedDataUpdated(EntityDataAccessor<?> accessor) {
     }

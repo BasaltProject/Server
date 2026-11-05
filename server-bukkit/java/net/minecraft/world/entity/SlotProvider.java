@@ -5,9 +5,9 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.world.item.slot.SlotCollection;
 public interface SlotProvider {
     default SlotAccess getSlot(int slot) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.SlotProvider#getSlot");
+        return null;
     }
     default SlotCollection getSlotsFromRange(IntList slots) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.SlotProvider#getSlotsFromRange");
+        return SlotCollection.of(slots.intStream().mapToObj(this::getSlot).filter(java.util.Objects::nonNull).toList());
     }
 }

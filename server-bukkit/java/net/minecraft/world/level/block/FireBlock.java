@@ -55,7 +55,8 @@ public class FireBlock extends BaseFireBlock {
         return level.isRainingAt(testPos);
     }
     protected boolean canBurn(BlockState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FireBlock#canBurn");
+        double[] info = org.basaltmc.bukkit.WorldNatives.blockInfo(state.stateId());
+        return info != null && info[5] > 0;
     }
     protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
         super.onPlace(state, level, pos, oldState, movedByPiston);
@@ -64,6 +65,6 @@ public class FireBlock extends BaseFireBlock {
         super.createBlockStateDefinition(builder);
     }
     public static void bootStrap() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FireBlock#bootStrap");
+        // flammability comes from the native fire odds table
     }
 }

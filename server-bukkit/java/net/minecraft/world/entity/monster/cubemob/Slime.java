@@ -28,7 +28,7 @@ public class Slime extends AbstractCubeMob implements Enemy {
         return net.minecraft.sounds.SoundEvents.byId("entity.slime.death");
     }
     protected ParticleOptions getParticleType() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.cubemob.Slime#getParticleType");
+        return net.minecraft.core.particles.ParticleTypes.ITEM_SLIME;
     }
     protected SoundEvent getSquishSound() {
         return null;
@@ -46,6 +46,8 @@ public class Slime extends AbstractCubeMob implements Enemy {
         return groupData;
     }
     public void setSize(int size, boolean updateHealth) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.cubemob.Slime#setSize");
+        if (live() instanceof org.bukkit.entity.Slime api) {
+            api.setSize(size);
+        }
     }
 }

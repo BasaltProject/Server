@@ -17,7 +17,7 @@ public abstract class VegetationBlock extends Block {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
     }
     protected boolean mayPlaceOn(BlockState state, BlockGetter level, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.VegetationBlock#mayPlaceOn");
+        return state.is(net.minecraft.tags.BlockTags.DIRT) || state.is(Blocks.FARMLAND);
     }
     protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess ticks, BlockPos pos, Direction directionToNeighbour, BlockPos neighbourPos, BlockState neighbourState, RandomSource random) {
         return super.updateShape(state, level, ticks, pos, directionToNeighbour, neighbourPos, neighbourState, random);

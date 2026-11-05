@@ -8,8 +8,13 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.level.Level;
 public class BannerDuplicateRecipe extends CustomRecipe {
-    public static final MapCodec<BannerDuplicateRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.BannerDuplicateRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, BannerDuplicateRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.BannerDuplicateRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<BannerDuplicateRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Ingredient.CODEC.fieldOf("banner").forGetter(o -> o.banner),
+        ItemStackTemplate.CODEC.fieldOf("result").forGetter(o -> o.result)).apply(i, BannerDuplicateRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, BannerDuplicateRecipe> STREAM_CODEC = StreamCodec.composite(
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.banner,
+        ItemStackTemplate.STREAM_CODEC, o -> o.result,
+        BannerDuplicateRecipe::new);
     public static final RecipeSerializer<BannerDuplicateRecipe> SERIALIZER = null;
     private final Ingredient banner;
     private final ItemStackTemplate result;

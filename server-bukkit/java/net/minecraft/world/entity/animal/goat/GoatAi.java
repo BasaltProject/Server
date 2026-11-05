@@ -1,107 +1,24 @@
 // Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.entity.animal.goat;
 
-import com.google.common.collect.ImmutableList;
-import com.mojang.datafixers.util.Pair;
 import java.util.List;
-import java.util.Set;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.RandomSource;
-import net.minecraft.util.valueproviders.UniformInt;
-import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.ai.ActivityData;
-import net.minecraft.world.entity.ai.behavior.AnimalMakeLove;
-import net.minecraft.world.entity.ai.behavior.AnimalPanic;
-import net.minecraft.world.entity.ai.behavior.BabyFollowAdult;
-import net.minecraft.world.entity.ai.behavior.CountDownCooldownTicks;
-import net.minecraft.world.entity.ai.behavior.DoNothing;
-import net.minecraft.world.entity.ai.behavior.FollowTemptation;
-import net.minecraft.world.entity.ai.behavior.LongJumpMidJump;
-import net.minecraft.world.entity.ai.behavior.LongJumpToRandomPos;
-import net.minecraft.world.entity.ai.behavior.LookAtTargetSink;
-import net.minecraft.world.entity.ai.behavior.MoveToTargetSink;
-import net.minecraft.world.entity.ai.behavior.PrepareRamNearestTarget;
-import net.minecraft.world.entity.ai.behavior.RamTarget;
-import net.minecraft.world.entity.ai.behavior.RandomStroll;
-import net.minecraft.world.entity.ai.behavior.RunOne;
-import net.minecraft.world.entity.ai.behavior.SetEntityLookTargetSometimes;
-import net.minecraft.world.entity.ai.behavior.SetWalkTargetFromLookTarget;
-import net.minecraft.world.entity.ai.behavior.Swim;
-import net.minecraft.world.entity.ai.memory.MemoryModuleType;
-import net.minecraft.world.entity.ai.memory.MemoryStatus;
-import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.schedule.Activity;
 
+/** Adapter: the native brain of this species owns the activity, the memories and every behavior. */
 public class GoatAi {
-    public static final int RAM_PREPARE_TIME = 20;
-    public static final int RAM_MAX_DISTANCE = 7;
-    private static final UniformInt ADULT_FOLLOW_RANGE = UniformInt.of(5, 16);
-    private static final UniformInt TIME_BETWEEN_LONG_JUMPS = UniformInt.of(600, 1200);
-    public static final int MAX_LONG_JUMP_HEIGHT = 5;
-    public static final int MAX_LONG_JUMP_WIDTH = 5;
-    public static final float MAX_JUMP_VELOCITY_MULTIPLIER = 3.5714288F;
-    private static final UniformInt TIME_BETWEEN_RAMS = UniformInt.of(600, 6000);
-    private static final UniformInt TIME_BETWEEN_RAMS_SCREAMER = UniformInt.of(100, 300);
-    private static final TargetingConditions RAM_TARGET_CONDITIONS = TargetingConditions.forCombat().selector((target, level) ->
-        !target.is(EntityTypes.GOAT) && (level.getGameRules().get(net.minecraft.world.level.gamerules.GameRules.MOB_GRIEFING) || !target.is(EntityTypes.ARMOR_STAND))
-            && level.getWorldBorder().isWithinBounds(target.getBoundingBox()));
-    public static final int RAM_MIN_DISTANCE = 4;
-    public static final float ADULT_RAM_KNOCKBACK_FORCE = 2.5F;
-    public static final float BABY_RAM_KNOCKBACK_FORCE = 1.0F;
-
-    protected static void initMemories(Goat body, RandomSource random) {
-        body.getBrain().setMemory(MemoryModuleType.LONG_JUMP_COOLDOWN_TICKS, TIME_BETWEEN_LONG_JUMPS.sample(random));
-        body.getBrain().setMemory(MemoryModuleType.RAM_COOLDOWN_TICKS, TIME_BETWEEN_RAMS.sample(random));
-    }
-
     protected static List<ActivityData<Goat>> getActivities() {
-        return List.of(coreActivity(), idleActivity(), longJumpActivity(), ramActivity());
-    }
-
-    private static SoundEvent sound(String id) {
-        return SoundEvents.byId(id);
-    }
-
-    private static ActivityData<Goat> coreActivity() {
-        return ActivityData.<Goat>create(Activity.CORE, 0, ImmutableList.<net.minecraft.world.entity.ai.behavior.BehaviorControl<? super Goat>>of(new Swim(0.8F), new AnimalPanic<>(2.0F), new LookAtTargetSink(45, 90),
-            new MoveToTargetSink(), new CountDownCooldownTicks(MemoryModuleType.TEMPTATION_COOLDOWN_TICKS),
-            new CountDownCooldownTicks(MemoryModuleType.LONG_JUMP_COOLDOWN_TICKS), new CountDownCooldownTicks(MemoryModuleType.RAM_COOLDOWN_TICKS)));
-    }
-
-    private static ActivityData<Goat> idleActivity() {
-        return ActivityData.<Goat>create(Activity.IDLE, ImmutableList.of(
-            Pair.of(0, SetEntityLookTargetSometimes.create(EntityTypes.PLAYER, 6.0F, UniformInt.of(30, 60))),
-            Pair.of(0, new AnimalMakeLove(EntityTypes.GOAT)),
-            Pair.of(1, new FollowTemptation(mob -> 1.25F)),
-            Pair.of(2, BabyFollowAdult.create(ADULT_FOLLOW_RANGE, 1.25F)),
-            Pair.of(3, new RunOne<>(ImmutableList.of(Pair.of(RandomStroll.stroll(1.0F), 2), Pair.of(SetWalkTargetFromLookTarget.create(1.0F, 3), 2),
-                Pair.of(new DoNothing(30, 60), 1))))),
-            Set.of(Pair.of(MemoryModuleType.RAM_COOLDOWN_TICKS, MemoryStatus.VALUE_PRESENT), Pair.of(MemoryModuleType.LONG_JUMP_COOLDOWN_TICKS, MemoryStatus.VALUE_PRESENT)));
-    }
-
-    private static ActivityData<Goat> longJumpActivity() {
-        return ActivityData.<Goat>create(Activity.LONG_JUMP, ImmutableList.of(
-            Pair.of(0, new LongJumpMidJump(TIME_BETWEEN_LONG_JUMPS, sound("entity.goat.step"))),
-            Pair.of(1, new LongJumpToRandomPos<Goat>(TIME_BETWEEN_LONG_JUMPS, MAX_LONG_JUMP_HEIGHT, MAX_LONG_JUMP_WIDTH, MAX_JUMP_VELOCITY_MULTIPLIER,
-                goat -> sound(goat.isScreamingGoat() ? "entity.goat.screaming.long_jump" : "entity.goat.long_jump")))),
-            Set.of(Pair.of(MemoryModuleType.TEMPTING_PLAYER, MemoryStatus.VALUE_ABSENT), Pair.of(MemoryModuleType.BREED_TARGET, MemoryStatus.VALUE_ABSENT),
-                Pair.of(MemoryModuleType.WALK_TARGET, MemoryStatus.VALUE_ABSENT), Pair.of(MemoryModuleType.LONG_JUMP_COOLDOWN_TICKS, MemoryStatus.VALUE_ABSENT)));
-    }
-
-    private static ActivityData<Goat> ramActivity() {
-        return ActivityData.<Goat>create(Activity.RAM, ImmutableList.of(
-            Pair.of(0, new RamTarget(goat -> goat.isScreamingGoat() ? TIME_BETWEEN_RAMS_SCREAMER : TIME_BETWEEN_RAMS, RAM_TARGET_CONDITIONS, 3.0F,
-                goat -> goat.isBaby() ? BABY_RAM_KNOCKBACK_FORCE : ADULT_RAM_KNOCKBACK_FORCE,
-                goat -> sound(goat.isScreamingGoat() ? "entity.goat.screaming.ram_impact" : "entity.goat.ram_impact"), goat -> sound("entity.goat.horn_break"))),
-            Pair.of(1, new PrepareRamNearestTarget<Goat>(mob -> mob.isScreamingGoat() ? TIME_BETWEEN_RAMS_SCREAMER.minInclusive() : TIME_BETWEEN_RAMS.minInclusive(),
-                RAM_MIN_DISTANCE, RAM_MAX_DISTANCE, 1.25F, RAM_TARGET_CONDITIONS, RAM_PREPARE_TIME,
-                goat -> sound(goat.isScreamingGoat() ? "entity.goat.screaming.prepare_ram" : "entity.goat.prepare_ram")))),
-            Set.of(Pair.of(MemoryModuleType.TEMPTING_PLAYER, MemoryStatus.VALUE_ABSENT), Pair.of(MemoryModuleType.BREED_TARGET, MemoryStatus.VALUE_ABSENT),
-                Pair.of(MemoryModuleType.RAM_COOLDOWN_TICKS, MemoryStatus.VALUE_ABSENT)));
+        return List.of(
+            ActivityData.<Goat>nativeOnly(Activity.CORE),
+            ActivityData.<Goat>nativeOnly(Activity.IDLE),
+            ActivityData.<Goat>nativeOnly(Activity.LONG_JUMP),
+            ActivityData.<Goat>nativeOnly(Activity.RAM));
     }
 
     public static void updateActivity(Goat body) {
-        body.getBrain().setActiveActivityToFirstValid(List.of(Activity.RAM, Activity.LONG_JUMP, Activity.IDLE));
+    }
+
+    protected static void initMemories(Goat body, RandomSource random) {
     }
 }

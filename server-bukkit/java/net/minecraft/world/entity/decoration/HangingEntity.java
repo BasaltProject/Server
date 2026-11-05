@@ -50,7 +50,11 @@ public abstract class HangingEntity extends BlockAttachedEntity {
     }
     public abstract void playPlacementSound();
     public ItemEntity spawnAtLocation(ServerLevel level, ItemStack itemStack, float yOffs) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.decoration.HangingEntity#spawnAtLocation");
+        ItemEntity item = new ItemEntity(level(), getX() + getDirection().getStepX() * 0.15F, getY() + yOffs,
+            getZ() + getDirection().getStepZ() * 0.15F, itemStack);
+        item.setDefaultPickUpDelay();
+        level().addFreshEntity(item);
+        return item;
     }
     public float rotate(Rotation rotation) {
         return getYRot();

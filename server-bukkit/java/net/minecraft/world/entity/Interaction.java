@@ -20,16 +20,12 @@ public class Interaction extends Entity implements Attackable, Targeting {
         super(type, level);
     }
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#defineSynchedData");
     }
     protected void readAdditionalSaveData(ValueInput input) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#readAdditionalSaveData");
     }
     protected void addAdditionalSaveData(ValueOutput output) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#addAdditionalSaveData");
     }
     public void onSyncedDataUpdated(EntityDataAccessor<?> accessor) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#onSyncedDataUpdated");
     }
     public boolean canBeHitByProjectile() {
         return false;
@@ -38,34 +34,37 @@ public class Interaction extends Entity implements Attackable, Targeting {
         return true;
     }
     public PushReaction getPistonPushReaction() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#getPistonPushReaction");
+        return PushReaction.IGNORE_ENTITY;
     }
     public boolean isIgnoringBlockTriggers() {
         return true;
     }
     public boolean skipAttackInteraction(Entity source) {
-        return true;
+        return source instanceof Player && !(live() instanceof org.bukkit.entity.Interaction api && api.isResponsive());
     }
     public final boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#hurtServer");
+        return false;
     }
     public InteractionResult interact(Player player, InteractionHand hand, Vec3 location) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#interact");
+        return InteractionResult.CONSUME;
     }
     public void tick() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#tick");
     }
     public LivingEntity getLastAttacker() {
-        return null;
+        return playerOf(live() instanceof org.bukkit.entity.Interaction api ? api.getLastAttack() : null);
     }
     public LivingEntity getTarget() {
-        return null;
+        return playerOf(live() instanceof org.bukkit.entity.Interaction api ? api.getLastInteraction() : null);
+    }
+    private Player playerOf(org.bukkit.entity.Interaction.PreviousInteraction previous) {
+        return previous == null ? null : level().getPlayerByUUID(previous.getPlayer().getUniqueId());
     }
     public EntityDimensions getDimensions(Pose pose) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#getDimensions");
+        org.bukkit.entity.Interaction api = live() instanceof org.bukkit.entity.Interaction i ? i : null;
+        return api == null ? EntityDimensions.scalable(1.0F, 1.0F) : EntityDimensions.fixed(api.getInteractionWidth(), api.getInteractionHeight());
     }
     protected AABB makeBoundingBox(Vec3 position) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Interaction#makeBoundingBox");
+        return getDimensions(Pose.STANDING).makeBoundingBox(position);
     }
     static record PlayerAction(UUID player, long timestamp) {
         public static final Codec<PlayerAction> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.Interaction.PlayerAction.class, "CODEC");

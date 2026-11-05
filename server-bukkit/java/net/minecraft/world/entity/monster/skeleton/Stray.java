@@ -30,6 +30,10 @@ public class Stray extends AbstractSkeleton {
         return net.minecraft.sounds.SoundEvents.STRAY_STEP;
     }
     protected AbstractArrow getArrow(ItemStack projectile, float power, ItemStack firingWeapon) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.skeleton.Stray#getArrow");
+        AbstractArrow arrow = super.getArrow(projectile, power, firingWeapon);
+        if (arrow instanceof net.minecraft.world.entity.projectile.arrow.Arrow tipped) {
+            tipped.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.SLOWNESS, 600));
+        }
+        return arrow;
     }
 }

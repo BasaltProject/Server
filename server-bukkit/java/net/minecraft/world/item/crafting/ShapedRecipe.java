@@ -10,8 +10,17 @@ import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.display.RecipeDisplay;
 import net.minecraft.world.level.Level;
 public class ShapedRecipe extends NormalCraftingRecipe {
-    public static final MapCodec<ShapedRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.ShapedRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, ShapedRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.ShapedRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<ShapedRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Recipe.CommonInfo.MAP_CODEC.forGetter(o -> o.commonInfo),
+        CraftingRecipe.CraftingBookInfo.MAP_CODEC.forGetter(o -> o.bookInfo),
+        ShapedRecipePattern.MAP_CODEC.forGetter(o -> o.pattern),
+        ItemStackTemplate.CODEC.fieldOf("result").forGetter(o -> o.result)).apply(i, ShapedRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShapedRecipe> STREAM_CODEC = StreamCodec.composite(
+        Recipe.CommonInfo.STREAM_CODEC, o -> o.commonInfo,
+        CraftingRecipe.CraftingBookInfo.STREAM_CODEC, o -> o.bookInfo,
+        ShapedRecipePattern.STREAM_CODEC, o -> o.pattern,
+        ItemStackTemplate.STREAM_CODEC, o -> o.result,
+        ShapedRecipe::new);
     public static final RecipeSerializer<ShapedRecipe> SERIALIZER = null;
     private final ShapedRecipePattern pattern;
     private final ItemStackTemplate result;

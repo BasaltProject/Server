@@ -14,6 +14,6 @@ public class PileFeatures {
     public static final ResourceKey<Object> PILE_ICE = FeatureUtils.createKey("pile_ice");
     public static final ResourceKey<Object> PILE_PUMPKIN = FeatureUtils.createKey("pile_pumpkin");
     public static void bootstrap(BootstrapContext<Feature> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.PileFeatures#bootstrap");
+        // registries come from the native datapack loader, so there is nothing to bootstrap
     }
 }

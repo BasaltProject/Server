@@ -29,7 +29,7 @@ public abstract class BasePressurePlateBlock extends Block {
         return super.getShape(state, level, pos, context);
     }
     protected int getPressedTime() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.BasePressurePlateBlock#getPressedTime");
+        return 20;
     }
     public boolean isPossibleToRespawnInThis(BlockState state) {
         return super.isPossibleToRespawnInThis(state);
@@ -50,7 +50,8 @@ public abstract class BasePressurePlateBlock extends Block {
         super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
     protected void updateNeighbours(Level level, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.BasePressurePlateBlock#updateNeighbours");
+        level.updateNeighborsAt(pos, this);
+        level.updateNeighborsAt(pos.below(), this);
     }
     protected int getDirectSignal(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
         return super.getDirectSignal(state, level, pos, direction);
@@ -62,7 +63,8 @@ public abstract class BasePressurePlateBlock extends Block {
         return super.ownSignal(state, level, pos);
     }
     protected static int getEntityCount(Level level, AABB entityDetectionBox, Class<? extends Entity> entityClass) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.BasePressurePlateBlock#getEntityCount");
+        return level.getEntitiesOfClass(entityClass, entityDetectionBox,
+            candidate -> !candidate.isSpectator() && !candidate.isIgnoringBlockTriggers()).size();
     }
     protected abstract int getSignalStrength(Level level, BlockPos pos);
     protected abstract int getSignalForState(BlockState state);

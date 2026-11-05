@@ -7,10 +7,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.lighting.ChunkSkyLightSources;
 public interface LightChunk extends BlockGetter {
-    default void findBlockLightSources(BiConsumer<BlockPos, BlockState> consumer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LightChunk#findBlockLightSources");
-    }
-    default ChunkSkyLightSources getSkyLightSources() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LightChunk#getSkyLightSources");
-    }
+    void findBlockLightSources(BiConsumer<BlockPos, BlockState> consumer);
+    ChunkSkyLightSources getSkyLightSources();
 }

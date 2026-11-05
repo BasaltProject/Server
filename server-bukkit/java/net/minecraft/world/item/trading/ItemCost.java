@@ -11,9 +11,17 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ItemLike;
 public record ItemCost(Holder<Item> item, int count, DataComponentExactPredicate components, ItemStack itemStack) {
-    public static final Codec<ItemCost> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.item.trading.ItemCost.class, "CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, ItemCost> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.trading.ItemCost.class, "STREAM_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, Optional<ItemCost>> OPTIONAL_STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.trading.ItemCost.class, "OPTIONAL_STREAM_CODEC");
+    public static final Codec<ItemCost> CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.create(i -> i.group(
+        net.minecraft.resources.Identifier.CODEC.<Holder<Item>>xmap(id -> org.basaltmc.bukkit.facade.HolderRefs.of(Item.class, id), holder -> holder.unwrapKey().get().identifier())
+            .fieldOf("id").forGetter(ItemCost::item),
+        Codec.intRange(1, 99).optionalFieldOf("count", 1).forGetter(ItemCost::count),
+        DataComponentExactPredicate.CODEC.optionalFieldOf("components", DataComponentExactPredicate.EMPTY).forGetter(ItemCost::components))
+        .apply(i, ItemCost::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, ItemCost> STREAM_CODEC = StreamCodec.composite(
+        net.minecraft.network.codec.ByteBufCodecs.holderRegistry(net.minecraft.core.registries.Registries.ITEM), ItemCost::item,
+        net.minecraft.network.codec.ByteBufCodecs.VAR_INT, ItemCost::count,
+        DataComponentExactPredicate.STREAM_CODEC, ItemCost::components, ItemCost::new);
+    public static final StreamCodec<RegistryFriendlyByteBuf, Optional<ItemCost>> OPTIONAL_STREAM_CODEC = STREAM_CODEC.apply(net.minecraft.network.codec.ByteBufCodecs::optional);
     public ItemCost(ItemLike item) {
         this(item, 1);
     }
@@ -24,9 +32,9 @@ public record ItemCost(Holder<Item> item, int count, DataComponentExactPredicate
         this(item, count, components, new ItemStack(item, count));
     }
     public ItemCost withComponents(UnaryOperator<DataComponentExactPredicate.Builder> components) {
-        return this;
+        return new ItemCost(item, count, components.apply(DataComponentExactPredicate.builder()).build());
     }
     public boolean test(ItemStack itemStack) {
-        return itemStack.is(item.value()) && itemStack.getCount() >= count;
+        return itemStack.is(item.value()) && itemStack.getCount() >= count && components.test(itemStack.getComponents());
     }
 }

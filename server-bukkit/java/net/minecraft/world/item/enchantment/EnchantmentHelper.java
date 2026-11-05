@@ -260,6 +260,14 @@ public class EnchantmentHelper {
         }
         return false;
     }
+    public static boolean hasEffect(ItemStack item, String effectKey) {
+        for (Holder<Enchantment> enchantment : item.getOrDefault(net.minecraft.core.component.DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY).keySet()) {
+            if (org.basaltmc.bukkit.facade.EnchantmentEffects.has(enchantment.value(), effectKey)) {
+                return true;
+            }
+        }
+        return false;
+    }
     public static boolean has(ItemStack item, DataComponentType<?> effectType) {
         for (Holder<Enchantment> enchantment : item.getOrDefault(net.minecraft.core.component.DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY).keySet()) {
             if (org.basaltmc.bukkit.facade.EnchantmentEffects.has(enchantment.value(), String.valueOf(effectType))) {

@@ -222,82 +222,56 @@ public class TagValueInput implements ValueInput {
     public HolderLookup.Provider lookup() {
         return provider;
     }
-    private TagValueInput(ProblemReporter problemReporter, ValueInputContextHelper context, CompoundTag input) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput#<init>");
-    }
     public static ValueInput.ValueInputList create(ProblemReporter problemReporter, HolderLookup.Provider holders, List<CompoundTag> tags) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput#create");
-    }
-    static class ListWrapper implements ValueInput.ValueInputList {
-        private ListWrapper(ProblemReporter problemReporter, String name, ValueInputContextHelper context, ListTag list) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.ListWrapper#<init>");
+        List<ValueInput> children = new ArrayList<>(tags.size());
+        for (CompoundTag tag : tags) {
+            children.add(create(problemReporter, holders, tag));
         }
-        public boolean isEmpty() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.ListWrapper#isEmpty");
-        }
-        public Stream<ValueInput> stream() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.ListWrapper#stream");
-        }
-        public Iterator<ValueInput> iterator() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.ListWrapper#iterator");
-        }
-    }
-    static class TypedListWrapper<T> implements ValueInput.TypedInputList<T> {
-        private TypedListWrapper(ProblemReporter problemReporter, String name, ValueInputContextHelper context, Codec<T> codec, ListTag list) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.TypedListWrapper#<init>");
-        }
-        public boolean isEmpty() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.TypedListWrapper#isEmpty");
-        }
-        public Stream<T> stream() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.TypedListWrapper#stream");
-        }
-        public Iterator<T> iterator() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.TypedListWrapper#iterator");
-        }
-    }
-    static class CompoundListWrapper implements ValueInput.ValueInputList {
-        public CompoundListWrapper(ProblemReporter problemReporter, ValueInputContextHelper context, List<CompoundTag> list) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.CompoundListWrapper#<init>");
-        }
-        public boolean isEmpty() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.CompoundListWrapper#isEmpty");
-        }
-        public Stream<ValueInput> stream() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.CompoundListWrapper#stream");
-        }
-        public Iterator<ValueInput> iterator() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.CompoundListWrapper#iterator");
-        }
+        return new ValueInputList() {
+            @Override
+            public boolean isEmpty() {
+                return children.isEmpty();
+            }
+
+            @Override
+            public Stream<ValueInput> stream() {
+                return children.stream();
+            }
+
+            @Override
+            public Iterator<ValueInput> iterator() {
+                return children.iterator();
+            }
+        };
     }
     public static record DecodeFromFieldFailedProblem(String name, Tag tag, DataResult.Error<?> error) implements ProblemReporter.Problem {
         public String description() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.DecodeFromFieldFailedProblem#description");
+            return "Failed to decode value '" + tag + "' from field '" + name + "': " + error.message();
         }
     }
     public static record DecodeFromListFailedProblem(String name, int index, Tag tag, DataResult.Error<?> error) implements ProblemReporter.Problem {
         public String description() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.DecodeFromListFailedProblem#description");
+            return "Failed to decode value '" + tag + "' from field '" + name + "' at index " + index + ": " + error.message();
         }
     }
     public static record DecodeFromMapFailedProblem(DataResult.Error<?> error) implements ProblemReporter.Problem {
         public String description() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.DecodeFromMapFailedProblem#description");
+            return "Failed to decode from map: " + error.message();
         }
     }
     public static record UnexpectedTypeProblem(String name, TagType<?> expected, TagType<?> actual) implements ProblemReporter.Problem {
         public String description() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.UnexpectedTypeProblem#description");
+            return "Expected field '" + name + "' to contain value of type " + expected.getName() + ", but got " + actual.getName();
         }
     }
     public static record UnexpectedNonNumberProblem(String name, TagType<?> actual) implements ProblemReporter.Problem {
         public String description() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.UnexpectedNonNumberProblem#description");
+            return "Expected field '" + name + "' to contain a number, but got " + actual.getName();
         }
     }
     public static record UnexpectedListElementTypeProblem(String name, int index, TagType<?> expected, TagType<?> actual) implements ProblemReporter.Problem {
         public String description() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.TagValueInput.UnexpectedListElementTypeProblem#description");
+            return "Expected list '" + name + "' to contain at index " + index + " value of type " + expected.getName() + ", but got " + actual.getName();
         }
     }
 }

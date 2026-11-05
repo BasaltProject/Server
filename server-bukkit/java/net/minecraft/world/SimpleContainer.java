@@ -126,16 +126,25 @@ public class SimpleContainer implements Container, StackedContentsCompatible {
         items.replaceAll(stack -> ItemStack.EMPTY);
     }
     public void fillStackedContents(StackedItemContents contents) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.SimpleContainer#fillStackedContents");
+        for (ItemStack stack : items) {
+            contents.accountStack(stack);
+        }
     }
     public String toString() {
         return items.stream().filter(stack -> !stack.isEmpty()).toList().toString();
     }
     public void fromItemList(ValueInput.TypedInputList<ItemStack> items) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.SimpleContainer#fromItemList");
+        clearContent();
+        for (ItemStack stack : items) {
+            addItem(stack);
+        }
     }
     public void storeAsItemList(ValueOutput.TypedOutputList<ItemStack> output) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.SimpleContainer#storeAsItemList");
+        for (ItemStack stack : items) {
+            if (!stack.isEmpty()) {
+                output.add(stack);
+            }
+        }
     }
     public NonNullList<ItemStack> getItems() {
         return items;

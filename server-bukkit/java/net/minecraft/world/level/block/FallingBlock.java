@@ -28,7 +28,7 @@ public abstract class FallingBlock extends Block implements Fallable {
         super.tick(state, level, pos, random);
     }
     protected void falling(FallingBlockEntity entity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FallingBlock#falling");
+
     }
     protected int getDelayAfterPlace() {
         return 2;

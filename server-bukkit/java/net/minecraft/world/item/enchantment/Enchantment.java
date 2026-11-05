@@ -113,7 +113,7 @@ public record Enchantment(Component description, EnchantmentDefinition definitio
     public <T> List<T> getEffects(DataComponentType<List<T>> type) {
         List<ConditionalEffect<EnchantmentValueEffect>> typed = org.basaltmc.bukkit.facade.EnchantmentEffects.valueEffects(this, String.valueOf(type));
         if (typed == null) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment#getEffects(" + type + ")");
+            return List.of();
         }
         return (List<T>) (List<?>) typed;
     }
@@ -169,7 +169,17 @@ public record Enchantment(Component description, EnchantmentDefinition definitio
         org.basaltmc.bukkit.facade.EnchantmentEffects.runEntity(this, "minecraft:post_attack", enchantmentLevel, serverLevel, victim, damageSource, item.owner());
     }
     public static void doPostAttack(TargetedConditionalEffect<EnchantmentEntityEffect> effect, ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity victim, DamageSource damageSource) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment#doPostAttack");
+        if (!effect.matches(damageContext(serverLevel, enchantmentLevel, victim, damageSource))) {
+            return;
+        }
+        Entity target = switch (effect.affected()) {
+            case ATTACKER -> damageSource.getEntity();
+            case DAMAGING_ENTITY -> damageSource.getDirectEntity();
+            case VICTIM -> victim;
+        };
+        if (target != null) {
+            effect.effect().apply(serverLevel, enchantmentLevel, item, target, target.position());
+        }
     }
     public void doPostPiercingAttack(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, Entity user) {
         org.basaltmc.bukkit.facade.EnchantmentEffects.runEntity(this, "minecraft:post_piercing_attack", enchantmentLevel, serverLevel, user, null, user);
@@ -196,7 +206,15 @@ public record Enchantment(Component description, EnchantmentDefinition definitio
         org.basaltmc.bukkit.facade.EnchantmentEffects.runEntity(this, "minecraft:hit_block", enchantmentLevel, serverLevel, projectile, null, projectile);
     }
     public static LootContext damageContext(ServerLevel serverLevel, int enchantmentLevel, Entity victim, DamageSource source) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment#damageContext");
+        var params = new net.minecraft.world.level.storage.loot.LootParams.Builder(serverLevel)
+            .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.THIS_ENTITY, victim)
+            .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ENCHANTMENT_LEVEL, enchantmentLevel)
+            .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN, victim.position())
+            .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.DAMAGE_SOURCE, source)
+            .withOptionalParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ATTACKING_ENTITY, source.getEntity())
+            .withOptionalParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.DIRECT_ATTACKING_ENTITY, source.getDirectEntity());
+        var lootParams = new net.minecraft.world.level.storage.loot.LootParams(serverLevel, params.contextMap(), java.util.Map.of(), 0.0F);
+        return new net.minecraft.world.level.storage.loot.LootContext.Builder(lootParams).create(java.util.Optional.empty());
     }
     public void runLocationChangedEffects(ServerLevel serverLevel, int enchantmentLevel, EnchantedItemInUse item, LivingEntity entity) {
         org.basaltmc.bukkit.facade.EnchantmentEffects.runEntity(this, "minecraft:location_changed", enchantmentLevel, serverLevel, entity, null, entity);
@@ -219,6 +237,13 @@ public record Enchantment(Component description, EnchantmentDefinition definitio
     public static class Builder {
         private final EnchantmentDefinition definition;
         private HolderSet<Enchantment> exclusiveSet = HolderSet.empty();
+        private final DataComponentMap.Builder effects = DataComponentMap.builder();
+        private final java.util.Map<DataComponentType<?>, List<Object>> lists = new java.util.LinkedHashMap<>();
+        @SuppressWarnings("unchecked")
+        private <E> Builder add(DataComponentType<?> type, E effect) {
+            lists.computeIfAbsent(type, key -> new java.util.ArrayList<>()).add(effect);
+            return this;
+        }
         public Builder(EnchantmentDefinition definition) {
             this.definition = definition;
         }
@@ -227,34 +252,42 @@ public record Enchantment(Component description, EnchantmentDefinition definitio
             return this;
         }
         public <E> Builder withEffect(DataComponentType<List<ConditionalEffect<E>>> type, E effect, LootItemCondition.Builder condition) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment.Builder#withEffect");
+            return add(type, new ConditionalEffect<>(effect, java.util.Optional.of(net.minecraft.core.Holder.direct(condition.build()))));
         }
         public <E> Builder withEffect(DataComponentType<List<ConditionalEffect<E>>> type, E effect) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment.Builder#withEffect");
+            return add(type, new ConditionalEffect<>(effect, java.util.Optional.empty()));
         }
         public <E> Builder withEffect(DataComponentType<List<TargetedConditionalEffect<E>>> type, EnchantmentTarget enchanted, EnchantmentTarget affected, E effect, LootItemCondition.Builder condition) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment.Builder#withEffect");
+            return add(type, new TargetedConditionalEffect<>(enchanted, affected, effect, java.util.Optional.of(net.minecraft.core.Holder.direct(condition.build()))));
         }
         public <E> Builder withEffect(DataComponentType<List<TargetedConditionalEffect<E>>> type, EnchantmentTarget enchanted, EnchantmentTarget affected, E effect) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment.Builder#withEffect");
+            return add(type, new TargetedConditionalEffect<>(enchanted, affected, effect, java.util.Optional.empty()));
         }
         public Builder withEffect(DataComponentType<List<EnchantmentAttributeEffect>> type, EnchantmentAttributeEffect effect) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment.Builder#withEffect");
+            return add(type, effect);
         }
         public <E> Builder withSpecialEffect(DataComponentType<E> type, E effect) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment.Builder#withSpecialEffect");
+            effects.set(type, effect);
+            return this;
         }
         public Builder withEffect(DataComponentType<Unit> type) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment.Builder#withEffect");
+            effects.set(type, Unit.INSTANCE);
+            return this;
+        }
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        private DataComponentMap built() {
+            DataComponentMap.Builder all = DataComponentMap.builder().addAll(effects.build());
+            lists.forEach((type, list) -> all.set((DataComponentType) type, List.copyOf(list)));
+            return all.build();
         }
         public Enchantment build(Identifier descriptionKey) {
-            return new Enchantment(Component.translatable("enchantment." + descriptionKey.getNamespace() + "." + descriptionKey.getPath().replace('/', '.')), definition, exclusiveSet, DataComponentMap.EMPTY);
+            return new Enchantment(Component.translatable("enchantment." + descriptionKey.getNamespace() + "." + descriptionKey.getPath().replace('/', '.')), definition, exclusiveSet, built());
         }
     }
     interface FloatAction<T> {
         float apply(T effect, float value);
         default GenericAction<T> asGeneric(MutableFloat v) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.Enchantment.FloatAction#asGeneric");
+            return effect -> v.setValue(apply(effect, v.floatValue()));
         }
     }
     interface GenericAction<T> {

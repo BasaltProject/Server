@@ -184,7 +184,15 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
     private final class HolderIds implements IdMap<Holder<T>> {
         @Override
         public int getId(Holder<T> holder) {
-            return holder instanceof Holder.Reference<T> reference ? byId.indexOf(reference) : -1;
+            if (!(holder instanceof Holder.Reference<T> reference)) {
+                return -1;
+            }
+            int index = byId.indexOf(reference);
+            if (index >= 0) {
+                return index;
+            }
+            Holder.Reference<T> registered = byValue.get(reference.value());
+            return registered == null ? -1 : byId.indexOf(registered);
         }
 
         @Override

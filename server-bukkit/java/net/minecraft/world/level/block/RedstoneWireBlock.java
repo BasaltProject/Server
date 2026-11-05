@@ -53,7 +53,7 @@ public class RedstoneWireBlock extends Block {
         return super.canSurvive(state, level, pos);
     }
     public int getBlockSignal(Level level, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.RedstoneWireBlock#getBlockSignal");
+        return level.getBestNeighborSignal(pos);
     }
     protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
         super.onPlace(state, level, pos, oldState, movedByPiston);
@@ -77,10 +77,10 @@ public class RedstoneWireBlock extends Block {
         return super.shouldRedstoneWireConnectTo(state, level, pos, direction);
     }
     protected static boolean shouldConnectTo(BlockGetter level, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.RedstoneWireBlock#shouldConnectTo");
+        return shouldConnectTo(level.getBlockState(pos), level, pos, null);
     }
     protected static boolean shouldConnectTo(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.RedstoneWireBlock#shouldConnectTo");
+        return state.shouldRedstoneWireConnectTo(level, pos, direction);
     }
     protected boolean isSignalSource(BlockState state) {
         return super.isSignalSource(state);

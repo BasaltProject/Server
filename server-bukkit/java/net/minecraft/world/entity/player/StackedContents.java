@@ -67,14 +67,15 @@ public class StackedContents<T> {
         return Math.min(bound, pooled / ingredients.size());
     }
     class RecipePicker {
+        private final List<? extends IngredientInfo<T>> ingredients;
         public RecipePicker(List<? extends IngredientInfo<T>> ingredients) {
-            
+            this.ingredients = ingredients;
         }
         public boolean tryPick(int capacity, Output<T> output) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.player.StackedContents.RecipePicker#tryPick");
+            return StackedContents.this.tryPick(ingredients, capacity, output);
         }
         public int tryPickAll(int maxSize, Output<T> output) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.player.StackedContents.RecipePicker#tryPickAll");
+            return StackedContents.this.tryPickAll(ingredients, maxSize, output);
         }
     }
     public interface IngredientInfo<T> {

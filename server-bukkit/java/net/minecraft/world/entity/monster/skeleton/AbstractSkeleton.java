@@ -52,7 +52,7 @@ public abstract class AbstractSkeleton extends Monster implements RangedAttackMo
         return groupData;
     }
     public void reassessWeaponGoal() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.skeleton.AbstractSkeleton#reassessWeaponGoal");
+        return;
     }
     protected int getHardAttackInterval() {
         return 0;
@@ -64,11 +64,11 @@ public abstract class AbstractSkeleton extends Monster implements RangedAttackMo
         if (live() instanceof com.destroystokyo.paper.entity.RangedEntity ranged && target.live() instanceof org.bukkit.entity.LivingEntity victim) { ranged.rangedAttack(victim, power); }
     }
     protected AbstractArrow getArrow(ItemStack projectile, float power, ItemStack firingWeapon) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.skeleton.AbstractSkeleton#getArrow");
+        return net.minecraft.world.entity.projectile.ProjectileUtil.getMobArrow(this, projectile, power, firingWeapon);
     }
     protected void readAdditionalSaveData(ValueInput input) {
     }
     public boolean isShaking() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.skeleton.AbstractSkeleton#isShaking");
+        return isFullyFrozen();
     }
 }

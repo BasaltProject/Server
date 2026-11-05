@@ -9,8 +9,19 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.display.RecipeDisplay;
 public class SmithingTransformRecipe extends SimpleSmithingRecipe {
-    public static final MapCodec<SmithingTransformRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.SmithingTransformRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, SmithingTransformRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.SmithingTransformRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<SmithingTransformRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Recipe.CommonInfo.MAP_CODEC.forGetter(o -> o.commonInfo),
+        Ingredient.CODEC.optionalFieldOf("template").forGetter(o -> o.template),
+        Ingredient.CODEC.fieldOf("base").forGetter(o -> o.base),
+        Ingredient.CODEC.optionalFieldOf("addition").forGetter(o -> o.addition),
+        ItemStackTemplate.CODEC.fieldOf("result").forGetter(o -> o.result)).apply(i, SmithingTransformRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, SmithingTransformRecipe> STREAM_CODEC = StreamCodec.composite(
+        Recipe.CommonInfo.STREAM_CODEC, o -> o.commonInfo,
+        Ingredient.OPTIONAL_CONTENTS_STREAM_CODEC, o -> o.template,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.base,
+        Ingredient.OPTIONAL_CONTENTS_STREAM_CODEC, o -> o.addition,
+        ItemStackTemplate.STREAM_CODEC, o -> o.result,
+        SmithingTransformRecipe::new);
     public static final RecipeSerializer<SmithingTransformRecipe> SERIALIZER = null;
     private final Optional<Ingredient> template;
     private final Ingredient base;

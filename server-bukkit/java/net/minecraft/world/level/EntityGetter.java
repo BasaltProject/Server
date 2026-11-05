@@ -10,18 +10,12 @@ import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.VoxelShape;
 public interface EntityGetter {
-    default List<Entity> getEntities(Entity except, AABB bb, Predicate<? super Entity> selector) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.EntityGetter#getEntities");
-    }
-    default <T extends Entity> List<T> getEntities(EntityTypeTest<Entity, T> type, AABB bb, Predicate<? super T> selector) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.EntityGetter#getEntities");
-    }
+    List<Entity> getEntities(Entity except, AABB bb, Predicate<? super Entity> selector);
+    <T extends Entity> List<T> getEntities(EntityTypeTest<Entity, T> type, AABB bb, Predicate<? super T> selector);
     default <T extends Entity> List<T> getEntitiesOfClass(Class<T> baseClass, AABB bb, Predicate<? super T> selector) {
         return getEntities(EntityTypeTest.forClass(baseClass), bb, selector);
     }
-    default List<? extends Player> players() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.EntityGetter#players");
-    }
+    List<? extends Player> players();
     default List<Entity> getEntities(Entity except, AABB bb) {
         return getEntities(except, bb, entity -> !entity.isSpectator());
     }

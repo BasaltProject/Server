@@ -7,8 +7,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.level.Level;
 public class ShieldDecorationRecipe extends CustomRecipe {
-    public static final MapCodec<ShieldDecorationRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.ShieldDecorationRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, ShieldDecorationRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.ShieldDecorationRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<ShieldDecorationRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Ingredient.CODEC.fieldOf("banner").forGetter(o -> o.banner),
+        Ingredient.CODEC.fieldOf("target").forGetter(o -> o.target),
+        ItemStackTemplate.CODEC.fieldOf("result").forGetter(o -> o.result)).apply(i, ShieldDecorationRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShieldDecorationRecipe> STREAM_CODEC = StreamCodec.composite(
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.banner,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.target,
+        ItemStackTemplate.STREAM_CODEC, o -> o.result,
+        ShieldDecorationRecipe::new);
     public static final RecipeSerializer<ShieldDecorationRecipe> SERIALIZER = null;
     private final Ingredient banner;
     private final Ingredient target;

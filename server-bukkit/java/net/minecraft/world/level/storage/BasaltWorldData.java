@@ -43,7 +43,8 @@ public final class BasaltWorldData implements WorldData {
     }
 
     public LevelSettings getLevelSettings() {
-        return null;
+        return new LevelSettings(getLevelName(), getGameType(), new LevelSettings.DifficultySettings(getDifficulty(), isHardcore(), isDifficultyLocked()),
+            isAllowCommands(), getDataConfiguration());
     }
 
     public CompoundTag createTag(UUID singlePlayerUUID) {
@@ -86,10 +87,11 @@ public final class BasaltWorldData implements WorldData {
     }
 
     public boolean isDifficultyLocked() {
-        return false;
+        return org.basaltmc.bukkit.WorldNatives.difficultyLocked(world().getName());
     }
 
     public void setDifficultyLocked(boolean difficultyLocked) {
+        org.basaltmc.bukkit.WorldNatives.setDifficultyLocked(world().getName(), difficultyLocked);
     }
 
     public UUID getSinglePlayerUUID() {

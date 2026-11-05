@@ -205,10 +205,11 @@ public class ItemStack implements DataComponentHolder, ItemInstance {
         this.patch = components;
     }
     private ItemStack(Holder<Item> item, int count, PatchedDataComponentMap components) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.ItemStack#<init>");
+        this(item, count);
+        this.patch = components.asPatch();
     }
     private ItemStack(Void nullMarker) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.ItemStack#<init>");
+        this((Item) null, 0);
     }
     public boolean isItemEnabled(FeatureFlagSet enabledFeatures) {
         return true;
@@ -389,7 +390,8 @@ public class ItemStack implements DataComponentHolder, ItemInstance {
         return a.getItem() == b.getItem() && a.getComponentsPatch().forget(ignoredPredicate).equals(b.getComponentsPatch().forget(ignoredPredicate));
     }
     public static MapCodec<ItemStack> lenientOptionalFieldOf(String name) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.ItemStack#lenientOptionalFieldOf");
+        return CODEC.lenientOptionalFieldOf(name).xmap(stack -> stack.orElse(EMPTY),
+            stack -> stack.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(stack));
     }
     public static int hashItemAndComponents(ItemStack item) {
         return item == null || item.isEmpty() ? 0 : 31 * item.getItem().hashCode() + item.patch.hashCode();

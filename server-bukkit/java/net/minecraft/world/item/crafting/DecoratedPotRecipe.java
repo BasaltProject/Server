@@ -7,8 +7,19 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.level.Level;
 public class DecoratedPotRecipe extends CustomRecipe {
-    public static final MapCodec<DecoratedPotRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.DecoratedPotRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, DecoratedPotRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.DecoratedPotRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<DecoratedPotRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Ingredient.CODEC.fieldOf("back").forGetter(o -> o.backPattern),
+        Ingredient.CODEC.fieldOf("left").forGetter(o -> o.leftPattern),
+        Ingredient.CODEC.fieldOf("right").forGetter(o -> o.rightPattern),
+        Ingredient.CODEC.fieldOf("front").forGetter(o -> o.frontPattern),
+        ItemStackTemplate.CODEC.fieldOf("result").forGetter(o -> o.result)).apply(i, DecoratedPotRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, DecoratedPotRecipe> STREAM_CODEC = StreamCodec.composite(
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.backPattern,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.leftPattern,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.rightPattern,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.frontPattern,
+        ItemStackTemplate.STREAM_CODEC, o -> o.result,
+        DecoratedPotRecipe::new);
     public static final RecipeSerializer<DecoratedPotRecipe> SERIALIZER = null;
     private final Ingredient backPattern;
     private final Ingredient leftPattern;

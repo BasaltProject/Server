@@ -9,6 +9,6 @@ public record MultiplyValue(LevelBasedValue factor) implements EnchantmentValueE
         return inputValue * factor.calculate(enchantmentLevel);
     }
     public MapCodec<MultiplyValue> codec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.effects.MultiplyValue#codec");
+        return CODEC;
     }
 }

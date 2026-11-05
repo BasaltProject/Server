@@ -32,6 +32,9 @@ import net.minecraft.world.level.validation.DirectoryValidator;
 import org.apache.commons.io.function.IORunnable;
 public class LevelStorageSource {
     private Path baseDir;
+    private Path backupDir;
+    private DirectoryValidator worldDirValidator;
+    private DataFixer fixerUpper;
 
     protected LevelStorageSource() {
     }
@@ -147,20 +150,27 @@ public class LevelStorageSource {
         public String getLevelId() {
             return levelId;
         }
+        private LevelSummary fixAndGetSummaryQuietly() {
+            try {
+                return fixAndGetSummary();
+            } catch (IOException e) {
+                return new LevelSummary.CorruptedLevelSummary(levelId, levelPath.resolve("icon.png"), 0L);
+            }
+        }
         public Path getLevelPath(LevelResource resource) {
             return levelPath.resolve(resource.id());
         }
         public PlayerDataStorage createPlayerStorage() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess#createPlayerStorage");
+        return new PlayerDataStorage(this, source == null ? null : source.fixerUpper);
         }
         public void collectIssues(boolean useFallback) throws IOException {
             return;
         }
         public LevelSummary fixAndGetSummary() throws IOException {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess#fixAndGetSummary");
+            return fixAndGetSummaryFromTag(getUnfixedDataTag(true));
         }
         public LevelSummary fixAndGetSummaryFromTag(Dynamic<?> dataTag) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess#fixAndGetSummaryFromTag");
+            return source.summaryOf(levelId, levelPath, dataTag.get("Data").orElseEmptyMap());
         }
         public Dynamic<?> getUnfixedDataTagWithFallback() throws IOException {
             return getUnfixedDataTag(true);
@@ -171,10 +181,12 @@ public class LevelStorageSource {
             return new Dynamic<>(net.minecraft.nbt.NbtOps.INSTANCE, root);
         }
         public void saveDataTag(WorldData levelData) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess#saveDataTag");
+        saveDataTag(levelData, null);
         }
         public void saveDataTag(WorldData levelData, UUID singleplayerUUID) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess#saveDataTag");
+        net.minecraft.nbt.CompoundTag root = new net.minecraft.nbt.CompoundTag();
+        root.put("Data", levelData.createTag(singleplayerUUID));
+        saveLevelData(new Dynamic<>(net.minecraft.nbt.NbtOps.INSTANCE, root));
         }
         public void saveLevelData(Dynamic<?> tag) {
             Object value = tag.getValue();
@@ -238,10 +250,26 @@ public class LevelStorageSource {
     public static final String TAG_DATA = "Data";
     public static final String ALLOWED_SYMLINKS_CONFIG_NAME = "allowed_symlinks.txt";
     public LevelStorageSource(Path baseDir, Path backupDir, DirectoryValidator worldDirValidator, DataFixer fixerUpper) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#<init>");
+        this.baseDir = baseDir;
+        this.backupDir = backupDir;
+        this.worldDirValidator = worldDirValidator;
+        this.fixerUpper = fixerUpper;
     }
     public static DirectoryValidator parseValidator(Path configPath) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#parseValidator");
+        java.util.List<java.nio.file.PathMatcher> allowed = new java.util.ArrayList<>();
+        if (java.nio.file.Files.isRegularFile(configPath)) {
+            try {
+                for (String line : java.nio.file.Files.readAllLines(configPath)) {
+                    String pattern = line.strip();
+                    if (!pattern.isEmpty() && !pattern.startsWith("#")) {
+                        allowed.add(configPath.getFileSystem().getPathMatcher(pattern.startsWith("regex:") || pattern.startsWith("glob:") ? pattern : "glob:" + pattern));
+                    }
+                }
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        }
+        return new DirectoryValidator(path -> allowed.stream().anyMatch(matcher -> matcher.matches(path)));
     }
     public static WorldDataConfiguration readDataConfig(Dynamic<?> levelData) {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#readDataConfig");
@@ -265,10 +293,34 @@ public class LevelStorageSource {
         return "Anvil";
     }
     public LevelCandidates findLevelCandidates() throws LevelStorageException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#findLevelCandidates");
+        List<LevelDirectory> found = new java.util.ArrayList<>();
+        if (java.nio.file.Files.isDirectory(baseDir)) {
+            try (java.util.stream.Stream<Path> entries = java.nio.file.Files.list(baseDir)) {
+                entries.filter(java.nio.file.Files::isDirectory).sorted().forEach(entry -> found.add(new LevelDirectory(entry)));
+            } catch (IOException e) {
+                throw new LevelStorageException(net.minecraft.network.chat.Component.translatable("selectWorld.load_folder_access"));
+            }
+        }
+        return new LevelCandidates(found);
     }
     public CompletableFuture<List<LevelSummary>> loadLevelSummaries(LevelCandidates candidates) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#loadLevelSummaries");
+        List<LevelSummary> summaries = new java.util.ArrayList<>();
+        for (LevelDirectory directory : candidates) {
+            String id = directory.directoryName();
+            if (java.nio.file.Files.isSymbolicLink(directory.path())) {
+                summaries.add(new LevelSummary.SymlinkLevelSummary(id, directory.iconFile()));
+                continue;
+            }
+            summaries.add(createAccess(id).fixAndGetSummaryQuietly());
+        }
+        java.util.Collections.sort(summaries);
+        return CompletableFuture.completedFuture(summaries);
+    }
+    private LevelSummary summaryOf(String levelId, Path levelPath, Dynamic<?> data) {
+        net.minecraft.world.level.LevelSettings settings = net.minecraft.world.level.LevelSettings.parse(data, null);
+        LevelVersion version = LevelVersion.parse(data);
+        Path icon = levelPath.resolve("icon.png");
+        return new LevelSummary(settings, version, levelId, false, false, false, false, icon);
     }
     public boolean isNewLevelIdAcceptable(String levelId) {
         return !levelId.isBlank() && !levelId.contains("/") && !levelId.contains("\\") && !java.nio.file.Files.exists(getLevelPath(levelId));
@@ -286,17 +338,17 @@ public class LevelStorageSource {
         return baseDir.resolveSibling("backups");
     }
     public LevelStorageAccess validateAndCreateAccess(String levelId) throws IOException, ContentValidationException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#validateAndCreateAccess");
+        return createAccess(levelId);
     }
     public DirectoryValidator getWorldDirValidator() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#getWorldDirValidator");
+        return worldDirValidator;
     }
     public static record LevelCandidates(List<LevelDirectory> levels) implements Iterable<LevelDirectory> {
         public boolean isEmpty() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource.LevelCandidates#isEmpty");
+            return levels.isEmpty();
         }
         public Iterator<LevelDirectory> iterator() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource.LevelCandidates#iterator");
+            return levels.iterator();
         }
     }
     public static record LevelDirectory(Path path) {

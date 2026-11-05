@@ -15,6 +15,6 @@ public final class FeatureUtils {
         return ResourceKey.create(Registries.CONFIGURED_FEATURE, Identifier.withDefaultNamespace(name));
     }
     public static void bootstrap(BootstrapContext<Feature> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.FeatureUtils#bootstrap");
+        // registries come from the native datapack loader, so there is nothing to bootstrap
     }
 }

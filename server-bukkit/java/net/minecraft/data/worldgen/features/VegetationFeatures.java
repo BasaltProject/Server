@@ -72,7 +72,7 @@ public class VegetationFeatures {
     public static final ResourceKey<Object> RED_SHRUB = FeatureUtils.createKey("red_shrub");
     public static final ResourceKey<Object> TREES_DAPPLED_FOREST = FeatureUtils.createKey("trees_dappled_forest");
     public static void bootstrap(BootstrapContext<Feature> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.VegetationFeatures#bootstrap");
+        // registries come from the native datapack loader, so there is nothing to bootstrap
     }
     public static WeightedList.Builder<BlockState> leafLitterPatchBuilder(int minState, int maxState) {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.VegetationFeatures#leafLitterPatchBuilder");

@@ -9,6 +9,6 @@ public record SetValue(LevelBasedValue value) implements EnchantmentValueEffect 
         return value.calculate(enchantmentLevel);
     }
     public MapCodec<SetValue> codec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.effects.SetValue#codec");
+        return CODEC;
     }
 }

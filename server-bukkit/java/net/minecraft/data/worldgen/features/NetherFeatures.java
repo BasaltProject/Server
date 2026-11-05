@@ -28,6 +28,6 @@ public class NetherFeatures {
     public static final ResourceKey<Object> SOUL_FIRE = FeatureUtils.createKey("patch_soul_fire");
     public static final ResourceKey<Object> NYLIUM_BONEMEAL = FeatureUtils.createKey("nylium_bonemeal");
     public static void bootstrap(BootstrapContext<Feature> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.NetherFeatures#bootstrap");
+        // registries come from the native datapack loader, so there is nothing to bootstrap
     }
 }

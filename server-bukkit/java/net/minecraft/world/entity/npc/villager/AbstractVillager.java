@@ -183,9 +183,29 @@ public abstract class AbstractVillager extends AgeableMob implements Npc, Mercha
     }
     protected abstract void updateTrades(ServerLevel level);
     protected void addOffersFromTradeSet(ServerLevel level, MerchantOffers offers, ResourceKey<TradeSet> resourceKey) {
+        String path = resourceKey.identifier().getPath();
+        int slash = path.indexOf('/');
+        int levelAt = path.lastIndexOf("level_");
+        if (slash < 0 || levelAt < 0) {
+            return;
         }
+        org.basaltmc.bukkit.trade.TradeOffers.add(offers, path.substring(0, slash),
+            Integer.parseInt(path.substring(levelAt + 6)), level.getWorld().getName(), getX(), getY(), getZ(),
+            villagerVariant(), -1, 0L, null);
+    }
+    private String villagerVariant() {
+        return live() instanceof org.bukkit.entity.Villager villager ? villager.getVillagerType().getKey().toString() : "";
+    }
     static void addOffersFromItemListings(LootContext lootContext, MerchantOffers merchantOffers, HolderSet<VillagerTrade> potentialOffers, int numberOfOffers) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.npc.villager.AbstractVillager#addOffersFromItemListings");
+        java.util.List<String> listed = new java.util.ArrayList<>();
+        for (net.minecraft.core.Holder<VillagerTrade> holder : potentialOffers) {
+            holder.unwrapKey().ifPresent(key -> listed.add(key.identifier().toString()));
+        }
+        net.minecraft.world.phys.Vec3 origin = lootContext.getParams().contextMap().getOrDefault(
+            net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN, Vec3.ZERO);
+        org.basaltmc.bukkit.trade.TradeOffers.add(merchantOffers, "", 1, lootContext.getLevel().getWorld().getName(),
+            origin.x, origin.y, origin.z, "", numberOfOffers, lootContext.getRandom().nextLong(),
+            listed.toArray(new String[0]));
     }
     public Vec3 getRopeHoldPosition(float partialTickTime) {
         float yaw = Mth.lerp(partialTickTime, yBodyRotO, yBodyRot) * (float) (Math.PI / 180.0);

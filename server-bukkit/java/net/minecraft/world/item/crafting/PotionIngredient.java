@@ -21,6 +21,6 @@ public record PotionIngredient(Ingredient ingredient, Optional<PotionsPredicate>
         return new PotionIngredient(Ingredient.of(item), Optional.empty());
     }
     public static boolean isPotionInput(ItemStack itemStack, RecipeAccess recipeAccess) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.crafting.PotionIngredient#isPotionInput");
+        return recipeAccess.propertySet(RecipePropertySet.BREWING_INPUTS).test(itemStack);
     }
 }

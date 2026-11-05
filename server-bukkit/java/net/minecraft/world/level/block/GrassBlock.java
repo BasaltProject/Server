@@ -24,6 +24,6 @@ public class GrassBlock extends SpreadingSnowyBlock implements BonemealableBlock
         org.basaltmc.bukkit.WorldEnvNatives.boneMeal(level.getWorld().getName(), pos.getX(), pos.getY(), pos.getZ());
     }
     public BonemealableBlock.Type getType() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.GrassBlock#getType");
+        return BonemealableBlock.Type.NEIGHBOR_SPREADER;
     }
 }

@@ -42,88 +42,91 @@ import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
 public abstract class ChunkGenerator {
     protected ChunkGenerator() {
+        this.biomeSource = null;
+        this.generationSettingsGetter = biome -> biome.value().getGenerationSettings();
     }
     public BiomeSource getBiomeSource() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkGenerator.getBiomeSource");
+        return biomeSource;
     }
     public static final Codec<ChunkGenerator> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.chunk.ChunkGenerator.class, "CODEC");
-    protected final BiomeSource biomeSource = null;
+    protected final BiomeSource biomeSource;
+    private final Function<Holder<Biome>, BiomeGenerationSettings> generationSettingsGetter;
     public ChunkGenerator(BiomeSource biomeSource) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#<init>");
+        this(biomeSource, biome -> biome.value().getGenerationSettings());
     }
     public ChunkGenerator(BiomeSource biomeSource, Function<Holder<Biome>, BiomeGenerationSettings> generationSettingsGetter) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#<init>");
+        this.biomeSource = biomeSource;
+        this.generationSettingsGetter = generationSettingsGetter;
     }
     public void validate() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#validate");
+
     }
     public ChunkPos getOrigin(RandomState randomState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getOrigin");
+        return ChunkPos.ZERO;
     }
-    protected MapCodec<? extends ChunkGenerator> codec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#codec");
-    }
+    protected abstract MapCodec<? extends ChunkGenerator> codec();
     public ChunkGeneratorStructureState createState(HolderLookup<StructureSet> structureSets, RandomState randomState, long legacyLevelSeed) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#createState");
+        return ChunkGeneratorStructureState.ofSeed(randomState, legacyLevelSeed);
     }
     public Optional<Identifier> getTypeNameForDataFixer() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getTypeNameForDataFixer");
+        return Optional.empty();
     }
     public CompletableFuture<ChunkAccess> createBiomes(RandomState randomState, Blender blender, StructureManager structureManager, ChunkAccess protoChunk) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#createBiomes");
+        return CompletableFuture.completedFuture(protoChunk);
     }
     protected BiomeResolver decorateBiomeResolver(Blender blender, ChunkAccess protoChunk, BiomeResolver biomeResolver) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#decorateBiomeResolver");
+        return biomeResolver;
     }
     public Pair<BlockPos, Holder<Structure>> findNearestMapStructure(ServerLevel level, HolderSet<Structure> wantedStructures, BlockPos pos, int maxSearchRadius, boolean createReference) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#findNearestMapStructure");
+        BlockPos best = null;
+        Holder<Structure> bestHolder = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (Holder<Structure> holder : wantedStructures) {
+            BlockPos found = level.findNearestMapStructure(HolderSet.direct(holder), pos, maxSearchRadius, createReference);
+            if (found != null && found.distSqr(pos) < bestDistance) {
+                best = found;
+                bestHolder = holder;
+                bestDistance = found.distSqr(pos);
+            }
+        }
+        return best == null ? null : Pair.of(best, bestHolder);
     }
     public void applyBiomeDecoration(WorldGenLevel level, ChunkAccess chunk, StructureManager structureManager) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#applyBiomeDecoration");
+
     }
     public void spawnOriginalMobs(WorldGenRegion worldGenRegion) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#spawnOriginalMobs");
+
     }
     public int getSpawnHeight(LevelHeightAccessor heightAccessor) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getSpawnHeight");
+        return 64;
     }
-    public int getGenDepth() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getGenDepth");
-    }
+    public abstract int getGenDepth();
     public WeightedList<MobSpawnSettings.SpawnerData> getMobsAt(Level level, StructureManager structureManager, MobCategory mobCategory, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getMobsAt");
+        return WeightedList.of();
     }
     public void createStructures(RegistryAccess registryAccess, ChunkGeneratorStructureState state, StructureManager structureManager, ChunkAccess centerChunk, StructureTemplateManager structureTemplateManager, ResourceKey<Level> level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#createStructures");
+
     }
     public void createReferences(WorldGenLevel level, StructureManager structureManager, ChunkAccess centerChunk) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#createReferences");
+
     }
     public CompletableFuture<ChunkAccess> buildTerrain(ChunkAccess chunk, Blender blender, RandomState randomState, StructureManager structureManager, BiomeManager biomeManager, WorldGenRegion carverBiomeRegion, Set<Holder<Biome>> possibleBiomes) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#buildTerrain");
+        return CompletableFuture.completedFuture(chunk);
     }
-    public int getSeaLevel() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getSeaLevel");
-    }
-    public int getMinY() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getMinY");
-    }
-    public int getBaseHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getBaseHeight");
-    }
-    public NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor heightAccessor, RandomState randomState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getBaseColumn");
-    }
+    public abstract int getSeaLevel();
+    public abstract int getMinY();
+    public abstract int getBaseHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState);
+    public abstract NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor heightAccessor, RandomState randomState);
     public int getFirstFreeHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getFirstFreeHeight");
+        return getBaseHeight(x, z, type, heightAccessor, randomState);
     }
     public int getFirstOccupiedHeight(int x, int z, Heightmap.Types type, LevelHeightAccessor heightAccessor, RandomState randomState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getFirstOccupiedHeight");
+        return getBaseHeight(x, z, type, heightAccessor, randomState) - 1;
     }
     public void addDebugScreenInfo(List<String> result, RandomState randomState, BlockPos feetPos, SamplerContext samplerContext) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#addDebugScreenInfo");
+
     }
     public BiomeGenerationSettings getBiomeGenerationSettings(Holder<Biome> biome) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.ChunkGenerator#getBiomeGenerationSettings");
+        return generationSettingsGetter.apply(biome);
     }
 }

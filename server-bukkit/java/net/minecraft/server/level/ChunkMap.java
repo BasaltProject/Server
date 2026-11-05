@@ -46,6 +46,8 @@ import net.minecraft.world.level.storage.LevelStorageSource;
 public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerProvider, GeneratingChunkMap {
     private final ServerChunkCache source;
     private final ServerPlayer watcher;
+    private volatile RandomState randomState;
+    private volatile ChunkGeneratorStructureState structureState;
 
     protected ChunkMap() {
         this.source = null;
@@ -84,10 +86,16 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
         return source.getGenerator();
     }
     protected ChunkGeneratorStructureState generatorState() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ChunkMap#generatorState");
+        if (structureState == null) {
+            structureState = ChunkGeneratorStructureState.ofSeed(randomState(), ((ServerLevel) source.getLevel()).getSeed());
+        }
+        return structureState;
     }
     protected RandomState randomState() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ChunkMap#randomState");
+        if (randomState == null) {
+            randomState = RandomState.ofSeed(((ServerLevel) source.getLevel()).getSeed(), false);
+        }
+        return randomState;
     }
     public boolean isChunkTracked(ServerPlayer player, int chunkX, int chunkZ) {
         return ((org.bukkit.entity.Player) player.getBukkitEntity()).isChunkSent(org.bukkit.Chunk.getChunkKey(chunkX, chunkZ));
@@ -118,7 +126,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
         return CompletableFuture.completedFuture(ChunkResult.of(chunks));
     }
     public ReportedException debugFuturesAndCreateReportedException(IllegalStateException exception, String details) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ChunkMap#debugFuturesAndCreateReportedException");
+        return new ReportedException(net.minecraft.CrashReport.forThrowable(exception, details));
     }
     public CompletableFuture<ChunkResult<LevelChunk>> prepareEntityTickingChunk(ChunkHolder chunk) {
         return chunk.getTickingChunkFuture();

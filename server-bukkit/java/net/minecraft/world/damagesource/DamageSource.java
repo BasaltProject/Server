@@ -25,7 +25,7 @@ public class DamageSource {
         return "DamageSource (" + (type == null ? "?" : type.unwrapKey().map(key -> key.identifier().toString()).orElse("?")) + ")";
     }
     public float getFoodExhaustion() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.damagesource.DamageSource#getFoodExhaustion");
+        return type.value().exhaustion();
     }
     public boolean isDirect() {
         return directEntity == causingEntity;
@@ -55,25 +55,38 @@ public class DamageSource {
         return causingEntity;
     }
     public ItemStack getWeaponItem() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.damagesource.DamageSource#getWeaponItem");
+        return directEntity != null ? directEntity.getWeaponItem() : null;
     }
     public Component getLocalizedDeathMessage(LivingEntity victim) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.damagesource.DamageSource#getLocalizedDeathMessage");
+        String key = "death.attack." + getMsgId();
+        if (causingEntity == null && directEntity == null) {
+            LivingEntity credit = victim.getKillCredit();
+            return credit != null
+                ? Component.translatable(key + ".player", victim.getDisplayName(), credit.getDisplayName())
+                : Component.translatable(key, victim.getDisplayName());
+        }
+        Component attacker = (causingEntity != null ? causingEntity : directEntity).getDisplayName();
+        ItemStack held = causingEntity instanceof LivingEntity living ? living.getMainHandItem() : ItemStack.EMPTY;
+        if (!held.isEmpty() && held.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME)) {
+            return Component.translatable(key + ".item", victim.getDisplayName(), attacker, held.getDisplayName());
+        }
+        return Component.translatable(key, victim.getDisplayName(), attacker);
     }
     public String getMsgId() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.damagesource.DamageSource#getMsgId");
+        return type.value().msgId();
     }
     public boolean scalesWithDifficulty() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.damagesource.DamageSource#scalesWithDifficulty");
+        boolean livingNonPlayer = causingEntity instanceof LivingEntity && !(causingEntity instanceof net.minecraft.world.entity.player.Player);
+        return org.basaltmc.bukkit.MechanicsNatives.scalesWithDifficulty(type.value().scaling().name(), livingNonPlayer);
     }
     public boolean isCreativePlayer() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.damagesource.DamageSource#isCreativePlayer");
+        return causingEntity instanceof net.minecraft.world.entity.player.Player player && player.getAbilities().instabuild;
     }
     public Vec3 getSourcePosition() {
         return damageSourcePosition != null ? damageSourcePosition : directEntity != null ? directEntity.position() : null;
     }
     public Vec3 sourcePositionRaw() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.damagesource.DamageSource#sourcePositionRaw");
+        return damageSourcePosition;
     }
     public boolean is(TagKey<DamageType> tag) {
         return isInTag("#" + tag.location());
@@ -86,7 +99,7 @@ public class DamageSource {
         return type != null && type.unwrapKey().equals(java.util.Optional.of(typeKey));
     }
     public DamageType type() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.damagesource.DamageSource#type");
+        return type.value();
     }
     public Holder<DamageType> typeHolder() {
         return type;

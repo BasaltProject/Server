@@ -23,7 +23,7 @@ public class Marker extends Entity {
     protected void addAdditionalSaveData(ValueOutput output) {
     }
     public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity serverEntity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Marker#getAddEntityPacket");
+        throw new IllegalStateException("Markers should never be sent");
     }
     protected boolean canAddPassenger(Entity passenger) {
         return false;

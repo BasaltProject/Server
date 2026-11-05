@@ -17,7 +17,7 @@ public class MerchantOffer {
     private final float priceMultiplier;
     private final int xp;
     public static final Codec<MerchantOffer> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.item.trading.MerchantOffer.class, "CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, MerchantOffer> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.trading.MerchantOffer.class, "STREAM_CODEC");
+    public static final StreamCodec<RegistryFriendlyByteBuf, MerchantOffer> STREAM_CODEC = StreamCodec.of(MerchantOffer::writeToStream, MerchantOffer::createFromStream);
     private MerchantOffer(ItemCost baseCostA, Optional<ItemCost> costB, ItemStack result, int uses, int maxUses, boolean rewardExp, int specialPriceDiff, int demand, float priceMultiplier, int xp) {
         this.baseCostA = baseCostA;
         this.costB = costB;
@@ -135,6 +135,33 @@ public class MerchantOffer {
         return new MerchantOffer(this);
     }
     public static MerchantOffer createFromStream(RegistryFriendlyByteBuf input) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.trading.MerchantOffer#createFromStream");
+        ItemCost buy = ItemCost.STREAM_CODEC.decode(input);
+        ItemStack sell = ItemStack.STREAM_CODEC.decode(input);
+        Optional<ItemCost> buyB = ItemCost.OPTIONAL_STREAM_CODEC.decode(input);
+        boolean exhausted = input.readBoolean();
+        int uses = input.readInt();
+        int maxUses = input.readInt();
+        int xp = input.readInt();
+        int specialPriceDiff = input.readInt();
+        float priceMultiplier = input.readFloat();
+        int demand = input.readInt();
+        MerchantOffer offer = new MerchantOffer(buy, buyB, sell, uses, maxUses, xp, priceMultiplier, demand);
+        if (exhausted) {
+            offer.setToOutOfStock();
+        }
+        offer.setSpecialPriceDiff(specialPriceDiff);
+        return offer;
+    }
+    private static void writeToStream(RegistryFriendlyByteBuf output, MerchantOffer offer) {
+        ItemCost.STREAM_CODEC.encode(output, offer.getItemCostA());
+        ItemStack.STREAM_CODEC.encode(output, offer.getResult());
+        ItemCost.OPTIONAL_STREAM_CODEC.encode(output, offer.getItemCostB());
+        output.writeBoolean(offer.isOutOfStock());
+        output.writeInt(offer.getUses());
+        output.writeInt(offer.getMaxUses());
+        output.writeInt(offer.getXp());
+        output.writeInt(offer.getSpecialPriceDiff());
+        output.writeFloat(offer.getPriceMultiplier());
+        output.writeInt(offer.getDemand());
     }
 }

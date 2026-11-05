@@ -29,12 +29,13 @@ public class TrimPatterns {
     public static final ResourceKey<TrimPattern> FLOW = key("flow");
     public static final ResourceKey<TrimPattern> BOLT = key("bolt");
     public static void bootstrap(BootstrapContext<TrimPattern> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.equipment.trim.TrimPatterns#bootstrap");
+        org.basaltmc.bukkit.facade.Bootstraps.replay(context, net.minecraft.core.registries.Registries.TRIM_PATTERN, TrimPatterns.class);
     }
     public static void register(BootstrapContext<TrimPattern> context, ResourceKey<TrimPattern> registryKey) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.equipment.trim.TrimPatterns#register");
+        context.register(registryKey, new TrimPattern(defaultAssetId(registryKey),
+            net.minecraft.network.chat.Component.translatable(net.minecraft.util.Util.makeDescriptionId("trim_pattern", registryKey.identifier())), false));
     }
     public static Identifier defaultAssetId(ResourceKey<TrimPattern> registryKey) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.equipment.trim.TrimPatterns#defaultAssetId");
+        return registryKey.identifier();
     }
 }

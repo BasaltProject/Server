@@ -45,7 +45,7 @@ public abstract class Display extends Entity {
     public void tick() {
     }
     protected InterpolationHandler createInterpolationHandler() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Display#createInterpolationHandler");
+        return null;
     }
     protected abstract void updateRenderSubState(boolean shouldInterpolate, float progress);
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
@@ -67,7 +67,21 @@ public abstract class Display extends Entity {
         return true;
     }
     public RenderState renderState() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Display#renderState");
+        org.bukkit.entity.Display api = live() instanceof org.bukkit.entity.Display d ? d : null;
+        if (api == null) {
+            return new RenderState(GenericInterpolator.constant(Transformation.IDENTITY), BillboardConstraints.FIXED, -1,
+                FloatInterpolator.constant(0.0F), FloatInterpolator.constant(1.0F), -1);
+        }
+        org.bukkit.util.Transformation moved = api.getTransformation();
+        Transformation transform = new Transformation(moved.getTranslation(), moved.getLeftRotation(), moved.getScale(),
+            moved.getRightRotation());
+        org.bukkit.entity.Display.Brightness light = api.getBrightness();
+        org.bukkit.Color glow = api.getGlowColorOverride();
+        return new RenderState(GenericInterpolator.constant(transform),
+            BillboardConstraints.valueOf(api.getBillboard().name()),
+            light == null ? -1 : light.getBlockLight() << 4 | light.getSkyLight() << 20,
+            FloatInterpolator.constant(api.getShadowRadius()), FloatInterpolator.constant(api.getShadowStrength()),
+            glow == null ? -1 : glow.asARGB());
     }
     public float calculateInterpolationProgress(float partialTickTime) {
         return 1.0F;
@@ -122,10 +136,19 @@ public abstract class Display extends Entity {
             };
         }
         public ItemRenderState itemRenderState() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Display.ItemDisplay#itemRenderState");
+            org.bukkit.entity.ItemDisplay api = live() instanceof org.bukkit.entity.ItemDisplay d ? d : null;
+            if (api == null) {
+                return new ItemRenderState(ItemStack.EMPTY, ItemDisplayContext.NONE);
+            }
+            String context = api.getItemDisplayTransform().name().replace("_", "");
+            for (ItemDisplayContext candidate : ItemDisplayContext.values()) {
+                if (candidate.name().replace("_", "").equals(context)) {
+                    return new ItemRenderState(org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(api.getItemStack()), candidate);
+                }
+            }
+            return new ItemRenderState(org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(api.getItemStack()), ItemDisplayContext.NONE);
         }
         protected void updateRenderSubState(boolean shouldInterpolate, float progress) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Display.ItemDisplay#updateRenderSubState");
         }
         public static record ItemRenderState(ItemStack itemStack, ItemDisplayContext itemTransform) {
         }
@@ -144,10 +167,11 @@ public abstract class Display extends Entity {
         protected void addAdditionalSaveData(ValueOutput output) {
         }
         public BlockRenderState blockRenderState() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Display.BlockDisplay#blockRenderState");
+            org.bukkit.block.data.BlockData data = live() instanceof org.bukkit.entity.BlockDisplay d ? d.getBlock() : null;
+            return new BlockRenderState(data instanceof org.bukkit.craftbukkit.block.data.CraftBlockData craft ? craft.getState()
+                : net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
         }
         protected void updateRenderSubState(boolean shouldInterpolate, float progress) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Display.BlockDisplay#updateRenderSubState");
         }
         public static record BlockRenderState(BlockState blockState) {
         }
@@ -172,13 +196,28 @@ public abstract class Display extends Entity {
         protected void addAdditionalSaveData(ValueOutput output) {
         }
         protected void updateRenderSubState(boolean shouldInterpolate, float progress) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Display.TextDisplay#updateRenderSubState");
         }
         public TextRenderState textRenderState() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Display.TextDisplay#textRenderState");
+            org.bukkit.entity.TextDisplay api = live() instanceof org.bukkit.entity.TextDisplay d ? d : null;
+            if (api == null) {
+                return new TextRenderState(Component.empty(), 200, IntInterpolator.constant(-1),
+                    IntInterpolator.constant(INITIAL_BACKGROUND), (byte) 0);
+            }
+            int flags = (api.isShadowed() ? FLAG_SHADOW : 0) | (api.isSeeThrough() ? FLAG_SEE_THROUGH : 0)
+                | (api.isDefaultBackground() ? FLAG_USE_DEFAULT_BACKGROUND : 0);
+            flags |= switch (api.getAlignment()) {
+                case LEFT -> FLAG_ALIGN_LEFT;
+                case RIGHT -> FLAG_ALIGN_RIGHT;
+                default -> 0;
+            };
+            org.bukkit.Color background = api.getBackgroundColor();
+            return new TextRenderState(org.basaltmc.bukkit.facade.ChatJson.fromAdventure(api.text()), api.getLineWidth(),
+                IntInterpolator.constant(api.getTextOpacity()),
+                IntInterpolator.constant(background == null ? INITIAL_BACKGROUND : background.asARGB()), (byte) flags);
         }
         public CachedInfo cacheDisplay(LineSplitter splitter) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Display.TextDisplay#cacheDisplay");
+            TextRenderState state = textRenderState();
+            return splitter.split(state.text(), state.lineWidth());
         }
         public static Align getAlign(byte flags) {
             if ((flags & 8) != 0) {

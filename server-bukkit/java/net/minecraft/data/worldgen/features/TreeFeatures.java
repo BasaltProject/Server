@@ -66,6 +66,6 @@ public class TreeFeatures {
     public static final ResourceKey<Object> YELLOW_POPLAR_LEAF_LITTER = FeatureUtils.createKey("yellow_poplar_leaf_litter");
     public static final ResourceKey<Object> FALLEN_POPLAR_TREE = FeatureUtils.createKey("fallen_poplar_tree");
     public static void bootstrap(BootstrapContext<Feature> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.TreeFeatures#bootstrap");
+        // registries come from the native datapack loader, so there is nothing to bootstrap
     }
 }

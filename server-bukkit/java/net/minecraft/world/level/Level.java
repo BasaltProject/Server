@@ -83,6 +83,10 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     private final java.util.concurrent.atomic.AtomicLong kSubTickCount = new java.util.concurrent.atomic.AtomicLong();
 
     protected Level() {
+        this.blockEntityTickers = new java.util.ArrayList<>();
+        this.neighborUpdater = null;
+        this.random = RandomSource.create();
+        this.levelData = null;
     }
 
     protected void emitSound(double x, double y, double z, String key, SoundSource source, float volume, float pitch) {
@@ -140,25 +144,26 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public static final int MAX_BRIGHTNESS = 15;
     public static final int MAX_ENTITY_SPAWN_Y = 20000000;
     public static final int MIN_ENTITY_SPAWN_Y = -20000000;
-    protected final List<TickingBlockEntity> blockEntityTickers = null;
-    protected final CollectingNeighborUpdater neighborUpdater = null;
+    protected final List<TickingBlockEntity> blockEntityTickers;
+    protected final CollectingNeighborUpdater neighborUpdater;
     protected int randValue;
     protected final int addend = 0;
     protected float oRainLevel;
     protected float rainLevel;
     protected float oThunderLevel;
     protected float thunderLevel;
-    protected final RandomSource random = null;
-    protected final WritableLevelData levelData = null;
+    protected final RandomSource random;
+    protected final WritableLevelData levelData;
     protected Level(WritableLevelData levelData, ResourceKey<Level> dimension, RegistryAccess registryAccess, Holder<DimensionType> dimensionTypeRegistration, boolean isClientSide, boolean isDebug, long biomeZoomSeed, int maxChainedNeighborUpdates) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#<init>");
+        this.blockEntityTickers = new java.util.ArrayList<>();
+        this.neighborUpdater = null;
+        this.random = RandomSource.create();
+        this.levelData = levelData;
     }
     public int getNextEntityId() {
         return kNextEntityId.incrementAndGet();
     }
-    public MinecraftServer getServer() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#getServer");
-    }
+    public abstract MinecraftServer getServer();
     public boolean isInWorldBounds(BlockPos pos) {
         return isInsideBuildHeight(pos) && pos.getX() >= -30000000 && pos.getZ() >= -30000000
             && pos.getX() < 30000000 && pos.getZ() < 30000000;
@@ -173,45 +178,27 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public LevelChunk getChunkAt(BlockPos pos) {
         return getChunk(pos.getX() >> 4, pos.getZ() >> 4);
     }
-    public ChunkAccess getChunk(int chunkX, int chunkZ, ChunkStatus status, boolean loadOrGenerate) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#getChunk");
-    }
-    public boolean setBlock(BlockPos pos, BlockState blockState, int updateFlags, int updateLimit) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#setBlock");
-    }
-    public boolean removeBlock(BlockPos pos, boolean movedByPiston) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#removeBlock");
-    }
-    public boolean destroyBlock(BlockPos pos, boolean dropResources, Entity breaker, int updateLimit) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#destroyBlock");
-    }
+    public abstract ChunkAccess getChunk(int chunkX, int chunkZ, ChunkStatus status, boolean loadOrGenerate);
+    public abstract boolean setBlock(BlockPos pos, BlockState blockState, int updateFlags, int updateLimit);
+    public abstract boolean removeBlock(BlockPos pos, boolean movedByPiston);
+    public abstract boolean destroyBlock(BlockPos pos, boolean dropResources, Entity breaker, int updateLimit);
     public void addDestroyBlockEffect(BlockPos pos, BlockState blockState) {
         return;
     }
     public void setBlocksDirty(BlockPos pos, BlockState oldState, BlockState newState) {
         return;
     }
-    public void updateNeighborsAt(BlockPos pos, Block sourceBlock, Orientation orientation) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#updateNeighborsAt");
-    }
-    public void updateNeighborsAtExceptFromFacing(BlockPos pos, Block blockObject, Direction skipDirection, Orientation orientation) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#updateNeighborsAtExceptFromFacing");
-    }
-    public void neighborChanged(BlockPos pos, Block changedBlock, Orientation orientation) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#neighborChanged");
-    }
-    public void neighborChanged(BlockState state, BlockPos pos, Block changedBlock, Orientation orientation, boolean movedByPiston) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#neighborChanged");
-    }
+    public abstract void updateNeighborsAt(BlockPos pos, Block sourceBlock, Orientation orientation);
+    public abstract void updateNeighborsAtExceptFromFacing(BlockPos pos, Block blockObject, Direction skipDirection, Orientation orientation);
+    public abstract void neighborChanged(BlockPos pos, Block changedBlock, Orientation orientation);
+    public abstract void neighborChanged(BlockState state, BlockPos pos, Block changedBlock, Orientation orientation, boolean movedByPiston);
     public void neighborShapeChanged(Direction direction, BlockPos pos, BlockPos neighborPos, BlockState neighborState, int updateFlags, int updateLimit) {
         return;
     }
     public int getHeight(Heightmap.Types type, int x, int z) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#getHeight");
+        return LevelAccessor.super.getHeight(type, x, z);
     }
-    public LevelLightEngine getLightEngine() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#getLightEngine");
-    }
+    public abstract LevelLightEngine getLightEngine();
     public FluidState getFluidState(BlockPos pos) {
         return getBlockState(pos).getFluidState();
     }
@@ -280,12 +267,8 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public boolean shouldTickDeath(Entity entity) {
         return true;
     }
-    public boolean shouldTickBlocksAt(long chunkPos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#shouldTickBlocksAt");
-    }
-    public boolean shouldTickBlocksAt(BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#shouldTickBlocksAt");
-    }
+    public abstract boolean shouldTickBlocksAt(long chunkPos);
+    public abstract boolean shouldTickBlocksAt(BlockPos pos);
     public void explode(Entity source, double x, double y, double z, float r, ExplosionInteraction blockInteraction) {
         emitExplosion(x, y, z, r, false, blockInteraction != ExplosionInteraction.NONE);
     }
@@ -301,15 +284,11 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public void explode(Entity source, DamageSource damageSource, ExplosionDamageCalculator damageCalculator, double x, double y, double z, float r, boolean fire, ExplosionInteraction interactionType, ParticleOptions smallExplosionParticles, ParticleOptions largeExplosionParticles, WeightedList<ExplosionParticleInfo> blockParticles, Holder<SoundEvent> explosionSound) {
         emitExplosion(x, y, z, r, fire, interactionType != ExplosionInteraction.NONE);
     }
-    public String gatherChunkSourceStats() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#gatherChunkSourceStats");
-    }
+    public abstract String gatherChunkSourceStats();
     public void setBlockEntity(BlockEntity blockEntity) {
         getChunkAt(blockEntity.getBlockPos()).setBlockEntity(blockEntity);
     }
-    public void removeBlockEntity(BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#removeBlockEntity");
-    }
+    public abstract void removeBlockEntity(BlockPos pos);
     public boolean isLoaded(BlockPos pos) {
         return getChunkSource().getChunk(pos.getX() >> 4, pos.getZ() >> 4, false) != null;
     }
@@ -325,18 +304,12 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public void setSpawnSettings(boolean spawnEnemies) {
         return;
     }
-    public void setRespawnData(LevelData.RespawnData respawnData) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#setRespawnData");
-    }
-    public LevelData.RespawnData getRespawnData() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#getRespawnData");
-    }
+    public abstract void setRespawnData(LevelData.RespawnData respawnData);
+    public abstract LevelData.RespawnData getRespawnData();
     public LevelData.RespawnData getWorldBorderAdjustedRespawnData(LevelData.RespawnData respawnData) {
         return respawnData;
     }
-    public void close() throws IOException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#close");
-    }
+    public abstract void close() throws IOException;
     public BlockGetter getChunkForCollisions(int chunkX, int chunkZ) {
         return getChunkSource().getChunk(chunkX, chunkZ, false);
     }
@@ -401,9 +374,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public void blockEntityChanged(BlockPos pos) {
         return;
     }
-    public void onBlockEntityAdded(BlockEntity blockEntity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#onBlockEntityAdded");
-    }
+    public abstract void onBlockEntityAdded(BlockEntity blockEntity);
     public long getOverworldClockTime() {
         return getGameTime();
     }
@@ -432,12 +403,8 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public void blockEvent(BlockPos pos, Block block, int b0, int b1) {
         return;
     }
-    public LevelData getLevelData() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#getLevelData");
-    }
-    public TickRateManager tickRateManager() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#tickRateManager");
-    }
+    public abstract LevelData getLevelData();
+    public abstract TickRateManager tickRateManager();
     public float getRelativeTickSpeed() {
         return 1.0F;
     }
@@ -477,9 +444,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public void globalLevelEvent(int type, BlockPos pos, int data) {
 
     }
-    public CrashReportCategory fillReportDetails(CrashReport report) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#fillReportDetails");
-    }
+    public abstract CrashReportCategory fillReportDetails(CrashReport report);
     public void destroyBlockProgress(int id, BlockPos blockPos, int progress) {
 
     }
@@ -508,12 +473,8 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public DimensionType dimensionType() {
         return dimensionTypeRegistration().value();
     }
-    public Holder<DimensionType> dimensionTypeRegistration() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#dimensionTypeRegistration");
-    }
-    public ResourceKey<Level> dimension() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#dimension");
-    }
+    public abstract Holder<DimensionType> dimensionTypeRegistration();
+    public abstract ResourceKey<Level> dimension();
     public RandomSource getRandom() {
         return kRandom;
     }
@@ -540,36 +501,26 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
     public boolean isDebug() {
         return false;
     }
-    protected LevelEntityGetter<Entity> getEntities() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#getEntities");
-    }
+    protected abstract LevelEntityGetter<Entity> getEntities();
     public long nextSubTickCount() {
         return kSubTickCount.getAndIncrement();
     }
-    public RegistryAccess registryAccess() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#registryAccess");
-    }
+    public abstract RegistryAccess registryAccess();
     private final DamageSources damageSources = new DamageSources(null);
     public DamageSources damageSources() {
         return damageSources;
     }
-    public ClockManager clockManager() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#clockManager");
-    }
-    public EnvironmentAttributeSystem environmentAttributes() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#environmentAttributes");
-    }
+    public abstract ClockManager clockManager();
+    public abstract EnvironmentAttributeSystem environmentAttributes();
     public int getClientLeafTintColor(BlockPos pos) {
         return 0xFFFFFF;
     }
-    public PalettedContainerFactory palettedContainerFactory() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level#palettedContainerFactory");
-    }
+    public abstract PalettedContainerFactory palettedContainerFactory();
     public static enum ExplosionInteraction implements StringRepresentable {
         NONE, BLOCK, MOB, TNT, TRIGGER;
         public static final Codec<ExplosionInteraction> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.Level.ExplosionInteraction.class, "CODEC");
         public String getSerializedName() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.Level.ExplosionInteraction#getSerializedName");
+            return name().toLowerCase(java.util.Locale.ROOT);
         }
     }
 }

@@ -44,23 +44,56 @@ public record ChargedProjectiles(List<ItemStackTemplate> items) implements Conta
         return new ChargedProjectiles(newContents.filter(stack -> !stack.isEmpty()).map(ItemStackTemplate::fromNonEmptyStack).toList());
     }
     public Mutable asMutable() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.ChargedProjectiles#asMutable");
+        List<ItemStack> copies = new java.util.ArrayList<>(items.size());
+        for (ItemStackTemplate template : items) {
+            copies.add(template.create());
+        }
+        return new Mutable(copies);
     }
     public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.ChargedProjectiles#addToTooltip");
+        ItemStack current = null;
+        int count = 0;
+        for (ItemStackTemplate template : items) {
+            ItemStack projectile = template.create();
+            if (current != null && ItemStack.matches(current, projectile)) {
+                count++;
+                continue;
+            }
+            if (current != null) {
+                projectileTooltip(consumer, current, count);
+            }
+            current = projectile;
+            count = 1;
+        }
+        if (current != null) {
+            projectileTooltip(consumer, current, count);
+        }
+    }
+    private static void projectileTooltip(Consumer<Component> consumer, ItemStack projectile, int count) {
+        if (count == 1) {
+            consumer.accept(Component.translatable("item.minecraft.crossbow.projectile.single", projectile.getDisplayName()));
+        } else {
+            consumer.accept(Component.translatable("item.minecraft.crossbow.projectile.multiple", count, projectile.getHoverName()));
+        }
     }
     public static class Mutable extends GrowableMutableContainer<ChargedProjectiles> {
         private Mutable(List<ItemStack> items) {
-            super((java.util.List) null);
+            super(items);
         }
         protected boolean addSlotWithItem(ItemProvider newItems) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.ChargedProjectiles.Mutable#addSlotWithItem");
+            return newItems.findNextNonEmpty() && super.addSlotWithItem(newItems);
         }
         public boolean canInsertNewSlots() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.ChargedProjectiles.Mutable#canInsertNewSlots");
+            return items.size() < 1024;
         }
         public ChargedProjectiles toImmutable() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.ChargedProjectiles.Mutable#toImmutable");
+            List<ItemStackTemplate> kept = new java.util.ArrayList<>(items.size());
+            for (ItemStack stack : items) {
+                if (!stack.isEmpty()) {
+                    kept.add(ItemStackTemplate.fromNonEmptyStack(stack));
+                }
+            }
+            return new ChargedProjectiles(kept);
         }
     }
 }

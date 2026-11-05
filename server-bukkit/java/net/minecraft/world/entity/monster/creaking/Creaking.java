@@ -253,9 +253,14 @@ public class Creaking extends Monster {
             super(mob, level);
         }
         public void tick() {
+            if (Creaking.this.canMove()) {
+                super.tick();
+            }
         }
         protected PathFinder createPathFinder(int maxVisitedNodes) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.creaking.Creaking.CreakingPathNavigation#createPathFinder");
+            nodeEvaluator = Creaking.this.new HomeNodeEvaluator();
+            nodeEvaluator.setCanPassDoors(true);
+            return new PathFinder(nodeEvaluator, maxVisitedNodes);
         }
     }
 }

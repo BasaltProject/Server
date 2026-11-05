@@ -351,7 +351,10 @@ public class Turtle extends Animal {
             super(mob, level);
         }
         public boolean isStableDestination(BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.turtle.Turtle.TurtlePathNavigation#isStableDestination");
+            if (mob instanceof Turtle turtle && turtle.travelPos != null && !turtle.travelPos.equals(BlockPos.ZERO)) {
+                return level.getBlockState(pos).is(net.minecraft.world.level.block.Blocks.WATER);
+            }
+            return !level.getBlockState(pos.below()).isAir();
         }
     }
 }

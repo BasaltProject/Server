@@ -1,5 +1,7 @@
 #include "BukkitMiscNativesShared.hpp"
 
+#include <limits>
+
 namespace basalt::server::bukkit {
 namespace {
 using namespace shared;
@@ -105,6 +107,19 @@ jobjectArray JNICALL nativeLootTables(JNIEnv* env, jclass) {
     return jni::stringArrayOf(env, jni::onServer<std::vector<std::string>>({}, [] { return loot().tables(); }));
 }
 
+jobjectArray flatLoot(JNIEnv* env, const std::optional<std::vector<plugins::PluginLootItem>>& items) {
+    if (!items.has_value()) {
+        return nullptr;
+    }
+    std::vector<std::string> flat;
+    for (const plugins::PluginLootItem& item : *items) {
+        flat.push_back(item.item);
+        flat.push_back(std::to_string(item.count));
+        flat.push_back(item.components);
+    }
+    return jni::stringArrayOf(env, flat);
+}
+
 jobjectArray JNICALL nativeLootRoll(JNIEnv* env, jclass, jstring table, jstring world, jdouble x, jdouble y, jdouble z,
                                     jfloat luck, jlong seed, jstring looter) {
     const std::string id = toStd(env, table);
@@ -117,16 +132,64 @@ jobjectArray JNICALL nativeLootRoll(JNIEnv* env, jclass, jstring table, jstring 
                                          .looter = looter == nullptr ? std::string{} : toStd(env, looter)};
     const auto items = jni::onServer<std::optional<std::vector<plugins::PluginLootItem>>>(
         std::nullopt, [&] { return loot().roll(id, rolled); });
-    if (!items.has_value()) {
+    return flatLoot(env, items);
+}
+
+jobjectArray JNICALL nativeLootRollJson(JNIEnv* env, jclass, jstring tableJson, jstring world, jdouble x, jdouble y,
+                                        jdouble z, jfloat luck, jlong seed, jstring looter) {
+    const std::string json = toStd(env, tableJson);
+    const plugins::PluginLootRoll rolled{.world = toStd(env, world),
+                                         .x = x,
+                                         .y = y,
+                                         .z = z,
+                                         .luck = luck,
+                                         .seed = seed,
+                                         .looter = looter == nullptr ? std::string{} : toStd(env, looter)};
+    const auto items = jni::onServer<std::optional<std::vector<plugins::PluginLootItem>>>(
+        std::nullopt, [&] { return loot().rollJson(json, rolled); });
+    return flatLoot(env, items);
+}
+
+jobjectArray JNICALL nativeTradeRoll(JNIEnv* env, jclass, jstring profession, jint level, jstring world, jdouble x,
+                                     jdouble y, jdouble z, jstring variant, jint amount, jlong seed,
+                                     jobjectArray listed) {
+    const std::string name = toStd(env, profession);
+    const plugins::PluginTradeRoll roll{.world = toStd(env, world),
+                                        .x = x,
+                                        .y = y,
+                                        .z = z,
+                                        .variant = variant == nullptr ? std::string{} : toStd(env, variant),
+                                        .amount = amount,
+                                        .seed = seed,
+                                        .listed = listed == nullptr ? std::vector<std::string>{}
+                                                                    : jni::stringsOf(env, listed)};
+    const auto offers = jni::onServer<std::optional<std::vector<plugins::PluginTradeOffer>>>(
+        std::nullopt, [&] { return loot().trades(name, level, roll); });
+    if (!offers.has_value()) {
         return nullptr;
     }
     std::vector<std::string> flat;
-    for (const plugins::PluginLootItem& item : *items) {
+    const auto put = [&flat](const plugins::PluginLootItem& item) {
         flat.push_back(item.item);
         flat.push_back(std::to_string(item.count));
         flat.push_back(item.components);
+    };
+    for (const plugins::PluginTradeOffer& offer : *offers) {
+        put(offer.costA);
+        put(offer.costB.value_or(plugins::PluginLootItem{}));
+        put(offer.result);
+        flat.push_back(std::to_string(offer.maxUses));
+        flat.push_back(std::to_string(offer.experience));
+        flat.push_back(std::to_string(offer.priceMultiplier));
     }
     return jni::stringArrayOf(env, flat);
+}
+
+jdouble JNICALL nativeLootNumber(JNIEnv* env, jclass, jstring json, jboolean asFloat, jlong seed) {
+    const std::string text = toStd(env, json);
+    const auto value = jni::onServer<std::optional<double>>(
+        std::nullopt, [&] { return loot().number(text, asFloat != JNI_FALSE, seed); });
+    return value.value_or(std::numeric_limits<double>::quiet_NaN());
 }
 
 jintArray JNICALL nativeLocateStructure(JNIEnv* env, jclass, jstring world, jstring structure, jint x, jint z,
@@ -272,6 +335,13 @@ void registerMiscNativesMaps(JNIEnv* env, jclass natives) {
         nativeMethod("lootTables", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeLootTables)),
         nativeMethod("lootRoll", "(Ljava/lang/String;Ljava/lang/String;DDDFJLjava/lang/String;)[Ljava/lang/String;",
                      reinterpret_cast<void*>(&nativeLootRoll)),
+        nativeMethod("lootRollJson", "(Ljava/lang/String;Ljava/lang/String;DDDFJLjava/lang/String;)[Ljava/lang/String;",
+                     reinterpret_cast<void*>(&nativeLootRollJson)),
+        nativeMethod(
+            "tradeRoll",
+            "(Ljava/lang/String;ILjava/lang/String;DDDLjava/lang/String;IJ[Ljava/lang/String;)[Ljava/lang/String;",
+            reinterpret_cast<void*>(&nativeTradeRoll)),
+        nativeMethod("lootNumber", "(Ljava/lang/String;ZJ)D", reinterpret_cast<void*>(&nativeLootNumber)),
         nativeMethod("locateStructure", "(Ljava/lang/String;Ljava/lang/String;III)[I",
                      reinterpret_cast<void*>(&nativeLocateStructure)),
         nativeMethod("locateBiome", "(Ljava/lang/String;[Ljava/lang/String;IIIII)[I",

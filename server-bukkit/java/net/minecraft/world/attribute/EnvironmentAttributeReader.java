@@ -14,6 +14,7 @@ public interface EnvironmentAttributeReader {
     }
     <Value> Value getValue(EnvironmentAttribute<Value> attribute, Vec3 pos, SpatialAttributeInterpolator biomeInterpolator);
     default <Value> Value getValue(LootContext context, EnvironmentAttribute<Value> attribute) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.attribute.EnvironmentAttributeReader#getValue");
+        Vec3 origin = context.getOptional(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN);
+        return origin == null ? getDimensionValue(attribute) : getValue(attribute, origin);
     }
 }

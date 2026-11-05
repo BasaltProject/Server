@@ -43,13 +43,17 @@ public class AnvilBlock extends FallingBlock {
         super.falling(entity);
     }
     public void onLand(Level level, BlockPos pos, BlockState state, BlockState replacedBlock, FallingBlockEntity entity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.AnvilBlock#onLand");
+        if (!entity.isSilent()) {
+            level.levelEvent(1031, pos, 0);
+        }
     }
     public void onBrokenAfterFall(Level level, BlockPos pos, FallingBlockEntity entity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.AnvilBlock#onBrokenAfterFall");
+        if (!entity.isSilent()) {
+            level.levelEvent(1029, pos, 0);
+        }
     }
     public DamageSource getFallDamageSource(Entity entity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.AnvilBlock#getFallDamageSource");
+        return entity.damageSources().anvil(entity);
     }
     public static BlockState damage(BlockState blockState) {
         Block next = blockState.is(Blocks.ANVIL) ? Blocks.CHIPPED_ANVIL : blockState.is(Blocks.CHIPPED_ANVIL) ? Blocks.DAMAGED_ANVIL : null;
@@ -65,6 +69,6 @@ public class AnvilBlock extends FallingBlock {
         return super.isPathfindable(state, type);
     }
     public int getDustColor(BlockState blockState, BlockGetter level, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.AnvilBlock#getDustColor");
+        return blockState.getMapColor(level, pos).col;
     }
 }

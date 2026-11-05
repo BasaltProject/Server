@@ -8,8 +8,8 @@ import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.display.RecipeDisplay;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
 public class StonecutterRecipe extends SingleItemRecipe {
-    public static final MapCodec<StonecutterRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.StonecutterRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, StonecutterRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.StonecutterRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<StonecutterRecipe> MAP_CODEC = SingleItemRecipe.simpleMapCodec(StonecutterRecipe::new);
+    public static final StreamCodec<RegistryFriendlyByteBuf, StonecutterRecipe> STREAM_CODEC = SingleItemRecipe.simpleStreamCodec(StonecutterRecipe::new);
     public static final RecipeSerializer<StonecutterRecipe> SERIALIZER = null;
     public StonecutterRecipe(Recipe.CommonInfo commonInfo, Ingredient ingredient, ItemStackTemplate result) {
         super(commonInfo, ingredient, result);

@@ -66,6 +66,6 @@ public class MinecartHopper extends AbstractMinecartContainer implements Hopper 
     protected void readAdditionalSaveData(ValueInput input) {
     }
     public AbstractContainerMenu createMenu(int containerId, Inventory inventory) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.vehicle.minecart.MinecartHopper#createMenu");
+        return new net.minecraft.world.inventory.HopperMenu(containerId, inventory, this);
     }
 }

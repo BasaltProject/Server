@@ -48,59 +48,22 @@ public class BeaconBlockEntity extends BlockEntity implements net.minecraft.worl
         if (getLevel() == null || getLevel().getWorld() == null) {
             return List.of();
         }
-        org.bukkit.World world = getLevel().getWorld();
+        int[] scan = org.basaltmc.bukkit.MechanicsNatives.beaconScan(getLevel().getWorld().getName(), getBlockPos().getX(),
+            getBlockPos().getY(), getBlockPos().getZ());
         List<BeaconBeamOwner.Section> sections = new java.util.ArrayList<>();
-        BeaconBeamOwner.Section current = null;
-        for (int y = getBlockPos().getY() + 1; y < world.getMaxHeight(); y++) {
-            org.bukkit.Material type = world.getBlockAt(getBlockPos().getX(), y, getBlockPos().getZ()).getType();
-            String name = type.name();
-            if (name.endsWith("_STAINED_GLASS") || name.endsWith("_STAINED_GLASS_PANE")) {
-                int rgb = net.minecraft.world.item.DyeColor.byName(
-                    name.substring(0, name.indexOf("_STAINED")).toLowerCase(java.util.Locale.ROOT), net.minecraft.world.item.DyeColor.WHITE)
-                    .getTextureDiffuseColor() & 0xFFFFFF;
-                if (current == null) {
-                    current = new BeaconBeamOwner.Section(rgb);
-                    sections.add(current);
-                } else {
-                    int mixed = 0;
-                    for (int shift = 0; shift <= 16; shift += 8) {
-                        mixed |= ((((current.getColor() >> shift) & 0xFF) + ((rgb >> shift) & 0xFF)) / 2) << shift;
-                    }
-                    current = new BeaconBeamOwner.Section(mixed);
-                    sections.add(current);
-                }
-            } else if (type != org.bukkit.Material.BEDROCK && type.isOccluding()) {
-                break;
-            } else {
-                if (current == null) {
-                    current = new BeaconBeamOwner.Section(0xFFFFFF);
-                    sections.add(current);
-                } else {
-                    current.increaseHeight();
-                }
+        for (int at = 1; at + 1 < scan.length; at += 2) {
+            BeaconBeamOwner.Section section = new BeaconBeamOwner.Section(scan[at]);
+            for (int height = 1; height < scan[at + 1]; height++) {
+                section.increaseHeight();
             }
+            sections.add(section);
         }
         return sections;
     }
 
     public static int updateBase(Level level, int x, int y, int z) {
-        org.bukkit.World world = level.getWorld();
-        int levels = 0;
-        for (int layer = 1; layer <= 4; layer++) {
-            int by = y - layer;
-            if (by < level.getMinY()) {
-                break;
-            }
-            for (int bx = x - layer; bx <= x + layer; bx++) {
-                for (int bz = z - layer; bz <= z + layer; bz++) {
-                    if (!org.bukkit.Tag.BEACON_BASE_BLOCKS.isTagged(world.getBlockAt(bx, by, bz).getType())) {
-                        return levels;
-                    }
-                }
-            }
-            levels = layer;
-        }
-        return levels;
+        int[] scan = org.basaltmc.bukkit.MechanicsNatives.beaconScan(level.getWorld().getName(), x, y, z);
+        return scan.length == 0 ? 0 : scan[0];
     }
 
     @Override

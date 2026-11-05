@@ -111,7 +111,7 @@ public abstract class AbstractBoat extends VehicleEntity implements Leashable {
         return false;
     }
     public Vec3[] getQuadLeashOffsets() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.vehicle.boat.AbstractBoat#getQuadLeashOffsets");
+        return net.minecraft.world.entity.Leashable.createQuadLeashOffsets(this, 0.0, 0.64, 0.382, 0.88);
     }
     public float getWaterLevelAbove() {
         net.minecraft.world.phys.AABB box = getBoundingBox();

@@ -22,6 +22,22 @@ public final class NativeChunkGenerator extends ChunkGenerator {
     }
 
     @Override
+    protected com.mojang.serialization.MapCodec<? extends ChunkGenerator> codec() {
+        return net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator.CODEC;
+    }
+
+    @Override
+    public net.minecraft.world.level.NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor heightAccessor,
+            net.minecraft.world.level.levelgen.RandomState randomState) {
+        int min = heightAccessor.getMinY();
+        net.minecraft.world.level.block.state.BlockState[] states = new net.minecraft.world.level.block.state.BlockState[heightAccessor.getHeight()];
+        for (int i = 0; i < states.length; i++) {
+            states[i] = level.getBlockState(new net.minecraft.core.BlockPos(x, min + i, z));
+        }
+        return new net.minecraft.world.level.NoiseColumn(min, states);
+    }
+
+    @Override
     public int getSeaLevel() {
         return level.getSeaLevel();
     }
@@ -132,8 +148,15 @@ public final class NativeChunkGenerator extends ChunkGenerator {
             var box = new net.minecraft.world.level.levelgen.structure.BoundingBox(Integer.parseInt(n[0]), Integer.parseInt(n[1]),
                 Integer.parseInt(n[2]), Integer.parseInt(n[3]), Integer.parseInt(n[4]), Integer.parseInt(n[5]));
             var structure = (net.minecraft.world.level.levelgen.structure.Structure) holder.get().value();
+            java.util.List<net.minecraft.world.level.levelgen.structure.StructurePiece> pieces = new java.util.ArrayList<>();
+            for (String piece : parts.length > 4 && !parts[4].isEmpty() ? parts[4].split(";") : new String[0]) {
+                String[] p = piece.split(",");
+                pieces.add(new net.minecraft.world.level.levelgen.structure.NativeStructurePiece(
+                    new net.minecraft.world.level.levelgen.structure.BoundingBox(Integer.parseInt(p[0]), Integer.parseInt(p[1]),
+                        Integer.parseInt(p[2]), Integer.parseInt(p[3]), Integer.parseInt(p[4]), Integer.parseInt(p[5]))));
+            }
             centerChunk.setStartForStructure(structure,
-                new net.minecraft.world.level.levelgen.structure.StructureStart(structure, pos, 0, box));
+                new net.minecraft.world.level.levelgen.structure.StructureStart(structure, pos, 0, box, pieces));
         }
     }
 }

@@ -62,6 +62,16 @@ public class SoundEvents {
                 (net.minecraft.resources.ResourceKey) net.minecraft.core.registries.Registries.SOUND_EVENT, event.location()), event);
     }
 
+    private static Holder.Reference<SoundEvent> refById(String id) {
+        SoundEvent event = kById.get(id);
+        if (event == null) {
+            event = SoundEvent.createVariableRangeEvent(net.minecraft.resources.Identifier.withDefaultNamespace(id));
+        }
+        return new Holder.Reference<SoundEvent>((net.minecraft.core.Registry<SoundEvent>) null,
+            (net.minecraft.resources.ResourceKey<SoundEvent>) (Object) net.minecraft.resources.ResourceKey.create(
+                (net.minecraft.resources.ResourceKey) net.minecraft.core.registries.Registries.SOUND_EVENT, event.location()), event);
+    }
+
     private static SoundEvent of(String field) {
         return kByName.get(field);
     }
@@ -882,7 +892,10 @@ public class SoundEvents {
     public static final SoundEvent HONEYCOMB_WAX_ON = of("HONEYCOMB_WAX_ON");
     public static final Holder.Reference<SoundEvent> HONEY_DRINK = ref("HONEY_DRINK");
     public static final int GOAT_HORN_VARIANT_COUNT = 8;
-    public static final ImmutableList<Holder.Reference<SoundEvent>> GOAT_HORN_SOUND_VARIANTS = null;
+    public static final ImmutableList<Holder.Reference<SoundEvent>> GOAT_HORN_SOUND_VARIANTS = ImmutableList.of(
+        refById("item.goat_horn.sound.0"), refById("item.goat_horn.sound.1"), refById("item.goat_horn.sound.2"),
+        refById("item.goat_horn.sound.3"), refById("item.goat_horn.sound.4"), refById("item.goat_horn.sound.5"),
+        refById("item.goat_horn.sound.6"), refById("item.goat_horn.sound.7"));
     public static final SoundEvent HORSE_AMBIENT = of("HORSE_AMBIENT");
     public static final SoundEvent HORSE_AMBIENT_BABY = of("HORSE_AMBIENT_BABY");
     public static final SoundEvent HORSE_ANGRY = of("HORSE_ANGRY");

@@ -28,24 +28,23 @@ import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.entity.ai.memory.ExpirableValue;
 import net.minecraft.world.entity.ai.memory.MemoryMap;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
-import net.minecraft.world.entity.ai.memory.MemorySlot;
 import net.minecraft.world.entity.ai.memory.MemoryStatus;
 import net.minecraft.world.entity.ai.sensing.Sensor;
 import net.minecraft.world.entity.ai.sensing.SensorType;
 import net.minecraft.world.entity.schedule.Activity;
 import net.minecraft.world.phys.Vec3;
+import org.basaltmc.bukkit.NativeBehaviors;
+import org.basaltmc.bukkit.NativeBrain;
 
 public class Brain<E extends LivingEntity> {
-    private static final int kScheduleUpdateDelay = 20;
-
-    private final Map<MemoryModuleType<?>, MemorySlot<?>> memories = new HashMap<>();
+    private final NativeBrain nativeBrain;
+    private final LivingEntity body;
+    private final Map<MemoryModuleType<?>, Object[]> payloads = new HashMap<>();
+    private final Set<MemoryModuleType<?>> registered = new LinkedHashSet<>();
     private final Map<SensorType<? extends Sensor<? super E>>, Sensor<? super E>> sensors = new LinkedHashMap<>();
     private final Map<Integer, Map<Activity, Set<BehaviorControl<? super E>>>> availableBehaviorsByPriority = new TreeMap<>();
+    private final Map<String, Activity> activitiesByName = new HashMap<>();
     private EnvironmentAttribute<Activity> schedule;
-    private final Map<Activity, Set<Pair<MemoryModuleType<?>, MemoryStatus>>> activityRequirements = new HashMap<>();
-    private final Map<Activity, Set<MemoryModuleType<?>>> activityMemoriesToEraseWhenStopped = new HashMap<>();
-    private Set<Activity> coreActivities = new HashSet<>();
-    private final Set<Activity> activeActivities = new HashSet<>();
     private Activity defaultActivity = Activity.IDLE;
     private long lastScheduleUpdate = -9999L;
 
@@ -64,8 +63,11 @@ public class Brain<E extends LivingEntity> {
         return new Provider<>(memoryTypes, sensorTypes, activities);
     }
 
-    protected Brain(Collection<? extends MemoryModuleType<?>> memoryTypes, Collection<? extends SensorType<? extends Sensor<? super E>>> sensorTypes,
-        List<ActivityData<E>> activities, MemoryMap memories, RandomSource randomSource) {
+    protected Brain(E body, Collection<? extends MemoryModuleType<?>> memoryTypes,
+        Collection<? extends SensorType<? extends Sensor<? super E>>> sensorTypes, List<ActivityData<E>> activities, MemoryMap memories,
+        RandomSource randomSource) {
+        this.body = body;
+        nativeBrain = new NativeBrain(body);
         for (MemoryModuleType<?> memoryType : memoryTypes) {
             registerMemory(memoryType);
         }
@@ -87,13 +89,31 @@ public class Brain<E extends LivingEntity> {
         useDefaultActivity();
     }
 
-    public Brain() {
+    public Brain(E body) {
+        this.body = body;
+        nativeBrain = new NativeBrain(body);
         setCoreActivities(ImmutableSet.of(Activity.CORE));
         useDefaultActivity();
     }
 
+    private static String keyOf(MemoryModuleType<?> type) {
+        String name = type.toString();
+        return name.startsWith("minecraft:") ? name.substring("minecraft:".length()) : name;
+    }
+
+    private static String nameOf(Activity activity) {
+        return activity.getName();
+    }
+
+    private Activity activityOf(String name) {
+        Activity found = activitiesByName.get(name);
+        return found != null ? found : Activity.registry().getValue(net.minecraft.resources.Identifier.withDefaultNamespace(name));
+    }
+
     private void registerMemory(MemoryModuleType<?> memoryType) {
-        memories.putIfAbsent(memoryType, MemorySlot.create());
+        if (registered.add(memoryType)) {
+            nativeBrain.call("brain_register", keyOf(memoryType));
+        }
     }
 
     public Packed pack() {
@@ -120,17 +140,10 @@ public class Brain<E extends LivingEntity> {
         return new Packed(builder.build());
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> MemorySlot<T> slotIfPresent(MemoryModuleType<T> memoryType) {
-        return (MemorySlot<T>) memories.get(memoryType);
-    }
-
-    private <T> MemorySlot<T> slot(MemoryModuleType<T> memoryType) {
-        MemorySlot<T> result = slotIfPresent(memoryType);
-        if (result == null) {
+    private void requireRegistered(MemoryModuleType<?> memoryType) {
+        if (!registered.contains(memoryType)) {
             throw new IllegalStateException("Unregistered memory fetched: " + memoryType);
         }
-        return result;
     }
 
     public boolean hasMemoryValue(MemoryModuleType<?> type) {
@@ -138,18 +151,19 @@ public class Brain<E extends LivingEntity> {
     }
 
     public void clearMemories() {
-        memories.values().forEach(MemorySlot::clear);
+        payloads.clear();
+        nativeBrain.call("brain_clear_memories");
     }
 
     public <U> void eraseMemory(MemoryModuleType<U> type) {
-        MemorySlot<U> slot = slotIfPresent(type);
-        if (slot != null) {
-            slot.clear();
+        if (registered.contains(type)) {
+            payloads.remove(type);
+            nativeBrain.call("brain_erase_memory", keyOf(type));
         }
     }
 
     public <U> void setMemory(MemoryModuleType<U> type, U value) {
-        setMemoryInternal(type, value);
+        setMemoryInternal(type, value, -1L);
     }
 
     public <U> void setMemoryWithExpiry(MemoryModuleType<U> type, U value, long timeToLive) {
@@ -157,16 +171,12 @@ public class Brain<E extends LivingEntity> {
     }
 
     public <U> void setMemory(MemoryModuleType<U> type, Optional<? extends U> optionalValue) {
-        setMemoryInternal(type, optionalValue.orElse(null));
+        setMemoryInternal(type, optionalValue.orElse(null), -1L);
     }
 
     private <U> void setMemoryInternal(MemoryMap.Value<U> value) {
         ExpirableValue<U> expirable = value.value();
-        if (expirable.timeToLive().isPresent()) {
-            setMemoryInternal(value.type(), expirable.value(), expirable.timeToLive().get());
-        } else {
-            setMemoryInternal(value.type(), expirable.value());
-        }
+        setMemoryInternal(value.type(), expirable.value(), expirable.timeToLive().isPresent() ? expirable.timeToLive().get() : -1L);
     }
 
     private static boolean isEmptyCollection(Object value) {
@@ -174,74 +184,101 @@ public class Brain<E extends LivingEntity> {
     }
 
     private <U> void setMemoryInternal(MemoryModuleType<U> type, U value, long timeToLive) {
-        MemorySlot<U> slot = slotIfPresent(type);
-        if (slot != null) {
-            if (value == null || isEmptyCollection(value)) {
-                slot.clear();
-            } else {
-                slot.set(value, timeToLive);
-            }
+        if (!registered.contains(type)) {
+            return;
         }
-    }
-
-    private <U> void setMemoryInternal(MemoryModuleType<U> type, U value) {
-        MemorySlot<U> slot = slotIfPresent(type);
-        if (slot != null) {
-            if (value == null || isEmptyCollection(value)) {
-                slot.clear();
-            } else {
-                slot.set(value);
-            }
+        if (value == null || isEmptyCollection(value)) {
+            eraseMemory(type);
+            return;
         }
-    }
-
-    public <U> Optional<U> getMemory(MemoryModuleType<U> type) {
-        return Optional.ofNullable(slot(type).value());
-    }
-
-    public <U> Optional<U> getMemoryInternal(MemoryModuleType<U> type) {
-        MemorySlot<U> slot = slotIfPresent(type);
-        return slot == null ? null : Optional.ofNullable(slot.value());
-    }
-
-    public <U> long getTimeUntilExpiry(MemoryModuleType<U> type) {
-        return slot(type).timeToLive();
-    }
-
-    public void forEach(Visitor visitor) {
-        memories.forEach((type, slot) -> visit(visitor, type, slot));
+        Object encoded = nativeBrain.encode(value);
+        payloads.put(type, new Object[] {value, NativeBrain.fingerprint(encoded)});
+        nativeBrain.call("brain_set_memory", keyOf(type), encoded, timeToLive);
     }
 
     @SuppressWarnings("unchecked")
-    private static <U> void visit(Visitor visitor, MemoryModuleType<U> type, MemorySlot<?> slot) {
-        ((MemorySlot<U>) slot).visit(type, visitor);
+    private <U> U read(MemoryModuleType<U> type) {
+        Object wire = nativeBrain.call("brain_memory", keyOf(type));
+        if (wire == null) {
+            payloads.remove(type);
+            return null;
+        }
+        Object[] held = payloads.get(type);
+        if (held != null && held[1].equals(NativeBrain.fingerprint(wire))) {
+            return (U) held[0];
+        }
+        payloads.remove(type);
+        return (U) nativeBrain.decode(wire);
+    }
+
+    public <U> Optional<U> getMemory(MemoryModuleType<U> type) {
+        requireRegistered(type);
+        return Optional.ofNullable(read(type));
+    }
+
+    public <U> Optional<U> getMemoryInternal(MemoryModuleType<U> type) {
+        return registered.contains(type) ? Optional.ofNullable(read(type)) : null;
+    }
+
+    public <U> long getTimeUntilExpiry(MemoryModuleType<U> type) {
+        requireRegistered(type);
+        return nativeBrain.call("brain_memory_ttl", keyOf(type)) instanceof Long left && left >= 0 ? left : Long.MAX_VALUE;
+    }
+
+    public void forEach(Visitor visitor) {
+        for (MemoryModuleType<?> type : registered) {
+            visit(visitor, type);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <U> void visit(Visitor visitor, MemoryModuleType<U> type) {
+        U value = read(type);
+        if (value == null) {
+            visitor.acceptEmpty(type);
+            return;
+        }
+        long left = getTimeUntilExpiry(type);
+        if (left == Long.MAX_VALUE) {
+            visitor.accept(type, value);
+        } else {
+            visitor.accept(type, value, left);
+        }
     }
 
     public <U> boolean isMemoryValue(MemoryModuleType<U> memoryType, U value) {
-        MemorySlot<U> slot = slotIfPresent(memoryType);
-        return slot != null && Objects.equals(value, slot.value());
+        return registered.contains(memoryType) && Objects.equals(value, read(memoryType));
     }
 
     public boolean checkMemory(MemoryModuleType<?> type, MemoryStatus status) {
-        MemorySlot<?> slot = memories.get(type);
-        if (slot == null) {
+        if (!registered.contains(type)) {
             return false;
         }
-        return status == MemoryStatus.REGISTERED || (status == MemoryStatus.VALUE_PRESENT && slot.hasValue())
-            || (status == MemoryStatus.VALUE_ABSENT && !slot.hasValue());
+        return status == MemoryStatus.REGISTERED || (status == MemoryStatus.VALUE_PRESENT && nativeBrain.test("brain_has_memory", keyOf(type)))
+            || (status == MemoryStatus.VALUE_ABSENT && !nativeBrain.test("brain_has_memory", keyOf(type)));
     }
 
     public void setSchedule(EnvironmentAttribute<Activity> schedule) {
         this.schedule = schedule;
+        String native_ = schedule == net.minecraft.world.attribute.EnvironmentAttributes.VILLAGER_ACTIVITY ? "villager" : "";
+        nativeBrain.call("brain_schedule", native_);
     }
 
     public void setCoreActivities(Set<Activity> activities) {
-        coreActivities = activities;
+        String[] names = activities.stream().map(Brain::nameOf).toArray(String[]::new);
+        nativeBrain.call("brain_set_core", (Object) names);
     }
 
     @Deprecated
     public Set<Activity> getActiveActivities() {
-        return activeActivities;
+        Set<Activity> out = new HashSet<>();
+        for (String name : nativeBrain.strings("brain_active")) {
+            Activity activity = activityOf(name);
+            if (activity != null) {
+                out.add(activity);
+            }
+        }
+        return out;
     }
 
     @Deprecated
@@ -260,75 +297,58 @@ public class Brain<E extends LivingEntity> {
     }
 
     public void useDefaultActivity() {
-        setActiveActivity(defaultActivity);
+        nativeBrain.call("brain_set_activity", nameOf(defaultActivity), "default");
     }
 
     public Optional<Activity> getActiveNonCoreActivity() {
-        for (Activity activity : activeActivities) {
-            if (!coreActivities.contains(activity)) {
-                return Optional.of(activity);
-            }
-        }
-        return Optional.empty();
+        return nativeBrain.call("brain_active_non_core") instanceof String name ? Optional.ofNullable(activityOf(name)) : Optional.empty();
     }
 
     public void setActiveActivityIfPossible(Activity activity) {
-        if (activityRequirementsAreMet(activity)) {
-            setActiveActivity(activity);
-        } else {
-            useDefaultActivity();
-        }
+        nativeBrain.call("brain_set_activity", nameOf(activity), "if_possible");
     }
 
     private void setActiveActivity(Activity activity) {
-        if (!isActive(activity)) {
-            eraseMemoriesForOtherActivitiesThan(activity);
-            activeActivities.clear();
-            activeActivities.addAll(coreActivities);
-            activeActivities.add(activity);
-        }
-    }
-
-    private void eraseMemoriesForOtherActivitiesThan(Activity activity) {
-        for (Activity old : activeActivities) {
-            if (old != activity) {
-                Set<MemoryModuleType<?>> toErase = activityMemoriesToEraseWhenStopped.get(old);
-                if (toErase != null) {
-                    toErase.forEach(this::eraseMemory);
-                }
-            }
-        }
+        nativeBrain.call("brain_set_activity", nameOf(activity), "force");
     }
 
     public void updateActivityFromSchedule(EnvironmentAttributeSystem environmentAttributes, long gameTime, Vec3 pos) {
-        if (gameTime - lastScheduleUpdate > kScheduleUpdateDelay) {
+        if (schedule == net.minecraft.world.attribute.EnvironmentAttributes.VILLAGER_ACTIVITY) {
+            nativeBrain.call("brain_tick");
+            return;
+        }
+        if (gameTime - lastScheduleUpdate > 20L) {
             lastScheduleUpdate = gameTime;
             Activity scheduled = schedule != null ? environmentAttributes.getValue(schedule, pos) : Activity.IDLE;
-            if (!activeActivities.contains(scheduled)) {
+            if (!isActive(scheduled)) {
                 setActiveActivityIfPossible(scheduled);
             }
         }
     }
 
     public void setActiveActivityToFirstValid(List<Activity> activities) {
-        for (Activity activity : activities) {
-            if (activityRequirementsAreMet(activity)) {
-                setActiveActivity(activity);
-                break;
-            }
-        }
+        nativeBrain.call("brain_first_valid", (Object) activities.stream().map(Brain::nameOf).toArray(String[]::new));
     }
 
     public void setDefaultActivity(Activity activity) {
         defaultActivity = activity;
+        nativeBrain.call("brain_set_default", nameOf(activity));
     }
 
     public void addActivity(Activity activity, ImmutableList<? extends Pair<Integer, ? extends BehaviorControl<? super E>>> behaviorPriorityPairs,
         Set<Pair<MemoryModuleType<?>, MemoryStatus>> conditions, Set<MemoryModuleType<?>> memoriesToEraseWhenStopped) {
-        activityRequirements.put(activity, conditions);
-        if (!memoriesToEraseWhenStopped.isEmpty()) {
-            activityMemoriesToEraseWhenStopped.put(activity, memoriesToEraseWhenStopped);
+        activitiesByName.put(nameOf(activity), activity);
+        List<String> requirements = new ArrayList<>();
+        for (Pair<MemoryModuleType<?>, MemoryStatus> condition : conditions) {
+            registerMemory(condition.getFirst());
+            requirements.add(keyOf(condition.getFirst()) + "=" + switch (condition.getSecond()) {
+                case VALUE_PRESENT -> "present";
+                case VALUE_ABSENT -> "absent";
+                default -> "registered";
+            });
         }
+        nativeBrain.call("brain_define_activity", nameOf(activity), requirements.toArray(new String[0]),
+            memoriesToEraseWhenStopped.stream().map(Brain::keyOf).toArray(String[]::new));
         for (Pair<Integer, ? extends BehaviorControl<? super E>> pair : behaviorPriorityPairs) {
             BehaviorControl<? super E> behavior = pair.getSecond();
             for (MemoryModuleType<?> required : behavior.getRequiredMemories()) {
@@ -336,36 +356,26 @@ public class Brain<E extends LivingEntity> {
             }
             availableBehaviorsByPriority.computeIfAbsent(pair.getFirst(), key -> new HashMap<>())
                 .computeIfAbsent(activity, key -> new LinkedHashSet<>()).add(behavior);
+            nativeBrain.call("brain_add_behavior", nameOf(activity), pair.getFirst().longValue(), NativeBehaviors.INSTANCE.bind(body, behavior));
         }
     }
 
     public void removeAllBehaviors() {
+        for (Map<Activity, Set<BehaviorControl<? super E>>> byActivity : availableBehaviorsByPriority.values()) {
+            byActivity.values().forEach(set -> set.forEach(behavior -> NativeBehaviors.INSTANCE.unbind(body, behavior)));
+        }
         availableBehaviorsByPriority.clear();
+        nativeBrain.call("brain_clear_behaviors");
     }
 
     public boolean isActive(Activity activity) {
-        return activeActivities.contains(activity);
+        return nativeBrain.test("brain_is_active", nameOf(activity));
     }
 
     public void tick(ServerLevel level, E body) {
-        memories.values().forEach(MemorySlot::tick);
+        nativeBrain.call("brain_tick");
         for (Sensor<? super E> sensor : sensors.values()) {
             sensor.tick(level, body);
-        }
-        long time = level.getGameTime();
-        for (Map<Activity, Set<BehaviorControl<? super E>>> byActivity : availableBehaviorsByPriority.values()) {
-            for (Map.Entry<Activity, Set<BehaviorControl<? super E>>> forActivity : byActivity.entrySet()) {
-                if (activeActivities.contains(forActivity.getKey())) {
-                    for (BehaviorControl<? super E> behavior : forActivity.getValue()) {
-                        if (behavior.getStatus() == Behavior.Status.STOPPED) {
-                            behavior.tryStart(level, body, time);
-                        }
-                    }
-                }
-            }
-        }
-        for (BehaviorControl<? super E> behavior : getRunningBehaviors()) {
-            behavior.tickOrStop(level, body, time);
         }
     }
 
@@ -376,21 +386,8 @@ public class Brain<E extends LivingEntity> {
         }
     }
 
-    private boolean activityRequirementsAreMet(Activity activity) {
-        Set<Pair<MemoryModuleType<?>, MemoryStatus>> requirements = activityRequirements.get(activity);
-        if (requirements == null) {
-            return false;
-        }
-        for (Pair<MemoryModuleType<?>, MemoryStatus> requirement : requirements) {
-            if (!checkMemory(requirement.getFirst(), requirement.getSecond())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     public boolean isBrainDead() {
-        return memories.isEmpty() && sensors.isEmpty() && availableBehaviorsByPriority.isEmpty();
+        return registered.isEmpty() && sensors.isEmpty() && availableBehaviorsByPriority.isEmpty();
     }
 
     public static final class Provider<E extends LivingEntity> {
@@ -406,7 +403,7 @@ public class Brain<E extends LivingEntity> {
         }
 
         public Brain<E> makeBrain(E body, Packed packed) {
-            return new Brain<>(memoryTypes, sensorTypes, activities.createActivities(body), packed.memories(), body.getRandom());
+            return new Brain<>(body, memoryTypes, sensorTypes, activities.createActivities(body), packed.memories(), body.getRandom());
         }
     }
 

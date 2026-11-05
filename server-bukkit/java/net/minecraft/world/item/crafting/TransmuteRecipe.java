@@ -14,8 +14,23 @@ public class TransmuteRecipe extends NormalCraftingRecipe {
     public static final MinMaxBounds.Ints DEFAULT_MATERIAL_COUNT = MinMaxBounds.Ints.exactly(1);
     public static final MinMaxBounds.Ints FULL_RANGE_MATERIAL_COUNT = MinMaxBounds.Ints.between(1, 8);
     public static final Codec<MinMaxBounds.Ints> MATERIAL_COUNT_BOUNDS = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.item.crafting.TransmuteRecipe.class, "MATERIAL_COUNT_BOUNDS");
-    public static final MapCodec<TransmuteRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.TransmuteRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, TransmuteRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.TransmuteRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<TransmuteRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Recipe.CommonInfo.MAP_CODEC.forGetter(o -> o.commonInfo),
+        CraftingRecipe.CraftingBookInfo.MAP_CODEC.forGetter(o -> o.bookInfo),
+        Ingredient.CODEC.fieldOf("input").forGetter(o -> o.input),
+        Ingredient.CODEC.fieldOf("material").forGetter(o -> o.material),
+        MinMaxBounds.Ints.CODEC.optionalFieldOf("material_count", DEFAULT_MATERIAL_COUNT).forGetter(o -> o.materialCount),
+        TransmuteResult.CODEC.fieldOf("result").forGetter(o -> o.result),
+        com.mojang.serialization.Codec.BOOL.optionalFieldOf("add_material_count_to_result", false).forGetter(o -> o.addMaterialCountToResult)).apply(i, TransmuteRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, TransmuteRecipe> STREAM_CODEC = StreamCodec.composite(
+        Recipe.CommonInfo.STREAM_CODEC, o -> o.commonInfo,
+        CraftingRecipe.CraftingBookInfo.STREAM_CODEC, o -> o.bookInfo,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.input,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.material,
+        MinMaxBounds.Ints.STREAM_CODEC, o -> o.materialCount,
+        TransmuteResult.STREAM_CODEC, o -> o.result,
+        net.minecraft.network.codec.ByteBufCodecs.BOOL, o -> o.addMaterialCountToResult,
+        TransmuteRecipe::new);
     public static final RecipeSerializer<TransmuteRecipe> SERIALIZER = null;
     private final Ingredient input;
     private final Ingredient material;

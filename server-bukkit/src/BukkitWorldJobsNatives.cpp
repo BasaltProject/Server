@@ -1,4 +1,5 @@
 #include "BukkitWorldNativesShared.hpp"
+#include "JniSupport.hpp"
 
 namespace basalt::server::bukkit {
 namespace {
@@ -66,6 +67,38 @@ jboolean JNICALL nativeHoldChunks(JNIEnv* env, jclass, jstring name, jstring tok
     const std::string holder = toStd(env, token);
     const std::vector<std::int32_t> pairs = ints(env, chunks);
     return guarded<bool>(false, [&] { return world->holdChunks(holder, pairs); }) ? JNI_TRUE : JNI_FALSE;
+}
+
+void JNICALL nativeReleaseChunkPairs(JNIEnv* env, jclass, jstring name, jstring token, jintArray chunks) {
+    if (const auto world = worldOf(env, name); world != nullptr) {
+        const std::string holder = toStd(env, token);
+        const std::vector<std::int32_t> pairs = ints(env, chunks);
+        static_cast<void>(guarded<int>(0, [&] {
+            world->releaseChunkPairs(holder, pairs);
+            return 0;
+        }));
+    }
+}
+
+jintArray JNICALL nativeHeldChunks(JNIEnv* env, jclass, jstring name, jstring token) {
+    std::vector<std::int32_t> pairs;
+    if (const auto world = worldOf(env, name); world != nullptr) {
+        const std::string holder = toStd(env, token);
+        pairs = guarded<std::vector<std::int32_t>>({}, [&] { return world->heldChunks(holder); });
+    }
+    jintArray out = env->NewIntArray(static_cast<jsize>(pairs.size()));
+    if (out != nullptr && !pairs.empty()) {
+        env->SetIntArrayRegion(out, 0, static_cast<jsize>(pairs.size()), pairs.data());
+    }
+    return out;
+}
+
+jobjectArray JNICALL nativeChunkHolders(JNIEnv* env, jclass, jstring name, jint x, jint z, jboolean all) {
+    std::vector<std::string> tokens;
+    if (const auto world = worldOf(env, name); world != nullptr) {
+        tokens = guarded<std::vector<std::string>>({}, [&] { return world->chunkHolders(x, z, all == JNI_TRUE); });
+    }
+    return jni::stringArrayOf(env, tokens);
 }
 
 void JNICALL nativeReleaseChunks(JNIEnv* env, jclass, jstring name, jstring token) {
@@ -245,6 +278,12 @@ void registerWorldNativesJobs(JNIEnv* env, jclass natives) {
                      reinterpret_cast<void*>(&nativeRequestChunk)),
         nativeMethod("holdChunks", "(Ljava/lang/String;Ljava/lang/String;[I)Z",
                      reinterpret_cast<void*>(&nativeHoldChunks)),
+        nativeMethod("releaseChunkPairs", "(Ljava/lang/String;Ljava/lang/String;[I)V",
+                     reinterpret_cast<void*>(&nativeReleaseChunkPairs)),
+        nativeMethod("heldChunks", "(Ljava/lang/String;Ljava/lang/String;)[I",
+                     reinterpret_cast<void*>(&nativeHeldChunks)),
+        nativeMethod("chunkHolders", "(Ljava/lang/String;IIZ)[Ljava/lang/String;",
+                     reinterpret_cast<void*>(&nativeChunkHolders)),
         nativeMethod("releaseChunks", "(Ljava/lang/String;Ljava/lang/String;)V",
                      reinterpret_cast<void*>(&nativeReleaseChunks)),
         nativeMethod("updateNeighbors", "(Ljava/lang/String;[II)I", reinterpret_cast<void*>(&nativeUpdateNeighbors)),

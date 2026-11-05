@@ -33,11 +33,13 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 public class Hoglin extends Animal implements Enemy, HoglinBase {
     public static final int CONVERSION_TIME = 300;
+    private int timeInOverworld;
+    private int attackAnimationRemainingTicks;
     public Hoglin(EntityType<? extends Hoglin> type, Level level) {
         super(type, level);
     }
     public void setTimeInOverworld(int timeInOverworld) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.hoglin.Hoglin#setTimeInOverworld");
+        this.timeInOverworld = timeInOverworld;
     }
     public boolean canBeLeashed() {
         return super.canBeLeashed();
@@ -91,7 +93,7 @@ public class Hoglin extends Animal implements Enemy, HoglinBase {
     public void handleEntityEvent(byte id) {
     }
     public int getAttackAnimationRemainingTicks() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.hoglin.Hoglin#getAttackAnimationRemainingTicks");
+        return attackAnimationRemainingTicks;
     }
     protected int getBaseExperienceReward(ServerLevel level) {
         return super.getBaseExperienceReward(level);
@@ -115,7 +117,7 @@ public class Hoglin extends Animal implements Enemy, HoglinBase {
         return live() instanceof org.bukkit.entity.Hoglin api ? (boolean) api.isConverting() : false;
     }
     public boolean canBeHunted() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.hoglin.Hoglin#canBeHunted");
+        return live() instanceof org.bukkit.entity.Hoglin api && api.isAbleToBeHunted();
     }
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob partner) {
         return null;

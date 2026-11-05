@@ -10,33 +10,33 @@ public interface LayerLightEventListener extends LightEventListener {
         return null;
     }
     default int getLightValue(BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LayerLightEventListener#getLightValue");
+        return 0;
     }
     public static enum DummyLightLayerEventListener implements LayerLightEventListener {
         INSTANCE;
         public DataLayer getDataLayerData(SectionPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LayerLightEventListener.DummyLightLayerEventListener#getDataLayerData");
+            return null;
         }
         public int getLightValue(BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LayerLightEventListener.DummyLightLayerEventListener#getLightValue");
+            return 0;
         }
         public void checkBlock(BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LayerLightEventListener.DummyLightLayerEventListener#checkBlock");
+
         }
         public boolean hasLightWork() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LayerLightEventListener.DummyLightLayerEventListener#hasLightWork");
+            return false;
         }
         public int runLightUpdates() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LayerLightEventListener.DummyLightLayerEventListener#runLightUpdates");
+            return 0;
         }
         public void updateSectionStatus(SectionPos pos, boolean sectionEmpty) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LayerLightEventListener.DummyLightLayerEventListener#updateSectionStatus");
+
         }
         public void setLightEnabled(ChunkPos pos, boolean enable) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LayerLightEventListener.DummyLightLayerEventListener#setLightEnabled");
+
         }
         public void propagateLightSources(ChunkPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LayerLightEventListener.DummyLightLayerEventListener#propagateLightSources");
+
         }
     }
 }

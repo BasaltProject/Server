@@ -93,6 +93,9 @@ public class ServerPlayer extends Player {
 
     public ServerGamePacketListenerImpl connection;
     private ServerLevel level;
+    private final List<Identifier> postEffects = new java.util.ArrayList<>();
+    private boolean postEffectsDirty;
+    private ClientInformation clientInformation;
 
     public ServerPlayer(ServerGamePacketListenerImpl connection) {
         this.connection = connection;
@@ -186,7 +189,18 @@ public class ServerPlayer extends Player {
         player.setHealth(0.0);
     }
     public void awardKillScore(Entity victim, DamageSource killingBlow) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#awardKillScore");
+        if (victim == this) {
+            return;
+        }
+        super.awardKillScore(victim, killingBlow);
+        net.minecraft.world.scores.Scoreboard scoreboard = level().getScoreboard();
+        scoreboard.forAllObjectives(net.minecraft.world.scores.criteria.ObjectiveCriteria.KILL_COUNT_ALL, this, net.minecraft.world.scores.ScoreAccess::increment);
+        if (victim instanceof Player) {
+            awardStat(net.minecraft.stats.Stats.PLAYER_KILLS);
+            scoreboard.forAllObjectives(net.minecraft.world.scores.criteria.ObjectiveCriteria.KILL_COUNT_PLAYERS, this, net.minecraft.world.scores.ScoreAccess::increment);
+        } else {
+            awardStat(net.minecraft.stats.Stats.MOB_KILLS);
+        }
     }
     public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
         player.damage(damage);
@@ -196,7 +210,12 @@ public class ServerPlayer extends Player {
         return player.getWorld().getPVP();
     }
     public TeleportTransition findRespawnPositionAndUseSpawnBlock(boolean consumeSpawnBlock, TeleportTransition.PostTeleportTransition postTeleportTransition) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#findRespawnPositionAndUseSpawnBlock");
+        org.bukkit.Location spawn = player.getRespawnLocation();
+        if (spawn == null || spawn.getWorld() == null) {
+            return TeleportTransition.createDefault(this, postTeleportTransition);
+        }
+        ServerLevel target = ((org.bukkit.craftbukkit.CraftWorld) spawn.getWorld()).getHandle();
+        return new TeleportTransition(target, new Vec3(spawn.getX(), spawn.getY(), spawn.getZ()), Vec3.ZERO, spawn.getYaw(), spawn.getPitch(), postTeleportTransition);
     }
     public boolean isReceivingWaypoints() {
         return true;
@@ -204,19 +223,34 @@ public class ServerPlayer extends Player {
     protected void onAttributeUpdated(Holder<Attribute> attribute) {
     }
     public void sendPostEffects() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#sendPostEffects");
+        postEffectsDirty = false;
+        connection.send(new net.minecraft.network.protocol.common.ClientboundPostEffectsPacket(postEffects));
     }
     public boolean addPostEffect(Identifier postEffect) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#addPostEffect");
+        if (postEffects.contains(postEffect)) {
+            return false;
+        }
+        postEffects.add(postEffect);
+        postEffectsDirty = true;
+        return true;
     }
     public boolean clearPostEffects() {
-        return false;
+        if (postEffects.isEmpty()) {
+            return false;
+        }
+        postEffects.clear();
+        postEffectsDirty = true;
+        return true;
     }
     public List<Identifier> getPostEffects() {
-        return java.util.List.of();
+        return postEffects;
     }
     public boolean removePostEffect(Identifier postEffect) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#removePostEffect");
+        if (postEffects.remove(postEffect)) {
+            postEffectsDirty = true;
+            return true;
+        }
+        return false;
     }
     public void showEndCredits() {
         player.showWinScreen();
@@ -521,10 +555,10 @@ public class ServerPlayer extends Player {
         return player.getAddress() == null ? "" : player.getAddress().getAddress().getHostAddress();
     }
     public void updateOptions(ClientInformation information) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#updateOptions");
+        this.clientInformation = information;
     }
     public ClientInformation clientInformation() {
-        return ClientInformation.createDefault();
+        return clientInformation != null ? clientInformation : ClientInformation.createDefault();
     }
     public boolean canChatInColor() {
         return Boolean.TRUE.equals(org.basaltmc.bukkit.PlayerNatives.get(player.getUniqueId().toString(), "chat_colors"));
@@ -537,7 +571,7 @@ public class ServerPlayer extends Player {
         return value instanceof Number number ? number.intValue() : player.getClientViewDistance();
     }
     public void sendServerStatus(ServerStatus status) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#sendServerStatus");
+        connection.send(new net.minecraft.network.protocol.game.ClientboundServerDataPacket(status.description(), status.favicon().map(ServerStatus.Favicon::iconBytes)));
     }
     public PermissionSet permissions() {
         return org.basaltmc.bukkit.facade.BukkitCommandBridge.permissionsOf(player);
@@ -629,10 +663,15 @@ public class ServerPlayer extends Player {
         this.chunkTrackingView = chunkTrackingView;
     }
     public ItemEntity drop(ItemStack itemStack, boolean thrownFromHand, Prediction prediction) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#drop");
+        ItemEntity entity = super.drop(itemStack, thrownFromHand, prediction);
+        if (thrownFromHand && entity != null && !entity.getItem().isEmpty()) {
+            awardStat(net.minecraft.stats.Stats.ITEM_DROPPED.get(entity.getItem().getItem()), itemStack.getCount());
+            awardStat(net.minecraft.stats.Stats.DROP);
+        }
+        return entity;
     }
     public TextFilter getTextFilter() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#getTextFilter");
+        return TextFilter.DUMMY;
     }
     public void setServerLevel(ServerLevel level) {
         org.bukkit.Location at = player.getLocation();
@@ -682,7 +721,10 @@ public class ServerPlayer extends Player {
         player.leaveVehicle();
     }
     public CommonPlayerSpawnInfo createCommonSpawnInfo(ServerLevel level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer#createCommonSpawnInfo");
+        return new CommonPlayerSpawnInfo(level.dimensionTypeRegistration(), level.dimension(),
+            net.minecraft.world.level.biome.BiomeManager.obfuscateSeed(level.getSeed()), gameMode(),
+            java.util.Optional.empty(), level.isDebug(), level.isFlat(), getLastDeathLocation(), getPortalCooldown(),
+            level.getSeaLevel());
     }
     public void setRaidOmenPosition(BlockPos raidOmenPosition) {
     }
@@ -767,13 +809,15 @@ public class ServerPlayer extends Player {
     }
     static record RespawnPosAngle(Vec3 position, float yaw, float pitch) {
         public static RespawnPosAngle of(Vec3 position, BlockPos lookAtBlockPos, float pitch) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer.RespawnPosAngle#of");
+        Vec3 look = Vec3.atBottomCenterOf(lookAtBlockPos).subtract(position).normalize();
+        float yaw = (float) net.minecraft.util.Mth.wrapDegrees(net.minecraft.util.Mth.atan2(look.z, look.x) * (180.0F / (float) Math.PI) - 90.0);
+        return new RespawnPosAngle(position, yaw, pitch);
         }
     }
     public static record RespawnConfig(LevelData.RespawnData respawnData, boolean forced) {
         public static final Codec<RespawnConfig> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.server.level.ServerPlayer.RespawnConfig.class, "CODEC");
         public boolean isSamePosition(RespawnConfig other) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerPlayer.RespawnConfig#isSamePosition");
+        return other != null && respawnData().globalPos().equals(other.respawnData().globalPos());
         }
     }
     public static record SavedPosition(Optional<ResourceKey<Level>> dimension, Optional<Vec3> position, Optional<Vec2> rotation) {

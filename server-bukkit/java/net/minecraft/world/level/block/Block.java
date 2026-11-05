@@ -420,10 +420,22 @@ public class Block extends BlockBehaviour implements ItemLike {
             || state.is(net.minecraft.tags.BlockTags.SHULKER_BOXES);
     }
     public static boolean dropFromBlockInteractLootTable(ServerLevel level, ResourceKey<LootTable> key, BlockPos interactedBlockPos, BlockState interactedBlockState, BlockEntity interactedBlockEntity, ItemInstance tool, Entity interactingEntity, BiConsumer<ServerLevel, ItemStack> consumer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.Block#dropFromBlockInteractLootTable");
+        return dropFromLootTable(level, key, builder -> builder
+            .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN, net.minecraft.world.phys.Vec3.atCenterOf(interactedBlockPos))
+            .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.BLOCK_STATE, interactedBlockState)
+            .withOptionalParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.BLOCK_ENTITY, interactedBlockEntity)
+            .withOptionalParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.INTERACTING_ENTITY, interactingEntity)
+            .withOptionalParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.TOOL, tool)
+            .create(net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.BLOCK_INTERACT), consumer);
     }
     protected static boolean dropFromLootTable(ServerLevel level, ResourceKey<LootTable> key, Function<LootParams.Builder, LootParams> paramsBuilder, BiConsumer<ServerLevel, ItemStack> consumer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.Block#dropFromLootTable");
+        LootParams params = paramsBuilder.apply(new LootParams.Builder(level));
+        java.util.List<ItemStack> drops = LootTable.of(key.identifier()).getRandomItems(params);
+        if (drops.isEmpty()) {
+            return false;
+        }
+        drops.forEach(stack -> consumer.accept(level, stack));
+        return true;
     }
     public static boolean shouldRenderFace(BlockState state, BlockState neighborState, Direction direction) {
         VoxelShape occluder = neighborState.getFaceOcclusionShape(direction.getOpposite());
@@ -592,10 +604,10 @@ public class Block extends BlockBehaviour implements ItemLike {
         return true;
     }
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.Block#createBlockStateDefinition");
+
     }
     protected void registerDefaultState(BlockState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.Block#registerDefaultState");
+
     }
     private static <T extends Comparable<T>> BlockState copyProperty(BlockState from, BlockState to,
             net.minecraft.world.level.block.state.properties.Property<T> property) {

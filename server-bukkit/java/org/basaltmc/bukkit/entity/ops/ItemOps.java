@@ -10,6 +10,7 @@ import org.bukkit.inventory.ItemStack;
 
 public interface ItemOps extends Item, Cored {
     int kUnlimited = -32768;
+    int kNeverPickUp = 32767;
 
     default ItemStack getItemStack() {
         byte[] stored = core().nbt("Item");
@@ -62,6 +63,15 @@ public interface ItemOps extends Item, Cored {
 
     default void setUnlimitedLifetime(boolean unlimited) {
         core().nbtSet("Age", "short", unlimited ? kUnlimited : 0);
+    }
+
+    default void setExtendedLifetime() {
+        core().nbtSet("Age", "short", -6000);
+    }
+
+    default void makeFake() {
+        setPickupDelay(kNeverPickUp);
+        core().nbtSet("Age", "short", 5999);
     }
 
     default UUID getOwner() {

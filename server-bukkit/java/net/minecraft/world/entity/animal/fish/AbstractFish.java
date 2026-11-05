@@ -33,10 +33,12 @@ public abstract class AbstractFish extends WaterAnimal implements Bucketable {
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
     }
     public boolean fromBucket() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.AbstractFish#fromBucket");
+        return live() instanceof io.papermc.paper.entity.Bucketable api && api.isFromBucket();
     }
     public void setFromBucket(boolean fromBucket) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.AbstractFish#setFromBucket");
+        if (live() instanceof io.papermc.paper.entity.Bucketable api) {
+            api.setFromBucket(fromBucket);
+        }
     }
     protected void addAdditionalSaveData(ValueOutput output) {
     }
@@ -55,10 +57,10 @@ public abstract class AbstractFish extends WaterAnimal implements Bucketable {
         return net.minecraft.world.InteractionResult.PASS;
     }
     public void saveToBucketTag(ItemStack bucket) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.AbstractFish#saveToBucketTag");
+        net.minecraft.world.entity.Bucketable.saveDefaultDataToBucketTag(this, bucket);
     }
     public void loadFromBucketTag(CompoundTag tag) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.AbstractFish#loadFromBucketTag");
+        net.minecraft.world.entity.Bucketable.loadDefaultDataFromBucketTag(this, tag);
     }
     public SoundEvent getPickupSound() {
         return null;

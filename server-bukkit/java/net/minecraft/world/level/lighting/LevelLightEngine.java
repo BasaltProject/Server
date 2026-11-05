@@ -10,6 +10,7 @@ import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 public class LevelLightEngine implements LightEventListener {
     protected LevelLightEngine() {
+        this.levelHeightAccessor = null;
     }
     public void checkBlock(BlockPos pos) {
         return;
@@ -19,9 +20,9 @@ public class LevelLightEngine implements LightEventListener {
     }
     public static final int LIGHT_SECTION_PADDING = 1;
     public static final LevelLightEngine EMPTY = null;
-    protected final LevelHeightAccessor levelHeightAccessor = null;
+    protected final LevelHeightAccessor levelHeightAccessor;
     public LevelLightEngine(LightChunkGetter chunkSource, boolean hasBlockLight, boolean hasSkyLight) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LevelLightEngine#<init>");
+        this.levelHeightAccessor = chunkSource == null ? null : chunkSource.getLevel();
     }
     public boolean hasLightWork() {
         return false;
@@ -39,7 +40,7 @@ public class LevelLightEngine implements LightEventListener {
         return;
     }
     public LayerLightEventListener getLayerListener(LightLayer layer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.lighting.LevelLightEngine#getLayerListener");
+        return LayerLightEventListener.DummyLightLayerEventListener.INSTANCE;
     }
     public String getDebugData(LightLayer layer, SectionPos pos) {
         return "n/a";

@@ -165,17 +165,21 @@ public class Allay extends PathfinderMob implements InventoryCarrier, VibrationS
         return vibrationUser;
     }
     class JukeboxListener implements GameEventListener {
+        private final PositionSource source;
+        private final int radius;
+
         public JukeboxListener(PositionSource listenerSource, int listenerRadius) {
-            
+            source = listenerSource;
+            radius = listenerRadius;
         }
         public PositionSource getListenerSource() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.allay.Allay.JukeboxListener#getListenerSource");
+            return source;
         }
         public int getListenerRadius() {
-            return 16;
+            return radius;
         }
         public boolean handleGameEvent(ServerLevel level, Holder<GameEvent> event, GameEvent.Context context, Vec3 sourcePosition) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.allay.Allay.JukeboxListener#handleGameEvent");
+            return false;
         }
     }
     class VibrationUser implements VibrationSystem.User {

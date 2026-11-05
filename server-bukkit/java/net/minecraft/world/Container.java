@@ -79,7 +79,10 @@ public interface Container extends Clearable, Iterable<ItemStack>, SlotProvider 
             * (player.blockInteractionRange() + distanceBuffer);
     }
     default SlotAccess getSlot(int slot) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.Container#getSlot");
+        if (slot < 0 || slot >= getContainerSize()) {
+            return null;
+        }
+        return SlotAccess.of(() -> getItem(slot), stack -> setItem(slot, stack));
     }
     default Iterator<ItemStack> iterator() {
         return new ContainerIterator(this);

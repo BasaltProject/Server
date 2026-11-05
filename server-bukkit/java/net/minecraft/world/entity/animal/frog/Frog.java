@@ -156,21 +156,28 @@ public class Frog extends Animal {
             super(mob, level);
         }
         public boolean canCutCorner(PathType pathType) {
-            return pathType != PathType.POWDER_SNOW && super.canCutCorner(pathType);
+            return pathType != PathType.WATER_BORDER && super.canCutCorner(pathType);
         }
         protected PathFinder createPathFinder(int maxVisitedNodes) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.frog.Frog.FrogPathNavigation#createPathFinder");
+            nodeEvaluator = new FrogNodeEvaluator(true);
+            return new PathFinder(nodeEvaluator, maxVisitedNodes);
         }
     }
     static class FrogNodeEvaluator extends AmphibiousNodeEvaluator {
         public FrogNodeEvaluator(boolean prefersShallowSwimming) {
-            super(false);
+            super(prefersShallowSwimming);
         }
         public Node getStart() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.frog.Frog.FrogNodeEvaluator#getStart");
+            if (!mob.isInWater()) {
+                return super.getStart();
+            }
+            net.minecraft.world.phys.AABB box = mob.getBoundingBox();
+            return getStartNode(new BlockPos(net.minecraft.util.Mth.floor(box.minX), net.minecraft.util.Mth.floor(box.minY),
+                net.minecraft.util.Mth.floor(box.minZ)));
         }
         public PathType getPathType(PathfindingContext context, int x, int y, int z) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.frog.Frog.FrogNodeEvaluator#getPathType");
+            return context.getBlockState(new BlockPos(x, y - 1, z)).is(net.minecraft.tags.BlockTags.FROG_PREFER_JUMP_TO) ? PathType.OPEN
+                : super.getPathType(context, x, y, z);
         }
     }
 }

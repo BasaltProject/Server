@@ -18,22 +18,31 @@ public class StructureStart {
     private final ChunkPos chunkPos;
     private final BoundingBox box;
     private int references;
+    private final List<StructurePiece> pieces;
 
     protected StructureStart() {
         this.structure = null;
         this.chunkPos = null;
         this.box = null;
+        this.pieces = List.of();
     }
 
     public StructureStart(Structure structure, ChunkPos chunkPos, int references, PiecesContainer pieceContainer) {
-        this(structure, chunkPos, references, new BoundingBox(chunkPos.getMinBlockX(), 0, chunkPos.getMinBlockZ(), chunkPos.getMaxBlockX(), 0, chunkPos.getMaxBlockZ()));
+        this(structure, chunkPos, references, pieceContainer.pieces().isEmpty()
+            ? new BoundingBox(chunkPos.getMinBlockX(), 0, chunkPos.getMinBlockZ(), chunkPos.getMaxBlockX(), 0, chunkPos.getMaxBlockZ())
+            : StructurePiece.createBoundingBox(pieceContainer.pieces().stream()), pieceContainer.pieces());
     }
 
     public StructureStart(Structure structure, ChunkPos chunkPos, int references, BoundingBox box) {
+        this(structure, chunkPos, references, box, List.of());
+    }
+
+    public StructureStart(Structure structure, ChunkPos chunkPos, int references, BoundingBox box, List<StructurePiece> pieces) {
         this.structure = structure;
         this.chunkPos = chunkPos;
         this.references = references;
         this.box = box;
+        this.pieces = List.copyOf(pieces);
     }
 
     public BoundingBox getBoundingBox() {
@@ -89,6 +98,6 @@ public class StructureStart {
     }
 
     public List<StructurePiece> getPieces() {
-        return List.of();
+        return pieces;
     }
 }

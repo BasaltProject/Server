@@ -9,7 +9,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.util.AbortableIterationConsumer;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.phys.AABB;
 import org.basaltmc.bukkit.WorldNatives;
 import java.io.IOException;
 import java.io.Writer;
@@ -48,9 +50,50 @@ public class PersistentEntitySectionManager<T extends EntityAccess> implements A
     public LevelEntityGetter<Entity> getEntityGetter() {
         return new LevelEntityGetter<>() {
             @Override
-            public EntityAccess get(UUID id) {
+            public Entity get(UUID id) {
                 int found = WorldNatives.entityByUuid(level.getWorld().getName(), id.toString());
                 return found < 0 ? null : view(found);
+            }
+
+            @Override
+            public Entity get(int id) {
+                return view(id);
+            }
+
+            @Override
+            public Iterable<Entity> getAll() {
+                List<Entity> all = new ArrayList<>();
+                for (int id : WorldNatives.entityIds(level.getWorld().getName(), 0, 0, true)) {
+                    Entity view = view(id);
+                    if (view != null) {
+                        all.add(view);
+                    }
+                }
+                return all;
+            }
+
+            @Override
+            public <U extends Entity> void get(EntityTypeTest<Entity, U> type, AbortableIterationConsumer<U> consumer) {
+                for (Entity entity : getAll()) {
+                    U cast = type.tryCast(entity);
+                    if (cast != null && consumer.accept(cast).shouldAbort()) {
+                        return;
+                    }
+                }
+            }
+
+            @Override
+            public void get(AABB bb, java.util.function.Consumer<Entity> output) {
+                level.getEntities((Entity) null, bb, entity -> true).forEach(output);
+            }
+
+            @Override
+            public <U extends Entity> void get(EntityTypeTest<Entity, U> type, AABB bb, AbortableIterationConsumer<U> consumer) {
+                for (U entity : level.getEntities(type, bb, found -> true)) {
+                    if (consumer.accept(entity).shouldAbort()) {
+                        return;
+                    }
+                }
             }
         };
     }

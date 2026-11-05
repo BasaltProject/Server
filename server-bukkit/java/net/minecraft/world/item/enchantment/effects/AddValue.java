@@ -9,6 +9,6 @@ public record AddValue(LevelBasedValue value) implements EnchantmentValueEffect 
         return inputValue + value.calculate(enchantmentLevel);
     }
     public MapCodec<AddValue> codec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.effects.AddValue#codec");
+        return CODEC;
     }
 }

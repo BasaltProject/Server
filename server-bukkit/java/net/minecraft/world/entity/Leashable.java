@@ -91,10 +91,9 @@ public interface Leashable {
         return 6.0;
     }
     static <E extends Entity & Leashable> float angularFriction(E entity) {
-        if (entity.onGround()) {
-            return entity.level().getBlockState(entity.getBlockPosBelowThatAffectsMyMovement()).getBlock().getFriction() * 0.91F;
-        }
-        return entity.isInLiquid() ? 0.8F : 0.91F;
+        float friction = entity.onGround()
+            ? entity.level().getBlockState(entity.getBlockPosBelowThatAffectsMyMovement()).getBlock().getFriction() : 0.0F;
+        return org.basaltmc.bukkit.MechanicsNatives.angularFriction(entity.onGround(), friction, entity.isInLiquid());
     }
     default void whenLeashedTo(Entity leashHolder) {
         return;
@@ -108,35 +107,21 @@ public interface Leashable {
     default boolean checkElasticInteractions(Entity leashHolder, LeashData leashData) {
         Entity self = (Entity) this;
         boolean quad = leashHolder.supportQuadLeashAsHolder() && supportQuadLeash();
-        List<Vec3> selfPoints = quad ? SHARED_QUAD_ATTACHMENT_POINTS : ENTITY_ATTACHMENT_POINT;
-        List<Vec3> holderPoints = quad ? SHARED_QUAD_ATTACHMENT_POINTS : LEASHER_ATTACHMENT_POINT;
-        Vec3 motion = movementOf(self);
-        double slack = leashElasticDistance();
-        Vec3 selfSize = new Vec3(self.getBbWidth(), self.getBbHeight(), self.getBbWidth());
-        Vec3 holderSize = new Vec3(leashHolder.getBbWidth(), leashHolder.getBbHeight(), leashHolder.getBbWidth());
-        float selfYaw = self.getYRot() * ((float) Math.PI / 180F);
-        float holderYaw = leashHolder.getYRot() * ((float) Math.PI / 180F);
-        java.util.ArrayList<Wrench> wrenches = new java.util.ArrayList<>();
-        for (int i = 0; i < selfPoints.size(); i++) {
-            Vec3 lever = selfPoints.get(i).multiply(selfSize).yRot(-selfYaw);
-            Vec3 selfPos = self.position().add(lever);
-            Vec3 pivot = leashHolder.position().add(holderPoints.get(i).multiply(holderSize).yRot(-holderYaw));
-            double distance = selfPos.distanceTo(pivot);
-            if (distance < slack) {
-                continue;
-            }
-            Vec3 pull = pivot.subtract(selfPos).normalize().scale(distance - slack);
-            double torque = Wrench.torqueFromForce(lever, pull);
-            wrenches.add(new Wrench(motion.dot(pull) >= 0.0 ? pull.scale(0.3) : pull, torque));
-        }
-        if (wrenches.isEmpty()) {
+        Vec3 known = self.getKnownMovement();
+        double[] pull = org.basaltmc.bukkit.MechanicsNatives.leashPull(body(self), body(leashHolder), quad, leashElasticDistance(),
+            vector(movementOf(self)), vector(movementOf(leashHolder)), vector(known));
+        if (pull == null) {
             return false;
         }
-        Wrench total = Wrench.accumulate(wrenches).scale(quad ? 0.25 : 1.0);
-        leashData.angularMomentum += 10.0 * total.torque();
-        Vec3 relative = movementOf(leashHolder).subtract(self.getKnownMovement());
-        self.addDeltaMovement(total.force().multiply(AXIS_SPECIFIC_ELASTICITY).add(relative.scale(0.11)));
+        leashData.angularMomentum += pull[0];
+        self.addDeltaMovement(new Vec3(pull[1], pull[2], pull[3]));
         return true;
+    }
+    private static double[] body(Entity entity) {
+        return new double[] {entity.getX(), entity.getY(), entity.getZ(), entity.getBbWidth(), entity.getBbHeight(), entity.getYRot()};
+    }
+    private static double[] vector(Vec3 v) {
+        return new double[] {v.x, v.y, v.z};
     }
     private static Vec3 movementOf(Entity holder) {
         return holder instanceof Mob mob && mob.isNoAi() ? Vec3.ZERO : holder.getKnownMovement();

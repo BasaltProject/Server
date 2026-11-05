@@ -10,6 +10,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.storage.ValueInput;
@@ -28,17 +29,42 @@ public abstract class AgeableMob extends PathfinderMob {
         super(type, level);
     }
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob#finalizeSpawn");
+                AgeableMobGroupData group = groupData instanceof AgeableMobGroupData existing ? existing : new AgeableMobGroupData(true);
+        boolean rollBaby = group.isShouldSpawnBaby() && group.getGroupSize() > 0;
+        if (rollBaby && level.getRandom().nextFloat() <= group.getBabySpawnChance()) {
+            setAge(getBabyStartAge());
+        }
+        group.increaseGroupSizeByOne();
+        return super.finalizeSpawn(level, difficulty, spawnReason, group);
     }
     public abstract AgeableMob getBreedOffspring(ServerLevel level, AgeableMob partner);
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob#mobInteract");
+                ItemStack held = player.getItemInHand(hand);
+        if (!canUseGoldenDandelion(held, isBaby(), ageLockParticleTimer, this)) {
+            return super.mobInteract(player, hand);
+        }
+        setAgeLocked(this, this::isAgeLocked, player, held, mob -> {
+            setAgeLocked(!isAgeLocked());
+            setAge(getBabyStartAge());
+            ageLockParticleTimer = AGE_LOCK_COOLDOWN_TICKS;
+        });
+        return InteractionResult.SUCCESS;
     }
     public static boolean canUseGoldenDandelion(ItemStack itemInHand, boolean isBaby, int cooldown, Mob mob) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob#canUseGoldenDandelion");
+                boolean fresh = isBaby && cooldown == 0;
+        return fresh && itemInHand.getItem() == net.minecraft.world.item.Items.GOLDEN_DANDELION
+            && !mob.is(net.minecraft.tags.EntityTypeTags.CANNOT_BE_AGE_LOCKED);
     }
     public static void setAgeLocked(Mob mob, Supplier<Boolean> isAgedLocked, Player player, ItemStack itemInHand, Consumer<Mob> setAgeLockData) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob#setAgeLocked");
+                setAgeLockData.accept(mob);
+        itemInHand.consume(1, player);
+        boolean locked = isAgedLocked.get();
+        if (locked) {
+            mob.setPersistenceRequired();
+        }
+        net.minecraft.sounds.SoundEvent sound = locked ? net.minecraft.sounds.SoundEvents.GOLDEN_DANDELION_USE
+            : net.minecraft.sounds.SoundEvents.GOLDEN_DANDELION_UNUSE;
+        mob.level().playSound(null, mob.blockPosition(), sound, net.minecraft.sounds.SoundSource.PLAYERS, 1.0F, 1.0F);
     }
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
     }
@@ -80,10 +106,21 @@ public abstract class AgeableMob extends PathfinderMob {
         return !isAgeLocked();
     }
     public static int makeAgeLockedParticle(Level level, Mob mob, int ageLockParticleTimer, boolean isAgeLocked) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob#makeAgeLockedParticle");
+        if (ageLockParticleTimer <= 0) {
+            return ageLockParticleTimer;
+        }
+        if (ageLockParticleTimer % 2 == 0 && level instanceof ServerLevel server) {
+            double lift = (isAgeLocked ? 0.2F : 0.0F) + mob.getBbHeight();
+            server.sendParticles(isAgeLocked ? net.minecraft.core.particles.ParticleTypes.PAUSE_MOB_GROWTH
+                : net.minecraft.core.particles.ParticleTypes.RESET_MOB_GROWTH, mob.getRandomX(1.0), mob.getRandomY(0.2) + lift,
+                mob.getRandomZ(1.0), 1, 0.0, 0.0, 0.0, 0.0);
+        }
+        return ageLockParticleTimer - 1;
     }
     protected void ageBoundaryReached() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob#ageBoundaryReached");
+                if (!isBaby() && isPassenger() && getVehicle() instanceof AbstractBoat boat && !boat.hasEnoughSpaceFor(this)) {
+            stopRiding();
+        }
     }
     protected int getBabyStartAge() {
         return -24000;
@@ -107,26 +144,30 @@ public abstract class AgeableMob extends PathfinderMob {
         return live() instanceof org.bukkit.entity.Ageable ageable && ageable.getAgeLock();
     }
     public static class AgeableMobGroupData implements SpawnGroupData {
+        private int groupSize;
+        private final boolean shouldSpawnBaby;
+        private final float babySpawnChance;
         public AgeableMobGroupData(boolean shouldSpawnBaby, float babySpawnChance) {
-            
+            this.shouldSpawnBaby = shouldSpawnBaby;
+            this.babySpawnChance = babySpawnChance;
         }
         public AgeableMobGroupData(boolean shouldSpawnBaby) {
-            
+            this(shouldSpawnBaby, 0.05F);
         }
         public AgeableMobGroupData(float babySpawnChance) {
-            
+            this(true, babySpawnChance);
         }
         public int getGroupSize() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob.AgeableMobGroupData#getGroupSize");
+            return groupSize;
         }
         public void increaseGroupSizeByOne() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob.AgeableMobGroupData#increaseGroupSizeByOne");
+            groupSize++;
         }
         public boolean isShouldSpawnBaby() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob.AgeableMobGroupData#isShouldSpawnBaby");
+            return shouldSpawnBaby;
         }
         public float getBabySpawnChance() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.AgeableMob.AgeableMobGroupData#getBabySpawnChance");
+            return babySpawnChance;
         }
     }
 }

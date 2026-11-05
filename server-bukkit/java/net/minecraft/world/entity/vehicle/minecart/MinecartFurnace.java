@@ -38,7 +38,9 @@ public class MinecartFurnace extends AbstractMinecart {
         return net.minecraft.world.InteractionResult.PASS;
     }
     public boolean addFuel(Vec3 interactingPos, ItemStack itemStack) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.vehicle.minecart.MinecartFurnace#addFuel");
+        return itemStack.is(net.minecraft.tags.ItemTags.FURNACE_MINECART_FUEL)
+            && org.basaltmc.bukkit.EntityNatives.call(level().getWorld().getName(), getId(), "cart_add_fuel", new Object[] {interactingPos.x, interactingPos.z})
+                instanceof Boolean added && added;
     }
     protected void addAdditionalSaveData(ValueOutput output) {
     }

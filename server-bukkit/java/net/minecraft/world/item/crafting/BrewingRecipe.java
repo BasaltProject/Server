@@ -7,8 +7,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.level.Level;
 public class BrewingRecipe implements Recipe<BrewingInput> {
-    public static final MapCodec<BrewingRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.BrewingRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, BrewingRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.BrewingRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<BrewingRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        PotionIngredient.MAP_CODEC.fieldOf("input").forGetter(o -> o.input),
+        PotionIngredient.MAP_CODEC.fieldOf("reagent").forGetter(o -> o.reagent),
+        ItemStackTemplate.CODEC.fieldOf("output").forGetter(o -> o.output)).apply(i, BrewingRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, BrewingRecipe> STREAM_CODEC = StreamCodec.composite(
+        PotionIngredient.STREAM_CODEC, o -> o.input,
+        PotionIngredient.STREAM_CODEC, o -> o.reagent,
+        ItemStackTemplate.STREAM_CODEC, o -> o.output,
+        BrewingRecipe::new);
     public static final RecipeSerializer<BrewingRecipe> SERIALIZER = null;
     private final Recipe.CommonInfo commonInfo = new Recipe.CommonInfo(false);
     private final PotionIngredient input;

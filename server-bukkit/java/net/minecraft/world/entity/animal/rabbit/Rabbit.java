@@ -177,19 +177,26 @@ public class Rabbit extends Animal {
         }
     }
     public static class RabbitJumpControl extends JumpControl {
+        private final Rabbit rabbit;
+        private boolean canJump;
         public RabbitJumpControl(Rabbit rabbit) {
             super(rabbit);
+            this.rabbit = rabbit;
         }
         public boolean wantJump() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.rabbit.Rabbit.RabbitJumpControl#wantJump");
+            return jump;
         }
         public boolean canJump() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.rabbit.Rabbit.RabbitJumpControl#canJump");
+            return canJump;
         }
         public void setCanJump(boolean canJump) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.rabbit.Rabbit.RabbitJumpControl#setCanJump");
+            this.canJump = canJump;
         }
         public void tick() {
+            if (jump) {
+                rabbit.startJumping();
+                jump = false;
+            }
         }
     }
     static class RabbitMoveControl<T extends Rabbit> extends MoveControl<T> {
