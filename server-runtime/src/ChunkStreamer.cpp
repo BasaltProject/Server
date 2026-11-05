@@ -313,6 +313,12 @@ std::vector<std::pair<std::int32_t, std::int32_t>> ChunkStreamer::sentChunks() c
     return sent;
 }
 
+bool ChunkStreamer::sentToClient(const std::int32_t chunkX, const std::int32_t chunkZ) const {
+    const ChunkPos pos{.x = chunkX, .z = chunkZ};
+    const std::lock_guard<std::mutex> guard{chunkStreamMutex_};
+    return chunkTracker_.loaded().contains(pos) && std::ranges::find(pendingChunks_, pos) == pendingChunks_.end();
+}
+
 void ChunkStreamer::overrideViewDistance(const std::optional<std::int32_t> distance) {
     viewOverride_ = distance;
     if (const world::LoadedWorld* current = owner_->currentWorld(); distance.has_value() && current != nullptr) {
