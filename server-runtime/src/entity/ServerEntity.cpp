@@ -145,6 +145,8 @@ ServerEntity::ServerEntity(std::int32_t entityId, wire::common::Uuid uuid, wire:
                            std::int32_t protocolType, double x, double y, double z, float yaw, float pitch)
     : x(x), y(y), z(z), yaw(yaw), pitch(pitch), entityId_(entityId), uuid_(uuid), type_(std::move(type)),
       protocolType_(protocolType) {
+    baseWidth_ = static_cast<float>(registry::entityTypeShapes::widthOf(type_));
+    baseHeight_ = static_cast<float>(registry::entityTypeShapes::heightOf(type_));
     const bool dolphin = type_.path() == "dolphin";
     airSupply = mobBreathing::maxAirOf(type_.path());
     canPickUpLoot = dolphin;
@@ -262,8 +264,8 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
 
 /// parity: `getDefaultDimensions` for a baby.
 [[nodiscard]] std::pair<float, float> defaultBox(const ServerEntity& entity, const wire::common::Identifier& type) {
-    const auto width = static_cast<float>(registry::entityTypeShapes::widthOf(type));
-    const auto height = static_cast<float>(registry::entityTypeShapes::heightOf(type));
+    const float width = entity.baseWidth();
+    const float height = entity.baseHeight();
     const std::string_view path = type.path();
     if (path == "slime" || path == "magma_cube" || path == "sulfur_cube") {
         const auto size = static_cast<float>(entity.cubeSize);
@@ -301,7 +303,7 @@ double ServerEntity::width() const {
         return static_cast<double>(kBabyCamelWidth);
     }
     if (sniffer != nullptr && sniffer->pose == sniffers::Pose::Digging && age < 0) {
-        return static_cast<double>(static_cast<float>(registry::entityTypeShapes::widthOf(type_)) * 0.5F);
+        return static_cast<double>(baseWidth_ * 0.5F);
     }
     return static_cast<double>(defaultBox(*this, type_).first);
 }
@@ -309,14 +311,13 @@ double ServerEntity::width() const {
 double ServerEntity::height() const {
     if (camel != nullptr && camel->lastPoseTick < 0) {
         return babyCamel(*this) ? static_cast<double>(kBabyCamelSittingHeight)
-                                : static_cast<double>(static_cast<float>(registry::entityTypeShapes::heightOf(type_)) -
-                                                      kCamelSittingDrop);
+                                : static_cast<double>(baseHeight_ - kCamelSittingDrop);
     }
     if (babyCamel(*this)) {
         return static_cast<double>(kBabyCamelHeight);
     }
     if (sniffer != nullptr && sniffer->pose == sniffers::Pose::Digging) {
-        const float digging = static_cast<float>(registry::entityTypeShapes::heightOf(type_)) - kSnifferDiggingDrop;
+        const float digging = baseHeight_ - kSnifferDiggingDrop;
         return static_cast<double>(age < 0 ? digging * 0.5F : digging);
     }
     return static_cast<double>(defaultBox(*this, type_).second);

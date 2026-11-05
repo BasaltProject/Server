@@ -87,6 +87,7 @@ bool tntMayExplode(const world::LoadedWorld& world) {
 using namespace basaltServerTick;
 
 void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& region) {
+    world.state().beginEntityTick();
     std::vector<player::PlayerSession*> watchers;
     for (player::PlayerSession* player : playerRegistry_.snapshot()) {
         if (player->worldName == world.name()) {

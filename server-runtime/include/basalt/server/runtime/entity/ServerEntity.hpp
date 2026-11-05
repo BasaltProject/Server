@@ -165,6 +165,11 @@ public:
 
     [[nodiscard]] const wire::common::Identifier& type() const noexcept { return type_; }
 
+    /// The type's builder box, looked up once: it is read several times a tick by every mob.
+    [[nodiscard]] float baseWidth() const noexcept { return baseWidth_; }
+
+    [[nodiscard]] float baseHeight() const noexcept { return baseHeight_; }
+
     [[nodiscard]] std::int32_t protocolType() const noexcept { return protocolType_; }
 
     double x = 0.0;
@@ -605,6 +610,8 @@ private:
     std::int32_t entityId_ = 0;
     wire::common::Uuid uuid_;
     wire::common::Identifier type_;
+    float baseWidth_ = 1.0F;
+    float baseHeight_ = 1.0F;
     std::int32_t protocolType_ = 0;
 };
 
