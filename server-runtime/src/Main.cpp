@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/LoadingServer.hpp>
+#include <basalt/server/runtime/MemoryReleaser.hpp>
 #include <basalt/server/runtime/command/ConsoleReader.hpp>
 #include <basalt/server/runtime/config/BasaltConfig.hpp>
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
@@ -250,6 +251,7 @@ bool gSafeMode = false;
 
 int main(int argc, char** argv) {
     const std::chrono::steady_clock::time_point startedAt = std::chrono::steady_clock::now();
+    MemoryReleaser::configureAllocator();
     std::puts(std::string{kBanner}.c_str());
     std::puts(versionLine().c_str());
 

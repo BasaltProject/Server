@@ -88,6 +88,9 @@ struct PiglinState {
     std::optional<std::int32_t> wantedItem;
     bool memoriesSeeded = false;
     std::int64_t lastTick = 0;
+    /// parity: `PiglinSpecificSensor` scans every twenty ticks and the memory lasts until the next scan.
+    std::optional<Pos> repellent;
+    std::int64_t repellentScanAt = 0;
 };
 
 [[nodiscard]] bool isPiglin(const wire::common::Identifier& type);

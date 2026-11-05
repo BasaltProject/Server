@@ -450,8 +450,10 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
         }
     }
     save(toSave);
-    return onOwner<std::size_t>(owner(), [this, &candidates, &withEntities] {
-        const std::size_t evicted = state_.evictClean(candidates);
+    // Destroyed here, on the calling thread, once the tick thread has let go of them.
+    std::vector<std::unique_ptr<Chunk>> doomed;
+    return onOwner<std::size_t>(owner(), [this, &candidates, &withEntities, &doomed] {
+        const std::size_t evicted = state_.evictClean(candidates, &doomed);
         for (const auto& [chunkX, chunkZ] : withEntities) {
             // A chunk dirtied again since the save stays loaded, and so do its entities.
             if (state_.chunkIfLoaded(chunkX, chunkZ) == nullptr) {

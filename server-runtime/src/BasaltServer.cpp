@@ -319,7 +319,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     persistence_->persistPlayers();
                 }
             },
-        .onUnloadInterval = [this] { persistence_->unloadUnreachableChunks(); },
+        .onUnloadInterval =
+            [this] {
+                persistence_->unloadUnreachableChunks();
+                memoryReleaser_.request();
+            },
         .pauseWhenEmptySeconds = [this] { return settings_.pauseAllowed() ? settings_.pauseWhenEmptySeconds() : 0; },
         .hasPlayers = [this] { return playerRegistry_.count() > 0; },
         .onTick =

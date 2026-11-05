@@ -574,6 +574,10 @@ void MobActionSystem::applyEffect(std::int32_t playerId, std::string_view effect
     }
 }
 
+const std::set<wire::common::Identifier>* MobActionSystem::blockTagMembers(std::string_view tag) const {
+    return options_.blockTags == nullptr ? nullptr : &world::realBlockTags::membersOf(*options_.blockTags, tag);
+}
+
 std::optional<bool> MobActionSystem::blockTagged(std::string_view tag, const wire::common::Identifier& block) const {
     if (options_.blockTags == nullptr) {
         return std::nullopt;

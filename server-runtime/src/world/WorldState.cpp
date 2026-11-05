@@ -214,29 +214,42 @@ void WorldState::lightDone() {
     graveyard_.clear();
 }
 
-std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks) {
-    const WorldWriteLock lock{mutex_};
-    std::size_t removed = 0;
-    for (Chunk* chunk : chunks) {
-        if (chunk->isDirty()) {
-            continue;
-        }
-        const std::int64_t chunkKey = key(chunk->chunkX(), chunk->chunkZ());
-        const std::int32_t chunkX = chunk->chunkX();
-        const std::int32_t chunkZ = chunk->chunkZ();
-        if (auto node = chunksByPos_.extract(chunkKey); !node.empty()) {
-            if (lightBusy_.load() > 0) {
-                const std::lock_guard<std::mutex> graveyard{graveyardMutex_};
-                graveyard_.push_back(std::move(node.mapped()));
+std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks, std::vector<std::unique_ptr<Chunk>>* sink) {
+    // Freed after the lock is released: destroying hundreds of chunks under it stalls every reader on the tick thread.
+    std::vector<std::unique_ptr<Chunk>> doomed;
+    doomed.reserve(chunks.size());
+    const std::size_t removed = [&] {
+        const WorldWriteLock lock{mutex_};
+        std::size_t removed = 0;
+        for (Chunk* chunk : chunks) {
+            if (chunk->isDirty()) {
+                continue;
             }
-            pendingDecorations_.forgetGeneratedEntities(chunkKey);
-            sculkSensors_.forgetChunk(chunkX, chunkZ);
-            blockVersion_.fetch_add(1, std::memory_order_release);
-            ++removed;
+            const std::int64_t chunkKey = key(chunk->chunkX(), chunk->chunkZ());
+            const std::int32_t chunkX = chunk->chunkX();
+            const std::int32_t chunkZ = chunk->chunkZ();
+            if (auto node = chunksByPos_.extract(chunkKey); !node.empty()) {
+                if (lightBusy_.load() > 0) {
+                    const std::lock_guard<std::mutex> graveyard{graveyardMutex_};
+                    graveyard_.push_back(std::move(node.mapped()));
+                } else {
+                    doomed.push_back(std::move(node.mapped()));
+                }
+                pendingDecorations_.forgetGeneratedEntities(chunkKey);
+                sculkSensors_.forgetChunk(chunkX, chunkZ);
+                blockVersion_.fetch_add(1, std::memory_order_release);
+                ++removed;
+            }
         }
-    }
-    if (removed > 0) {
-        chunkVersion_.fetch_add(1);
+        if (removed > 0) {
+            chunkVersion_.fetch_add(1);
+        }
+        return removed;
+    }();
+    if (sink != nullptr) {
+        for (std::unique_ptr<Chunk>& chunk : doomed) {
+            sink->push_back(std::move(chunk));
+        }
     }
     return removed;
 }

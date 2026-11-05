@@ -116,6 +116,9 @@ public:
 
     bool mayTeleport(entity::ServerEntity& mob, double x, double y, double z, std::string_view cause) override;
 
+    /// The members of a block tag, or null when tags are not loaded. Looked up once for a scan over many blocks.
+    [[nodiscard]] const std::set<wire::common::Identifier>* blockTagMembers(std::string_view tag) const;
+
     [[nodiscard]] std::optional<bool> blockTagged(std::string_view tag,
                                                   const wire::common::Identifier& block) const override;
 
