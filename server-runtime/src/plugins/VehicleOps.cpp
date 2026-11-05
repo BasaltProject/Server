@@ -56,7 +56,12 @@ void boatMember(Table& table, std::string_view name, T entity::boats::BoatState:
 
 } // namespace
 
-void addVehicles(Table& table, Operations& /*operations*/) {
+void addVehicles(Table& table, Operations& operations) {
+    operations["cart_add_fuel"] = [](const Environment&, ServerEntity& entity,
+                                     const Arguments& arguments) -> std::optional<Value> {
+        return entity::minecarts::isFurnace(entity) &&
+               entity::minecarts::addFuel(entity, asReal(at(arguments, 0)), asReal(at(arguments, 1)));
+    };
     cartMember(table, "cart_slow_when_empty", &entity::minecarts::CartState::slowWhenEmpty, true);
     cartMember(table, "cart_friction", &entity::minecarts::CartState::frictionState, std::int8_t{-1});
     cartVector(table, "cart_flying_x", &entity::minecarts::CartState::flyingVelocityMod, 0, static_cast<double>(0.95F));

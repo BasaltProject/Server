@@ -1,4 +1,5 @@
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Items.hpp>
@@ -11,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/plugins/ServerWorldEnv.hpp>
+#include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/Bells.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
@@ -22,6 +24,7 @@
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/WorldBorder.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/WorldHeight.hpp>
 #include <basalt/server/world/terrain/BiomeTemperature.hpp>
 #include <basalt/wire/nbt/Snbt.hpp>
 #include <basalt/wire/protocol/play/BorderPackets.hpp>
@@ -422,6 +425,54 @@ double ServerWorldEnv::temperature(const std::int32_t x, const std::int32_t y, c
 double ServerWorldEnv::humidity(const std::int32_t x, const std::int32_t y, const std::int32_t z) {
     const std::optional<Identifier> biome = world::naturalSpawner::biomeAt(*world_, x, y, z);
     return biome.has_value() ? static_cast<double>(biomeDownfall(biome->path())) : 0.4;
+}
+
+std::optional<std::array<std::int64_t, 6>>
+ServerWorldEnv::climateAtQuart(const std::int32_t quartX, const std::int32_t quartY, const std::int32_t quartZ) {
+    const server::world::terrain::OverworldBiomeSource* source = world_->biomeSource();
+    if (source == nullptr) {
+        return std::nullopt;
+    }
+    const server::world::climate::TargetPoint point = source->climateAtQuart(quartX, quartY, quartZ);
+    return std::array<std::int64_t, 6>{point.temperature, point.humidity, point.continentalness,
+                                       point.erosion,     point.depth,    point.weirdness};
+}
+
+server::plugins::PluginBeacon ServerWorldEnv::beaconScan(const std::int32_t x, const std::int32_t y,
+                                                         const std::int32_t z) {
+    server::plugins::PluginBeacon scan;
+    const auto blockAt = [this](const std::int32_t bx, const std::int32_t by, const std::int32_t bz) {
+        const std::optional<std::int32_t> state = world_->state().blockState(bx, by, bz);
+        return state.has_value() ? reg::blockStateDefinitions::blockOf(*state) : nullptr;
+    };
+    scan.levels = world::beacons::levelsUnder(
+        [&](const std::int32_t bx, const std::int32_t by, const std::int32_t bz) {
+            const Identifier* block = blockAt(bx, by, bz);
+            return block != nullptr && hooks_->blockTags != nullptr &&
+                   world::realBlockTags::contains(*hooks_->blockTags, "minecraft:beacon_base_blocks", *block);
+        },
+        x, y, z, server::world::worldHeight::kMinY);
+    std::vector<world::beacons::BeamCell> column;
+    std::vector<std::int32_t> tints;
+    for (std::int32_t above = y + 1; above <= server::world::worldHeight::kMaxY; ++above) {
+        const std::optional<std::int32_t> state = world_->state().blockState(x, above, z);
+        const Identifier* block = state.has_value() ? reg::blockStateDefinitions::blockOf(*state) : nullptr;
+        if (block == nullptr) {
+            column.push_back(world::beacons::BeamCell::Open);
+        } else if (block->path().ends_with("_stained_glass") || block->path().ends_with("_stained_glass_pane")) {
+            column.push_back(world::beacons::BeamCell::Tinted);
+            tints.push_back(world::beacons::tintOf(block->path()));
+        } else if (!world::beacons::letsBeamThrough(reg::blockShapes::dampening(*state), block->path())) {
+            column.push_back(world::beacons::BeamCell::Blocked);
+            break;
+        } else {
+            column.push_back(world::beacons::BeamCell::Open);
+        }
+    }
+    for (const world::beacons::BeamPiece& piece : world::beacons::beamPieces(column, tints)) {
+        scan.sections.push_back({piece.color, piece.height});
+    }
+    return scan;
 }
 
 double ServerWorldEnv::breakSpeed(const std::string_view uuid, const std::int32_t x, const std::int32_t y,

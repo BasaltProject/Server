@@ -155,6 +155,11 @@ public:
         return false;
     }
 
+    /// Asks the plugin that owns a brain behavior row; only `CanUse` and `CanContinue` answers matter.
+    virtual bool pluginBehavior(ServerEntity& /*mob*/, std::string_view /*key*/, PluginGoalPhase /*phase*/) {
+        return false;
+    }
+
     virtual void heldItemChanged(ServerEntity& /*mob*/) {}
 
     virtual void poseChanged(ServerEntity& /*mob*/) {}

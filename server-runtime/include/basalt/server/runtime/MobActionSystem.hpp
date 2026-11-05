@@ -98,6 +98,7 @@ public:
     void poseChanged(entity::ServerEntity& mob) override;
 
     bool pluginGoal(entity::ServerEntity& mob, std::string_view key, entity::ai::PluginGoalPhase phase) override;
+    bool pluginBehavior(entity::ServerEntity& mob, std::string_view key, entity::ai::PluginGoalPhase phase) override;
 
     void throwPotion(entity::ServerEntity& mob, double targetX, double targetY, double targetZ,
                      std::string_view potion) override;
@@ -323,6 +324,16 @@ public:
     void tickVexLife(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& vex);
 
     static void blazeRises(entity::ServerEntity& blaze, std::optional<double> targetEye, random::RandomSource& random);
+
+    [[nodiscard]] entity::ai::MobContext mobContext(world::LoadedWorld& world, entity::ServerEntity& mob,
+                                                    const std::vector<entity::ai::PlayerView>& views,
+                                                    const std::vector<entity::ServerEntity*>& living,
+                                                    random::RandomSource& random, bool raider);
+
+    /// Runs sensors and plugin behaviors of a mob whose own AI is off but whose brain a plugin drives.
+    void tickBrainOnly(world::LoadedWorld& world, entity::ServerEntity& mob,
+                       const std::vector<entity::ai::PlayerView>& views,
+                       const std::vector<entity::ServerEntity*>& living, random::RandomSource& random);
 
     void tickMobAi(world::LoadedWorld& world, entity::ServerEntity& mob,
                    const std::vector<entity::ai::PlayerView>& views, const std::vector<entity::ServerEntity*>& living,

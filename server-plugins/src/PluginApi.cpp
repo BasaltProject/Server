@@ -614,6 +614,7 @@ void install(PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, s
     installFiles(lua, plugin);
     installScheduling(lua, instance, plugin, host);
     installWorld(lua, instance, plugin, host);
+    installMechanics(lua);
     installMessaging(lua, plugin, host);
     installListeners(lua, instance, plugin, host);
     installGranted(lua, plugin, host);

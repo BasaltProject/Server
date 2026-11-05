@@ -225,6 +225,7 @@ basalt_module(server-runtime-core
         src/plugins/VehicleOps.cpp
         src/plugins/MobCommonOps.cpp
         src/plugins/MobGoalOps.cpp
+        src/plugins/MobBrainOps.cpp
         src/plugins/MobStateOps.cpp
         src/plugins/PlayerEntityOps.cpp
         src/plugins/DroppedItemOps.cpp
@@ -440,7 +441,6 @@ basalt_module(server-runtime-core
         src/player/PlayerRegistry.cpp
         src/player/Menu.cpp
         src/player/PlayerInventory.cpp
-        src/player/Combat.cpp
         src/player/ExperienceData.cpp
         src/player/PlayerStats.cpp
         src/player/StatAwards.cpp
@@ -781,6 +781,10 @@ basalt_module(server-runtime-core
         src/entity/ai/BeeGoals.cpp
         src/entity/ai/BeeNavigation.cpp
         src/entity/ai/BrainKit.cpp
+        src/entity/BrainState.cpp
+        src/entity/BrainSensors.cpp
+        src/entity/BrainPublish.cpp
+        src/entity/BrainBehaviors.cpp
         src/entity/ai/LongJump.cpp
         src/entity/ai/NeutralGoals.cpp
         src/entity/ai/EndermanGoals.cpp
@@ -818,6 +822,12 @@ if(BASALT_BUKKIT_ACTIVE)
     target_compile_definitions(server-runtime-core PUBLIC BASALT_WITH_BUKKIT=1)
     target_sources(server-runtime-core PRIVATE src/bukkit/BukkitRuntimeFiles.cpp)
 endif()
+
+basalt_test(server-runtime-brain-state-test
+    SOURCES
+        test/BrainStateTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
 
 basalt_test(server-runtime-entity-selector-test
     SOURCES

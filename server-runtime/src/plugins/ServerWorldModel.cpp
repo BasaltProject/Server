@@ -194,6 +194,19 @@ std::vector<double> LoadedWorlds::blockHardness(std::string_view block) const {
             found->requiresCorrectTool ? 1.0 : 0.0};
 }
 
+namespace {
+[[nodiscard]] std::ptrdiff_t instrumentIndex(std::int32_t stateId) {
+    const Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return 0;
+    }
+    const std::span<const reg::InstrumentEntry> table = reg::instrumentsTable();
+    const auto found = std::ranges::find(table, reg::noteBlockInstruments::of(*block).serializedName(),
+                                         &reg::InstrumentEntry::serializedName);
+    return found == table.end() ? 0 : found - table.begin();
+}
+} // namespace
+
 std::vector<double> LoadedWorlds::blockInfo(std::int32_t stateId) const {
     if (reg::blockStateDefinitions::blockOf(stateId) == nullptr) {
         return {};
@@ -206,7 +219,8 @@ std::vector<double> LoadedWorlds::blockInfo(std::int32_t stateId) const {
             static_cast<double>(static_cast<std::int32_t>(reg::blockSupport::pushReaction(stateId))),
             static_cast<double>(color & 0xFFFFFFU),
             static_cast<double>(reg::fireOdds::igniteOdds(stateId)),
-            static_cast<double>(reg::fireOdds::burnOdds(stateId))};
+            static_cast<double>(reg::fireOdds::burnOdds(stateId)),
+            static_cast<double>(instrumentIndex(stateId))};
 }
 
 std::vector<std::string> LoadedWorlds::gameRuleSpecs() const {

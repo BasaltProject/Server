@@ -36,6 +36,30 @@ struct PluginLootEnchant {
     std::int64_t seed = 0;
 };
 
+struct PluginTradeOffer {
+    PluginLootItem costA;
+    std::optional<PluginLootItem> costB;
+    PluginLootItem result;
+    std::int32_t maxUses = 0;
+    std::int32_t experience = 0;
+    float priceMultiplier = 0.0F;
+};
+
+struct PluginTradeRoll {
+    std::string world;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    /// The villager variant the conditions see, or empty for plains.
+    std::string variant;
+    /// How many trades to draw; negative takes the trade set's own amount.
+    std::int32_t amount = -1;
+    /// Zero rolls without a fixed seed.
+    std::int64_t seed = 0;
+    /// Trade ids to draw from without repeats instead of a profession's trade set.
+    std::vector<std::string> listed;
+};
+
 class PluginLoot {
 public:
     PluginLoot() = default;
@@ -67,6 +91,31 @@ public:
                                                                           const PluginLootRoll& roll) {
         static_cast<void>(table);
         static_cast<void>(roll);
+        return std::nullopt;
+    }
+
+    /// What a table given as JSON gives for this roll; nothing when the JSON does not parse or the world is unknown.
+    [[nodiscard]] virtual std::optional<std::vector<PluginLootItem>> rollJson(std::string_view json,
+                                                                              const PluginLootRoll& roll) {
+        static_cast<void>(json);
+        static_cast<void>(roll);
+        return std::nullopt;
+    }
+
+    /// The trades a profession offers at a level, rolled as a villager of that level would; nothing when unknown.
+    [[nodiscard]] virtual std::optional<std::vector<PluginTradeOffer>>
+    trades(std::string_view profession, std::int32_t level, const PluginTradeRoll& roll) {
+        static_cast<void>(profession);
+        static_cast<void>(level);
+        static_cast<void>(roll);
+        return std::nullopt;
+    }
+
+    /// A number provider given as JSON evaluated with an empty context; nothing when the JSON does not parse.
+    [[nodiscard]] virtual std::optional<double> number(std::string_view json, bool asFloat, std::int64_t seed) {
+        static_cast<void>(json);
+        static_cast<void>(asFloat);
+        static_cast<void>(seed);
         return std::nullopt;
     }
 };

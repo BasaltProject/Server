@@ -4,7 +4,9 @@
 #include <basalt/server/runtime/world/RealVillagerTrades.hpp>
 #include <basalt/server/runtime/world/Trades.hpp>
 
+#include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -28,6 +30,17 @@ struct Offers {
     std::vector<world::trades::Offer> list;
     std::int32_t level = 0;
 };
+
+/// Rolls the trade set of a profession and level; a seed makes it repeatable and skips the world's sequence.
+[[nodiscard]] std::vector<world::trades::Offer>
+rollOffers(world::RealVillagerTrades& trades, std::string_view profession, std::int32_t level,
+           world::LoadedWorld& world, const std::array<double, 3>& origin, std::string_view variant,
+           std::optional<std::int32_t> fixedAmount, std::optional<std::int64_t> seed);
+
+/// Draws offers from the listed trades without repeats, as a villager does for `addOffersFromItemListings`.
+[[nodiscard]] std::vector<world::trades::Offer>
+rollListed(world::RealVillagerTrades& trades, std::span<const wire::common::Identifier> listed, std::int32_t amount,
+           world::LoadedWorld& world, const std::array<double, 3>& origin, std::string_view variant, std::int64_t seed);
 
 [[nodiscard]] std::vector<world::trades::Offer>& offersOf(world::RealVillagerTrades& trades, ServerEntity& villager,
                                                           world::LoadedWorld& world);

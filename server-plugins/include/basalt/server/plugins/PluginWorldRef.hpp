@@ -253,6 +253,27 @@ public:
     /// Lets go of everything `token` held.
     virtual void releaseChunks(std::string_view token) { static_cast<void>(token); }
 
+    /// Lets go of single chunks (x, z pairs) that `token` held.
+    virtual void releaseChunkPairs(std::string_view token, std::span<const std::int32_t> chunks) {
+        static_cast<void>(token);
+        static_cast<void>(chunks);
+    }
+
+    /// The chunks (x, z pairs) held for `token`.
+    [[nodiscard]] virtual std::vector<std::int32_t> heldChunks(std::string_view token) const {
+        static_cast<void>(token);
+        return {};
+    }
+
+    /// Every token that holds the chunk, or every token that holds anything when `all` is set.
+    [[nodiscard]] virtual std::vector<std::string> chunkHolders(std::int32_t chunkX, std::int32_t chunkZ,
+                                                                bool all) const {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        static_cast<void>(all);
+        return {};
+    }
+
     /// What a change of blocks sets off beyond the blocks themselves (bits of `effects`).
     struct BlockEffects {
         /// The neighbors are told one of their neighbors changed (`Level.updateNeighborsAt`).

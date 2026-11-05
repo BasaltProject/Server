@@ -372,6 +372,27 @@ bool LoadedWorldRef::holdChunks(std::string_view token, std::span<const std::int
 
 void LoadedWorldRef::releaseChunks(std::string_view token) { world_->releaseChunks(std::string{token}); }
 
+void LoadedWorldRef::releaseChunkPairs(std::string_view token, std::span<const std::int32_t> chunks) {
+    std::vector<std::int64_t> keys;
+    for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
+        keys.push_back(world::ChunkGenerationQueue::pack(chunks[at], chunks[at + 1]));
+    }
+    world_->releaseChunkKeys(std::string{token}, keys);
+}
+
+std::vector<std::int32_t> LoadedWorldRef::heldChunks(std::string_view token) const {
+    std::vector<std::int32_t> pairs;
+    for (const std::int64_t key : world_->heldBy(std::string{token})) {
+        pairs.push_back(world::ChunkGenerationQueue::unpackX(key));
+        pairs.push_back(world::ChunkGenerationQueue::unpackZ(key));
+    }
+    return pairs;
+}
+
+std::vector<std::string> LoadedWorldRef::chunkHolders(std::int32_t chunkX, std::int32_t chunkZ, bool all) const {
+    return all ? world_->holderTokens() : world_->holdersOf(chunkX, chunkZ);
+}
+
 std::int32_t LoadedWorldRef::settleBlocks(std::span<const std::int32_t> positions,
                                           std::span<const std::int32_t> previous, std::uint32_t effects) {
     constexpr std::uint32_t kUpdates = BlockEffects::kNeighbors | BlockEffects::kShapes | BlockEffects::kTicks |

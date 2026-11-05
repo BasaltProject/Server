@@ -111,6 +111,9 @@ struct MobActionHooks {
     std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::string_view key,
                        entity::ai::PluginGoalPhase phase)>
         pluginGoal;
+    std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::string_view key,
+                       entity::ai::PluginGoalPhase phase)>
+        pluginBehavior;
     std::function<void(world::LoadedWorld& world, wire::nbt::NbtCompound item, double x, double y, double z,
                        std::int32_t ownerId)>
         launchFirework;

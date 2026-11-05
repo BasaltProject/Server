@@ -351,6 +351,48 @@ void LoadedWorld::releaseChunks(const std::string& token) {
     holds_.erase(token);
 }
 
+void LoadedWorld::releaseChunkKeys(const std::string& token, const std::vector<std::int64_t>& keys) {
+    const std::lock_guard<std::mutex> lock{holdsMutex_};
+    const auto found = holds_.find(token);
+    if (found == holds_.end()) {
+        return;
+    }
+    for (const std::int64_t key : keys) {
+        found->second.erase(key);
+    }
+    if (found->second.empty()) {
+        holds_.erase(found);
+    }
+}
+
+std::vector<std::int64_t> LoadedWorld::heldBy(const std::string& token) const {
+    const std::lock_guard<std::mutex> lock{holdsMutex_};
+    const auto found = holds_.find(token);
+    return found == holds_.end() ? std::vector<std::int64_t>{}
+                                 : std::vector<std::int64_t>(found->second.begin(), found->second.end());
+}
+
+std::vector<std::string> LoadedWorld::holdersOf(std::int32_t chunkX, std::int32_t chunkZ) const {
+    const std::lock_guard<std::mutex> lock{holdsMutex_};
+    const std::int64_t key = ChunkGenerationQueue::pack(chunkX, chunkZ);
+    std::vector<std::string> out;
+    for (const auto& [token, keys] : holds_) {
+        if (keys.contains(key)) {
+            out.push_back(token);
+        }
+    }
+    return out;
+}
+
+std::vector<std::string> LoadedWorld::holderTokens() const {
+    const std::lock_guard<std::mutex> lock{holdsMutex_};
+    std::vector<std::string> out;
+    for (const auto& entry : holds_) {
+        out.push_back(entry.first);
+    }
+    return out;
+}
+
 bool LoadedWorld::isHeld(std::int32_t chunkX, std::int32_t chunkZ) const {
     const std::lock_guard<std::mutex> lock{holdsMutex_};
     const std::int64_t key = ChunkGenerationQueue::pack(chunkX, chunkZ);

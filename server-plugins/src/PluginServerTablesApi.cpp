@@ -352,6 +352,52 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
         return 1;
     });
     lua.setField("roll");
+    wire::lua::pushHostFunction(lua, "loot.roll_json", [server](LuaArgs& args) {
+        PluginLootRoll roll;
+        const std::string json = args.checkString(1);
+        if (!args.isTable(2)) {
+            args.raise("loot.roll_json(json, { world = ..., x = ..., y = ..., z = ... }) takes a table");
+        }
+        roll.world = stringField(args, 2, "world").value_or(std::string{});
+        roll.x = numberField(args, 2, "x").value_or(0.0);
+        roll.y = numberField(args, 2, "y").value_or(0.0);
+        roll.z = numberField(args, 2, "z").value_or(0.0);
+        roll.luck = static_cast<float>(numberField(args, 2, "luck").value_or(0.0));
+        roll.seed = static_cast<std::int64_t>(numberField(args, 2, "seed").value_or(0.0));
+        roll.looter = stringField(args, 2, "looter").value_or(std::string{});
+        const std::optional<std::vector<PluginLootItem>> items = server->services().loot().rollJson(json, roll);
+        if (!items.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const PluginLootItem& item : *items) {
+            args.pushTable();
+            args.pushString(item.item);
+            args.setField("item");
+            args.pushInteger(item.count);
+            args.setField("count");
+            args.pushString(item.components);
+            args.setField("components");
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("roll_json");
+    wire::lua::pushHostFunction(lua, "loot.number", [server](LuaArgs& args) {
+        const std::string json = args.checkString(1);
+        const bool asFloat = args.isTable(2) && numberField(args, 2, "float").value_or(0.0) != 0.0;
+        const auto seed = args.isTable(2) ? static_cast<std::int64_t>(numberField(args, 2, "seed").value_or(0.0)) : 0;
+        const std::optional<double> value = server->services().loot().number(json, asFloat, seed);
+        if (!value.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushNumber(*value);
+        return 1;
+    });
+    lua.setField("number");
     wire::lua::pushHostFunction(lua, "loot.enchant", [server](LuaArgs& args) {
         if (!args.isTable(1)) {
             args.raise("loot.enchant({ item = ..., levels = ..., world = ... }) takes a table");
@@ -381,6 +427,61 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
     });
     lua.setField("enchant");
     lua.setGlobal("loot");
+
+    lua.pushTable();
+    wire::lua::pushHostFunction(lua, "trades.roll", [server](LuaArgs& args) {
+        const std::string profession = args.checkString(1);
+        PluginTradeRoll roll;
+        const auto level = static_cast<std::int32_t>(args.checkInteger(2));
+        if (args.isTable(3)) {
+            roll.world = stringField(args, 3, "world").value_or(std::string{});
+            roll.x = numberField(args, 3, "x").value_or(0.0);
+            roll.y = numberField(args, 3, "y").value_or(0.0);
+            roll.z = numberField(args, 3, "z").value_or(0.0);
+            roll.variant = stringField(args, 3, "variant").value_or(std::string{});
+            roll.amount = static_cast<std::int32_t>(numberField(args, 3, "amount").value_or(-1.0));
+            roll.seed = static_cast<std::int64_t>(numberField(args, 3, "seed").value_or(0.0));
+            roll.listed = namesField(args, 3, "listed");
+        }
+        const std::optional<std::vector<PluginTradeOffer>> offers =
+            server->services().loot().trades(profession, level, roll);
+        if (!offers.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        const auto pushItem = [&args](const PluginLootItem& item) {
+            args.pushTable();
+            args.pushString(item.item);
+            args.setField("item");
+            args.pushInteger(item.count);
+            args.setField("count");
+            args.pushString(item.components);
+            args.setField("components");
+        };
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const PluginTradeOffer& offer : *offers) {
+            args.pushTable();
+            pushItem(offer.costA);
+            args.setField("cost_a");
+            if (offer.costB.has_value()) {
+                pushItem(*offer.costB);
+                args.setField("cost_b");
+            }
+            pushItem(offer.result);
+            args.setField("result");
+            args.pushInteger(offer.maxUses);
+            args.setField("max_uses");
+            args.pushInteger(offer.experience);
+            args.setField("xp");
+            args.pushNumber(static_cast<double>(offer.priceMultiplier));
+            args.setField("price_multiplier");
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("roll");
+    lua.setGlobal("trades");
 
     lua.pushTable();
     wire::lua::pushHostFunction(lua, "maps.create", [server](LuaArgs& args) {

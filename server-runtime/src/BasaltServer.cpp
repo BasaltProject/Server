@@ -806,8 +806,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         plugins::ServerStructures::Hooks{.templates = &vanillaData_.structureTemplates,
                                          .blocks = [this] { return structureBlocks_.get(); },
                                          .worldFor = model.worldFor});
-    miscServices_.loot = std::make_unique<plugins::ServerLoot>(plugins::ServerLoot::Hooks{
-        .tables = &vanillaData_.lootTables, .worldFor = model.worldFor, .sessions = sessions});
+    miscServices_.loot =
+        std::make_unique<plugins::ServerLoot>(plugins::ServerLoot::Hooks{.tables = &vanillaData_.lootTables,
+                                                                         .villagerTrades = &vanillaData_.villagerTrades,
+                                                                         .worldFor = model.worldFor,
+                                                                         .sessions = sessions});
     miscServices_.selectors = std::make_unique<plugins::ServerSelectors>(plugins::ServerSelectors::Hooks{
         .environment = model.environment,
         .console = [this]() -> const command::CommandSource* { return consoleSource_.get(); },

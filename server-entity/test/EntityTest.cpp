@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/entity/Collision.hpp>
 #include <basalt/server/entity/ecs/ComponentStore.hpp>
 #include <basalt/server/entity/ecs/MovementSystem.hpp>
 #include <basalt/server/entity/ecs/World.hpp>
@@ -94,4 +95,13 @@ TEST_CASE("the sparse set packs and reorders the way the frozen kotlin does") {
     CHECK_FALSE(store.has(1000));
     CHECK(store.has(5));
     CHECK(*store.get(5) == "v5");
+}
+
+TEST_CASE("a fall stops on the floor and a rest below a tenth of a micron counts as none") {
+    using namespace basalt::server::entity;
+    const geometry::Box mover = geometry::makeBox(0.0, 1.0, 0.0, 0.6, 2.8, 0.6);
+    const std::vector<collision::Collider> floor{{geometry::makeBox(-1.0, 0.0, -1.0, 1.0, 0.5, 1.0), 0}};
+    CHECK(collision::sweep(floor, mover, {0.0, -2.0, 0.0})[1] == doctest::Approx(-0.5));
+    const std::vector<collision::Collider> flush{{geometry::makeBox(-1.0, 0.0, -1.0, 1.0, 1.0 - 5.0E-8, 1.0), 0}};
+    CHECK(collision::sweep(flush, mover, {0.0, -2.0, 0.0})[1] == 0.0);
 }

@@ -66,6 +66,11 @@ struct PluginClock {
     std::vector<std::pair<std::string, std::int32_t>> markers;
 };
 
+struct PluginBeacon {
+    std::int32_t levels = 0;
+    std::vector<std::array<std::int32_t, 2>> sections;
+};
+
 struct PluginRaid {
     std::int32_t id = 0;
     bool started = false;
@@ -275,6 +280,24 @@ public:
         static_cast<void>(face);
         static_cast<void>(direct);
         return 0;
+    }
+
+    /// The pyramid levels under a beacon and the colour and height of each beam section above it.
+    [[nodiscard]] virtual PluginBeacon beaconScan(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return {};
+    }
+
+    /// The six quantised climate parameters (temperature, humidity, continentalness, erosion, depth, weirdness) at a
+    /// quart position, or nothing when the world has no multi-noise biome source.
+    [[nodiscard]] virtual std::optional<std::array<std::int64_t, 6>>
+    climateAtQuart(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) {
+        static_cast<void>(quartX);
+        static_cast<void>(quartY);
+        static_cast<void>(quartZ);
+        return std::nullopt;
     }
 
     /// The climate humidity (downfall) of the biome at a point.

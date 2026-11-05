@@ -220,6 +220,16 @@ std::optional<trades::Offer> RealVillagerTrades::offerOf(const VillagerTrade& tr
     return offer;
 }
 
+std::optional<VillagerTrade> RealVillagerTrades::byId(const Identifier& id) {
+    const std::optional<std::string> text =
+        jar_.readText ? jar_.readText("data/" + id.namespaceName() + "/villager_trade/" + id.path() + ".json")
+                      : std::nullopt;
+    if (!text.has_value()) {
+        return std::nullopt;
+    }
+    return parse(id, *text, lootTables_ == nullptr ? nullptr : &lootTables_->references());
+}
+
 const TradeSet& RealVillagerTrades::tradeSet(std::string_view profession, std::int32_t level) {
     const std::string key = std::string{profession} + "/" + std::to_string(level);
     if (const auto cached = sets_.find(key); cached != sets_.end()) {

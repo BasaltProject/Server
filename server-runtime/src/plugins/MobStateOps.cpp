@@ -1,3 +1,4 @@
+#include "MobBrainOps.hpp"
 #include "MobGoalOps.hpp"
 #include "MobStateTable.hpp"
 
@@ -54,6 +55,10 @@ invoke(const Environment& environment, entity::ServerEntity& entity, std::string
        const std::vector<server::plugins::PluginEntityValue>& arguments) {
     if (std::optional<Value> goal = mobGoalOps::invoke(entity, operation, arguments); goal.has_value()) {
         return goal;
+    }
+    if (std::optional<Value> brain = mobBrainOps::invoke(environment, entity, operation, arguments);
+        brain.has_value()) {
+        return brain;
     }
     const Operations& operations = tables().operations;
     const auto found = operations.find(operation);
