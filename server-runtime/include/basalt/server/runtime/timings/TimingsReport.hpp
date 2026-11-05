@@ -22,6 +22,8 @@ struct WorldFacts {
     std::int32_t entities = 0;
     std::int32_t blockEntities = 0;
     std::int32_t players = 0;
+    /// Entities standing in a chunk that is not loaded: they should not exist, and each one still costs a tick.
+    std::int32_t orphanEntities = 0;
     std::map<std::string, std::int32_t> entityCounts;
 };
 

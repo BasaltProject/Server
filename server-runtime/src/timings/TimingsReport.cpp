@@ -368,13 +368,16 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
     const std::vector<WorldFacts> worlds = sources_.worlds ? sources_.worlds() : std::vector<WorldFacts>{};
     std::map<std::string, std::int32_t> totalByType;
     std::int32_t totalEntities = 0;
+    std::int32_t totalOrphans = 0;
     for (const WorldFacts& world : worlds) {
         totalEntities += world.entities;
+        totalOrphans += world.orphanEntities;
         for (const auto& [type, count] : world.entityCounts) {
             totalByType[type] += count;
         }
     }
     json.member("total_entities", totalEntities);
+    json.member("orphan_entities", totalOrphans);
     json.key("entity_counts");
     json.beginObject();
     for (const auto& [type, count] : totalByType) {
@@ -389,6 +392,7 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
         json.member("chunks", world.loadedChunks);
         json.member("entities", world.entities);
         json.member("block_entities", world.blockEntities);
+        json.member("orphan_entities", world.orphanEntities);
         json.member("players", world.players);
         json.key("entity_counts");
         json.beginObject();
