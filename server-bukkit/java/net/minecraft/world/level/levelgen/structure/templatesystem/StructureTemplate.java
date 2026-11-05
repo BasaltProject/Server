@@ -186,62 +186,97 @@ public class StructureTemplate {
         data = tag.copy();
     }
     public static JigsawBlockEntity.JointType getJointType(CompoundTag nbt, BlockState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate#getJointType");
+        String joint = nbt.getStringOr("joint", "");
+        for (JigsawBlockEntity.JointType type : JigsawBlockEntity.JointType.values()) {
+            if (type.getSerializedName().equals(joint)) {
+                return type;
+            }
+        }
+        return getDefaultJointType(state);
     }
     public static JigsawBlockEntity.JointType getDefaultJointType(BlockState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate#getDefaultJointType");
+        String front = state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.ORIENTATION).name();
+        return front.startsWith("UP") || front.startsWith("DOWN") ? JigsawBlockEntity.JointType.ROLLABLE : JigsawBlockEntity.JointType.ALIGNED;
     }
     static class SimplePalette implements Iterable<BlockState> {
-        public static final BlockState DEFAULT_BLOCK_STATE = null;
+        public static final BlockState DEFAULT_BLOCK_STATE = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        private final java.util.List<BlockState> states = new java.util.ArrayList<>();
+        private final java.util.Map<BlockState, Integer> ids = new java.util.HashMap<>();
         public int idFor(BlockState state) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.SimplePalette#idFor");
+            Integer known = ids.get(state);
+            if (known != null) {
+                return known;
+            }
+            addMapping(state, states.size());
+            return ids.get(state);
         }
         public BlockState stateFor(int index) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.SimplePalette#stateFor");
+            return index >= 0 && index < states.size() ? states.get(index) : DEFAULT_BLOCK_STATE;
         }
         public Iterator<BlockState> iterator() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.SimplePalette#iterator");
+            return states.iterator();
         }
         public void addMapping(BlockState state, int id) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.SimplePalette#addMapping");
+            while (states.size() <= id) {
+                states.add(null);
+            }
+            states.set(id, state);
+            ids.put(state, id);
         }
     }
     public static record StructureBlockInfo(BlockPos pos, BlockState state, CompoundTag nbt) {
         public String toString() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo#toString");
+            return "StructureBlockInfo[pos=" + pos + ", state=" + state + ", nbt=" + nbt + "]";
         }
     }
     public static record JigsawBlockInfo(BlockPos pos, BlockState state, JigsawBlockEntity.JointType jointType, Identifier name, ResourceKey<StructureTemplatePool> pool, Identifier target, int placementPriority, int selectionPriority) {
         public static JigsawBlockInfo parse(StructureBlockInfo info) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.JigsawBlockInfo#parse");
+            CompoundTag nbt = java.util.Objects.requireNonNull(info.nbt(), () -> info + " nbt was null");
+            Identifier none = Identifier.withDefaultNamespace("empty");
+            return new JigsawBlockInfo(info.pos(), info.state(), StructureTemplate.getJointType(nbt, info.state()),
+                Identifier.parse(nbt.getStringOr("name", none.toString())),
+                (ResourceKey<StructureTemplatePool>) (ResourceKey) ResourceKey.create(net.minecraft.core.registries.Registries.TEMPLATE_POOL,
+                    Identifier.parse(nbt.getStringOr("pool", none.toString()))),
+                Identifier.parse(nbt.getStringOr("target", none.toString())), nbt.getIntOr("placement_priority", 0),
+                nbt.getIntOr("selection_priority", 0));
         }
         public String toString() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.JigsawBlockInfo#toString");
+            return String.format(java.util.Locale.ROOT, "<JigsawBlockInfo | %s | %s | name: %s | pool: %s | target: %s | placement: %d | selection: %d>",
+                pos, state, name, pool.identifier(), target, placementPriority, selectionPriority);
         }
         public JigsawBlockInfo withInfo(BlockPos pos, BlockState state) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.JigsawBlockInfo#withInfo");
+            return new JigsawBlockInfo(pos, state, jointType, name, pool, target, placementPriority, selectionPriority);
         }
     }
     public static class StructureEntityInfo {
-        public final Vec3 pos = null;
-        public final BlockPos blockPos = null;
-        public final CompoundTag nbt = null;
+        public final Vec3 pos;
+        public final BlockPos blockPos;
+        public final CompoundTag nbt;
         public StructureEntityInfo(Vec3 pos, BlockPos blockPos, CompoundTag nbt) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureEntityInfo#<init>");
+            this.pos = pos;
+            this.blockPos = blockPos;
+            this.nbt = nbt;
         }
     }
     public static final class Palette {
+        private final List<StructureBlockInfo> blocks;
         private Palette(List<StructureBlockInfo> blocks) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.Palette#<init>");
+            this.blocks = blocks;
         }
         public List<JigsawBlockInfo> jigsaws() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.Palette#jigsaws");
+            List<JigsawBlockInfo> found = new java.util.ArrayList<>();
+            for (StructureBlockInfo info : blocks) {
+                if (info.nbt() != null && info.state().is(net.minecraft.world.level.block.Blocks.JIGSAW)) {
+                    found.add(JigsawBlockInfo.parse(info));
+                }
+            }
+            return found;
         }
         public List<StructureBlockInfo> blocks() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.Palette#blocks");
+            return blocks;
         }
         public List<StructureBlockInfo> blocks(Block filter) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.Palette#blocks");
+            return blocks.stream().filter(info -> info.state().is(filter)).toList();
         }
     }
 }

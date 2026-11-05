@@ -11,9 +11,13 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.Item;
 public interface Waypoint {
-    AttributeModifier WAYPOINT_TRANSMIT_RANGE_HIDE_MODIFIER = null;
+    AttributeModifier WAYPOINT_TRANSMIT_RANGE_HIDE_MODIFIER = new AttributeModifier(
+        net.minecraft.resources.Identifier.withDefaultNamespace("waypoint_transmit_range_hide"), -1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
     static Item.Properties addHideAttribute(Item.Properties properties) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.waypoints.Waypoint#addHideAttribute");
+        return properties.component(net.minecraft.core.component.DataComponents.ATTRIBUTE_MODIFIERS,
+            net.minecraft.world.item.component.ItemAttributeModifiers.builder().add(
+                net.minecraft.world.entity.ai.attributes.Attributes.WAYPOINT_TRANSMIT_RANGE, WAYPOINT_TRANSMIT_RANGE_HIDE_MODIFIER,
+                net.minecraft.world.entity.EquipmentSlotGroup.HEAD, net.minecraft.world.item.component.ItemAttributeModifiers.Display.hidden()).build());
     }
     public static class Icon {
         public static final Codec<Icon> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.waypoints.Waypoint.Icon.class, "CODEC");

@@ -10,7 +10,7 @@ public class Cod extends AbstractSchoolingFish {
         super(type, level);
     }
     public ItemStack getBucketItemStack() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.Cod#getBucketItemStack");
+        return new ItemStack(net.minecraft.world.item.Items.COD_BUCKET);
     }
     protected SoundEvent getAmbientSound() {
         return net.minecraft.sounds.SoundEvents.byId("entity.cod.ambient");

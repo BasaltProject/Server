@@ -17,19 +17,54 @@ public record KineticWeapon(int contactCooldownTicks, int delayTicks, Optional<C
     public static final Codec<KineticWeapon> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.item.component.KineticWeapon.class, "CODEC");
     public static final StreamCodec<RegistryFriendlyByteBuf, KineticWeapon> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.component.KineticWeapon.class, "STREAM_CODEC");
     public static Vec3 getMotion(Entity livingEntity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.KineticWeapon#getMotion");
+        Entity mover = !(livingEntity instanceof net.minecraft.world.entity.player.Player) && livingEntity.isPassenger()
+            ? livingEntity.getRootVehicle() : livingEntity;
+        return mover.getKnownSpeed().scale(20.0);
     }
     public void makeSound(Entity causer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.KineticWeapon#makeSound");
+        sound.ifPresent(event -> causer.level().playSound(causer, causer.getX(), causer.getY(), causer.getZ(), event, causer.getSoundSource(), 1.0F, 1.0F));
     }
     public void makeLocalHitSound(Entity causer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.KineticWeapon#makeLocalHitSound");
+        hitSound.ifPresent(event -> causer.level().playLocalSound(causer.blockPosition(), event.value(), causer.getSoundSource(), 1.0F, 1.0F, false));
     }
     public int computeDamageUseDuration() {
         return delayTicks + damageConditions.map(Condition::maxDurationTicks).orElse(0);
     }
     public void damageEntities(ItemStack stack, int ticksRemaining, LivingEntity livingEntity, EquipmentSlot equipmentSlot) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.KineticWeapon#damageEntities");
+        int used = stack.getUseDuration(livingEntity) - ticksRemaining;
+        if (used < delayTicks) {
+            return;
+        }
+        used -= delayTicks;
+        Vec3 look = livingEntity.getLookAngle();
+        double attackerSpeed = look.dot(getMotion(livingEntity));
+        double factor = livingEntity instanceof net.minecraft.world.entity.player.Player ? 1.0 : 0.2;
+        AttackRange range = livingEntity.getAttackRangeWith(stack);
+        double baseDamage = livingEntity.getAttributeBaseValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE);
+        boolean affected = false;
+        var along = net.minecraft.world.entity.projectile.ProjectileUtil.getHitEntitiesAlong(livingEntity, range,
+            target -> PiercingWeapon.canHitEntity(livingEntity, target), net.minecraft.world.level.ClipContext.Block.COLLIDER);
+        for (var hit : along.right().orElse(java.util.List.of())) {
+            Entity target = hit.getEntity();
+            if (target instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragonPart part) {
+                target = part.parentMob;
+            }
+            if (livingEntity.wasRecentlyStabbed(target, contactCooldownTicks)) {
+                continue;
+            }
+            livingEntity.rememberStabbedEntity(target);
+            double relative = Math.max(0.0, attackerSpeed - look.dot(getMotion(target)));
+            boolean dismounts = dismountConditions.isPresent() && dismountConditions.get().test(used, attackerSpeed, relative, factor);
+            boolean knocks = knockbackConditions.isPresent() && knockbackConditions.get().test(used, attackerSpeed, relative, factor);
+            boolean damages = damageConditions.isPresent() && damageConditions.get().test(used, attackerSpeed, relative, factor);
+            if (dismounts || knocks || damages) {
+                float damage = (float) baseDamage + (float) net.minecraft.util.Mth.floor(relative * damageMultiplier);
+                affected |= livingEntity.stabAttack(equipmentSlot, target, damage, damages, knocks, dismounts);
+            }
+        }
+        if (affected) {
+            livingEntity.level().broadcastEntityEvent(livingEntity, (byte) 2);
+        }
     }
     public static record Condition(int maxDurationTicks, float minSpeed, float minRelativeSpeed) {
         public static final Codec<Condition> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.item.component.KineticWeapon.Condition.class, "CODEC");

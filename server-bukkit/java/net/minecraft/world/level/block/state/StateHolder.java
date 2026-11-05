@@ -74,7 +74,7 @@ public abstract class StateHolder<O, S> {
         return hasProperty(property) ? getValue(property) : defaultValue;
     }
     void initializeNeighbors(S[][] neighbors) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.StateHolder#initializeNeighbors");
+
     }
     public boolean isSingletonState() {
         return getProperties().isEmpty();

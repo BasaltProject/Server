@@ -51,25 +51,25 @@ public class SculkShriekerBlockEntity extends BlockEntity {
             
         }
         public int getListenerRadius() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkShriekerBlockEntity.VibrationUser#getListenerRadius");
+            return 8;
         }
         public PositionSource getPositionSource() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkShriekerBlockEntity.VibrationUser#getPositionSource");
+            return new net.minecraft.world.level.gameevent.BlockPositionSource(getBlockPos());
         }
         public TagKey<GameEvent> getListenableEvents() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkShriekerBlockEntity.VibrationUser#getListenableEvents");
+            return net.minecraft.tags.GameEventTags.SHRIEKER_CAN_LISTEN;
         }
         public boolean canReceiveVibration(ServerLevel level, BlockPos pos, Holder<GameEvent> event, GameEvent.Context context) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkShriekerBlockEntity.VibrationUser#canReceiveVibration");
+            return !pos.equals(getBlockPos());
         }
         public void onReceiveVibration(ServerLevel level, BlockPos pos, Holder<GameEvent> event, Entity sourceEntity, Entity projectileOwner, float receivingDistance) {
             throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkShriekerBlockEntity.VibrationUser#onReceiveVibration");
         }
         public void onDataChanged() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkShriekerBlockEntity.VibrationUser#onDataChanged");
+            setChanged();
         }
         public boolean requiresAdjacentChunksToBeTicking() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkShriekerBlockEntity.VibrationUser#requiresAdjacentChunksToBeTicking");
+            return true;
         }
     }
 }

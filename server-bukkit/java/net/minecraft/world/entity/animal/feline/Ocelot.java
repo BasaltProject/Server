@@ -100,7 +100,7 @@ public class Ocelot extends Animal {
         return groupData;
     }
     public Vec3 getLeashOffset() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.feline.Ocelot#getLeashOffset");
+        return new Vec3(0.0, 0.5F * getEyeHeight(), getBbWidth() * 0.4F);
     }
     static class OcelotAvoidEntityGoal<T extends LivingEntity> extends AvoidEntityGoal<T> {
         public OcelotAvoidEntityGoal(Ocelot ocelot, Class<T> avoidClass, float maxDist, double walkSpeedModifier, double sprintSpeedModifier) {

@@ -215,7 +215,7 @@ public class BlockEntity implements DebugValueSource, TypedInstance<BlockEntityT
         return (net.minecraft.core.Holder.Reference<BlockEntityType<?>>) type.builtInRegistryHolder();
     }
     protected void applyImplicitComponents(DataComponentGetter components) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BlockEntity#applyImplicitComponents");
+
     }
     public void applyComponentsFromItemStack(ItemStack stack) {
 
@@ -224,7 +224,7 @@ public class BlockEntity implements DebugValueSource, TypedInstance<BlockEntityT
 
     }
     protected void collectImplicitComponents(DataComponentMap.Builder components) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BlockEntity#collectImplicitComponents");
+
     }
     public void removeComponentsFromTag(ValueOutput output) {
 
@@ -239,17 +239,17 @@ public class BlockEntity implements DebugValueSource, TypedInstance<BlockEntityT
 
     }
     public static Component parseCustomNameSafe(ValueInput input, String name) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BlockEntity#parseCustomNameSafe");
+        return input.read(name, net.minecraft.network.chat.ComponentSerialization.CODEC).orElse(null);
     }
     public ProblemReporter.PathElement problemPath() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BlockEntity#problemPath");
+        return new BlockEntityPathElement(this);
     }
     public void registerDebugValues(ServerLevel level, DebugValueSource.Registration registration) {
 
     }
     static record BlockEntityPathElement(BlockEntity blockEntity) implements ProblemReporter.PathElement {
         public String get() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BlockEntity.BlockEntityPathElement#get");
+            return blockEntity.getType() + "@" + blockEntity.getBlockPos();
         }
     }
 }

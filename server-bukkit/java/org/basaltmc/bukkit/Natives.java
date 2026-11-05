@@ -42,4 +42,6 @@ public final class Natives {
     public static native boolean playerPacketReceive(String uuid, int id, byte[] body);
     public static native void packetClose(long connection);
     public static native long packetConnectionOf(String uuid);
+    public static native byte[] lpVec3Encode(double x, double y, double z);
+    public static native double[] lpVec3Decode(byte[] data, int offset);
 }

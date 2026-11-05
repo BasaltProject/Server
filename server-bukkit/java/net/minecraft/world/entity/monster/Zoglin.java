@@ -31,8 +31,12 @@ public class Zoglin extends Monster implements HoglinBase {
     protected Brain<Zoglin> makeBrain(Brain.Packed packedBrain) {
         @SuppressWarnings("unchecked") Brain<Zoglin> made = (Brain<Zoglin>) (Brain<?>) super.makeBrain(packedBrain); return made;
     }
+    private int attackAnimationRemainingTicks;
     protected static List<ActivityData<Zoglin>> getActivities() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.Zoglin#getActivities");
+        return List.of(
+            ActivityData.<Zoglin>nativeOnly(net.minecraft.world.entity.schedule.Activity.CORE),
+            ActivityData.<Zoglin>nativeOnly(net.minecraft.world.entity.schedule.Activity.IDLE),
+            ActivityData.<Zoglin>nativeOnly(net.minecraft.world.entity.schedule.Activity.FIGHT));
     }
     public EntityDimensions getDefaultDimensions(Pose pose) {
         return net.minecraft.world.entity.EntityDimensions.scalable(getBbWidth(), getBbHeight());
@@ -79,7 +83,7 @@ public class Zoglin extends Monster implements HoglinBase {
     public void handleEntityEvent(byte id) {
     }
     public int getAttackAnimationRemainingTicks() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.Zoglin#getAttackAnimationRemainingTicks");
+        return attackAnimationRemainingTicks;
     }
     protected SoundEvent getAmbientSound() {
         return net.minecraft.sounds.SoundEvents.byId("entity.zoglin.ambient");

@@ -22,6 +22,6 @@ public class AquaticFeatures {
     public static final ResourceKey<Object> FIRE_CORAL_BLOCK = FeatureUtils.createKey("coral/fire_block");
     public static final ResourceKey<Object> HORN_CORAL_BLOCK = FeatureUtils.createKey("coral/horn_block");
     public static void bootstrap(BootstrapContext<Feature> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.AquaticFeatures#bootstrap");
+        // registries come from the native datapack loader, so there is nothing to bootstrap
     }
 }

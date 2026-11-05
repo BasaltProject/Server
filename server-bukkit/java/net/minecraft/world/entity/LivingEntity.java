@@ -131,7 +131,7 @@ public class LivingEntity extends Entity implements Attackable, WaypointTransmit
     protected static final int LIVING_ENTITY_FLAG_OFF_HAND = 2;
     protected static final int LIVING_ENTITY_FLAG_SPIN_ATTACK = 4;
     protected static final EntityDataAccessor<Byte> DATA_LIVING_ENTITY_FLAGS = null;
-    protected static final EntityDimensions SLEEPING_DIMENSIONS = null;
+    protected static final EntityDimensions SLEEPING_DIMENSIONS = EntityDimensions.fixed(0.2F, 0.2F).withEyeHeight(0.2F);
     public static final float EXTRA_RENDER_CULLING_SIZE_WITH_BIG_HAT = 0.5F;
     public static final float DEFAULT_BABY_SCALE = 0.5F;
     protected static final float SWIMMING_VERTICAL_SPEED = 0.04F;
@@ -196,12 +196,12 @@ public class LivingEntity extends Entity implements Attackable, WaypointTransmit
     }
     public Brain<? extends LivingEntity> getBrain() {
         if (brain == null) {
-            brain = new Brain<LivingEntity>();
+            brain = new Brain<LivingEntity>(this);
         }
         return brain;
     }
     protected Brain<? extends LivingEntity> makeBrain(Brain.Packed packedBrain) {
-        return new Brain<LivingEntity>();
+        return new Brain<LivingEntity>(this);
     }
     public void kill(ServerLevel level) {
         org.bukkit.entity.LivingEntity living = living();
@@ -805,10 +805,8 @@ public class LivingEntity extends Entity implements Attackable, WaypointTransmit
         if (damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_ARMOR)) {
             return damage;
         }
-        float armor = (float) getArmorValue();
-        float toughness = (float) getAttributeValue(Attributes.ARMOR_TOUGHNESS);
-        float reduction = Mth.clamp(armor - damage / (2.0F + toughness / 4.0F), armor * 0.2F, 20.0F);
-        return damage * (1.0F - reduction / 25.0F);
+        return org.basaltmc.bukkit.MechanicsNatives.afterArmor(damage, (float) getArmorValue(),
+            (float) getAttributeValue(Attributes.ARMOR_TOUGHNESS), 0.0F);
     }
     protected float getDamageAfterMagicAbsorb(DamageSource damageSource, float damage) {
         if (damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_EFFECTS)) {
@@ -816,17 +814,16 @@ public class LivingEntity extends Entity implements Attackable, WaypointTransmit
         }
         MobEffectInstance resistance = getEffect(net.minecraft.world.effect.MobEffects.RESISTANCE);
         if (resistance != null && !damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_RESISTANCE)) {
-            int scale = 25 - (resistance.getAmplifier() + 1) * 5;
-            return Math.max(damage * scale / 25.0F, 0.0F);
+            return org.basaltmc.bukkit.MechanicsNatives.afterResistance(damage, resistance.getAmplifier());
         }
         return damage;
     }
     protected void actuallyHurt(ServerLevel level, DamageSource source, float dmg) {
         float afterArmor = getDamageAfterMagicAbsorb(source, getDamageAfterArmorAbsorb(source, dmg));
-        float absorbed = Math.max(afterArmor - getAbsorptionAmount(), 0.0F);
-        setAbsorptionAmount(getAbsorptionAmount() - (afterArmor - absorbed));
-        if (absorbed > 0.0F) {
-            setHealth(getHealth() - absorbed);
+        float[] split = org.basaltmc.bukkit.MechanicsNatives.absorb(afterArmor, getAbsorptionAmount());
+        setAbsorptionAmount(split[1]);
+        if (split[0] > 0.0F) {
+            setHealth(getHealth() - split[0]);
         }
     }
     public CombatTracker getCombatTracker() {
@@ -1055,7 +1052,18 @@ public class LivingEntity extends Entity implements Attackable, WaypointTransmit
         setDeltaMovement(getDeltaMovement().scale(0.91F));
     }
     protected void travelFlying(Vec3 input, float waterSpeed, float lavaSpeed, float airSpeed) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.LivingEntity#travelFlying");
+        float speed = airSpeed;
+        double drag = 0.91F;
+        if (isInWater()) {
+            speed = waterSpeed;
+            drag = 0.8F;
+        } else if (isInLava()) {
+            speed = lavaSpeed;
+            drag = 0.5F;
+        }
+        moveRelative(speed, input);
+        move(MoverType.SELF, getDeltaMovement());
+        setDeltaMovement(getDeltaMovement().scale(drag));
     }
     protected float getAirDrag() {
         return 0.98F;
@@ -1104,7 +1112,11 @@ public class LivingEntity extends Entity implements Attackable, WaypointTransmit
         return;
     }
     public Vec3 getFluidFallingAdjustedMovement(double baseGravity, boolean isFalling, Vec3 movement) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.LivingEntity#getFluidFallingAdjustedMovement");
+        if (baseGravity == 0.0 || isSprinting()) {
+            return movement;
+        }
+        boolean settle = isFalling && Math.abs(movement.y - 0.005) >= 0.003 && Math.abs(movement.y - baseGravity / 16.0) < 0.003;
+        return new Vec3(movement.x, settle ? -0.003 : movement.y - baseGravity / 16.0, movement.z);
     }
     protected float getFlyingSpeed() {
         return getControllingPassenger() instanceof net.minecraft.world.entity.player.Player ? getSpeed() * 0.1F : 0.02F;

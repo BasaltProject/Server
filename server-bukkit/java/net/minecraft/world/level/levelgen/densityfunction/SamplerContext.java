@@ -5,37 +5,49 @@ import org.basaltmc.bukkit.Unsupported;
 import net.minecraft.util.context.ContextKey;
 import net.minecraft.util.context.ContextMap;
 public class SamplerContext {
+    private ContextMap userFields = ContextMap.EMPTY;
+    private DensityBufferArena bufferArena;
+    private boolean enableCaches;
     protected SamplerContext() {
     }
-    public static SamplerContext EMPTY_UNCACHED;
+    public static SamplerContext EMPTY_UNCACHED = new SamplerContext();
     public static SamplerContext.Builder builder() {
-        throw Unsupported.hit("net.minecraft.world.level.levelgen.densityfunction.SamplerContext.builder");
+        return new Builder();
     }
 
     public static class Builder {
+        private ContextMap userFields = ContextMap.EMPTY;
+        private DensityBufferArena bufferArena;
+        private boolean enableCaches;
         protected Builder() {
         }
         public SamplerContext build() {
-            throw Unsupported.hit("net.minecraft.world.level.levelgen.densityfunction.SamplerContext.Builder.build");
+            return new SamplerContext(userFields, bufferArena, enableCaches);
         }
         public SamplerContext.Builder enableCaches() {
-            throw Unsupported.hit("net.minecraft.world.level.levelgen.densityfunction.SamplerContext.Builder.enableCaches");
+            this.enableCaches = true;
+            return this;
         }
             public Builder setUserFields(ContextMap userFields) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.densityfunction.SamplerContext.Builder#setUserFields");
+            this.userFields = userFields;
+            return this;
         }
         public Builder useBufferArena(DensityBufferArena bufferArena) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.densityfunction.SamplerContext.Builder#useBufferArena");
+            this.bufferArena = bufferArena;
+            return this;
         }
 }
     private SamplerContext(ContextMap userFields, DensityBufferArena bufferArena, boolean enableCaches) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.densityfunction.SamplerContext#<init>");
+        this.userFields = userFields;
+        this.bufferArena = bufferArena;
+        this.enableCaches = enableCaches;
     }
     public <T> T getField(ContextKey<T> key) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.densityfunction.SamplerContext#getField");
+        return userFields.getOrThrow(key);
     }
     public <T> T getFieldOrDefault(ContextKey<? extends T> key, T defaultValue) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.densityfunction.SamplerContext#getFieldOrDefault");
+        T found = userFields.get(key);
+        return found != null ? found : defaultValue;
     }
     public ScopedDensityBuffer acquireBuffer(DensityVolume volume) {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.densityfunction.SamplerContext#acquireBuffer");

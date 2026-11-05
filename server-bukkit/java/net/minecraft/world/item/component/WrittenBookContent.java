@@ -2,6 +2,7 @@
 package net.minecraft.world.item.component;
 import com.mojang.serialization.Codec;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentGetter;
@@ -31,16 +32,43 @@ public record WrittenBookContent(Filterable<String> title, String author, int ge
         this.resolved = resolved;
     }
     public static Codec<List<Filterable<Component>>> pagesCodec(Codec<Component> contentCodec) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.WrittenBookContent#pagesCodec");
+        return net.minecraft.server.network.Filterable.codec(contentCodec).listOf();
     }
     public WrittenBookContent craftCopy() {
         return new WrittenBookContent(title, author, generation + 1, pages, resolved);
     }
     public static boolean resolveForItem(ItemStack itemStack, ResolutionContext context, HolderLookup.Provider registries) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.WrittenBookContent#resolveForItem");
+        WrittenBookContent content = itemStack.get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT);
+        if (content == null || content.resolved()) {
+            return false;
+        }
+        WrittenBookContent resolved = content.resolve(context, registries);
+        if (resolved == null) {
+            return false;
+        }
+        itemStack.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT, resolved);
+        return true;
     }
     public WrittenBookContent resolve(ResolutionContext context, HolderLookup.Provider registries) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.WrittenBookContent#resolve");
+        if (resolved) {
+            return this;
+        }
+        List<Filterable<Component>> out = new java.util.ArrayList<>(pages.size());
+        for (Filterable<Component> page : pages) {
+            Optional<Filterable<Component>> resolvedPage = page.resolve(component -> resolveOne(context, component));
+            if (resolvedPage.isEmpty()) {
+                return null;
+            }
+            out.add(resolvedPage.get());
+        }
+        return new WrittenBookContent(title, author, generation, out, true);
+    }
+    private static Optional<Component> resolveOne(ResolutionContext context, Component component) {
+        try {
+            return Optional.of(net.minecraft.network.chat.ComponentUtils.resolve(context, component));
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            return Optional.empty();
+        }
     }
     public WrittenBookContent markResolved() {
         return new WrittenBookContent(title, author, generation, pages, true);
@@ -56,6 +84,9 @@ public record WrittenBookContent(Filterable<String> title, String author, int ge
         return new WrittenBookContent(title, author, generation, newPages, false);
     }
     public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.WrittenBookContent#addToTooltip");
+        if (author != null && !author.isBlank()) {
+            consumer.accept(Component.translatable("book.byAuthor", author).withStyle(net.minecraft.ChatFormatting.GRAY));
+        }
+        consumer.accept(Component.translatable("book.generation." + generation).withStyle(net.minecraft.ChatFormatting.GRAY));
     }
 }

@@ -45,7 +45,9 @@ public class WitherSkeleton extends AbstractSkeleton {
         return super.doHurtTarget(level, target);
     }
     protected AbstractArrow getArrow(ItemStack projectile, float power, ItemStack firingWeapon) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.skeleton.WitherSkeleton#getArrow");
+        AbstractArrow arrow = super.getArrow(projectile, power, firingWeapon);
+        arrow.igniteForSeconds(100.0F);
+        return arrow;
     }
     public boolean canBeAffected(MobEffectInstance newEffect) {
         return super.canBeAffected(newEffect);

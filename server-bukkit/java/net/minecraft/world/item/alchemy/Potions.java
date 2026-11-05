@@ -50,6 +50,6 @@ public class Potions {
     public static final Holder<Potion> OOZING = org.basaltmc.bukkit.facade.PotionFactory.holder("oozing");
     public static final Holder<Potion> INFESTED = org.basaltmc.bukkit.facade.PotionFactory.holder("infested");
     public static Holder<Potion> bootstrap(Registry<Potion> registry) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.alchemy.Potions#bootstrap");
+        return WATER;
     }
 }

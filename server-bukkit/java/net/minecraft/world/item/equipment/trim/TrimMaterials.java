@@ -22,15 +22,15 @@ public class TrimMaterials {
     public static final ResourceKey<TrimMaterial> AMETHYST = key("amethyst");
     public static final ResourceKey<TrimMaterial> RESIN = key("resin");
     public static void bootstrap(BootstrapContext<TrimMaterial> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.equipment.trim.TrimMaterials#bootstrap");
+        org.basaltmc.bukkit.facade.Bootstraps.replay(context, net.minecraft.core.registries.Registries.TRIM_MATERIAL, TrimMaterials.class);
     }
     public static enum Palette {
         QUARTZ, IRON, IRON_DARKER, NETHERITE, NETHERITE_DARKER, REDSTONE, COPPER, COPPER_DARKER, GOLD, GOLD_DARKER, EMERALD, DIAMOND, DIAMOND_DARKER, LAPIS, AMETHYST, RESIN;
         public String suffix() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.equipment.trim.TrimMaterials.Palette#suffix");
+            return name().toLowerCase(java.util.Locale.ROOT);
         }
         public Identifier id() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.equipment.trim.TrimMaterials.Palette#id");
+            return Identifier.withDefaultNamespace("trim/" + suffix());
         }
     }
 }

@@ -19,7 +19,14 @@ public class RotatedPillarBlock extends Block {
         return super.rotate(state, rotation);
     }
     public static BlockState rotatePillar(BlockState state, Rotation rotation) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.RotatedPillarBlock#rotatePillar");
+        if (rotation != Rotation.CLOCKWISE_90 && rotation != Rotation.COUNTERCLOCKWISE_90) {
+            return state;
+        }
+        return switch (state.getValue(AXIS)) {
+            case X -> state.setValue(AXIS, Direction.Axis.Z);
+            case Z -> state.setValue(AXIS, Direction.Axis.X);
+            default -> state;
+        };
     }
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         super.createBlockStateDefinition(builder);

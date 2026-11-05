@@ -71,6 +71,10 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
         return (flags() & kReplaceable) != 0;
     }
 
+    public boolean canBeReplaced(net.minecraft.world.level.material.Fluid fluid) {
+        return canBeReplaced() || !isSolid();
+    }
+
     public boolean canBeReplaced(BlockPlaceContext context) {
         return canBeReplaced();
     }
@@ -364,7 +368,7 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
         super((net.minecraft.world.level.block.Block) null, (net.minecraft.world.level.block.state.properties.Property[]) null, (Comparable[]) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockState#<init>");
     }
     protected BlockState asState() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockState#asState");
+        return this;
     }
 
     @Override

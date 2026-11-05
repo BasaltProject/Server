@@ -14,6 +14,6 @@ public class ColoredFallingBlock extends FallingBlock {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
     }
     public int getDustColor(BlockState blockState, BlockGetter level, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.ColoredFallingBlock#getDustColor");
+        return blockState.getMapColor(level, pos).col;
     }
 }

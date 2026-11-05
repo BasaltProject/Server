@@ -1,5 +1,6 @@
 // Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.block;
+import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -38,7 +39,11 @@ public class ObserverBlock extends DirectionalBlock {
         return super.updateShape(state, level, ticks, pos, directionToNeighbour, neighbourPos, neighbourState, random);
     }
     protected void updateNeighborsInFront(Level level, BlockPos pos, BlockState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.ObserverBlock#updateNeighborsInFront");
+        Direction behind = state.getValue(FACING).getOpposite();
+        BlockPos target = pos.relative(behind);
+        Orientation orientation = net.minecraft.world.level.redstone.ExperimentalRedstoneUtils.initialOrientation(level, behind, null);
+        level.neighborChanged(target, this, orientation);
+        level.updateNeighborsAtExceptFromFacing(target, this, behind.getOpposite(), orientation);
     }
     protected boolean isSignalSource(BlockState state) {
         return super.isSignalSource(state);

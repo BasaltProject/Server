@@ -41,7 +41,7 @@ public class Husk extends Zombie {
         return 0;
     }
     protected EntityType<? extends Zombie> convertsToWhenDrowning() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.zombie.Husk#convertsToWhenDrowning");
+        return net.minecraft.world.entity.EntityTypes.ZOMBIE;
     }
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData) {
         return groupData;

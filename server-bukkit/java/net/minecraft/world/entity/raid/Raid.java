@@ -15,7 +15,15 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.SpawnPlacementType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.level.block.entity.BannerPattern;
+import net.minecraft.world.level.block.entity.BannerPatternLayers;
+import net.minecraft.world.level.block.entity.BannerPatterns;
 public class Raid {
     public static final SpawnPlacementType RAVAGER_SPAWN_PLACEMENT_TYPE = null;
     public static final MapCodec<Raid> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.entity.raid.Raid.class, "MAP_CODEC");
@@ -131,13 +139,25 @@ public class Raid {
     public void removeFromRaid(ServerLevel level, Raider raider, boolean removeFromTotalHealth) {
     }
     public static DataComponentPatch getBannerComponentPatch(HolderGetter<BannerPattern> patternGetter) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.raid.Raid#getBannerComponentPatch");
+        BannerPatternLayers layers = new BannerPatternLayers.Builder()
+            .addIfRegistered(patternGetter, BannerPatterns.RHOMBUS_MIDDLE, DyeColor.CYAN)
+            .addIfRegistered(patternGetter, BannerPatterns.STRIPE_BOTTOM, DyeColor.LIGHT_GRAY)
+            .addIfRegistered(patternGetter, BannerPatterns.STRIPE_CENTER, DyeColor.GRAY)
+            .addIfRegistered(patternGetter, BannerPatterns.BORDER, DyeColor.LIGHT_GRAY)
+            .addIfRegistered(patternGetter, BannerPatterns.STRIPE_MIDDLE, DyeColor.BLACK)
+            .addIfRegistered(patternGetter, BannerPatterns.HALF_HORIZONTAL, DyeColor.LIGHT_GRAY)
+            .addIfRegistered(patternGetter, BannerPatterns.CIRCLE_MIDDLE, DyeColor.LIGHT_GRAY)
+            .addIfRegistered(patternGetter, BannerPatterns.BORDER, DyeColor.BLACK).build();
+        return DataComponentPatch.builder().set(DataComponents.BANNER_PATTERNS, layers)
+            .set(DataComponents.TOOLTIP_DISPLAY, TooltipDisplay.DEFAULT.withHidden(DataComponents.BANNER_PATTERNS, true))
+            .set(DataComponents.ITEM_NAME, Component.translatable("block.minecraft.ominous_banner")).set(DataComponents.RARITY, Rarity.UNCOMMON)
+            .build();
     }
     public static ItemStackTemplate getOminousBannerTemplate(HolderGetter<BannerPattern> patternGetter) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.raid.Raid#getOminousBannerTemplate");
+        return new ItemStackTemplate(Items.BANNER.white(), getBannerComponentPatch(patternGetter));
     }
     public static ItemStack getOminousBannerInstance(HolderGetter<BannerPattern> patternGetter) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.raid.Raid#getOminousBannerInstance");
+        return getOminousBannerTemplate(patternGetter).create();
     }
     public Raider getLeader(int wave) {
         if (bukkit == null) {

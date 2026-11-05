@@ -33,7 +33,9 @@ public class Cow extends AbstractCow {
         return groupData;
     }
     public void setVariant(Holder<CowVariant> variant) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.cow.Cow#setVariant");
+        if (live() instanceof org.bukkit.entity.Cow api) {
+            api.setVariant((org.bukkit.entity.Cow.Variant) org.basaltmc.bukkit.facade.VariantHolders.bukkit(io.papermc.paper.registry.RegistryKey.COW_VARIANT, variant));
+        }
     }
     public Holder<CowVariant> getVariant() {
         return live() instanceof org.bukkit.entity.Cow api

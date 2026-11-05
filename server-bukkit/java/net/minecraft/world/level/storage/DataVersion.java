@@ -1,11 +1,18 @@
 // Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.storage;
+
 public record DataVersion(int version, String series) {
     public static final String MAIN_SERIES = "main";
-    public boolean isSideSeries() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.DataVersion#isSideSeries");
+
+    public DataVersion(int version) {
+        this(version, MAIN_SERIES);
     }
+
+    public boolean isSideSeries() {
+        return !series.equals(MAIN_SERIES);
+    }
+
     public boolean isCompatible(DataVersion other) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.DataVersion#isCompatible");
+        return series.equals(other.series);
     }
 }

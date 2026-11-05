@@ -23,7 +23,8 @@ public abstract class FaceAttachedHorizontalDirectionalBlock extends HorizontalD
         return super.canSurvive(state, level, pos);
     }
     public static boolean canAttach(LevelReader level, BlockPos pos, Direction direction) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock#canAttach");
+        BlockPos support = pos.relative(direction);
+        return level.getBlockState(support).isFaceSturdy(level, support, direction.getOpposite());
     }
     public BlockState getStateForPlacement(BlockPlaceContext context) {
         return super.getStateForPlacement(context);
@@ -32,6 +33,10 @@ public abstract class FaceAttachedHorizontalDirectionalBlock extends HorizontalD
         return super.updateShape(state, level, ticks, pos, directionToNeighbour, neighbourPos, neighbourState, random);
     }
     protected static Direction getConnectedDirection(BlockState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock#getConnectedDirection");
+        return switch (state.getValue(FACE)) {
+            case CEILING -> Direction.DOWN;
+            case FLOOR -> Direction.UP;
+            default -> state.getValue(FACING);
+        };
     }
 }

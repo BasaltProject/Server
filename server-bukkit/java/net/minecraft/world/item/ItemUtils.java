@@ -29,6 +29,9 @@ public class ItemUtils {
         return createFilledResult(itemStack, player, newItemStack, true);
     }
     public static void onContainerDestroyed(ItemEntity container, Stream<ItemStack> contents) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.ItemUtils#onContainerDestroyed");
+        Level level = container.level();
+        if (!level.isClientSide()) {
+            contents.forEach(stack -> level.addFreshEntity(new ItemEntity(level, container.getX(), container.getY(), container.getZ(), stack)));
+        }
     }
 }

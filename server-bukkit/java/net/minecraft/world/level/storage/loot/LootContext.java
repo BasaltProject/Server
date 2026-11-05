@@ -1,5 +1,7 @@
 // Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.storage.loot;
+
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import java.util.Optional;
 import java.util.function.Consumer;
 import net.minecraft.core.HolderGetter;
@@ -59,16 +61,16 @@ public class LootContext {
         return params.getLevel();
     }
     public static VisitedEntry<LootTable> createVisitedEntry(LootTable table) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootContext#createVisitedEntry");
+        return new VisitedEntry<>(LootDataType.TABLE, table);
     }
     public static VisitedEntry<LootItemCondition> createVisitedEntry(LootItemCondition predicate) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootContext#createVisitedEntry");
+        return new VisitedEntry<>(LootDataType.PREDICATE, predicate);
     }
     public static VisitedEntry<LootItemFunction> createVisitedEntry(LootItemFunction modifier) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootContext#createVisitedEntry");
+        return new VisitedEntry<>(LootDataType.MODIFIER, modifier);
     }
     public static VisitedEntry<SlotSource> createVisitedEntry(SlotSource slotSource) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootContext#createVisitedEntry");
+        return new VisitedEntry<>(LootDataType.SLOT_SOURCE, slotSource);
     }
     public static class Builder {
         private final LootParams params;
@@ -98,10 +100,22 @@ public class LootContext {
         THIS, ATTACKER, DIRECT_ATTACKER, ATTACKING_PLAYER, TARGET_ENTITY, INTERACTING_ENTITY;
         public static final StringRepresentable.EnumCodec<EntityTarget> CODEC = net.minecraft.util.StringRepresentable.fromEnum(net.minecraft.world.level.storage.loot.LootContext.EntityTarget::values);
         public ContextKey<? extends Entity> contextParam() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootContext.EntityTarget#contextParam");
+            return switch (this) {
+                case THIS -> LootContextParams.THIS_ENTITY;
+                case ATTACKER -> LootContextParams.ATTACKING_ENTITY;
+                case DIRECT_ATTACKER -> LootContextParams.DIRECT_ATTACKING_ENTITY;
+                case ATTACKING_PLAYER -> LootContextParams.LAST_DAMAGE_PLAYER;
+                case TARGET_ENTITY -> LootContextParams.TARGET_ENTITY;
+                case INTERACTING_ENTITY -> LootContextParams.INTERACTING_ENTITY;
+            };
         }
         public static EntityTarget getByName(String name) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootContext.EntityTarget#getByName");
+            for (EntityTarget target : values()) {
+                if (target.getSerializedName().equals(name)) {
+                    return target;
+                }
+            }
+            throw new IllegalArgumentException("Invalid entity target " + name);
         }
         public String getSerializedName() {
             return name().toLowerCase(java.util.Locale.ROOT);
@@ -110,7 +124,7 @@ public class LootContext {
     public static enum BlockEntityTarget implements StringRepresentable, LootContextArg.SimpleGetter<BlockEntity> {
         BLOCK_ENTITY;
         public ContextKey<? extends BlockEntity> contextParam() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootContext.BlockEntityTarget#contextParam");
+            return LootContextParams.BLOCK_ENTITY;
         }
         public String getSerializedName() {
             return name().toLowerCase(java.util.Locale.ROOT);
@@ -119,7 +133,7 @@ public class LootContext {
     public static enum ItemStackTarget implements StringRepresentable, LootContextArg.SimpleGetter<ItemInstance> {
         TOOL;
         public ContextKey<? extends ItemInstance> contextParam() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootContext.ItemStackTarget#contextParam");
+            return LootContextParams.TOOL;
         }
         public String getSerializedName() {
             return name().toLowerCase(java.util.Locale.ROOT);

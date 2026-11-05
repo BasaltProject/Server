@@ -13,17 +13,14 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 public interface CollisionGetter extends BlockGetter {
-    default WorldBorder getWorldBorder() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CollisionGetter#getWorldBorder");
-    }
-    default BlockGetter getChunkForCollisions(int chunkX, int chunkZ) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CollisionGetter#getChunkForCollisions");
-    }
+    WorldBorder getWorldBorder();
+    BlockGetter getChunkForCollisions(int chunkX, int chunkZ);
     default boolean isUnobstructed(Entity source, VoxelShape shape) {
         return true;
     }
     default boolean isUnobstructed(BlockState state, BlockPos pos, CollisionContext context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CollisionGetter#isUnobstructed");
+        VoxelShape shape = state.getCollisionShape(this, pos, context);
+        return shape.isEmpty() || isUnobstructed(null, shape.move(pos));
     }
     default boolean isUnobstructed(Entity ignore) {
         return true;
@@ -38,13 +35,16 @@ public interface CollisionGetter extends BlockGetter {
         return noBlockCollision(entity, aabb);
     }
     default boolean noCollision(Entity entity, AABB aabb, boolean alwaysCollideWithFluids) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CollisionGetter#noCollision");
+        return noBlockCollision(entity, aabb, alwaysCollideWithFluids) && noEntityCollision(entity, aabb)
+            && noBorderCollision(entity, aabb);
     }
     default boolean noBlockCollision(Entity entity, AABB aabb) {
         return !getBlockCollisions(entity, aabb).iterator().hasNext();
     }
     default boolean noBlockCollision(Entity entity, AABB aabb, boolean alwaysCollideWithFluids) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CollisionGetter#noBlockCollision");
+
+        Iterable<VoxelShape> hits = alwaysCollideWithFluids ? getBlockAndLiquidCollisions(entity, aabb) : getBlockCollisions(entity, aabb);
+        return !hits.iterator().hasNext();
     }
     default boolean noEntityCollision(Entity entity, AABB aabb) {
         return true;
@@ -90,7 +90,7 @@ public interface CollisionGetter extends BlockGetter {
         return getBlockCollisions(null, box);
     }
     default BlockHitResult clipIncludingBorder(ClipContext c) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CollisionGetter#clipIncludingBorder");
+        return clip(c);
     }
     default boolean collidesWithSuffocatingBlock(Entity source, AABB box) {
         for (VoxelShape shape : getBlockCollisions(source, box)) {
@@ -101,7 +101,24 @@ public interface CollisionGetter extends BlockGetter {
         return false;
     }
     default Optional<BlockPos> findSupportingBlock(Entity source, AABB box) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CollisionGetter#findSupportingBlock");
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (BlockPos pos : BlockPos.betweenClosed(box)) {
+            VoxelShape shape = getBlockState(pos).getCollisionShape(this, pos);
+            boolean touching = false;
+            for (AABB part : shape.move(pos).toAabbs()) {
+                touching |= part.intersects(box);
+            }
+            if (!touching) {
+                continue;
+            }
+            double distance = pos.distToCenterSqr(source.position());
+            if (distance < bestDistance || (distance == bestDistance && (best == null || best.compareTo(pos) < 0))) {
+                best = pos.immutable();
+                bestDistance = distance;
+            }
+        }
+        return Optional.ofNullable(best);
     }
     default Optional<Vec3> findFreePosition(Entity source, VoxelShape allowedCenters, Vec3 preferredCenter, double sizeX, double sizeY, double sizeZ) {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CollisionGetter#findFreePosition");

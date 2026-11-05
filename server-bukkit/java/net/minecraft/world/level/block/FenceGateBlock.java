@@ -69,6 +69,6 @@ public class FenceGateBlock extends HorizontalDirectionalBlock {
         super.createBlockStateDefinition(builder);
     }
     public static boolean connectsToDirection(BlockState state, Direction direction) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FenceGateBlock#connectsToDirection");
+        return state.getValue(FACING).getAxis() == direction.getClockWise().getAxis();
     }
 }

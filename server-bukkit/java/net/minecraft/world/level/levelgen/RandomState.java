@@ -5,6 +5,7 @@ import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
 import org.basaltmc.bukkit.Unsupported;
 import net.minecraft.core.HolderGetter;
+import net.minecraft.util.RandomSource;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.block.state.BlockState;
@@ -16,16 +17,38 @@ import net.minecraft.world.level.levelgen.material.MaterialSystem;
 import net.minecraft.world.level.levelgen.synth.Noise;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 public class RandomState {
+    private long seed;
+    private boolean useLegacyRandom;
+    private PositionalRandomFactory randomFactory;
+    private String world;
+
     protected RandomState() {
     }
+
+    public static RandomState forWorld(String world, long seed, boolean useLegacyRandom) {
+        RandomState state = ofSeed(seed, useLegacyRandom);
+        state.world = world;
+        return state;
+    }
+    public static RandomState ofSeed(long seed, boolean useLegacyRandom) {
+        RandomState state = new RandomState();
+        state.seed = seed;
+        state.useLegacyRandom = useLegacyRandom;
+        RandomSource base = useLegacyRandom ? new LegacyRandomSource(seed) : new XoroshiroRandomSource(seed);
+        state.randomFactory = base.forkPositional();
+        return state;
+    }
     public Climate.Sampler createClimateSampler(SamplerContext context) {
-        throw Unsupported.hit("net.minecraft.world.level.levelgen.RandomState.createClimateSampler");
+        if (world == null) {
+            throw Unsupported.hit("net.minecraft.world.level.levelgen.RandomState.createClimateSampler");
+        }
+        return Climate.Sampler.forWorld(world);
     }
     public static RandomState create(HolderGetter<NormalNoise> noises, long seed, NoiseGeneratorSettings settings) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#create");
+        return ofSeed(seed, settings.useLegacyRandomSource());
     }
     public static RandomState create(HolderGetter<NormalNoise> noises, long seed, boolean useLegacyRandom, BlockState defaultBlock, int seaLevel, NoiseRouter noiseRouter) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#create");
+        return ofSeed(seed, useLegacyRandom);
     }
     private RandomState(HolderGetter<NormalNoise> noises, long seed, boolean useLegacyRandom, BlockState defaultBlock, int seaLevel, NoiseRouter router) {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#<init>");
@@ -37,7 +60,7 @@ public class RandomState {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#getOrCreateNoise");
     }
     public PositionalRandomFactory getOrCreateRandomFactory(Identifier name) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#getOrCreateRandomFactory");
+        return randomFactory.fromHashOf(name.toString()).forkPositional();
     }
     public MaterialSystem surfaceSystem() {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#surfaceSystem");
@@ -55,9 +78,9 @@ public class RandomState {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#releaseDensityBufferPool");
     }
     public void garbageCollect() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#garbageCollect");
+        return;
     }
     public long seed() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#seed");
+        return seed;
     }
 }

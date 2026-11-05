@@ -46,10 +46,50 @@ public class StructureBlockEntity extends BlockEntity implements BoundingBoxRend
     public static final int MAX_SIZE_PER_AXIS = 48;
     public static final String AUTHOR_TAG = "author";
     protected void saveAdditional(ValueOutput output) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.StructureBlockEntity#saveAdditional");
+        output.putString("name", getStructureName());
+        output.putString("author", nbt().getStringOr("author", ""));
+        output.putString("metadata", getMetaData());
+        BlockPos structurePos = getStructurePos();
+        output.putInt("posX", structurePos.getX());
+        output.putInt("posY", structurePos.getY());
+        output.putInt("posZ", structurePos.getZ());
+        Vec3i size = getStructureSize();
+        output.putInt("sizeX", size.getX());
+        output.putInt("sizeY", size.getY());
+        output.putInt("sizeZ", size.getZ());
+        output.putString("rotation", getRotation().name());
+        output.putString("mirror", getMirror().name());
+        output.putString("mode", getMode().name());
+        output.putBoolean("ignoreEntities", isIgnoreEntities());
+        output.putBoolean("strict", isStrict());
+        output.putBoolean("powered", isPowered());
+        output.putBoolean("showair", getShowAir());
+        output.putBoolean("showboundingbox", getShowBoundingBox());
+        output.putFloat("integrity", getIntegrity());
+        output.putLong("seed", getSeed());
     }
     protected void loadAdditional(ValueInput input) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.StructureBlockEntity#loadAdditional");
+        TileNbt.update(this, tag -> {
+            tag.putString("name", input.getStringOr("name", ""));
+            tag.putString("author", input.getStringOr("author", ""));
+            tag.putString("metadata", input.getStringOr("metadata", ""));
+            tag.putInt("posX", clamp(input.getIntOr("posX", 0), -48, 48));
+            tag.putInt("posY", clamp(input.getIntOr("posY", 1), -48, 48));
+            tag.putInt("posZ", clamp(input.getIntOr("posZ", 0), -48, 48));
+            tag.putInt("sizeX", clamp(input.getIntOr("sizeX", 0), 0, 48));
+            tag.putInt("sizeY", clamp(input.getIntOr("sizeY", 0), 0, 48));
+            tag.putInt("sizeZ", clamp(input.getIntOr("sizeZ", 0), 0, 48));
+            tag.putString("rotation", enumOf(Rotation.class, input.getStringOr("rotation", "NONE"), Rotation.NONE).name());
+            tag.putString("mirror", enumOf(Mirror.class, input.getStringOr("mirror", "NONE"), Mirror.NONE).name());
+            tag.putString("mode", enumOf(StructureMode.class, input.getStringOr("mode", "DATA"), StructureMode.DATA).name());
+            tag.putBoolean("ignoreEntities", input.getBooleanOr("ignoreEntities", true));
+            tag.putBoolean("strict", input.getBooleanOr("strict", false));
+            tag.putBoolean("powered", input.getBooleanOr("powered", false));
+            tag.putBoolean("showair", input.getBooleanOr("showair", false));
+            tag.putBoolean("showboundingbox", input.getBooleanOr("showboundingbox", true));
+            tag.putFloat("integrity", Math.max(0.0F, Math.min(1.0F, input.getFloatOr("integrity", 1.0F))));
+            tag.putLong("seed", input.getLongOr("seed", 0L));
+        });
     }
     public boolean usedBy(Player player) {
         return false;
@@ -254,10 +294,57 @@ public class StructureBlockEntity extends BlockEntity implements BoundingBoxRend
         TileNbt.update(this, tag -> tag.putBoolean("showboundingbox", showBoundingBox));
     }
     public BoundingBoxRenderable.Mode renderMode() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.StructureBlockEntity#renderMode");
+        StructureMode mode = getMode();
+        if (mode != StructureMode.SAVE && mode != StructureMode.LOAD) {
+            return BoundingBoxRenderable.Mode.NONE;
+        }
+        if (mode == StructureMode.SAVE && getShowAir()) {
+            return BoundingBoxRenderable.Mode.BOX_AND_INVISIBLE_BLOCKS;
+        }
+        return mode == StructureMode.LOAD && !getShowBoundingBox() ? BoundingBoxRenderable.Mode.NONE : BoundingBoxRenderable.Mode.BOX;
     }
     public BoundingBoxRenderable.RenderableBox getRenderableBox() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.StructureBlockEntity#getRenderableBox");
+        BlockPos origin = getStructurePos();
+        Vec3i size = getStructureSize();
+        int dx = size.getX();
+        int dz = size.getZ();
+        Mirror mirror = getMirror();
+        if (mirror == Mirror.LEFT_RIGHT) {
+            dz = -dz;
+        } else if (mirror == Mirror.FRONT_BACK) {
+            dx = -dx;
+        }
+        int x0;
+        int z0;
+        int x1;
+        int z1;
+        switch (getRotation()) {
+            case CLOCKWISE_90 -> {
+                x0 = dz < 0 ? origin.getX() : origin.getX() + 1;
+                z0 = dx < 0 ? origin.getZ() + 1 : origin.getZ();
+                x1 = x0 - dz;
+                z1 = z0 + dx;
+            }
+            case CLOCKWISE_180 -> {
+                x0 = dx < 0 ? origin.getX() : origin.getX() + 1;
+                z0 = dz < 0 ? origin.getZ() : origin.getZ() + 1;
+                x1 = x0 - dx;
+                z1 = z0 - dz;
+            }
+            case COUNTERCLOCKWISE_90 -> {
+                x0 = dz < 0 ? origin.getX() + 1 : origin.getX();
+                z0 = dx < 0 ? origin.getZ() : origin.getZ() + 1;
+                x1 = x0 + dz;
+                z1 = z0 - dx;
+            }
+            default -> {
+                x0 = dx < 0 ? origin.getX() + 1 : origin.getX();
+                z0 = dz < 0 ? origin.getZ() + 1 : origin.getZ();
+                x1 = x0 + dx;
+                z1 = z0 + dz;
+            }
+        }
+        return BoundingBoxRenderable.RenderableBox.fromCorners(x0, origin.getY(), z0, x1, origin.getY() + size.getY(), z1);
     }
     public static enum UpdateType {
         UPDATE_DATA, SAVE_AREA, LOAD_AREA, SCAN_AREA;

@@ -40,10 +40,12 @@ public interface Recipe<T extends RecipeInput> {
         CategoryType category();
         String group();
         static <CategoryType, SelfType extends BookInfo<CategoryType>> MapCodec<SelfType> mapCodec(Codec<CategoryType> categoryCodec, CategoryType defaultCategory, Constructor<CategoryType, SelfType> constructor) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.crafting.Recipe.BookInfo#mapCodec");
+            return com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+                categoryCodec.fieldOf("category").orElse(defaultCategory).forGetter(BookInfo::category),
+                com.mojang.serialization.Codec.STRING.optionalFieldOf("group", "").forGetter(BookInfo::group)).apply(i, constructor));
         }
         static <CategoryType, SelfType extends BookInfo<CategoryType>> StreamCodec<RegistryFriendlyByteBuf, SelfType> streamCodec(StreamCodec<? super RegistryFriendlyByteBuf, CategoryType> categoryCodec, Constructor<CategoryType, SelfType> constructor) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.crafting.Recipe.BookInfo#streamCodec");
+            return StreamCodec.composite(categoryCodec, BookInfo::category, net.minecraft.network.codec.ByteBufCodecs.STRING_UTF8, BookInfo::group, constructor);
         }
         public interface Constructor<CategoryType, SelfType extends BookInfo<CategoryType>> extends BiFunction<CategoryType, String, SelfType> {
         }

@@ -10,9 +10,9 @@ public enum InteractionHand {
 ;
     public static final StreamCodec<ByteBuf, InteractionHand> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.InteractionHand.class, "STREAM_CODEC");
     public HumanoidArm asArm(HumanoidArm mainArm) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.InteractionHand#asArm");
+        return this == MAIN_HAND ? mainArm : mainArm.getOpposite();
     }
     public EquipmentSlot asEquipmentSlot() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.InteractionHand#asEquipmentSlot");
+        return this == MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
     }
 }

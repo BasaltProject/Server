@@ -106,7 +106,7 @@ public class PolarBear extends Animal implements NeutralMob {
         if (live() instanceof org.bukkit.entity.PolarBear api) { api.setStanding(value); }
     }
     public float getStandingAnimationScale(float a) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.polarbear.PolarBear#getStandingAnimationScale");
+        return isStanding() ? 1.0F : 0.0F;
     }
     protected float getWaterSlowDown() {
         return 0;

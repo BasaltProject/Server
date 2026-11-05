@@ -27,6 +27,7 @@ public final class LeftoverNatives {
     public static native byte[] registryData(String registry, String id);
     public static native String[] entityDefaults(String type);
     public static native double humidity(String world, int x, int y, int z);
+    public static native long[] climate(String world, int quartX, int quartY, int quartZ);
     public static native boolean dragonAction(String world, String action, int value);
 
     public static native boolean dragonBar(String world, String action, String text, int value);

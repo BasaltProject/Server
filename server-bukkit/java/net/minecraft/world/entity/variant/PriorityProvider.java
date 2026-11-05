@@ -52,7 +52,9 @@ public interface PriorityProvider<Context, Condition extends PriorityProvider.Se
             this(Optional.empty(), priority);
         }
         public static <Context, Condition extends SelectorCondition<Context>> Codec<Selector<Context, Condition>> codec(Codec<Condition> conditionCodec) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.variant.PriorityProvider.Selector#codec");
+            return com.mojang.serialization.codecs.RecordCodecBuilder.create(i -> i.group(
+                conditionCodec.optionalFieldOf("condition").forGetter(Selector::condition),
+                Codec.INT.fieldOf("priority").forGetter(Selector::priority)).apply(i, Selector::new));
         }
     }
     public interface SelectorCondition<C> extends Predicate<C> {

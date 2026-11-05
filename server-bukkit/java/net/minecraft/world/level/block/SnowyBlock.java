@@ -26,7 +26,7 @@ public class SnowyBlock extends Block {
         return super.getStateForPlacement(context);
     }
     protected static boolean isSnowySetting(BlockState aboveState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.SnowyBlock#isSnowySetting");
+        return aboveState.is(net.minecraft.tags.BlockTags.SNOW);
     }
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         super.createBlockStateDefinition(builder);

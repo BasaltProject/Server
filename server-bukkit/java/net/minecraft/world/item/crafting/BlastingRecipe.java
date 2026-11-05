@@ -6,8 +6,8 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStackTemplate;
 public class BlastingRecipe extends AbstractCookingRecipe {
-    public static final MapCodec<BlastingRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.BlastingRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, BlastingRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.BlastingRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<BlastingRecipe> MAP_CODEC = AbstractCookingRecipe.cookingMapCodec(BlastingRecipe::new);
+    public static final StreamCodec<RegistryFriendlyByteBuf, BlastingRecipe> STREAM_CODEC = AbstractCookingRecipe.cookingStreamCodec(BlastingRecipe::new);
     public static final RecipeSerializer<BlastingRecipe> SERIALIZER = null;
     public BlastingRecipe(Recipe.CommonInfo commonInfo, AbstractCookingRecipe.CookingBookInfo bookInfo, Ingredient ingredient, ItemStackTemplate result, float experience, int cookingTime) {
         super(commonInfo, bookInfo, ingredient, result, experience, cookingTime);

@@ -34,7 +34,10 @@ public class FenceBlock extends CrossCollisionBlock {
         return super.isPathfindable(state, type);
     }
     public boolean connectsTo(BlockState state, boolean faceSolid, Direction direction) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FenceBlock#connectsTo");
+        boolean sameKind = state.is(net.minecraft.tags.BlockTags.FENCES)
+            && state.is(net.minecraft.tags.BlockTags.WOODEN_FENCES) == defaultBlockState().is(net.minecraft.tags.BlockTags.WOODEN_FENCES);
+        boolean gate = state.getBlock() instanceof FenceGateBlock && FenceGateBlock.connectsToDirection(state, direction);
+        return (faceSolid && !isExceptionForConnection(state)) || sameKind || gate;
     }
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult) {
         return super.useWithoutItem(state, level, pos, player, hitResult);

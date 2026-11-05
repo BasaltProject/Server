@@ -5,9 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.state.BlockState;
 public interface LevelWriter {
-    default boolean setBlock(BlockPos pos, BlockState blockState, int updateFlags, int updateLimit) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelWriter#setBlock");
-    }
+    boolean setBlock(BlockPos pos, BlockState blockState, int updateFlags, int updateLimit);
     default boolean setBlockAndUpdate(BlockPos pos, BlockState blockState) {
         return setBlock(pos, blockState, 3);
     }
@@ -23,10 +21,8 @@ public interface LevelWriter {
     default boolean destroyBlock(BlockPos pos, boolean dropResources, Entity breaker) {
         return destroyBlock(pos, dropResources, breaker, 512);
     }
-    default boolean destroyBlock(BlockPos pos, boolean dropResources, Entity breaker, int updateLimit) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelWriter#destroyBlock");
-    }
+    boolean destroyBlock(BlockPos pos, boolean dropResources, Entity breaker, int updateLimit);
     default boolean addFreshEntity(Entity entity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelWriter#addFreshEntity");
+        return false;
     }
 }

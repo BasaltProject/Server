@@ -232,7 +232,7 @@ public class ServerChunkCache extends ChunkSource {
     }
 
     public RandomState randomState() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerChunkCache.randomState");
+        return RandomState.forWorld(world, level.getSeed(), false);
     }
     public ServerChunkCache(ServerLevel level, LevelStorageSource.LevelStorageAccess levelStorage, DataFixer fixerUpper, StructureTemplateManager structureTemplateManager, Executor executor, ChunkGenerator generator, int viewDistance, int simulationDistance, boolean syncWrites, ChunkStatusUpdateListener chunkStatusListener) {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#<init>");
@@ -256,7 +256,7 @@ public class ServerChunkCache extends ChunkSource {
         return level;
     }
     boolean runDistanceManagerUpdates() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#runDistanceManagerUpdates");
+        return false;
     }
     public boolean isPositionTicking(long chunkKey) {
         return WorldNatives.chunkLoaded(world, ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey));
@@ -265,7 +265,7 @@ public class ServerChunkCache extends ChunkSource {
         WorldNatives.saveWorld(world);
     }
     public void close() throws IOException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#close");
+        lightEngine.close();
     }
     public void tick(BooleanSupplier haveTime, boolean tickChunks) {
 
@@ -277,11 +277,13 @@ public class ServerChunkCache extends ChunkSource {
         return 0;
     }
     public ChunkGeneratorStructureState getGeneratorState() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#getGeneratorState");
+        return chunkMap.generatorState();
     }
     public int getLoadedChunksCount() {
         int[] loaded = WorldNatives.loadedChunks(world);
         return loaded == null ? 0 : loaded.length / 2;
+    }
+    public void onSectionEmptinessChanged(int sectionX, int sectionY, int sectionZ, boolean empty) {
     }
     public void onLightUpdate(LightLayer layer, SectionPos pos) {
 
@@ -355,16 +357,16 @@ public class ServerChunkCache extends ChunkSource {
 
     }
     public String getChunkDebugData(ChunkPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#getChunkDebugData");
+        return pos + (WorldNatives.chunkLoaded(world, pos.x(), pos.z()) ? " loaded" : " unloaded");
     }
     public PoiManager getPoiManager() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#getPoiManager");
+        return level.getPoiManager();
     }
     public ChunkScanAccess chunkScanner() {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#chunkScanner");
     }
     public NaturalSpawner. SpawnState getLastSpawnState() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#getLastSpawnState");
+        return null;
     }
     public void deactivateTicketsOnClosing() {
 
@@ -374,25 +376,25 @@ public class ServerChunkCache extends ChunkSource {
     }
     final class MainThreadExecutor extends BlockableEventLoop<Runnable> {
         private MainThreadExecutor(Level level) {
-            super((String) null, false); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#<init>");
+            super("Chunk source main thread executor for " + level, false);
         }
         public Runnable wrapRunnable(Runnable runnable) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#wrapRunnable");
+            return runnable;
         }
         protected boolean shouldRun(Runnable task) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#shouldRun");
+            return true;
         }
         protected boolean scheduleExecutables() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#scheduleExecutables");
+            return true;
         }
         protected Thread getRunningThread() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#getRunningThread");
+            return net.minecraft.server.MinecraftServer.getServer().getRunningThread();
         }
         protected void doRunTask(Runnable task) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#doRunTask");
+            task.run();
         }
         protected boolean pollTask() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache.MainThreadExecutor#pollTask");
+            return super.pollTask();
         }
     }
 }

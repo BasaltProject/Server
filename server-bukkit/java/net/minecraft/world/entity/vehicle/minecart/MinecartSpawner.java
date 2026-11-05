@@ -9,11 +9,17 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 public class MinecartSpawner extends AbstractMinecart {
+    private final BaseSpawner spawner = new BaseSpawner() {
+        public void broadcastEvent(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos, int id) {
+            level.broadcastEntityEvent(MinecartSpawner.this, (byte) id);
+        }
+    };
+
     public MinecartSpawner(EntityType<? extends MinecartSpawner> type, Level level) {
         super(type, level);
     }
     protected Item getDropItem() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.vehicle.minecart.MinecartSpawner#getDropItem");
+        return net.minecraft.world.item.Items.MINECART;
     }
     public ItemStack getPickResult() {
         return new ItemStack(net.minecraft.world.item.Items.MINECART);
@@ -27,6 +33,6 @@ public class MinecartSpawner extends AbstractMinecart {
     public void tick() {
     }
     public BaseSpawner getSpawner() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.vehicle.minecart.MinecartSpawner#getSpawner");
+        return spawner;
     }
 }

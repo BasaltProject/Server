@@ -75,7 +75,7 @@ public class Ravager extends Raider {
         return super.checkSpawnObstruction(level);
     }
     public void applyRaidBuffs(ServerLevel level, int wave, boolean isCaptain) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.Ravager#applyRaidBuffs");
+        return;
     }
     public boolean canBeLeader() {
         return false;

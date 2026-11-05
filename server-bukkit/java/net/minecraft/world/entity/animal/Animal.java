@@ -59,10 +59,10 @@ public abstract class Animal extends AgeableMob {
     }
     public abstract boolean isFood(ItemStack itemStack);
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.Animal#mobInteract");
+        return super.mobInteract(player, hand);
     }
     protected void playEatingSound() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.Animal#playEatingSound");
+        return;
     }
     public boolean canFallInLove() {
         return getInLoveTime() <= 0;
@@ -101,7 +101,10 @@ public abstract class Animal extends AgeableMob {
         }
     }
     public void finalizeSpawnChildFromBreeding(ServerLevel level, Animal partner, AgeableMob offspring) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.Animal#finalizeSpawnChildFromBreeding");
+        setAge(6000);
+        partner.setAge(6000);
+        resetLove();
+        partner.resetLove();
     }
     public void handleEntityEvent(byte id) {
     }

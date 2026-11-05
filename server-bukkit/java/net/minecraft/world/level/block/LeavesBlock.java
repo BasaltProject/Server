@@ -35,7 +35,7 @@ public class LeavesBlock extends Block implements SimpleWaterloggedBlock {
         return super.skipRendering(state, neighborState, direction);
     }
     public static void setCutoutLeaves(boolean cutoutLeaves) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.LeavesBlock#setCutoutLeaves");
+
     }
     protected VoxelShape getBlockSupportShape(BlockState state, BlockGetter level, BlockPos pos) {
         return super.getBlockSupportShape(state, level, pos);

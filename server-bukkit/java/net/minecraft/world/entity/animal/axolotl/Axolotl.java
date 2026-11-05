@@ -228,7 +228,7 @@ public class Axolotl extends Animal implements Bucketable {
     }
     static class AxolotlMoveControl<T extends Axolotl> extends SmoothSwimmingMoveControl<T> {
         public AxolotlMoveControl(T axolotl) {
-            super(org.basaltmc.bukkit.facade.NmsStub.nul(), (int) 0, (int) 0, (float) 0, (float) 0, false);
+            super(axolotl, 85, 10, 0.1F, 0.5F, false);
         }
         public void tick() {
         }

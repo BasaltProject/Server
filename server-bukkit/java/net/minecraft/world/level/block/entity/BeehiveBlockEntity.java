@@ -72,29 +72,47 @@ public class BeehiveBlockEntity extends BlockEntity {
     }
 
     static class BeeData {
+        private final Occupant occupant;
+        private int ticksInHive;
         private BeeData(Occupant occupant) {
-            
+            this.occupant = occupant;
+            this.ticksInHive = occupant.ticksInHive();
         }
         public boolean tick() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BeehiveBlockEntity.BeeData#tick");
+            ticksInHive++;
+            return ticksInHive > occupant.minTicksInHive();
         }
         public Occupant toOccupant() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BeehiveBlockEntity.BeeData#toOccupant");
+            return new Occupant(occupant.entityData(), ticksInHive, occupant.minTicksInHive());
         }
         public boolean hasNectar() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BeehiveBlockEntity.BeeData#hasNectar");
+            return occupant.entityData().getUnsafe().getBooleanOr("HasNectar", false);
         }
     }
+
+    private static final int kMinTicksInHive = 600;
+    private static final java.util.List<String> kIgnoredBeeTags = java.util.List.of("Air", "drop_chances", "equipment",
+        "Brain", "CanPickUpLoot", "FallDistance", "FallFlying", "Fire", "HurtByTimestamp", "HurtTime", "LeftHanded",
+        "Motion", "NoGravity", "OnGround", "PortalCooldown", "Pos", "Rotation", "sleeping_pos", "CannotEnterHiveTicks",
+        "TicksSincePollination", "CropsGrownSincePollination", "hive_pos", "Passengers", "leash", "UUID", "id");
 
     public static record Occupant(TypedEntityData<EntityType<?>> entityData, int ticksInHive, int minTicksInHive) {
         public static final Codec<Occupant> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.block.entity.BeehiveBlockEntity.Occupant.class, "CODEC");
         public static final Codec<List<Occupant>> LIST_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.block.entity.BeehiveBlockEntity.Occupant.class, "LIST_CODEC");
         public static final StreamCodec<RegistryFriendlyByteBuf, Occupant> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.level.block.entity.BeehiveBlockEntity.Occupant.class, "STREAM_CODEC");
         public static Occupant of(Entity entity) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BeehiveBlockEntity.Occupant#of");
+            if (!(entity.level() instanceof ServerLevel server)) {
+                return create(0);
+            }
+            byte[] raw = org.basaltmc.bukkit.WorldNatives.entityNbt(server.getWorld().getName(), entity.getId());
+            CompoundTag tag = raw == null ? new CompoundTag() : org.basaltmc.bukkit.facade.NbtCodec.fromBytes(raw);
+            for (String ignored : kIgnoredBeeTags) {
+                tag.remove(ignored);
+            }
+            return new Occupant(TypedEntityData.of(entity.getType(), tag), 0, kMinTicksInHive);
         }
         public static Occupant create(int ticksInHive) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BeehiveBlockEntity.Occupant#create");
+            return new Occupant(TypedEntityData.<EntityType<?>>of(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("bee")), new CompoundTag()), ticksInHive, kMinTicksInHive);
         }
         public Entity createEntity(Level level, BlockPos hivePos) {
             throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BeehiveBlockEntity.Occupant#createEntity");

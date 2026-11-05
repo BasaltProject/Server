@@ -31,6 +31,21 @@ public interface LevelBasedValue {
 
     float calculate(int level);
 
+    default void encode(List<Double> out, int level) {
+        out.add(0.0);
+        out.add((double) calculate(level));
+    }
+
+    static float run(LevelBasedValue value, int level) {
+        List<Double> program = new ArrayList<>();
+        value.encode(program, level);
+        double[] flat = new double[program.size()];
+        for (int at = 0; at < flat.length; at++) {
+            flat[at] = program.get(at);
+        }
+        return org.basaltmc.bukkit.MechanicsNatives.levelValue(flat, level);
+    }
+
     /** Reads the datapack form: a bare number or an object with a `type`. */
     static LevelBasedValue fromData(Object raw) {
         if (raw instanceof Number number) {
@@ -73,6 +88,12 @@ public interface LevelBasedValue {
         public static final MapCodec<Constant> TYPED_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.enchantment.LevelBasedValue.Constant.class, "TYPED_CODEC");
 
         @Override
+        public void encode(List<Double> out, int level) {
+            out.add(0.0);
+            out.add((double) value);
+        }
+
+        @Override
         public float calculate(int level) {
             return value;
         }
@@ -82,8 +103,18 @@ public interface LevelBasedValue {
         public static final MapCodec<Lookup> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.enchantment.LevelBasedValue.Lookup.class, "CODEC");
 
         @Override
+        public void encode(List<Double> out, int level) {
+            out.add(6.0);
+            out.add((double) values.size());
+            for (Float entry : values) {
+                out.add((double) entry);
+            }
+            fallback.encode(out, level);
+        }
+
+        @Override
         public float calculate(int level) {
-            return level <= values.size() ? values.get(level - 1) : fallback.calculate(level);
+            return run(this, level);
         }
     }
 
@@ -91,8 +122,15 @@ public interface LevelBasedValue {
         public static final MapCodec<Linear> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.enchantment.LevelBasedValue.Linear.class, "CODEC");
 
         @Override
+        public void encode(List<Double> out, int level) {
+            out.add(1.0);
+            out.add((double) base);
+            out.add((double) perLevelAboveFirst);
+        }
+
+        @Override
         public float calculate(int level) {
-            return base + perLevelAboveFirst * (level - 1);
+            return run(this, level);
         }
     }
 
@@ -100,8 +138,16 @@ public interface LevelBasedValue {
         public static final MapCodec<Clamped> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.enchantment.LevelBasedValue.Clamped.class, "CODEC");
 
         @Override
+        public void encode(List<Double> out, int level) {
+            out.add(3.0);
+            out.add((double) min);
+            out.add((double) max);
+            value.encode(out, level);
+        }
+
+        @Override
         public float calculate(int level) {
-            return Math.clamp(value.calculate(level), min, max);
+            return run(this, level);
         }
     }
 
@@ -109,9 +155,15 @@ public interface LevelBasedValue {
         public static final MapCodec<Fraction> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.enchantment.LevelBasedValue.Fraction.class, "CODEC");
 
         @Override
+        public void encode(List<Double> out, int level) {
+            out.add(4.0);
+            numerator.encode(out, level);
+            denominator.encode(out, level);
+        }
+
+        @Override
         public float calculate(int level) {
-            float bottom = denominator.calculate(level);
-            return bottom == 0.0F ? 0.0F : numerator.calculate(level) / bottom;
+            return run(this, level);
         }
     }
 
@@ -119,8 +171,15 @@ public interface LevelBasedValue {
         public static final MapCodec<Exponent> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.enchantment.LevelBasedValue.Exponent.class, "CODEC");
 
         @Override
+        public void encode(List<Double> out, int level) {
+            out.add(5.0);
+            base.encode(out, level);
+            power.encode(out, level);
+        }
+
+        @Override
         public float calculate(int level) {
-            return (float) Math.pow(base.calculate(level), power.calculate(level));
+            return run(this, level);
         }
     }
 
@@ -128,8 +187,14 @@ public interface LevelBasedValue {
         public static final MapCodec<LevelsSquared> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.enchantment.LevelBasedValue.LevelsSquared.class, "CODEC");
 
         @Override
+        public void encode(List<Double> out, int level) {
+            out.add(2.0);
+            out.add((double) added);
+        }
+
+        @Override
         public float calculate(int level) {
-            return level * level + added;
+            return run(this, level);
         }
     }
 }

@@ -126,7 +126,8 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
         return section == null ? Optional.empty() : section.getType(pos);
     }
     public DebugPoiInfo getDebugPoiInfo(BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.ai.village.poi.PoiManager#getDebugPoiInfo");
+        return getInRange(type -> true, pos, 1, Occupancy.ANY).filter(record -> record.getPos().equals(pos)).findFirst()
+            .map(DebugPoiInfo::new).orElse(null);
     }
     public int sectionsToVillage(SectionPos sectionPos) {
         return 7;
@@ -141,7 +142,7 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
         return;
     }
     public void checkConsistencyWithBlocks(SectionPos sectionPos, LevelChunkSection blockSection) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.ai.village.poi.PoiManager#checkConsistencyWithBlocks");
+        return;
     }
     public void ensureLoadedAndValid(LevelReader reader, BlockPos center, int radius) {
         return;
@@ -161,16 +162,16 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
             super((int) 0, (int) 0, (int) 0);
         }
         protected int getLevelFromSource(long to) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.ai.village.poi.PoiManager.DistanceTracker#getLevelFromSource");
+            return 7;
         }
         protected int getLevel(long node) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.ai.village.poi.PoiManager.DistanceTracker#getLevel");
+            return 7;
         }
         protected void setLevel(long node, int level) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.ai.village.poi.PoiManager.DistanceTracker#setLevel");
+            return;
         }
         public void runAllUpdates() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.ai.village.poi.PoiManager.DistanceTracker#runAllUpdates");
+            return;
         }
     }
 }

@@ -19,9 +19,37 @@ public record PiercingWeapon(boolean dealsKnockback, boolean dismounts, Optional
         hitSound.ifPresent(event -> causer.level().playSound(null, causer.getX(), causer.getY(), causer.getZ(), event, causer.getSoundSource(), 1.0F, 1.0F));
     }
     public static boolean canHitEntity(Entity jabber, Entity target) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.PiercingWeapon#canHitEntity");
+        if (target.isInvulnerableToPiercingWeapon() || !target.isAlive()) {
+            return false;
+        }
+        if (target instanceof net.minecraft.world.entity.Interaction) {
+            return true;
+        }
+        if (!target.canBeHitByProjectile()) {
+            return false;
+        }
+        if (target instanceof net.minecraft.world.entity.player.Player victim
+            && jabber instanceof net.minecraft.world.entity.player.Player jabbingPlayer && !jabbingPlayer.canHarmPlayer(victim)) {
+            return false;
+        }
+        return !jabber.isPassengerOfSameVehicle(target);
     }
     public void attack(LivingEntity attacker, EquipmentSlot hand) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.PiercingWeapon#attack");
+        float damage = (float) attacker.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE);
+        net.minecraft.world.item.ItemStack weapon = attacker.getItemBySlot(hand);
+        AttackRange range = attacker.getAttackRangeWith(weapon);
+        boolean hitSomething = false;
+        var along = net.minecraft.world.entity.projectile.ProjectileUtil.getHitEntitiesAlong(attacker, range,
+            target -> canHitEntity(attacker, target), net.minecraft.world.level.ClipContext.Block.COLLIDER);
+        for (var hit : along.right().orElse(java.util.List.of())) {
+            hitSomething |= attacker.stabAttack(hand, hit.getEntity(), damage, true, dealsKnockback, dismounts);
+        }
+        attacker.onAttack();
+        attacker.postPiercingAttack();
+        if (hitSomething) {
+            makeHitSound(attacker);
+        }
+        makeSound(attacker);
+        attacker.swingAndResetAttackStrength(net.minecraft.world.InteractionHand.MAIN_HAND, weapon.getAttackAnimation(), false);
     }
 }

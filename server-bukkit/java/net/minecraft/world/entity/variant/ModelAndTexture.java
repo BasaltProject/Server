@@ -11,9 +11,12 @@ public record ModelAndTexture<T>(T model, ClientAsset.ResourceTexture asset) {
         this(model, new ClientAsset.ResourceTexture(assetId));
     }
     public static <T> MapCodec<ModelAndTexture<T>> codec(Codec<T> modelCodec, T defaultModel) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.variant.ModelAndTexture#codec");
+        return com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+            modelCodec.optionalFieldOf("model", defaultModel).forGetter(ModelAndTexture::model),
+            ClientAsset.ResourceTexture.DEFAULT_FIELD_CODEC.forGetter(ModelAndTexture::asset)).apply(i, ModelAndTexture::new));
     }
     public static <T> StreamCodec<RegistryFriendlyByteBuf, ModelAndTexture<T>> streamCodec(StreamCodec<? super RegistryFriendlyByteBuf, T> modelCodec) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.variant.ModelAndTexture#streamCodec");
+        return StreamCodec.composite(modelCodec, ModelAndTexture::model, ClientAsset.ResourceTexture.STREAM_CODEC,
+            ModelAndTexture::asset, ModelAndTexture::new);
     }
 }

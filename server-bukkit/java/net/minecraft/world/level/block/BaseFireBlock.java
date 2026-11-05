@@ -39,7 +39,18 @@ public abstract class BaseFireBlock extends Block {
         super.entityInside(state, level, pos, entity, effectApplier, isPrecise);
     }
     public static void fireIgnite(Entity entity) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.BaseFireBlock#fireIgnite");
+        if (entity.fireImmune()) {
+            return;
+        }
+        int ticks = entity.getRemainingFireTicks();
+        if (ticks < 0) {
+            entity.setRemainingFireTicks(ticks + 1);
+        } else if (entity instanceof net.minecraft.server.level.ServerPlayer) {
+            entity.setRemainingFireTicks(ticks + entity.level().getRandom().nextInt(1, 3));
+        }
+        if (entity.getRemainingFireTicks() >= 0) {
+            entity.igniteForSeconds(8.0F);
+        }
     }
     protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
         super.onPlace(state, level, pos, oldState, movedByPiston);

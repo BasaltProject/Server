@@ -91,7 +91,9 @@ public class Chicken extends Animal {
     protected void addAdditionalSaveData(ValueOutput output) {
     }
     public void setVariant(Holder<ChickenVariant> variant) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.chicken.Chicken#setVariant");
+        if (live() instanceof org.bukkit.entity.Chicken api) {
+            api.setVariant((org.bukkit.entity.Chicken.Variant) org.basaltmc.bukkit.facade.VariantHolders.bukkit(io.papermc.paper.registry.RegistryKey.CHICKEN_VARIANT, variant));
+        }
     }
     public Holder<ChickenVariant> getVariant() {
         return live() instanceof org.bukkit.entity.Chicken api
@@ -111,6 +113,8 @@ public class Chicken extends Animal {
         return live() instanceof org.bukkit.entity.Chicken api ? (boolean) api.isChickenJockey() : false;
     }
     public void setChickenJockey(boolean isChickenJockey) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.chicken.Chicken#setChickenJockey");
+        if (live() instanceof org.bukkit.entity.Chicken api) {
+            api.setIsChickenJockey(isChickenJockey);
+        }
     }
 }

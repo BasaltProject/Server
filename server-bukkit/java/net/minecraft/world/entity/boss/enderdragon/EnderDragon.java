@@ -34,6 +34,7 @@ public class EnderDragon extends Mob implements Enemy {
     public int dragonDeathTime;
     public float yRotA;
     public EndCrystal nearestCrystal;
+    private EnderDragonPhaseManager phaseManager;
     public EnderDragon(EntityType<? extends EnderDragon> type, Level level) {
         super(type, level);
     }
@@ -68,13 +69,29 @@ public class EnderDragon extends Mob implements Enemy {
     protected void tickDeath() {
     }
     public int findClosestNode() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.boss.enderdragon.EnderDragon#findClosestNode");
+        return findClosestNode(getX(), getY(), getZ());
     }
     public int findClosestNode(double tX, double tY, double tZ) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.boss.enderdragon.EnderDragon#findClosestNode");
+        boolean crystals = dragonFight != null && dragonFight.aliveCrystals() > 0;
+        return org.basaltmc.bukkit.EntityNatives.call(level().getWorld().getName(), getId(), "dragon_closest_node", new Object[] {tX, tY, tZ, crystals})
+            instanceof Long index ? index.intValue() : -1;
     }
     public Path findPath(int startIndex, int endIndex, Node finalNode) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.boss.enderdragon.EnderDragon#findPath");
+        boolean crystals = dragonFight != null && dragonFight.aliveCrystals() > 0;
+        Object rows = finalNode == null
+            ? org.basaltmc.bukkit.EntityNatives.call(level().getWorld().getName(), getId(), "dragon_find_path", new Object[] {(long) startIndex, (long) endIndex, crystals})
+            : org.basaltmc.bukkit.EntityNatives.call(level().getWorld().getName(), getId(), "dragon_find_path",
+                new Object[] {(long) startIndex, (long) endIndex, crystals, (long) finalNode.x, (long) finalNode.y, (long) finalNode.z});
+        if (!(rows instanceof String[] lines) || lines.length == 0) {
+            return null;
+        }
+        java.util.List<Node> nodes = new java.util.ArrayList<>();
+        for (String line : lines) {
+            String[] axes = line.split(",");
+            nodes.add(new Node(Integer.parseInt(axes[0]), Integer.parseInt(axes[1]), Integer.parseInt(axes[2])));
+        }
+        Node last = nodes.get(nodes.size() - 1);
+        return new Path(nodes, new BlockPos(last.x, last.y, last.z), true);
     }
     protected void addAdditionalSaveData(ValueOutput output) {
     }
@@ -83,7 +100,7 @@ public class EnderDragon extends Mob implements Enemy {
     public void checkDespawn() {
     }
     public EnderDragonPart[] getSubEntities() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.boss.enderdragon.EnderDragon#getSubEntities");
+        return new EnderDragonPart[0];
     }
     public boolean isPickable() {
         return super.isPickable();
@@ -115,7 +132,10 @@ public class EnderDragon extends Mob implements Enemy {
     public void onSyncedDataUpdated(EntityDataAccessor<?> accessor) {
     }
     public EnderDragonPhaseManager getPhaseManager() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.boss.enderdragon.EnderDragon#getPhaseManager");
+        if (phaseManager == null) {
+            phaseManager = new EnderDragonPhaseManager(this);
+        }
+        return phaseManager;
     }
     public EnderDragonFight getDragonFight() {
         return dragonFight;

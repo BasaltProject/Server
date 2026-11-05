@@ -69,4 +69,15 @@ public final class NativePoiManager extends PoiManager {
     public java.util.Optional<Holder<PoiType>> getType(BlockPos pos) {
         return rows(type -> true, pos, 1, Occupancy.ANY).filter(record -> record.getPos().equals(pos)).map(PoiRecord::getPoiType).findFirst();
     }
+
+    @Override
+    public int sectionsToVillage(net.minecraft.core.SectionPos sectionPos) {
+        BlockPos middle = sectionPos.center();
+        int reach = (MAX_VILLAGE_DISTANCE + 1) * 16;
+        return rows(type -> type.is(net.minecraft.tags.PoiTypeTags.VILLAGE), middle, reach, Occupancy.ANY).mapToInt(record -> {
+            BlockPos at = record.getPos();
+            return Math.max(Math.max(Math.abs((at.getX() >> 4) - sectionPos.x()), Math.abs((at.getY() >> 4) - sectionPos.y())),
+                Math.abs((at.getZ() >> 4) - sectionPos.z()));
+        }).filter(distance -> distance <= MAX_VILLAGE_DISTANCE).min().orElse(MAX_VILLAGE_DISTANCE + 1);
+    }
 }

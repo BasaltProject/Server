@@ -129,301 +129,138 @@ public abstract class BlockBehaviour implements FeatureElement {
             Property<?> property = owner.propertiesInOrder()[index];
             return ((id - owner.firstState()) / owner.strideOf(index)) % property.getPossibleValues().size();
         }
-            protected BlockStateBase(Block owner, Property<?>[] propertyKeys, Comparable<?>[] propertyValues) {
-            super(org.basaltmc.bukkit.facade.NmsStub.nul(), (net.minecraft.world.level.block.state.properties.Property[]) null, (Comparable[]) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#<init>");
+        protected BlockStateBase(Block owner, Property<?>[] propertyKeys, Comparable<?>[] propertyValues) {
+            this(owner, stateIdFor(owner, propertyKeys, propertyValues));
+        }
+        private static int stateIdFor(Block owner, Property<?>[] keys, Comparable<?>[] values) {
+            int offset = 0;
+            for (int i = 0; i < keys.length; i++) {
+                offset += keys[i].getPossibleValues().indexOf(values[i]) * owner.strideOf(owner.indexOf(keys[i]));
+            }
+            return owner.firstState() + offset;
         }
         public void initCache() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#initCache");
+
         }
-        public Holder<Block> typeHolder() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#typeHolder");
-        }
-        public boolean isSolid() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isSolid");
-        }
-        public boolean isValidSpawn(BlockGetter level, BlockPos pos, EntityType<?> type) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isValidSpawn");
-        }
-        public boolean propagatesSkylightDown() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#propagatesSkylightDown");
-        }
-        public int getLightDampening() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getLightDampening");
-        }
+        public abstract Holder<Block> typeHolder();
+        public abstract boolean isSolid();
+        public abstract boolean isValidSpawn(BlockGetter level, BlockPos pos, EntityType<?> type);
+        public abstract boolean propagatesSkylightDown();
+        public abstract int getLightDampening();
         public VoxelShape getFaceOcclusionShape(Direction direction) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getFaceOcclusionShape");
+            return canOcclude() ? getOcclusionShape().getFaceShape(direction) : VoxelShape.EMPTY;
         }
-        public VoxelShape getOcclusionShape() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getOcclusionShape");
-        }
-        public boolean hasLargeCollisionShape() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#hasLargeCollisionShape");
-        }
-        public boolean useShapeForLightOcclusion() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#useShapeForLightOcclusion");
-        }
-        public int getLightEmission() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getLightEmission");
-        }
-        public boolean isAir() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isAir");
-        }
-        public boolean ignitedByLava() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#ignitedByLava");
-        }
-        public boolean liquid() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#liquid");
-        }
-        public MapColor getMapColor(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getMapColor");
-        }
-        public BlockState rotate(Rotation rotation) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#rotate");
-        }
-        public BlockState mirror(Mirror mirror) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#mirror");
-        }
-        public RenderShape getRenderShape() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getRenderShape");
-        }
-        public boolean emissiveRendering() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#emissiveRendering");
-        }
-        public float getShadeBrightness(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getShadeBrightness");
-        }
-        public boolean isRedstoneConductor(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isRedstoneConductor");
-        }
-        public boolean isSignalSource() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isSignalSource");
-        }
-        public boolean shouldRedstoneWireConnectTo(BlockGetter level, BlockPos pos, Direction direction) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#shouldRedstoneWireConnectTo");
-        }
-        public int getOwnSignal(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getOwnSignal");
-        }
-        public int getSignal(BlockGetter level, BlockPos pos, Direction direction) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getSignal");
-        }
-        public boolean hasAnalogOutputSignal() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#hasAnalogOutputSignal");
-        }
-        public int getAnalogOutputSignal(Level level, BlockPos pos, Direction direction) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getAnalogOutputSignal");
-        }
-        public float getDestroySpeed(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getDestroySpeed");
-        }
-        public float getDestroyProgress(Player player, BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getDestroyProgress");
-        }
-        public int getDirectSignal(BlockGetter level, BlockPos pos, Direction direction) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getDirectSignal");
-        }
-        public PushReaction getPistonPushReaction() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getPistonPushReaction");
-        }
-        public boolean isSolidRender() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isSolidRender");
-        }
-        public boolean canOcclude() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#canOcclude");
-        }
-        public boolean skipRendering(BlockState neighborState, Direction direction) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#skipRendering");
-        }
-        public VoxelShape getShape(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getShape");
-        }
-        public VoxelShape getShape(BlockGetter level, BlockPos pos, CollisionContext context) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getShape");
-        }
-        public VoxelShape getCollisionShape(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getCollisionShape");
-        }
-        public VoxelShape getCollisionShape(BlockGetter level, BlockPos pos, CollisionContext context) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getCollisionShape");
-        }
+        public abstract VoxelShape getOcclusionShape();
+        public abstract boolean hasLargeCollisionShape();
+        public abstract boolean useShapeForLightOcclusion();
+        public abstract int getLightEmission();
+        public abstract boolean isAir();
+        public abstract boolean ignitedByLava();
+        public abstract boolean liquid();
+        public abstract MapColor getMapColor(BlockGetter level, BlockPos pos);
+        public abstract BlockState rotate(Rotation rotation);
+        public abstract BlockState mirror(Mirror mirror);
+        public abstract RenderShape getRenderShape();
+        public abstract boolean emissiveRendering();
+        public abstract float getShadeBrightness(BlockGetter level, BlockPos pos);
+        public abstract boolean isRedstoneConductor(BlockGetter level, BlockPos pos);
+        public abstract boolean isSignalSource();
+        public abstract boolean shouldRedstoneWireConnectTo(BlockGetter level, BlockPos pos, Direction direction);
+        public abstract int getOwnSignal(BlockGetter level, BlockPos pos);
+        public abstract int getSignal(BlockGetter level, BlockPos pos, Direction direction);
+        public abstract boolean hasAnalogOutputSignal();
+        public abstract int getAnalogOutputSignal(Level level, BlockPos pos, Direction direction);
+        public abstract float getDestroySpeed(BlockGetter level, BlockPos pos);
+        public abstract float getDestroyProgress(Player player, BlockGetter level, BlockPos pos);
+        public abstract int getDirectSignal(BlockGetter level, BlockPos pos, Direction direction);
+        public abstract PushReaction getPistonPushReaction();
+        public abstract boolean isSolidRender();
+        public abstract boolean canOcclude();
+        public abstract boolean skipRendering(BlockState neighborState, Direction direction);
+        public abstract VoxelShape getShape(BlockGetter level, BlockPos pos);
+        public abstract VoxelShape getShape(BlockGetter level, BlockPos pos, CollisionContext context);
+        public abstract VoxelShape getCollisionShape(BlockGetter level, BlockPos pos);
+        public abstract VoxelShape getCollisionShape(BlockGetter level, BlockPos pos, CollisionContext context);
         public VoxelShape getEntityInsideCollisionShape(BlockGetter level, BlockPos pos, Entity entity) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getEntityInsideCollisionShape");
+            return getBlock().getEntityInsideCollisionShape(asState(), level, pos, entity);
         }
-        public VoxelShape getBlockSupportShape(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getBlockSupportShape");
-        }
-        public VoxelShape getVisualShape(BlockGetter level, BlockPos pos, CollisionContext context) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getVisualShape");
-        }
-        public VoxelShape getInteractionShape(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getInteractionShape");
-        }
+        public abstract VoxelShape getBlockSupportShape(BlockGetter level, BlockPos pos);
+        public abstract VoxelShape getVisualShape(BlockGetter level, BlockPos pos, CollisionContext context);
+        public abstract VoxelShape getInteractionShape(BlockGetter level, BlockPos pos);
         public boolean entityCanStandOn(BlockGetter level, BlockPos pos, Entity entity) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#entityCanStandOn");
+            return entityCanStandOnFace(level, pos, entity, Direction.UP);
         }
         public boolean entityCanStandOnFace(BlockGetter level, BlockPos pos, Entity entity, Direction faceDirection) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#entityCanStandOnFace");
+            return Block.isFaceFull(getCollisionShape(level, pos, CollisionContext.of(entity)), faceDirection);
         }
-        public Vec3 getOffset(BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getOffset");
-        }
-        public boolean hasOffsetFunction() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#hasOffsetFunction");
-        }
-        public boolean triggerEvent(Level level, BlockPos pos, int b0, int b1) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#triggerEvent");
-        }
-        public void handleNeighborChanged(Level level, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#handleNeighborChanged");
-        }
+        public abstract Vec3 getOffset(BlockPos pos);
+        public abstract boolean hasOffsetFunction();
+        public abstract boolean triggerEvent(Level level, BlockPos pos, int b0, int b1);
+        public abstract void handleNeighborChanged(Level level, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston);
         public void updateNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#updateNeighbourShapes");
+            updateNeighbourShapes(level, pos, updateFlags, 512);
         }
-        public void updateNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags, int updateLimit) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#updateNeighbourShapes");
-        }
+        public abstract void updateNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags, int updateLimit);
         public void updateIndirectNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#updateIndirectNeighbourShapes");
+            updateIndirectNeighbourShapes(level, pos, updateFlags, 512);
         }
-        public void updateIndirectNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags, int updateLimit) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#updateIndirectNeighbourShapes");
-        }
-        public void onPlace(Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#onPlace");
-        }
-        public void affectNeighborsAfterRemoval(ServerLevel level, BlockPos pos, boolean movedByPiston) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#affectNeighborsAfterRemoval");
-        }
-        public void onExplosionHit(ServerLevel level, BlockPos pos, Explosion explosion, BiConsumer<ItemStack, BlockPos> onHit) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#onExplosionHit");
-        }
-        public void tick(ServerLevel level, BlockPos pos, RandomSource random) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#tick");
-        }
-        public void randomTick(ServerLevel level, BlockPos pos, RandomSource random) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#randomTick");
-        }
-        public void entityInside(Level level, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier, boolean isPrecise) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#entityInside");
-        }
-        public void spawnAfterBreak(ServerLevel level, BlockPos pos, ItemStack tool, boolean dropExperience) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#spawnAfterBreak");
-        }
+        public abstract void updateIndirectNeighbourShapes(LevelAccessor level, BlockPos pos, int updateFlags, int updateLimit);
+        public abstract void onPlace(Level level, BlockPos pos, BlockState oldState, boolean movedByPiston);
+        public abstract void affectNeighborsAfterRemoval(ServerLevel level, BlockPos pos, boolean movedByPiston);
+        public abstract void onExplosionHit(ServerLevel level, BlockPos pos, Explosion explosion, BiConsumer<ItemStack, BlockPos> onHit);
+        public abstract void tick(ServerLevel level, BlockPos pos, RandomSource random);
+        public abstract void randomTick(ServerLevel level, BlockPos pos, RandomSource random);
+        public abstract void entityInside(Level level, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier, boolean isPrecise);
+        public abstract void spawnAfterBreak(ServerLevel level, BlockPos pos, ItemStack tool, boolean dropExperience);
         public List<ItemStack> getDrops(LootParams.Builder params) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getDrops");
+            return getBlock().getDrops(asState(), params);
         }
-        public InteractionResult useItemOn(ItemStack itemStack, Level level, Player player, InteractionHand hand, BlockHitResult hitResult) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#useItemOn");
-        }
-        public InteractionResult useWithoutItem(Level level, Player player, BlockHitResult hitResult) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#useWithoutItem");
-        }
-        public boolean showAsInteractableInSpectatorMode(Level level, BlockPos pos, BlockHitResult hitResult) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#showAsInteractableInSpectatorMode");
-        }
-        public void attack(Level level, BlockPos pos, Player player) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#attack");
-        }
-        public boolean isSuffocating(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isSuffocating");
-        }
-        public boolean isLightPermeable() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isLightPermeable");
-        }
-        public boolean isViewBlocking(BlockGetter level, BlockPos blockPos, AABB nearPlaneBox) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isViewBlocking");
-        }
-        public BlockState updateShape(LevelReader level, ScheduledTickAccess ticks, BlockPos pos, Direction directionToNeighbour, BlockPos neighbourPos, BlockState neighbourState, RandomSource random) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#updateShape");
-        }
+        public abstract InteractionResult useItemOn(ItemStack itemStack, Level level, Player player, InteractionHand hand, BlockHitResult hitResult);
+        public abstract InteractionResult useWithoutItem(Level level, Player player, BlockHitResult hitResult);
+        public abstract boolean showAsInteractableInSpectatorMode(Level level, BlockPos pos, BlockHitResult hitResult);
+        public abstract void attack(Level level, BlockPos pos, Player player);
+        public abstract boolean isSuffocating(BlockGetter level, BlockPos pos);
+        public abstract boolean isLightPermeable();
+        public abstract boolean isViewBlocking(BlockGetter level, BlockPos blockPos, AABB nearPlaneBox);
+        public abstract BlockState updateShape(LevelReader level, ScheduledTickAccess ticks, BlockPos pos, Direction directionToNeighbour, BlockPos neighbourPos, BlockState neighbourState, RandomSource random);
         public boolean isPathfindable(PathComputationType type) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isPathfindable");
+            return getBlock().isPathfindable(asState(), type);
         }
-        public boolean canBeReplaced(BlockPlaceContext context) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#canBeReplaced");
-        }
-        public boolean canBeReplaced(Fluid fluid) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#canBeReplaced");
-        }
-        public boolean canBeReplaced() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#canBeReplaced");
-        }
-        public boolean canSurvive(LevelReader level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#canSurvive");
-        }
-        public BlockPos getPostProcessPos(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getPostProcessPos");
-        }
-        public MenuProvider getMenuProvider(Level level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getMenuProvider");
-        }
+        public abstract boolean canBeReplaced(BlockPlaceContext context);
+        public abstract boolean canBeReplaced(Fluid fluid);
+        public abstract boolean canBeReplaced();
+        public abstract boolean canSurvive(LevelReader level, BlockPos pos);
+        public abstract BlockPos getPostProcessPos(BlockGetter level, BlockPos pos);
+        public abstract MenuProvider getMenuProvider(Level level, BlockPos pos);
         public boolean is(TagKey<Block> tag, Predicate<BlockStateBase> predicate) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#is");
+            return is(tag) && predicate.test(this);
         }
-        public boolean hasBlockEntity() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#hasBlockEntity");
-        }
-        public boolean shouldChangedStateKeepBlockEntity(BlockState oldState) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#shouldChangedStateKeepBlockEntity");
-        }
+        public abstract boolean hasBlockEntity();
+        public abstract boolean shouldChangedStateKeepBlockEntity(BlockState oldState);
         public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockEntityType<T> type) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getTicker");
+            return getBlock() instanceof net.minecraft.world.level.block.EntityBlock entityBlock
+                ? entityBlock.getTicker(level, asState(), type) : null;
         }
-        public FluidState getFluidState() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getFluidState");
-        }
-        public boolean isRandomlyTicking() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isRandomlyTicking");
-        }
-        public long getSeed(BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getSeed");
-        }
-        public SoundType getSoundType() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getSoundType");
-        }
-        public void onProjectileHit(Level level, BlockState state, BlockHitResult blockHit, Projectile entity) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#onProjectileHit");
-        }
-        public boolean isFaceSturdy(BlockGetter level, BlockPos pos, Direction direction) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isFaceSturdy");
-        }
-        public boolean isFaceSturdy(BlockGetter level, BlockPos pos, Direction direction, SupportType supportType) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isFaceSturdy");
-        }
-        public boolean isCollisionShapeFullBlock(BlockGetter level, BlockPos pos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#isCollisionShapeFullBlock");
-        }
-        public ItemStack getCloneItemStack(LevelReader level, BlockPos pos, boolean includeData) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#getCloneItemStack");
-        }
-        protected BlockState asState() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#asState");
-        }
-        public boolean requiresCorrectToolForDrops() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#requiresCorrectToolForDrops");
-        }
-        public boolean shouldSpawnTerrainParticles() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#shouldSpawnTerrainParticles");
-        }
-        public BlockState withPropertiesOf(BlockState source) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#withPropertiesOf");
-        }
+        public abstract FluidState getFluidState();
+        public abstract boolean isRandomlyTicking();
+        public abstract long getSeed(BlockPos pos);
+        public abstract SoundType getSoundType();
+        public abstract void onProjectileHit(Level level, BlockState state, BlockHitResult blockHit, Projectile entity);
+        public abstract boolean isFaceSturdy(BlockGetter level, BlockPos pos, Direction direction);
+        public abstract boolean isFaceSturdy(BlockGetter level, BlockPos pos, Direction direction, SupportType supportType);
+        public abstract boolean isCollisionShapeFullBlock(BlockGetter level, BlockPos pos);
+        public abstract ItemStack getCloneItemStack(LevelReader level, BlockPos pos, boolean includeData);
+        protected abstract BlockState asState();
+        public abstract boolean requiresCorrectToolForDrops();
+        public abstract boolean shouldSpawnTerrainParticles();
+        public abstract BlockState withPropertiesOf(BlockState source);
         public static <T extends Comparable<T>> BlockState copyProperty(BlockState from, BlockState to, Property<T> property) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#copyProperty");
+            return to.setValue(property, from.getValue(property));
         }
         public NoteBlockInstrument instrument() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase#instrument");
-        }
-        static final class Cache {
-            public final VoxelShape collisionShape = null;
-            public final boolean largeCollisionShape = false;
-            public final boolean isCollisionShapeFullBlock = false;
-            private Cache(BlockState state) {
-                throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase.Cache#<init>");
-            }
-            public boolean isFaceSturdy(Direction direction, SupportType supportType) {
-                throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour.BlockStateBase.Cache#isFaceSturdy");
-            }
+            double[] info = org.basaltmc.bukkit.WorldNatives.blockInfo(stateId());
+            NoteBlockInstrument[] all = NoteBlockInstrument.values();
+            return all[info == null || info.length < 8 ? 0 : (int) info[7]];
         }
 }
     protected static final Direction[] UPDATE_SHAPE_ORDER = new Direction[] {Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH, Direction.DOWN, Direction.UP};
@@ -631,9 +468,7 @@ public abstract class BlockBehaviour implements FeatureElement {
         return Optional.of(ResourceKey.create((ResourceKey) net.minecraft.core.registries.Registries.LOOT_TABLE,
             net.minecraft.resources.Identifier.fromNamespaceAndPath(key.getNamespace(), "blocks/" + key.getPath())));
     }
-    public String getDescriptionId() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour#getDescriptionId");
-    }
+    public abstract String getDescriptionId();
     protected void onProjectileHit(Level level, BlockState state, BlockHitResult blockHit, Projectile projectile) {
 
     }
@@ -649,15 +484,9 @@ public abstract class BlockBehaviour implements FeatureElement {
     protected ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData) {
         return new ItemStack(asItem());
     }
-    public Item asItem() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour#asItem");
-    }
-    protected Block asBlock() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour#asBlock");
-    }
-    public MapColor defaultMapColor() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockBehaviour#defaultMapColor");
-    }
+    public abstract Item asItem();
+    protected abstract Block asBlock();
+    public abstract MapColor defaultMapColor();
     public float defaultDestroyTime() {
         return properties().destroyTime;
     }

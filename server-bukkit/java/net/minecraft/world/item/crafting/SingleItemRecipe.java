@@ -36,10 +36,14 @@ public abstract class SingleItemRecipe implements Recipe<SingleRecipeInput> {
         return result.create();
     }
     public static <T extends SingleItemRecipe> MapCodec<T> simpleMapCodec(Factory<T> factory) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.crafting.SingleItemRecipe#simpleMapCodec");
+        return com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+            Recipe.CommonInfo.MAP_CODEC.forGetter(r -> r.commonInfo),
+            Ingredient.CODEC.fieldOf("ingredient").forGetter(SingleItemRecipe::input),
+            ItemStackTemplate.CODEC.fieldOf("result").forGetter(SingleItemRecipe::result)).apply(i, factory::create));
     }
     public static <T extends SingleItemRecipe> StreamCodec<RegistryFriendlyByteBuf, T> simpleStreamCodec(Factory<T> factory) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.crafting.SingleItemRecipe#simpleStreamCodec");
+        return StreamCodec.composite(Recipe.CommonInfo.STREAM_CODEC, r -> r.commonInfo,
+            Ingredient.CONTENTS_STREAM_CODEC, SingleItemRecipe::input, ItemStackTemplate.STREAM_CODEC, SingleItemRecipe::result, factory::create);
     }
     public interface Factory<T extends SingleItemRecipe> {
         T create(Recipe.CommonInfo commonInfo, Ingredient ingredient, ItemStackTemplate result);

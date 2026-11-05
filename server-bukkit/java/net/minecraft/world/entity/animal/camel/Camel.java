@@ -98,10 +98,10 @@ public class Camel extends AbstractHorse {
         return 0;
     }
     protected Vec2 getRiddenRotation(LivingEntity controller) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.camel.Camel#getRiddenRotation");
+        return refuseToMove() ? new Vec2(getXRot(), getYRot()) : super.getRiddenRotation(controller);
     }
     protected Vec3 getRiddenInput(Player controller, Vec3 selfInput) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.camel.Camel#getRiddenInput");
+        return refuseToMove() ? Vec3.ZERO : super.getRiddenInput(controller, selfInput);
     }
     public boolean canJump() {
         return !refuseToMove();
@@ -229,7 +229,7 @@ public class Camel extends AbstractHorse {
         return level().getGameTime() - Math.abs(lastPoseChangeTick);
     }
     protected Holder.Reference<SoundEvent> getSaddleSound() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.camel.Camel#getSaddleSound");
+        return net.minecraft.sounds.SoundEvents.CAMEL_SADDLE;
     }
     public void onSyncedDataUpdated(EntityDataAccessor<?> accessor) {
     }

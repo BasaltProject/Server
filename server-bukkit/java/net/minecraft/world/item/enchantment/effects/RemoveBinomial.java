@@ -17,6 +17,6 @@ public record RemoveBinomial(LevelBasedValue chance) implements EnchantmentValue
         return inputValue - removed;
     }
     public MapCodec<RemoveBinomial> codec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.enchantment.effects.RemoveBinomial#codec");
+        return CODEC;
     }
 }

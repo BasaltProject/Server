@@ -98,10 +98,12 @@ public class Shulker extends AbstractGolem implements Enemy {
         return net.minecraft.world.entity.EntityDimensions.scalable(getBbWidth(), getBbHeight());
     }
     public static AABB getProgressAabb(float size, Direction direction, float progressTo, Vec3 position) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.Shulker#getProgressAabb");
+        return getProgressDeltaAabb(size, direction, -1.0F, progressTo, position);
     }
     public static AABB getProgressDeltaAabb(float size, Direction direction, float progressFrom, float progressTo, Vec3 position) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.Shulker#getProgressDeltaAabb");
+        double[] box = org.basaltmc.bukkit.MechanicsNatives.shulkerBox(size, direction.ordinal(), progressFrom, progressTo,
+            position.x, position.y, position.z);
+        return new AABB(box[0], box[1], box[2], box[3], box[4], box[5]);
     }
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnReason, SpawnGroupData groupData) {
         return groupData;

@@ -4,16 +4,14 @@ package net.minecraft.world.level;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 public interface BlockAndLightGetter extends BlockGetter {
-    default LevelLightEngine getLightEngine() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.BlockAndLightGetter#getLightEngine");
-    }
+    LevelLightEngine getLightEngine();
     default int getBrightness(LightLayer layer, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.BlockAndLightGetter#getBrightness");
+        return getLightEngine().getLayerListener(layer).getLightValue(pos);
     }
     default int getRawBrightness(BlockPos pos, int darkening) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.BlockAndLightGetter#getRawBrightness");
+        return getLightEngine().getRawBrightness(pos, darkening);
     }
     default boolean canSeeSky(BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.BlockAndLightGetter#canSeeSky");
+        return getBrightness(LightLayer.SKY, pos) >= 15;
     }
 }

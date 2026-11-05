@@ -9,8 +9,19 @@ import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.display.RecipeDisplay;
 import net.minecraft.world.level.Level;
 public class DyeRecipe extends NormalCraftingRecipe {
-    public static final MapCodec<DyeRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.DyeRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, DyeRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.DyeRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<DyeRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Recipe.CommonInfo.MAP_CODEC.forGetter(o -> o.commonInfo),
+        CraftingRecipe.CraftingBookInfo.MAP_CODEC.forGetter(o -> o.bookInfo),
+        Ingredient.CODEC.fieldOf("target").forGetter(o -> o.target),
+        Ingredient.CODEC.fieldOf("dye").forGetter(o -> o.dye),
+        ItemStackTemplate.CODEC.fieldOf("result").forGetter(o -> o.result)).apply(i, DyeRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, DyeRecipe> STREAM_CODEC = StreamCodec.composite(
+        Recipe.CommonInfo.STREAM_CODEC, o -> o.commonInfo,
+        CraftingRecipe.CraftingBookInfo.STREAM_CODEC, o -> o.bookInfo,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.target,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.dye,
+        ItemStackTemplate.STREAM_CODEC, o -> o.result,
+        DyeRecipe::new);
     public static final RecipeSerializer<DyeRecipe> SERIALIZER = null;
     private final Ingredient target;
     private final Ingredient dye;

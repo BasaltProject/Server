@@ -117,7 +117,48 @@ public record PotionContents(Optional<Holder<Potion>> potion, Optional<Integer> 
         }, durationScale);
     }
     public static void addPotionTooltip(Iterable<MobEffectInstance> effects, Consumer<Component> lines, float durationScale, float tickrate) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.alchemy.PotionContents#addPotionTooltip");
+        java.util.List<java.util.Map.Entry<Holder<net.minecraft.world.entity.ai.attributes.Attribute>, net.minecraft.world.entity.ai.attributes.AttributeModifier>> modifiers = new java.util.ArrayList<>();
+        boolean none = true;
+        for (MobEffectInstance effect : effects) {
+            none = false;
+            Holder<MobEffect> mobEffect = effect.getEffect();
+            int amplifier = effect.getAmplifier();
+            mobEffect.value().createModifiers(amplifier, (attribute, modifier) -> modifiers.add(java.util.Map.entry(attribute, modifier)));
+            MutableComponent line = getPotionDescription(mobEffect, amplifier);
+            if (!effect.endsWithin(20)) {
+                line = Component.translatable("potion.withDuration", line, durationText(effect, durationScale, tickrate));
+            }
+            lines.accept(line.withStyle(mobEffect.value().getCategory().getTooltipFormatting()));
+        }
+        if (none) {
+            lines.accept(Component.translatable("effect.none").withStyle(net.minecraft.ChatFormatting.GRAY));
+        }
+        if (modifiers.isEmpty()) {
+            return;
+        }
+        lines.accept(Component.empty());
+        lines.accept(Component.translatable("potion.whenDrank").withStyle(net.minecraft.ChatFormatting.DARK_PURPLE));
+        for (var entry : modifiers) {
+            var modifier = entry.getValue();
+            double amount = modifier.amount();
+            boolean multiplied = modifier.operation() == net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_MULTIPLIED_BASE
+                || modifier.operation() == net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL;
+            double shown = multiplied ? amount * 100.0 : amount;
+            Component name = Component.translatable(entry.getKey().value().getDescriptionId());
+            if (amount > 0.0) {
+                lines.accept(Component.translatable("attribute.modifier.plus." + modifier.operation().id(),
+                    net.minecraft.world.item.component.ItemAttributeModifiers.ATTRIBUTE_MODIFIER_FORMAT.format(shown), name).withStyle(net.minecraft.ChatFormatting.BLUE));
+            } else if (amount < 0.0) {
+                lines.accept(Component.translatable("attribute.modifier.take." + modifier.operation().id(),
+                    net.minecraft.world.item.component.ItemAttributeModifiers.ATTRIBUTE_MODIFIER_FORMAT.format(-shown), name).withStyle(net.minecraft.ChatFormatting.RED));
+            }
+        }
+    }
+    private static Component durationText(MobEffectInstance effect, float scale, float tickrate) {
+        if (effect.isInfiniteDuration()) {
+            return Component.translatable("effect.duration.infinite");
+        }
+        return Component.literal(net.minecraft.util.StringUtil.formatTickDuration((int) Math.floor(effect.getDuration() * scale), tickrate));
     }
     public static MutableComponent getPotionDescription(Holder<MobEffect> mobEffect, int amplifier) {
         MutableComponent line = Component.translatable(mobEffect.value().getDescriptionId());
@@ -127,6 +168,6 @@ public record PotionContents(Optional<Holder<Potion>> potion, Optional<Integer> 
         applyToLivingEntity(user, stack.getOrDefault(net.minecraft.core.component.DataComponents.POTION_DURATION_SCALE, 1.0F));
     }
     public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.alchemy.PotionContents#addToTooltip");
+        addPotionTooltip(getAllEffects(), consumer, components.getOrDefault(net.minecraft.core.component.DataComponents.POTION_DURATION_SCALE, 1.0F), context.tickRate());
     }
 }

@@ -148,6 +148,25 @@ jdouble JNICALL nativeHumidity(JNIEnv* env, jclass, jstring world, jint x, jint 
     });
 }
 
+jlongArray JNICALL nativeClimate(JNIEnv* env, jclass, jstring world, jint quartX, jint quartY, jint quartZ) {
+    const std::string name = toStd(env, world);
+    const auto point = jni::onServer<std::optional<std::array<std::int64_t, 6>>>(std::nullopt, [&] {
+        const auto found = BukkitBridge::current().services().worlds().byName(name);
+        plugins::PluginWorldEnv* target = found == nullptr ? nullptr : found->env();
+        return target == nullptr ? std::nullopt : target->climateAtQuart(quartX, quartY, quartZ);
+    });
+    if (!point.has_value()) {
+        return nullptr;
+    }
+    jlongArray out = env->NewLongArray(6);
+    if (out != nullptr) {
+        std::array<jlong, 6> values{};
+        std::copy(point->begin(), point->end(), values.begin());
+        env->SetLongArrayRegion(out, 0, 6, values.data());
+    }
+    return out;
+}
+
 jboolean JNICALL nativeDragonAction(JNIEnv* env, jclass, jstring world, jstring action, jint value) {
     const std::string name = toStd(env, world);
     const std::string what = toStd(env, action);
@@ -220,6 +239,7 @@ void registerLeftoverNatives(JNIEnv* env, jclass natives) {
         method("entityDefaults", "(Ljava/lang/String;)[Ljava/lang/String;",
                reinterpret_cast<void*>(&nativeEntityDefaults)),
         method("humidity", "(Ljava/lang/String;III)D", reinterpret_cast<void*>(&nativeHumidity)),
+        method("climate", "(Ljava/lang/String;III)[J", reinterpret_cast<void*>(&nativeClimate)),
         method("dragonBar", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Z",
                reinterpret_cast<void*>(&nativeDragonBar)),
         method("dragonAction", "(Ljava/lang/String;Ljava/lang/String;I)Z",

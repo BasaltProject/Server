@@ -31,7 +31,13 @@ public record SuspiciousStewEffects(List<Entry> effects) implements ConsumableLi
         }
     }
     public void addToTooltip(Item.TooltipContext context, Consumer<Component> consumer, TooltipFlag flag, DataComponentGetter components) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.SuspiciousStewEffects#addToTooltip");
+        if (flag.isCreative()) {
+            java.util.List<MobEffectInstance> instances = new java.util.ArrayList<>();
+            for (Entry entry : effects) {
+                instances.add(entry.createEffectInstance());
+            }
+            net.minecraft.world.item.alchemy.PotionContents.addPotionTooltip(instances, consumer, 1.0F, context.tickRate());
+        }
     }
     public static record Entry(Holder<MobEffect> effect, int duration) {
         public static final Codec<Entry> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.item.component.SuspiciousStewEffects.Entry.class, "CODEC");

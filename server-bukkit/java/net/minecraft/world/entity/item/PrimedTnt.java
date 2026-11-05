@@ -55,10 +55,13 @@ public class PrimedTnt extends Entity implements TraceableEntity {
         return random.nextInt(fuse / 4) + fuse / 8;
     }
     public void setBlockState(BlockState blockState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.item.PrimedTnt#setBlockState");
+        if (live() instanceof org.bukkit.entity.TNTPrimed api) {
+            api.setBlockData(org.bukkit.craftbukkit.block.data.CraftBlockData.fromData(blockState));
+        }
     }
     public BlockState getBlockState() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.item.PrimedTnt#getBlockState");
+        return live() instanceof org.bukkit.entity.TNTPrimed api && api.getBlockData() instanceof org.bukkit.craftbukkit.block.data.CraftBlockData craft
+            ? craft.getState() : net.minecraft.world.level.block.Blocks.TNT.defaultBlockState();
     }
     public final boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
         return false;

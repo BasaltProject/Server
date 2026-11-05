@@ -30,7 +30,7 @@ public class RedstoneTorchBlock extends BaseTorchBlock {
         super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
     protected boolean hasNeighborSignal(Level level, BlockPos pos, BlockState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.RedstoneTorchBlock#hasNeighborSignal");
+        return level.hasSignal(pos.below(), Direction.DOWN);
     }
     protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         super.tick(state, level, pos, random);

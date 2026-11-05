@@ -36,17 +36,18 @@ public class SculkCatalystBlockEntity extends BlockEntity {
 
     public static class CatalystListener implements GameEventListener {
         public static final int PULSE_TICKS = 8;
+        private final PositionSource positionSource;
         public CatalystListener(BlockState blockState, PositionSource positionSource) {
-            
+            this.positionSource = positionSource;
         }
         public PositionSource getListenerSource() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkCatalystBlockEntity.CatalystListener#getListenerSource");
+            return positionSource;
         }
         public int getListenerRadius() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkCatalystBlockEntity.CatalystListener#getListenerRadius");
+            return 8;
         }
         public GameEventListener.DeliveryMode getDeliveryMode() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkCatalystBlockEntity.CatalystListener#getDeliveryMode");
+            return GameEventListener.DeliveryMode.BY_DISTANCE;
         }
         public boolean handleGameEvent(ServerLevel level, Holder<GameEvent> event, GameEvent.Context context, Vec3 sourcePosition) {
             throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkCatalystBlockEntity.CatalystListener#handleGameEvent");

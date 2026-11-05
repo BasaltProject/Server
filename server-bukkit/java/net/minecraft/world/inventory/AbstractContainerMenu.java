@@ -117,7 +117,7 @@ public abstract class AbstractContainerMenu {
 
     }
     public void setRemoteSlotUnsafe(int slot, HashedStack itemStack) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.inventory.AbstractContainerMenu#setRemoteSlotUnsafe");
+        return;
     }
     public void setRemoteCarried(HashedStack carriedItem) {
 
@@ -130,7 +130,9 @@ public abstract class AbstractContainerMenu {
     }
     public abstract ItemStack quickMoveStack(Player player, int slotIndex);
     public void setSelectedBundleItemIndex(int slotIndex, int selectedItemIndex) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.inventory.AbstractContainerMenu#setSelectedBundleItemIndex");
+        if (slotIndex >= 0 && slotIndex < slots.size()) {
+            net.minecraft.world.item.BundleItem.toggleSelectedItem(slots.get(slotIndex).getItem(), selectedItemIndex);
+        }
     }
     public void clicked(int slotIndex, int buttonNum, ContainerInput containerInput, Player player) {
         if (containerInput == ContainerInput.PICKUP && slotIndex >= 0 && slotIndex < slots.size()) {
@@ -172,7 +174,12 @@ public abstract class AbstractContainerMenu {
 
     }
     protected void clearContainer(Player player, Container container) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.inventory.AbstractContainerMenu#clearContainer");
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            ItemStack stack = container.removeItemNoUpdate(slot);
+            if (!stack.isEmpty() && !player.getInventory().add(stack)) {
+                player.drop(stack, false, null);
+            }
+        }
     }
     public void slotsChanged(Container container) {
         broadcastChanges();

@@ -27,9 +27,7 @@ public interface BlockGetter extends LevelHeightAccessor {
         BlockEntity found = getBlockEntity(pos);
         return found != null && found.getType() == type ? Optional.of((T) found) : Optional.empty();
     }
-    default BlockState getBlockState(BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.BlockGetter#getBlockState");
-    }
+    BlockState getBlockState(BlockPos pos);
     default FluidState getFluidState(BlockPos pos) {
         return getBlockState(pos).getFluidState();
     }

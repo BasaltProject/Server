@@ -7,8 +7,17 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.level.Level;
 public class FireworkRocketRecipe extends CustomRecipe {
-    public static final MapCodec<FireworkRocketRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.FireworkRocketRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, FireworkRocketRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.FireworkRocketRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<FireworkRocketRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Ingredient.CODEC.fieldOf("shell").forGetter(o -> o.shell),
+        Ingredient.CODEC.fieldOf("fuel").forGetter(o -> o.fuel),
+        Ingredient.CODEC.fieldOf("star").forGetter(o -> o.star),
+        ItemStackTemplate.CODEC.fieldOf("result").forGetter(o -> o.result)).apply(i, FireworkRocketRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, FireworkRocketRecipe> STREAM_CODEC = StreamCodec.composite(
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.shell,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.fuel,
+        Ingredient.CONTENTS_STREAM_CODEC, o -> o.star,
+        ItemStackTemplate.STREAM_CODEC, o -> o.result,
+        FireworkRocketRecipe::new);
     public static final RecipeSerializer<FireworkRocketRecipe> SERIALIZER = null;
     private final Ingredient shell;
     private final Ingredient fuel;

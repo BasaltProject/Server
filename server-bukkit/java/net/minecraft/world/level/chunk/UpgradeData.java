@@ -10,42 +10,35 @@ import net.minecraft.world.level.block.state.BlockState;
 public class UpgradeData {
     protected UpgradeData() {
     }
-    public static final UpgradeData EMPTY = null;
-    private UpgradeData(LevelHeightAccessor levelHeightAccessor) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData#<init>");
-    }
+    public static final UpgradeData EMPTY = new UpgradeData();
     public UpgradeData(CompoundTag tag, LevelHeightAccessor levelHeightAccessor) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData#<init>");
-    }
-    private UpgradeData(UpgradeData source) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData#<init>");
     }
     public void upgrade(LevelChunk chunk) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData#upgrade");
+        return;
     }
     public boolean isEmpty() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData#isEmpty");
+        return true;
     }
     public CompoundTag write() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData#write");
+        return new CompoundTag();
     }
     public UpgradeData copy() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData#copy");
+        return this;
     }
     public interface BlockFixer {
         BlockState updateShape(BlockState state, Direction direction, BlockState neighbour, LevelAccessor level, BlockPos pos, BlockPos neighbourPos);
         default void processChunk(LevelAccessor level) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData.BlockFixer#processChunk");
+            return;
         }
     }
     static enum BlockFixers implements BlockFixer {
         BLACKLIST, DEFAULT, CHEST, LEAVES, STEM_BLOCK;
-        public static final Direction[] DIRECTIONS = null;
+        public static final Direction[] DIRECTIONS = Direction.values();
         public BlockState updateShape(BlockState state, Direction direction, BlockState neighbour, LevelAccessor level, BlockPos pos, BlockPos neighbourPos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData.BlockFixers#updateShape");
+            return state;
         }
         public void processChunk(LevelAccessor level) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.UpgradeData.BlockFixers#processChunk");
+            return;
         }
     }
 }

@@ -17,6 +17,7 @@ basalt_module(server-bukkit
         src/BukkitHost.cpp
         src/BukkitItemNatives.cpp
         src/BukkitLeftoverNatives.cpp
+        src/BukkitMechanicsNatives.cpp
         src/BukkitMiscNatives.cpp
         src/BukkitMiscDataNatives.cpp
         src/BukkitMiscBoardNatives.cpp
@@ -35,7 +36,7 @@ basalt_module(server-bukkit
         src/BukkitWorldEnvNatives.cpp
         src/BukkitWorldEnvMoreNatives.cpp
         src/ShimHost.cpp
-    DEPENDS basalt::server-plugins basalt::wire-common
+    DEPENDS basalt::server-plugins basalt::wire-common basalt::wire-protocol
 )
 target_include_directories(server-bukkit SYSTEM PUBLIC ${BASALT_JNI_INCLUDE_DIR} ${BASALT_JNI_INCLUDE_DIR}/linux
                                                       ${BASALT_JNI_INCLUDE_DIR}/darwin)

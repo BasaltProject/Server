@@ -11,34 +11,43 @@ import net.minecraft.world.phys.Vec3;
 public abstract class Avatar extends LivingEntity {
     protected Avatar() {
     }
-    public static final HumanoidArm DEFAULT_MAIN_HAND = null;
+    public static final HumanoidArm DEFAULT_MAIN_HAND = HumanoidArm.RIGHT;
     public static final int DEFAULT_MODEL_CUSTOMIZATION = 0;
     public static final float DEFAULT_EYE_HEIGHT = 1.62F;
-    public static final Vec3 DEFAULT_VEHICLE_ATTACHMENT = null;
+    public static final Vec3 DEFAULT_VEHICLE_ATTACHMENT = new Vec3(0.0, 0.6, 0.0);
     public static final float SWIMMING_BB_HEIGHT = 0.6F;
-    protected static final EntityDimensions STANDING_DIMENSIONS = null;
-    protected static final Map<Pose, EntityDimensions> POSES = null;
+    protected static final EntityDimensions STANDING_DIMENSIONS = EntityDimensions.scalable(0.6F, 1.8F).withEyeHeight(DEFAULT_EYE_HEIGHT)
+        .withAttachments(EntityAttachments.builder().attach(EntityAttachment.VEHICLE, DEFAULT_VEHICLE_ATTACHMENT));
+    private static final EntityDimensions SWIM_LIKE = EntityDimensions.scalable(0.6F, SWIMMING_BB_HEIGHT).withEyeHeight(0.4F);
+    protected static final Map<Pose, EntityDimensions> POSES = Map.of(Pose.STANDING, STANDING_DIMENSIONS,
+        Pose.SLEEPING, SLEEPING_DIMENSIONS, Pose.FALL_FLYING, SWIM_LIKE, Pose.SWIMMING, SWIM_LIKE,
+        Pose.SPIN_ATTACK, SWIM_LIKE, Pose.CROUCHING, EntityDimensions.scalable(0.6F, 1.5F).withEyeHeight(1.27F)
+            .withAttachments(EntityAttachments.builder().attach(EntityAttachment.VEHICLE, DEFAULT_VEHICLE_ATTACHMENT)),
+        Pose.DYING, EntityDimensions.fixed(0.2F, 0.2F).withEyeHeight(DEFAULT_EYE_HEIGHT));
     protected static final EntityDataAccessor<HumanoidArm> DATA_PLAYER_MAIN_HAND = null;
     protected static final EntityDataAccessor<Byte> DATA_PLAYER_MODE_CUSTOMISATION = null;
     protected Avatar(EntityType<? extends LivingEntity> type, Level level) {
         super(type, level);
     }
     protected void defineSynchedData(SynchedEntityData.Builder entityData) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Avatar#defineSynchedData");
     }
     public HumanoidArm getMainArm() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Avatar#getMainArm");
+        return live() instanceof org.bukkit.entity.HumanEntity human && human.getMainHand() == org.bukkit.inventory.MainHand.LEFT
+            ? HumanoidArm.LEFT : DEFAULT_MAIN_HAND;
     }
     public void setMainArm(HumanoidArm mainArm) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Avatar#setMainArm");
     }
     public boolean isModelPartShown(PlayerModelPart part) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Avatar#isModelPartShown");
+        if (!(live() instanceof org.bukkit.entity.Player player)) {
+            return false;
+        }
+        int raw = player.getClientOption(com.destroystokyo.paper.ClientOption.SKIN_PARTS).getRaw();
+        return (raw & part.getMask()) == part.getMask();
     }
     public EntityDimensions getDefaultDimensions(Pose pose) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Avatar#getDefaultDimensions");
+        return POSES.getOrDefault(pose, STANDING_DIMENSIONS);
     }
     public ResolvableProfile getProfile() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.Avatar#getProfile");
+        return null;
     }
 }

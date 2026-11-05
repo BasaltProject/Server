@@ -102,13 +102,13 @@ public class Wolf extends TamableAnimal implements NeutralMob {
     public void tick() {
     }
     public float getWetShade(float a) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.wolf.Wolf#getWetShade");
+        return live() instanceof org.bukkit.entity.Wolf api && api.isWet() ? 0.75F : 1.0F;
     }
     public float getShakeAnim(float a) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.wolf.Wolf#getShakeAnim");
+        return 0.0F;
     }
     public float getHeadRollAngle(float a) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.wolf.Wolf#getHeadRollAngle");
+        return live() instanceof org.bukkit.entity.Wolf api && api.isInterested() ? 0.15F * (float) Math.PI : 0.0F;
     }
     public int getMaxHeadXRot() {
         return super.getMaxHeadXRot();

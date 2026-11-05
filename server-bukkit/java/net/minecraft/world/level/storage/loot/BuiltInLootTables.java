@@ -152,7 +152,18 @@ public class BuiltInLootTables {
     public static final ResourceKey<LootTable> ABANDONED_CAMP_BARREL = table("ABANDONED_CAMP_BARREL");
     public static final ResourceKey<LootTable> ABANDONED_CAMP_COMMON_CHEST = table("ABANDONED_CAMP_COMMON_CHEST");
     public static final ResourceKey<LootTable> ABANDONED_CAMP_SECRET_CHEST = table("ABANDONED_CAMP_SECRET_CHEST");
+    @SuppressWarnings("unchecked")
     public static Set<ResourceKey<LootTable>> all() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.BuiltInLootTables#all");
+        Set<ResourceKey<LootTable>> keys = new java.util.LinkedHashSet<>();
+        for (java.lang.reflect.Field field : BuiltInLootTables.class.getFields()) {
+            if (field.getType() == ResourceKey.class) {
+                try {
+                    keys.add((ResourceKey<LootTable>) field.get(null));
+                } catch (IllegalAccessException ignored) {
+                    continue;
+                }
+            }
+        }
+        return java.util.Collections.unmodifiableSet(keys);
     }
 }

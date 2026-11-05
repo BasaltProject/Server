@@ -11,10 +11,23 @@ public class Climate {
     }
 
     public record Sampler(Object temperature, Object humidity, Object continentalness, Object erosion, Object depth, Object weirdness) {
-            public TargetPoint sample(int quartX, int quartY, int quartZ) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.Sampler#sample");
+        public static Sampler forWorld(String world) {
+            WorldSource source = new WorldSource(world);
+            return new Sampler(source, source, source, source, source, source);
         }
-}
+        public TargetPoint sample(int quartX, int quartY, int quartZ) {
+            if (!(temperature instanceof WorldSource source)) {
+                throw new UnsupportedOperationException("Only the sampler of a loaded world can be evaluated");
+            }
+            long[] point = org.basaltmc.bukkit.LeftoverNatives.climate(source.world(), quartX, quartY, quartZ);
+            if (point == null) {
+                throw new IllegalStateException("World " + source.world() + " has no multi-noise biome source");
+            }
+            return new TargetPoint(point[0], point[1], point[2], point[3], point[4], point[5]);
+        }
+    }
+    private record WorldSource(String world) {
+    }
     protected static final int PARAMETER_COUNT = 7;
     public static TargetPoint target(float temperature, float humidity, float continentalness, float erosion, float depth, float weirdness) {
         return new TargetPoint(quantizeCoord(temperature), quantizeCoord(humidity), quantizeCoord(continentalness),
@@ -34,48 +47,94 @@ public class Climate {
         return (float) coord / 10000.0F;
     }
     protected static final class RTree<T> {
+        private final Node<T> root;
         private RTree(Node<T> root) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree#<init>");
+            this.root = root;
         }
         public static <T> RTree<T> create(List<Pair<ParameterPoint, T>> values) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree#create");
+            return create(values, 6);
         }
         public static <T> RTree<T> create(List<Pair<ParameterPoint, T>> values, int childrenPerNode) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree#create");
+            if (values.isEmpty()) {
+                throw new IllegalArgumentException("Need at least one value to build the search tree.");
+            }
+            List<Leaf<T>> leaves = new java.util.ArrayList<>(values.size());
+            for (Pair<ParameterPoint, T> entry : values) {
+                leaves.add(new Leaf<>(entry.getFirst(), entry.getSecond()));
+            }
+            return new RTree<>(new SubTree<>(leaves));
         }
         public T search(TargetPoint target, DistanceMetric<T> distanceMetric) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree#search");
+            return root.search(target.toParameterArray(), null, distanceMetric).value;
         }
         static abstract class Node<T> {
-            protected final Parameter[] parameterSpace = null;
+            protected final Parameter[] parameterSpace;
             protected Node(List<Parameter> parameterSpace) {
-                throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree.Node#<init>");
+                this.parameterSpace = parameterSpace.toArray(new Parameter[0]);
             }
             protected abstract Leaf<T> search(long[] target, Leaf<T> candidate, DistanceMetric<T> distanceMetric);
             protected long distance(long[] target) {
-                throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree.Node#distance");
+                long total = 0L;
+                for (int i = 0; i < PARAMETER_COUNT; i++) {
+                    long gap = parameterSpace[i].distance(target[i]);
+                    total += gap * gap;
+                }
+                return total;
             }
             public String toString() {
-                return super.toString();
+                return java.util.Arrays.toString(parameterSpace);
             }
         }
         static final class Leaf<T> extends Node<T> {
+            final ParameterPoint parameterPoint;
+            final T value;
             private Leaf(ParameterPoint parameterPoint, T value) {
-                super((java.util.List) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree.Leaf#<init>");
+                super(parameterPoint.parameterSpace());
+                this.parameterPoint = parameterPoint;
+                this.value = value;
             }
             protected Leaf<T> search(long[] target, Leaf<T> candidate, DistanceMetric<T> distanceMetric) {
-                throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree.Leaf#search");
+                if (candidate == null) {
+                    return this;
+                }
+                return distanceMetric.distance(this, target) < distanceMetric.distance(candidate, target) ? this : candidate;
             }
         }
         static final class SubTree<T> extends Node<T> {
+            private final Node<T>[] children;
+            @SuppressWarnings("unchecked")
             public SubTree(List<? extends Node<T>> children) {
-                super((java.util.List) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree.SubTree#<init>");
+                this(spaceOf(children), children);
             }
+            @SuppressWarnings("unchecked")
             public SubTree(List<Parameter> parameterSpace, List<? extends Node<T>> children) {
-                super((java.util.List) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree.SubTree#<init>");
+                super(parameterSpace);
+                this.children = children.toArray(new Node[0]);
+            }
+            private static <T> List<Parameter> spaceOf(List<? extends Node<T>> children) {
+                Parameter[] merged = new Parameter[PARAMETER_COUNT];
+                for (Node<T> child : children) {
+                    for (int i = 0; i < PARAMETER_COUNT; i++) {
+                        merged[i] = merged[i] == null ? child.parameterSpace[i] : merged[i].span(child.parameterSpace[i]);
+                    }
+                }
+                return java.util.Arrays.asList(merged);
             }
             protected Leaf<T> search(long[] target, Leaf<T> candidate, DistanceMetric<T> distanceMetric) {
-                throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.RTree.SubTree#search");
+                long best = candidate == null ? Long.MAX_VALUE : distanceMetric.distance(candidate, target);
+                Leaf<T> found = candidate;
+                for (Node<T> child : children) {
+                    if (distanceMetric.distance(child, target) >= best) {
+                        continue;
+                    }
+                    Leaf<T> inner = child.search(target, found, distanceMetric);
+                    long innerDistance = inner == null ? Long.MAX_VALUE : distanceMetric.distance(inner, target);
+                    if (innerDistance < best) {
+                        best = innerDistance;
+                        found = inner;
+                    }
+                }
+                return found;
             }
         }
     }
@@ -115,7 +174,7 @@ public class Climate {
             return findValueBruteForce(target);
         }
         protected T findValueIndex(TargetPoint target, DistanceMetric<T> distanceMetric) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.ParameterList#findValueIndex");
+            return RTree.create(entries).search(target, distanceMetric);
         }
     }
     public static record TargetPoint(long temperature, long humidity, long continentalness, long erosion, long depth, long weirdness) {

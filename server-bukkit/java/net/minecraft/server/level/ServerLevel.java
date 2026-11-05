@@ -194,7 +194,12 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
 
             @Override
             public boolean isDifficultyLocked() {
-                return false;
+                return org.basaltmc.bukkit.WorldNatives.difficultyLocked(world.getName());
+            }
+
+            @Override
+            public net.minecraft.world.level.GameType getGameType() {
+                return net.minecraft.world.level.GameType.byId(org.bukkit.Bukkit.getDefaultGameMode().getValue());
             }
 
             @Override
@@ -508,6 +513,9 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     public static final IntProvider THUNDER_DURATION = null;
     protected final Raids raids = null;
     private net.minecraft.world.level.portal.PortalForcer portalForcer;
+    private ServerWaypointManager waypointManager;
+    private PathTypeCache pathTypeCache;
+    private LevelDebugSynchronizers debugSynchronizers;
     public ServerLevel(MinecraftServer server, Executor executor, LevelStorageSource.LevelStorageAccess levelStorage, ServerLevelData levelData, ResourceKey<Level> dimension, LevelStem levelStem, boolean isDebug, long biomeZoomSeed, List<CustomSpawner> customSpawners, boolean tickTime) {
         super((net.minecraft.world.level.storage.WritableLevelData) null, (net.minecraft.resources.ResourceKey) null, (net.minecraft.core.RegistryAccess) null, (net.minecraft.core.Holder) null, false, false, (long) 0, (int) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerLevel#<init>");
     }
@@ -517,7 +525,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     public void setDragonFight(EnderDragonFight fight) {
     }
     public BiomeResolver uncachedBiomeResolver() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerLevel#uncachedBiomeResolver");
+        return this::getUncachedNoiseBiome;
     }
     public ServerClockManager clockManager() {
         return MinecraftServer.getServer().clockManager();
@@ -537,6 +545,9 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return previous;
     }
     public void tick(BooleanSupplier haveTime) {
+    }
+    public boolean shouldTickBlocksAt(BlockPos pos) {
+        return shouldTickBlocksAt(ChunkPos.pack(pos.getX() >> 4, pos.getZ() >> 4));
     }
     public boolean shouldTickBlocksAt(long chunkPos) {
         return WorldNatives.chunkLoaded(world.getName(), (int) chunkPos, (int) (chunkPos >> 32));
@@ -568,7 +579,10 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return net.minecraft.server.MinecraftServer.getServer().getScoreboard();
     }
     public ServerWaypointManager getWaypointManager() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerLevel#getWaypointManager");
+        if (waypointManager == null) {
+            waypointManager = new ServerWaypointManager();
+        }
+        return waypointManager;
     }
     public float getMoonBrightness(BlockPos pos) {
         return world.getMoonPhase().ordinal() == 4 ? 0.0F : 1.0F;
@@ -787,7 +801,12 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return getEntity(id);
     }
     public Collection<EnderDragonPart> dragonParts() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerLevel#dragonParts");
+        java.util.List<EnderDragonPart> parts = new java.util.ArrayList<>();
+        ((net.minecraft.world.level.entity.LevelEntityGetter<net.minecraft.world.entity.Entity>) getEntities()).get(net.minecraft.world.level.entity.EntityTypeTest.forClass(net.minecraft.world.entity.boss.enderdragon.EnderDragon.class), dragon -> {
+            parts.addAll(java.util.Arrays.asList(dragon.getSubEntities()));
+            return net.minecraft.util.AbortableIterationConsumer.Continuation.CONTINUE;
+        });
+        return parts;
     }
     public BlockPos findNearestMapStructure(TagKey<Structure> structureTag, BlockPos origin, int maxSearchRadius, boolean createReference) {
         org.bukkit.Location from = new org.bukkit.Location(world, origin.getX(), origin.getY(), origin.getZ());
@@ -950,7 +969,10 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
 
     }
     public PathTypeCache getPathTypeCache() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerLevel#getPathTypeCache");
+        if (pathTypeCache == null) {
+            pathTypeCache = new PathTypeCache();
+        }
+        return pathTypeCache;
     }
     public void waitForEntities(ChunkPos centerChunk, int radius) {
 
@@ -1018,7 +1040,10 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     public void onBlockEntityAdded(BlockEntity blockEntity) {
     }
     public LevelDebugSynchronizers debugSynchronizers() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerLevel#debugSynchronizers");
+        if (debugSynchronizers == null) {
+            debugSynchronizers = new LevelDebugSynchronizers(this);
+        }
+        return debugSynchronizers;
     }
     public boolean isAllowedToEnterPortal(Level toLevel) {
         return true;
@@ -1034,7 +1059,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     }
     final class EntityCallbacks implements LevelCallback<Entity> {
         private EntityCallbacks() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerLevel.EntityCallbacks#<init>");
+
         }
         public void onCreated(Entity entity) {
             

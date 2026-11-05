@@ -11,6 +11,6 @@ public enum ChatVisiblity {
     public static final Codec<ChatVisiblity> LEGACY_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.player.ChatVisiblity.class, "LEGACY_CODEC");
     public static final StreamCodec<ByteBuf, ChatVisiblity> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.entity.player.ChatVisiblity.class, "STREAM_CODEC");
     public Component caption() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.player.ChatVisiblity#caption");
+        return Component.translatable("options.chat.visibility." + name().toLowerCase(java.util.Locale.ROOT));
     }
 }

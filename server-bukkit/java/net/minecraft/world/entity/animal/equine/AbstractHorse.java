@@ -182,7 +182,11 @@ public abstract class AbstractHorse extends Animal implements PlayerRideableJump
 
     }
     public InteractionResult fedFood(Player player, ItemStack itemStack) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.equine.AbstractHorse#fedFood");
+        boolean ate = handleEating(player, itemStack);
+        if (ate) {
+            itemStack.consume(1, player);
+        }
+        return !ate && !level().isClientSide() ? InteractionResult.PASS : InteractionResult.SUCCESS_SERVER;
     }
     protected boolean handleEating(Player player, ItemStack itemStack) {
         return false;
@@ -248,7 +252,14 @@ public abstract class AbstractHorse extends Animal implements PlayerRideableJump
     protected void tickRidden(Player controller, Vec3 riddenInput) {
         }
     protected Vec2 getRiddenRotation(LivingEntity controller) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.equine.AbstractHorse#getRiddenRotation");
+        return new Vec2(controller.getXRot() * 0.5F, controller.getYRot());
+    }
+    protected Vec3 getRiddenInput(Player controller, Vec3 selfInput) {
+        if (onGround() && playerJumpPendingScale == 0.0F && isStanding() && !allowStandSliding) {
+            return Vec3.ZERO;
+        }
+        float forward = controller.zza;
+        return new Vec3(controller.xxa * 0.5F, 0.0, forward <= 0.0F ? forward * 0.25F : forward);
     }
     protected void addPassenger(Entity passenger) {
         }
@@ -278,7 +289,14 @@ public abstract class AbstractHorse extends Animal implements PlayerRideableJump
     protected void setOffspringAttributes(AgeableMob partner, AbstractHorse baby) {
         }
     public static double createOffspringAttribute(double parentAValue, double parentBValue, double attributeRangeMin, double attributeRangeMax, RandomSource random) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.equine.AbstractHorse#createOffspringAttribute");
+        if (attributeRangeMax <= attributeRangeMin) {
+            throw new IllegalArgumentException("Incorrect range for an attribute");
+        }
+        double first = random.nextDouble();
+        double second = random.nextDouble();
+        double third = random.nextDouble();
+        return org.basaltmc.bukkit.MechanicsNatives.offspringAttribute(parentAValue, parentBValue, attributeRangeMin,
+            attributeRangeMax, first, second, third);
     }
     public float getEatAnim(float a) {
         return 0.0F;
@@ -344,7 +362,7 @@ public abstract class AbstractHorse extends Animal implements PlayerRideableJump
             super(AbstractHorse.this, speedModifier);
         }
         public boolean shouldPanic() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.equine.AbstractHorse.MountPanicGoal#shouldPanic");
+            return !AbstractHorse.this.isMobControlled() && super.shouldPanic();
         }
     }
     private boolean standing;

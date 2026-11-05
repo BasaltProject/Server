@@ -30,17 +30,12 @@ public interface LevelAccessor extends CommonLevelAccessor, ScheduledTickAccess 
         return this instanceof Level level ? level.nextSubTickCount() : 0L;
     }
     default <T> ScheduledTick<T> createTick(BlockPos pos, T type, int tickDelay, TickPriority priority) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelAccessor#createTick");
+        return new ScheduledTick<>(type, pos, getGameTime() + tickDelay, priority, nextSubTickCount());
     }
     default <T> ScheduledTick<T> createTick(BlockPos pos, T type, int tickDelay) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelAccessor#createTick");
+        return createTick(pos, type, tickDelay, TickPriority.NORMAL);
     }
-    default LevelData getLevelData() {
-        if (this instanceof Level level) {
-            return level.getLevelData();
-        }
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelAccessor#getLevelData");
-    }
+    LevelData getLevelData();
     default long getGameTime() {
         return this instanceof Level level ? level.getWorld().getGameTime() : 0L;
     }
@@ -48,23 +43,13 @@ public interface LevelAccessor extends CommonLevelAccessor, ScheduledTickAccess 
         return net.minecraft.server.MinecraftServer.getServer();
     }
     default Difficulty getDifficulty() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelAccessor#getDifficulty");
+        return getLevelData().getDifficulty();
     }
-    default ChunkSource getChunkSource() {
-        if (this instanceof Level level) {
-            return level.getChunkSource();
-        }
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelAccessor#getChunkSource");
-    }
+    ChunkSource getChunkSource();
     default boolean hasChunk(int chunkX, int chunkZ) {
         return getChunkSource().hasChunk(chunkX, chunkZ);
     }
-    default RandomSource getRandom() {
-        if (this instanceof Level level) {
-            return level.getRandom();
-        }
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelAccessor#getRandom");
-    }
+    RandomSource getRandom();
     default void updateNeighborsAt(BlockPos pos, Block sourceBlock) {
 
     }
@@ -74,15 +59,11 @@ public interface LevelAccessor extends CommonLevelAccessor, ScheduledTickAccess 
     default void playSound(Entity except, BlockPos pos, SoundEvent soundEvent, SoundSource source) {
         playSound(except, pos, soundEvent, source, 1.0F, 1.0F);
     }
-    default void playSound(Entity except, BlockPos pos, SoundEvent sound, SoundSource source, float volume, float pitch) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelAccessor#playSound");
-    }
+    void playSound(Entity except, BlockPos pos, SoundEvent sound, SoundSource source, float volume, float pitch);
     default void addParticle(ParticleOptions particle, double x, double y, double z, double xd, double yd, double zd) {
 
     }
-    default void levelEvent(Entity source, int type, BlockPos pos, int data) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.LevelAccessor#levelEvent");
-    }
+    void levelEvent(Entity source, int type, BlockPos pos, int data);
     default void levelEvent(int type, BlockPos pos, int data) {
         levelEvent(null, type, pos, data);
     }

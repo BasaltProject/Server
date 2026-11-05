@@ -265,6 +265,8 @@ public class Item implements ItemLike, FeatureElement {
         private int maxStackSize = -1;
         private int maxDamage;
         private Identifier id;
+        private String descriptionOverride;
+        private String descriptionPrefix = "item";
         public Properties() {
         }
         public Properties food(FoodProperties foodProperties) {
@@ -383,19 +385,25 @@ public class Item implements ItemLike, FeatureElement {
             return this;
         }
         public Properties overrideDescription(String descriptionId) {
+            this.descriptionOverride = descriptionId;
             return this;
         }
         public Properties useBlockDescriptionPrefix() {
+            this.descriptionPrefix = "block";
             return this;
         }
         public Properties useItemDescriptionPrefix() {
+            this.descriptionPrefix = "item";
             return this;
         }
         protected String effectiveDescriptionId() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.Item.Properties#effectiveDescriptionId");
+            if (descriptionOverride != null) {
+                return descriptionOverride;
+            }
+            return id == null ? "" : descriptionPrefix + "." + id.getNamespace() + "." + id.getPath().replace('/', '.');
         }
         public Identifier effectiveModel() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.Item.Properties#effectiveModel");
+            return id;
         }
         public <T> Properties component(DataComponentType<T> type, T value) {
             return this;

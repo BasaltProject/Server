@@ -12,7 +12,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.VoxelShape;
 public interface CommonLevelAccessor extends LevelReader, LevelSimulatedRW, EntityGetter {
     default <T extends BlockEntity> Optional<T> getBlockEntity(BlockPos pos, BlockEntityType<T> type) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CommonLevelAccessor#getBlockEntity");
+        return LevelReader.super.getBlockEntity(pos, type);
     }
     default List<VoxelShape> getEntityCollisions(Entity source, AABB testArea) {
         if (testArea.getSize() < 1.0E-7) {
@@ -28,9 +28,9 @@ public interface CommonLevelAccessor extends LevelReader, LevelSimulatedRW, Enti
         return shapes;
     }
     default boolean isUnobstructed(Entity source, VoxelShape shape) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CommonLevelAccessor#isUnobstructed");
+        return EntityGetter.super.isUnobstructed(source, shape);
     }
     default BlockPos getHeightmapPos(Heightmap.Types type, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CommonLevelAccessor#getHeightmapPos");
+        return LevelReader.super.getHeightmapPos(type, pos);
     }
 }

@@ -12,12 +12,12 @@ public enum HumanoidArm implements StringRepresentable {
     public static final Codec<HumanoidArm> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.HumanoidArm.class, "CODEC");
     public static final StreamCodec<ByteBuf, HumanoidArm> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.entity.HumanoidArm.class, "STREAM_CODEC");
     public HumanoidArm getOpposite() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.HumanoidArm#getOpposite");
+        return this == LEFT ? RIGHT : LEFT;
     }
     public Component caption() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.HumanoidArm#caption");
+        return Component.translatable("options.mainHand." + getSerializedName());
     }
     public String getSerializedName() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.HumanoidArm#getSerializedName");
+        return name().toLowerCase(java.util.Locale.ROOT);
     }
 }

@@ -29,7 +29,7 @@ public class Salmon extends AbstractSchoolingFish {
         return live() instanceof org.bukkit.entity.Salmon api ? (int) api.getMaxSchoolSize() : 0;
     }
     public ItemStack getBucketItemStack() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.Salmon#getBucketItemStack");
+        return new ItemStack(net.minecraft.world.item.Items.SALMON_BUCKET);
     }
     protected SoundEvent getAmbientSound() {
         return net.minecraft.sounds.SoundEvents.byId("entity.salmon.ambient");
@@ -52,10 +52,12 @@ public class Salmon extends AbstractSchoolingFish {
     protected void readAdditionalSaveData(ValueInput input) {
     }
     public void saveToBucketTag(ItemStack bucket) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.Salmon#saveToBucketTag");
+        super.saveToBucketTag(bucket);
+        net.minecraft.world.item.component.CustomData.update(net.minecraft.core.component.DataComponents.BUCKET_ENTITY_DATA, bucket,
+            tag -> tag.putString("type", getVariant().getSerializedName()));
     }
     public Variant getVariant() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.Salmon#getVariant");
+        return live() instanceof org.bukkit.entity.Salmon api ? Variant.valueOf(api.getVariant().name()) : Variant.DEFAULT;
     }
     protected void applyImplicitComponents(DataComponentGetter components) {
         }
@@ -66,14 +68,18 @@ public class Salmon extends AbstractSchoolingFish {
         return groupData;
     }
     public float getSalmonScale() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.fish.Salmon#getSalmonScale");
+        return getVariant().scale;
     }
     protected EntityDimensions getDefaultDimensions(Pose pose) {
         return net.minecraft.world.entity.EntityDimensions.scalable(getBbWidth(), getBbHeight());
     }
     public static enum Variant implements StringRepresentable {
-        SMALL, MEDIUM, LARGE;
-        public static final Variant DEFAULT = null;
+        SMALL(0.5F), MEDIUM(1.0F), LARGE(1.5F);
+        public static final Variant DEFAULT = MEDIUM;
+        private final float scale;
+        Variant(float scale) {
+            this.scale = scale;
+        }
         public static final Codec<Variant> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.animal.fish.Salmon.Variant.class, "CODEC");
         public static final StreamCodec<ByteBuf, Variant> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.entity.animal.fish.Salmon.Variant.class, "STREAM_CODEC");
         public String getSerializedName() {

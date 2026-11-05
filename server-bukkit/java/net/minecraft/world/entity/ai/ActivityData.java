@@ -13,6 +13,11 @@ import net.minecraft.world.entity.schedule.Activity;
 public record ActivityData<E extends LivingEntity>(Activity activityType,
     ImmutableList<? extends Pair<Integer, ? extends BehaviorControl<? super E>>> behaviorPriorityPairs,
     Set<Pair<MemoryModuleType<?>, MemoryStatus>> conditions, Set<MemoryModuleType<?>> memoriesToEraseWhenStopped) {
+    /** An activity with no Java behaviors: the native brain of the species runs it. */
+    public static <E extends LivingEntity> ActivityData<E> nativeOnly(Activity activity) {
+        return create(activity, ImmutableList.of());
+    }
+
     public static <E extends LivingEntity> ActivityData<E> create(Activity activity, int priorityOfFirstBehavior,
         ImmutableList<? extends BehaviorControl<? super E>> behaviorList) {
         return create(activity, createPriorityPairs(priorityOfFirstBehavior, behaviorList));

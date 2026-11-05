@@ -47,7 +47,7 @@ public class StairBlock extends Block implements SimpleWaterloggedBlock {
         return super.updateShape(state, level, ticks, pos, directionToNeighbour, neighbourPos, neighbourState, random);
     }
     public static boolean isStairs(BlockState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.StairBlock#isStairs");
+        return state.getBlock() instanceof StairBlock;
     }
     protected BlockState rotate(BlockState state, Rotation rotation) {
         return super.rotate(state, rotation);

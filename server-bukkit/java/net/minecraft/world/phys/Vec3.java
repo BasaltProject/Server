@@ -56,7 +56,7 @@ public class Vec3 implements Position {
             buf.writeDouble(v.y());
             buf.writeDouble(v.z());
         }, buf -> new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()));
-    public static final StreamCodec<ByteBuf, Vec3> LP_STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.phys.Vec3.class, "LP_STREAM_CODEC");
+    public static final StreamCodec<ByteBuf, Vec3> LP_STREAM_CODEC = StreamCodec.of(net.minecraft.network.LpVec3::write, net.minecraft.network.LpVec3::read);
     public static final Vec3 X_AXIS = new Vec3(1.0, 0.0, 0.0);
     public static final Vec3 Y_AXIS = new Vec3(0.0, 1.0, 0.0);
     public static final Vec3 Z_AXIS = new Vec3(0.0, 0.0, 1.0);

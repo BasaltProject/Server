@@ -6,30 +6,30 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelHeightAccessor;
 public interface ServerLevelData extends WritableLevelData {
     default String getLevelName() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.ServerLevelData#getLevelName");
+        return "";
     }
     default void fillCrashReportCategory(CrashReportCategory category, LevelHeightAccessor levelHeightAccessor) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.ServerLevelData#fillCrashReportCategory");
+        return;
     }
     default GameType getGameType() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.ServerLevelData#getGameType");
+        return GameType.SURVIVAL;
     }
     default boolean isInitialized() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.ServerLevelData#isInitialized");
+        return true;
     }
     default void setInitialized(boolean initialized) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.ServerLevelData#setInitialized");
+        return;
     }
     default boolean isAllowCommands() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.ServerLevelData#isAllowCommands");
+        return true;
     }
     default void setAllowCommands(boolean allowCommands) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.ServerLevelData#setAllowCommands");
+        return;
     }
     default void setGameType(GameType gameType) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.ServerLevelData#setGameType");
+        return;
     }
     default void setGameTime(long time) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.ServerLevelData#setGameTime");
+        return;
     }
 }

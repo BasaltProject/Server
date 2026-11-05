@@ -51,7 +51,11 @@ public class Bogged extends AbstractSkeleton implements Shearable {
         return net.minecraft.sounds.SoundEvents.BOGGED_STEP;
     }
     protected AbstractArrow getArrow(ItemStack projectile, float power, ItemStack firingWeapon) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.skeleton.Bogged#getArrow");
+        AbstractArrow arrow = super.getArrow(projectile, power, firingWeapon);
+        if (arrow instanceof net.minecraft.world.entity.projectile.arrow.Arrow tipped) {
+            tipped.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.POISON, 100));
+        }
+        return arrow;
     }
     protected int getHardAttackInterval() {
         return 0;
@@ -60,9 +64,11 @@ public class Bogged extends AbstractSkeleton implements Shearable {
         return 0;
     }
     public void shear(ServerLevel level, SoundSource soundSource, ItemStack tool) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.skeleton.Bogged#shear");
+        if (live() instanceof io.papermc.paper.entity.Shearable api) {
+            api.shear(net.kyori.adventure.sound.Sound.Source.values()[Math.min(soundSource.ordinal(), net.kyori.adventure.sound.Sound.Source.values().length - 1)]);
+        }
     }
     public boolean readyForShearing() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.monster.skeleton.Bogged#readyForShearing");
+        return live() instanceof io.papermc.paper.entity.Shearable api && api.readyToBeSheared();
     }
 }

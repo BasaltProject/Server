@@ -56,6 +56,6 @@ public interface DamageTypes {
     ResourceKey<DamageType> GENERIC_KILL = org.basaltmc.bukkit.facade.DamageKeys.of("generic_kill");
     ResourceKey<DamageType> MACE_SMASH = org.basaltmc.bukkit.facade.DamageKeys.of("mace_smash");
     static void bootstrap(BootstrapContext<DamageType> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.damagesource.DamageTypes#bootstrap");
+        org.basaltmc.bukkit.facade.Bootstraps.replay(context, net.minecraft.core.registries.Registries.DAMAGE_TYPE, DamageTypes.class);
     }
 }

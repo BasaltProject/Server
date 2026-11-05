@@ -17,6 +17,6 @@ public class EndFeatures {
     public static final ResourceKey<Object> END_PODIUM_ACTIVE = FeatureUtils.createKey("end_podium_active");
     public static final ResourceKey<Object> END_PODIUM_INACTIVE = FeatureUtils.createKey("end_podium_inactive");
     public static void bootstrap(BootstrapContext<Feature> context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.EndFeatures#bootstrap");
+        // registries come from the native datapack loader, so there is nothing to bootstrap
     }
 }

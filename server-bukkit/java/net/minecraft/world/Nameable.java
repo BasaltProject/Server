@@ -3,19 +3,17 @@ package net.minecraft.world;
 
 import net.minecraft.network.chat.Component;
 public interface Nameable {
-    default Component getName() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.Nameable#getName");
-    }
+    Component getName();
     default String getPlainTextName() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.Nameable#getPlainTextName");
+        return getName().getString();
     }
     default boolean hasCustomName() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.Nameable#hasCustomName");
+        return getCustomName() != null;
     }
     default Component getDisplayName() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.Nameable#getDisplayName");
+        return getName();
     }
     default Component getCustomName() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.Nameable#getCustomName");
+        return null;
     }
 }

@@ -4,18 +4,36 @@ package net.minecraft.world.level.gameevent;
 import net.minecraft.core.Holder;
 import net.minecraft.world.phys.Vec3;
 public interface GameEventListenerRegistry {
-    GameEventListenerRegistry NOOP = null;
+    GameEventListenerRegistry NOOP = new GameEventListenerRegistry() {
+        @Override
+        public boolean isEmpty() {
+            return true;
+        }
+
+        @Override
+        public void register(GameEventListener listener) {
+        }
+
+        @Override
+        public void unregister(GameEventListener listener) {
+        }
+
+        @Override
+        public boolean visitInRangeListeners(Holder<GameEvent> event, Vec3 sourcePosition, GameEvent.Context context, ListenerVisitor action) {
+            return false;
+        }
+    };
     default boolean isEmpty() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.gameevent.GameEventListenerRegistry#isEmpty");
+        return true;
     }
     default void register(GameEventListener listener) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.gameevent.GameEventListenerRegistry#register");
+        return;
     }
     default void unregister(GameEventListener listener) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.gameevent.GameEventListenerRegistry#unregister");
+        return;
     }
     default boolean visitInRangeListeners(Holder<GameEvent> event, Vec3 sourcePosition, GameEvent.Context context, ListenerVisitor action) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.gameevent.GameEventListenerRegistry#visitInRangeListeners");
+        return false;
     }
     public interface ListenerVisitor {
         void visit(GameEventListener listener, Vec3 position);

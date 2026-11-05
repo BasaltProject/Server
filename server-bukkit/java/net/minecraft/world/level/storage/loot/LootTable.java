@@ -15,12 +15,15 @@ import net.minecraft.util.context.ContextKeySet;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.loot.functions.FunctionUserBuilder;
+import org.basaltmc.bukkit.loot.LootJson;
 import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
-public class LootTable implements Validatable {
+public class LootTable implements Validatable, LootJson.Node {
     private Identifier key;
+    private final List<LootPool> pools;
+    private final Optional<Holder<LootItemFunction>> modifier;
 
     public static LootTable of(Identifier key) {
-        LootTable table = new LootTable(null, Optional.empty(), List.of(), Optional.empty());
+        LootTable table = new LootTable(null, Optional.empty(), null, Optional.empty());
         table.key = key;
         return table;
     }
@@ -30,14 +33,20 @@ public class LootTable implements Validatable {
     }
 
     private void roll(LootParams params, long seed, Consumer<ItemStack> output) {
-        if (key == null) {
+        if (key == null && pools == null) {
             return;
         }
+        rollNative(key == null ? null : key.toString(), key == null ? LootJson.of(this) : null, params, seed, output);
+    }
+
+    static void rollNative(String table, String json, LootParams params, long seed, Consumer<ItemStack> output) {
         net.minecraft.world.phys.Vec3 origin = params.contextMap().getOrDefault(
             net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN,
             net.minecraft.world.phys.Vec3.ZERO);
-        String[] flat = org.basaltmc.bukkit.MiscNatives.lootRoll(key.toString(), params.getLevel().getWorld().getName(),
-            origin.x, origin.y, origin.z, params.getLuck(), seed, null);
+        String world = params.getLevel().getWorld().getName();
+        String[] flat = json == null
+            ? org.basaltmc.bukkit.MiscNatives.lootRoll(table, world, origin.x, origin.y, origin.z, params.getLuck(), seed, null)
+            : org.basaltmc.bukkit.MiscNatives.lootRollJson(json, world, origin.x, origin.y, origin.z, params.getLuck(), seed, null);
         if (flat == null) {
             return;
         }
@@ -49,15 +58,29 @@ public class LootTable implements Validatable {
             }
         }
     }
+
+    @Override
+    public void writeJson(StringBuilder out) {
+        if (pools == null) {
+            LootJson.string(out, String.valueOf(key));
+            return;
+        }
+        out.append("{\"pools\":");
+        LootJson.nodes(out, pools);
+        LootJson.optional(out, "modifier", modifier);
+        out.append('}');
+    }
+
     public static final Codec<ResourceKey<LootTable>> KEY_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.storage.loot.LootTable.class, "KEY_CODEC");
-    public static final ContextKeySet DEFAULT_PARAM_SET = null;
+    public static final ContextKeySet DEFAULT_PARAM_SET = net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.ALL_PARAMS;
     public static final long RANDOMIZE_SEED = 0L;
     public static final Codec<LootTable> DIRECT_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.storage.loot.LootTable.class, "DIRECT_CODEC");
     public static final Codec<Holder<LootTable>> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.storage.loot.LootTable.class, "CODEC");
     public static final Codec<HolderSet<LootTable>> LIST_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.storage.loot.LootTable.class, "LIST_CODEC");
     public static final LootTable EMPTY = null;
     private LootTable(ContextKeySet paramSet, Optional<Identifier> randomSequence, List<LootPool> pools, Optional<Holder<LootItemFunction>> modifier) {
-
+        this.pools = pools;
+        this.modifier = modifier;
     }
     public static Consumer<ItemStack> createStackSplitter(ServerLevel level, Consumer<ItemStack> output) {
         return stack -> {
@@ -113,29 +136,37 @@ public class LootTable implements Validatable {
         }
     }
     public static Builder lootTable() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootTable#lootTable");
+        return new Builder();
     }
     public static class Builder implements FunctionUserBuilder<Builder> {
+        private final List<LootPool> pools = new java.util.ArrayList<>();
+        private final List<Holder<LootItemFunction>> functions = new java.util.ArrayList<>();
+        private ContextKeySet paramSet;
+        private Identifier randomSequence;
         public Builder() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootTable.Builder#<init>");
         }
         public Builder withPool(LootPool.Builder pool) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootTable.Builder#withPool");
+            pools.add(pool.build());
+            return this;
         }
         public Builder setParamSet(ContextKeySet paramSet) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootTable.Builder#setParamSet");
+            this.paramSet = paramSet;
+            return this;
         }
         public Builder setRandomSequence(Identifier key) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootTable.Builder#setRandomSequence");
+            this.randomSequence = key;
+            return this;
         }
         public Builder apply(Holder<LootItemFunction> function) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootTable.Builder#apply");
+            functions.add(function);
+            return this;
         }
         public Builder unwrap() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootTable.Builder#unwrap");
+            return this;
         }
         public LootTable build() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.LootTable.Builder#build");
+            return new LootTable(paramSet, Optional.ofNullable(randomSequence), List.copyOf(pools),
+                FunctionUserBuilder.buildFunction(functions));
         }
     }
 }

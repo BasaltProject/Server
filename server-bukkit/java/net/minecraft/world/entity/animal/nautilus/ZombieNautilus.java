@@ -64,7 +64,9 @@ public class ZombieNautilus extends AbstractNautilus {
     protected void addAdditionalSaveData(ValueOutput output) {
     }
     public void setVariant(Holder<ZombieNautilusVariant> variant) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.nautilus.ZombieNautilus#setVariant");
+        if (live() instanceof org.bukkit.entity.ZombieNautilus api) {
+            api.setVariant((org.bukkit.entity.ZombieNautilus.Variant) org.basaltmc.bukkit.facade.VariantHolders.bukkit(io.papermc.paper.registry.RegistryKey.ZOMBIE_NAUTILUS_VARIANT, variant));
+        }
     }
     public Holder<ZombieNautilusVariant> getVariant() {
         return live() instanceof org.bukkit.entity.ZombieNautilus api

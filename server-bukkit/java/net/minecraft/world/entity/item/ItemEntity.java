@@ -124,10 +124,14 @@ public class ItemEntity extends Entity implements TraceableEntity {
         }
     }
     public void setExtendedLifetime() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.item.ItemEntity#setExtendedLifetime");
+        if (live() instanceof org.basaltmc.bukkit.entity.ops.ItemOps item) {
+            item.setExtendedLifetime();
+        }
     }
     public void makeFakeItem() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.item.ItemEntity#makeFakeItem");
+        if (live() instanceof org.basaltmc.bukkit.entity.ops.ItemOps item) {
+            item.makeFake();
+        }
     }
     public static float getSpin(float ageInTicks, float bobOffset) {
         return ageInTicks / 20.0F + bobOffset;

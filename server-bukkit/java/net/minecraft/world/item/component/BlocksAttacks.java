@@ -20,13 +20,31 @@ public record BlocksAttacks(float blockDelaySeconds, float disableCooldownScale,
     public static final Codec<BlocksAttacks> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.item.component.BlocksAttacks.class, "CODEC");
     public static final StreamCodec<RegistryFriendlyByteBuf, BlocksAttacks> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.component.BlocksAttacks.class, "STREAM_CODEC");
     public void onBlocked(ServerLevel level, LivingEntity user) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.BlocksAttacks#onBlocked");
+        blockSound.ifPresent(event -> level.playSound(null, user.getX(), user.getY(), user.getZ(), event, user.getSoundSource(), 1.0F, 0.8F + level.getRandom().nextFloat() * 0.4F));
     }
     public void disable(ServerLevel level, LivingEntity user, float baseSeconds, ItemStack blockingWith) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.BlocksAttacks#disable");
+        float seconds = baseSeconds * disableCooldownScale;
+        int cooldownTicks = seconds > 0.0F ? Math.round(seconds * 20.0F) : 0;
+        if (cooldownTicks <= 0) {
+            return;
+        }
+        if (user instanceof net.minecraft.world.entity.player.Player player) {
+            player.getCooldowns().addCooldown(blockingWith, cooldownTicks);
+        }
+        user.stopUsingItem();
+        disableSound.ifPresent(event -> level.playSound(null, user.getX(), user.getY(), user.getZ(), event, user.getSoundSource(), 0.8F, 0.8F + level.getRandom().nextFloat() * 0.4F));
     }
     public void hurtBlockingItem(Level level, ItemStack item, LivingEntity user, InteractionHand hand, float damage) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.component.BlocksAttacks#hurtBlockingItem");
+        if (!(user instanceof net.minecraft.world.entity.player.Player player)) {
+            return;
+        }
+        if (!level.isClientSide()) {
+            player.awardStat(net.minecraft.stats.Stats.ITEM_USED.get(item.getItem()));
+        }
+        int damageDealt = itemDamage.apply(damage);
+        if (damageDealt > 0) {
+            item.hurtAndBreak(damageDealt, user, hand.asEquipmentSlot());
+        }
     }
     public int blockDelayTicks() {
         return Math.round(blockDelaySeconds * 20.0F);

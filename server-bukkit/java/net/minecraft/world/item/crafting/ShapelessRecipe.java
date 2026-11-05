@@ -9,8 +9,17 @@ import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.display.RecipeDisplay;
 import net.minecraft.world.level.Level;
 public class ShapelessRecipe extends NormalCraftingRecipe {
-    public static final MapCodec<ShapelessRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.ShapelessRecipe.class, "MAP_CODEC");
-    public static final StreamCodec<RegistryFriendlyByteBuf, ShapelessRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.ShapelessRecipe.class, "STREAM_CODEC");
+    public static final MapCodec<ShapelessRecipe> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+        Recipe.CommonInfo.MAP_CODEC.forGetter(o -> o.commonInfo),
+        CraftingRecipe.CraftingBookInfo.MAP_CODEC.forGetter(o -> o.bookInfo),
+        ItemStackTemplate.CODEC.fieldOf("result").forGetter(o -> o.result),
+        Ingredient.CODEC.listOf(1, 9).fieldOf("ingredients").forGetter(o -> o.ingredients)).apply(i, ShapelessRecipe::new));
+    public static final StreamCodec<RegistryFriendlyByteBuf, ShapelessRecipe> STREAM_CODEC = StreamCodec.composite(
+        Recipe.CommonInfo.STREAM_CODEC, o -> o.commonInfo,
+        CraftingRecipe.CraftingBookInfo.STREAM_CODEC, o -> o.bookInfo,
+        ItemStackTemplate.STREAM_CODEC, o -> o.result,
+        Ingredient.CONTENTS_STREAM_CODEC.apply(net.minecraft.network.codec.ByteBufCodecs.list()), o -> o.ingredients,
+        ShapelessRecipe::new);
     public static final RecipeSerializer<ShapelessRecipe> SERIALIZER = null;
     private final ItemStackTemplate result;
     private final List<Ingredient> ingredients;

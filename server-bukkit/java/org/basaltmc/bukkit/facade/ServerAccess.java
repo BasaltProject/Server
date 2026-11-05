@@ -67,6 +67,9 @@ public final class ServerAccess {
                 return BuiltInRegistries.MOB_EFFECT;
             case "stat_type":
                 return BuiltInRegistries.STAT_TYPE;
+            case "menu":
+                net.minecraft.world.inventory.MenuType.GENERIC_9x1.requiredFeatures();
+                return BuiltInRegistries.MENU;
             case "enchantment":
                 return enchantments(key);
             case "biome":

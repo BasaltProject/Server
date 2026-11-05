@@ -35,6 +35,7 @@ final class EntityEvents {
 
     static void install() {
         EventBridge.mapLazily("entity.goal", BasaltMobGoals.INSTANCE::answer);
+        EventBridge.mapLazily("entity.behavior", NativeBehaviors.INSTANCE::answer);
         EventBridge.map("entity.damage", EntityDamageEvent.class, EntityEvents::damage,
             (e, f) -> f.put("amount", ((EntityDamageEvent) e).getDamage()));
         EventBridge.map("entity.drops", EntityDeathEvent.class, f -> {

@@ -46,4 +46,7 @@ public final class VariantHolders {
     public static <T> Holder<T> at(ResourceKey<? extends Registry<T>> registry, Class<T> type, io.papermc.paper.registry.RegistryKey<? extends org.bukkit.Keyed> key, int index) {
         return of(registry, type, ordered(key).get(index));
     }
+    public static org.bukkit.Keyed bukkit(io.papermc.paper.registry.RegistryKey<? extends org.bukkit.Keyed> key, Holder<?> holder) {
+        return ordered(key).get(indexOf(key, holder));
+    }
 }

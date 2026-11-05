@@ -8,11 +8,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
 public record SelectableRecipe<T extends Recipe<?>>(SlotDisplay optionDisplay, Optional<RecipeHolder<T>> recipe) {
     public static <T extends Recipe<?>> StreamCodec<RegistryFriendlyByteBuf, SelectableRecipe<T>> noRecipeCodec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.crafting.SelectableRecipe#noRecipeCodec");
+        return StreamCodec.composite(SlotDisplay.STREAM_CODEC, SelectableRecipe::optionDisplay, (display) -> new SelectableRecipe<T>(display, Optional.empty()));
     }
     public static record SingleInputEntry<T extends Recipe<?>>(Ingredient input, SelectableRecipe<T> recipe) {
         public static <T extends Recipe<?>> StreamCodec<RegistryFriendlyByteBuf, SingleInputEntry<T>> noRecipeCodec() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.crafting.SelectableRecipe.SingleInputEntry#noRecipeCodec");
+            return StreamCodec.composite(Ingredient.CONTENTS_STREAM_CODEC, SingleInputEntry::input,
+                SelectableRecipe.<T>noRecipeCodec(), SingleInputEntry::recipe, SingleInputEntry::new);
         }
     }
     public static record SingleInputSet<T extends Recipe<?>>(List<SingleInputEntry<T>> entries) {
@@ -20,7 +21,7 @@ public record SelectableRecipe<T extends Recipe<?>>(SlotDisplay optionDisplay, O
             return new SingleInputSet<>(List.of());
         }
         public static <T extends Recipe<?>> StreamCodec<RegistryFriendlyByteBuf, SingleInputSet<T>> noRecipeCodec() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.crafting.SelectableRecipe.SingleInputSet#noRecipeCodec");
+            return SingleInputEntry.<T>noRecipeCodec().apply(net.minecraft.network.codec.ByteBufCodecs.list()).map(SingleInputSet::new, SingleInputSet::entries);
         }
         public boolean acceptsInput(ItemStack input) {
             for (SingleInputEntry<T> entry : entries) {
