@@ -306,6 +306,8 @@ void PlayerLifecycle::respawn() {
             .write(buffer);
     });
     owner_->uiState().sendAbilities();
+    // parity: `PlayerList.sendPlayerPermissionLevel`; the respawn leaves the client at level 0.
+    owner_->uiState().sendCommandTree();
     owner_->uiState().syncHealth();
     owner_->uiState().syncExperience();
     // parity: `PlayerList.respawn` carries the post effects over and sends them again.
@@ -457,6 +459,8 @@ bool PlayerLifecycle::switchWorld(world::LoadedWorld& target, double x, double y
     });
     owner_->sendPlayerPosition(x, y, z, session->yaw, session->pitch);
     owner_->uiState().sendAbilities();
+    // parity: `PlayerList.sendPlayerPermissionLevel`; the respawn leaves the client at level 0.
+    owner_->uiState().sendCommandTree();
     owner_->uiState().syncHealth();
     owner_->uiState().syncExperience();
     owner_->playerUi().worldChanged();
