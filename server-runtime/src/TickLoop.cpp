@@ -149,6 +149,7 @@ void TickLoop::runTicks() {
         static_cast<std::int64_t>(options_.playerSaveIntervalSeconds) * kTicksPerSecond;
     std::int64_t ticksUntilPlayerSave = playerSaveTicks;
     const Clock::time_point clock = Clock::now();
+    const Clock::time_point durationsClock = options_.durationsOrigin.value_or(clock);
     std::int64_t nextTickMillis = 0;
     std::int64_t emptyTicks = 0;
     while (running_.load(std::memory_order_relaxed)) {
@@ -197,7 +198,7 @@ void TickLoop::runTicks() {
         if (!skip) {
             recentNanos_[static_cast<std::size_t>(tick % 100)].store(nanosSince(started), std::memory_order_relaxed);
         }
-        durations_.record(nanosSince(clock), nanosSince(started));
+        durations_.record(nanosSince(durationsClock), nanosSince(started));
         const TickRates rates = meter.tick();
         oneMinute_.store(rates.oneMinute, std::memory_order_relaxed);
         fiveMinutes_.store(rates.fiveMinutes, std::memory_order_relaxed);

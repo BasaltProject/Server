@@ -352,7 +352,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                         event.set("duration_ms", took);
                         event.set("remaining_ms", 50.0 - took);
                     });
-            }});
+            },
+        .durationsOrigin = serverClock_});
 
     functionRunner_ = makeFunctionRunner(config.functionPermissionLevel);
     consoleSource_ = std::make_unique<command::ConsoleCommandSource>(
@@ -408,6 +409,48 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     sources.onlinePlayers = [this] { return static_cast<std::int32_t>(playerRegistry_.snapshot().size()); };
     sources.maxPlayers = [this] { return config_->maxPlayers; };
+    sources.loadedChunks = [this] {
+        std::int32_t total = 0;
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            total += static_cast<std::int32_t>(world->state().loadedChunkCount());
+        }
+        return total;
+    };
+    sources.chunkBytes = [this] {
+        std::int64_t total = 0;
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            total += world->state().chunkMemory().bytes;
+        }
+        return total;
+    };
+    sources.regionCacheBytes = [this] {
+        std::int64_t total = 0;
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            total += world->regions().cachedRegionBytes();
+        }
+        return total;
+    };
+    sources.chunkBlockEntities = [this] {
+        std::int32_t total = 0;
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            total += world->state().chunkMemory().blockEntities;
+        }
+        return total;
+    };
+    sources.chunkScheduledTicks = [this] {
+        std::int32_t total = 0;
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            total += world->state().chunkMemory().scheduledTicks;
+        }
+        return total;
+    };
+    sources.chunkGeneratedEntities = [this] {
+        std::int32_t total = 0;
+        for (const auto& [name, world] : worldRegistry_->worlds()) {
+            total += world->state().chunkMemory().generatedEntities;
+        }
+        return total;
+    };
     sources.worldCount = [this] { return static_cast<std::int32_t>(worldRegistry_->worlds().size()); };
     sources.cpuPercent = [this] { return cpuMeter_.percent(); };
     sources.residentBytes = [this]() -> std::optional<std::int64_t> {
@@ -427,6 +470,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             for (const entity::ServerEntity* one : world->state().entities()) {
                 entry.entities += 1;
                 entry.entityCounts[one->type().path()] += 1;
+                const auto chunkX = static_cast<std::int32_t>(std::floor(one->x)) >> 4;
+                const auto chunkZ = static_cast<std::int32_t>(std::floor(one->z)) >> 4;
+                entry.orphanEntities += world->state().chunkIfLoaded(chunkX, chunkZ) == nullptr ? 1 : 0;
             }
             for (const player::PlayerSession* player : online) {
                 entry.players += player->worldName == world->name() ? 1 : 0;

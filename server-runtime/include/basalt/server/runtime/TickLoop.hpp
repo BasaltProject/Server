@@ -4,9 +4,11 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -34,6 +36,9 @@ struct TickLoopOptions {
     std::function<bool()> hasPlayers;
     /// parity: `worldRuns` is false while `/tick freeze` holds and no step is owed.
     std::function<void(bool worldRuns)> onTick;
+    /// The instant the tick durations are measured from, so they share a clock with whoever reads them back.
+    /// Unset, they count from when the loop starts.
+    std::optional<std::chrono::steady_clock::time_point> durationsOrigin;
 };
 
 class TickLoop {
