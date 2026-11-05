@@ -9,8 +9,8 @@ fi
 source="$(mktemp -d)"
 trap 'rm -rf "$source"' EXIT
 url=https://download.freebsd.org/releases/arm64/aarch64/14.5-RELEASE
-curl -fLsS --retry 3 "$url/base.txz" -o "$source/base.txz"
-curl -fLsS --retry 3 "$url/MANIFEST" -o "$source/MANIFEST"
+curl -fLsS --retry 5 --retry-all-errors --retry-delay 10 --connect-timeout 20 --max-time 900 "$url/base.txz" -o "$source/base.txz"
+curl -fLsS --retry 5 --retry-all-errors --retry-delay 10 --connect-timeout 20 --max-time 120 "$url/MANIFEST" -o "$source/MANIFEST"
 digest="$(awk '$1 == "base.txz" {print $2}' "$source/MANIFEST")"
 [ "${#digest}" -eq 64 ]
 if command -v sha256sum >/dev/null; then
