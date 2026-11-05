@@ -393,6 +393,12 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         if (!ticking(entity->x, entity->z)) {
             continue;
         }
+        // parity: `Entity.checkBelowWorld`, sixty-four blocks under the floor of the world.
+        if (entity->y <
+            static_cast<double>(config::dimensionFacts(world.declaration().dimension).chunkHeight.minY() - 64)) {
+            entity->removed = true;
+            continue;
+        }
         if (entity->sourceNbt.has_value() && entity->type().path() == "armor_stand") {
             if (entity->sourceNbt->getBoolean("BasaltNoTick")) {
                 continue;
