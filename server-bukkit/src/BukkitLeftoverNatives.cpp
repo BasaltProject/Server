@@ -279,7 +279,7 @@ jdoubleArray JNICALL nativeNoiseHandleRange(JNIEnv* env, jclass, jlong handle) {
 }
 
 void JNICALL nativeNoiseRelease(JNIEnv*, jclass, jlong handle) {
-    jni::onServer<bool>(false, [&] {
+    (void)jni::onServer<bool>(false, [&] {
         BukkitBridge::current().services().worldgen().releaseNoise(handle);
         return true;
     });
