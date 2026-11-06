@@ -13,6 +13,7 @@ basalt_module(server-world
         src/SimpleWorldGenerators.cpp
         src/portal/PortalShape.cpp
         src/ChunkDataCodec.cpp
+        src/FolderRegions.cpp
         src/ChunkSection.cpp
         src/ChunkTypes.cpp
         src/PalettedContainer.cpp

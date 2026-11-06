@@ -170,7 +170,8 @@ public:
         static_cast<void>(second);
     }
 
-    /// "shriek" makes the shrieker at the position shriek for a player uuid; "bloom" makes the catalyst spread.
+    /// "shriek" makes the shrieker at the position shriek for a player uuid; "bloom" makes the catalyst spread,
+    /// "update" ticks its cursors once.
     virtual bool sculk(std::string_view action, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t sourceX,
                        std::int32_t sourceY, std::int32_t sourceZ, std::int32_t value, std::string_view player) {
         static_cast<void>(action);

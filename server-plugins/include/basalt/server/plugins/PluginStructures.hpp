@@ -25,6 +25,52 @@ struct PluginStructurePlacement {
     std::int32_t palette = -1;
 };
 
+struct PluginTemplateScanRequest {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+    std::int32_t rotation = 0;
+    std::int32_t mirror = 0;
+    std::int32_t pivotX = 0;
+    std::int32_t pivotZ = 0;
+    /// Only blocks of this id when set, such as `minecraft:jigsaw`.
+    std::string block;
+    /// False keeps the template-relative positions.
+    bool absolute = true;
+};
+
+struct PluginTemplateBlock {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+    std::int32_t stateId = 0;
+    /// The block entity data as an unnamed NBT compound, empty when the block has none.
+    std::vector<std::uint8_t> nbt;
+};
+
+struct PluginTemplateJigsaw {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+    std::string front;
+    std::string top;
+    bool rollable = false;
+    std::string name;
+    std::string pool;
+    std::string target;
+    std::string finalState;
+    std::int32_t placementPriority = 0;
+    std::int32_t selectionPriority = 0;
+};
+
+struct PluginTemplateScan {
+    std::int32_t sizeX = 0;
+    std::int32_t sizeY = 0;
+    std::int32_t sizeZ = 0;
+    std::vector<PluginTemplateBlock> blocks;
+    std::vector<PluginTemplateJigsaw> jigsaws;
+};
+
 /// Structure templates: those in the game data, those saved from a world, and in-memory ones.
 class PluginStructures {
 public:
@@ -78,6 +124,14 @@ public:
         static_cast<void>(sizeY);
         static_cast<void>(sizeZ);
         static_cast<void>(entities);
+        return std::nullopt;
+    }
+
+    /// The blocks and jigsaws of a template as a placement would put them, with the world left alone.
+    [[nodiscard]] virtual std::optional<PluginTemplateScan> scan(std::span<const std::uint8_t> structure,
+                                                                 const PluginTemplateScanRequest& request) {
+        static_cast<void>(structure);
+        static_cast<void>(request);
         return std::nullopt;
     }
 

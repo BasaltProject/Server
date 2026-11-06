@@ -77,6 +77,7 @@ public:
     world::realTimelineTags::TagMembers timelineTags;
     world::realDamageTypeTags::TagMembers damageTypeTags;
     world::realEntityTypeTags::TagMembers entityTags;
+    world::realFluidTags::TagMembers gameEventTags;
     /// The banner-pattern tags, kept in their own order because a loom's buttons are numbered by it.
     world::realBannerPatterns::TagOrder bannerPatterns;
     world::RealAdvancements advancements;

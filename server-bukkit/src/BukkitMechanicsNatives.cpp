@@ -8,6 +8,8 @@
 #include <basalt/server/entity/LevelValue.hpp>
 #include <basalt/server/entity/Projectiles.hpp>
 #include <basalt/server/plugins/PluginWorldEnv.hpp>
+#include <basalt/server/registry/CreativeTabs.hpp>
+#include <basalt/server/world/FolderRegions.hpp>
 
 #include <array>
 
@@ -105,6 +107,30 @@ jdoubleArray JNICALL nativeStepUp(JNIEnv* env, jclass, jdoubleArray colliders, j
 jdouble JNICALL nativeOffspringAttribute(JNIEnv*, jclass, jdouble parentA, jdouble parentB, jdouble min, jdouble max,
                                          jdouble first, jdouble second, jdouble third) {
     return entity::breeding::offspringAttribute(parentA, parentB, min, max, first, second, third);
+}
+
+jobjectArray JNICALL nativeCreativeTabItems(JNIEnv* env, jclass, jstring tab) {
+    const auto ids = registry::creativeTabItems(toStd(env, tab));
+    return jni::stringArrayOf(env, std::vector<std::string>(ids.begin(), ids.end()));
+}
+
+jbyteArray JNICALL nativeRegionRead(JNIEnv* env, jclass, jstring folder, jint chunkX, jint chunkZ) {
+    return jni::byteArrayOf(env, world::folderRegions::read(toStd(env, folder), chunkX, chunkZ));
+}
+
+void JNICALL nativeRegionWrite(JNIEnv* env, jclass, jstring folder, jint chunkX, jint chunkZ, jbyteArray data,
+                               jint timestamp) {
+    world::folderRegions::write(toStd(env, folder), chunkX, chunkZ, jni::bytesOf(env, data), timestamp);
+}
+
+jint JNICALL nativeRegionTimestamp(JNIEnv* env, jclass, jstring folder, jint chunkX, jint chunkZ) {
+    return world::folderRegions::timestamp(toStd(env, folder), chunkX, chunkZ);
+}
+
+jboolean JNICALL nativeRegionFlush(JNIEnv* env, jclass, jstring folder, jboolean release) {
+    const std::string path = toStd(env, folder);
+    return (release == JNI_TRUE ? world::folderRegions::release(path) : world::folderRegions::flush(path)) ? JNI_TRUE
+                                                                                                           : JNI_FALSE;
 }
 
 jfloat JNICALL nativeLevelValue(JNIEnv* env, jclass, jdoubleArray program, jint level) {
@@ -227,6 +253,12 @@ void registerMechanicsNatives(JNIEnv* env, jclass natives) {
         nativeMethod("collide", "([D[DDDD)[D", reinterpret_cast<void*>(&nativeCollide)),
         nativeMethod("stepUp", "([D[DDDDDFD)[D", reinterpret_cast<void*>(&nativeStepUp)),
         nativeMethod("offspringAttribute", "(DDDDDDD)D", reinterpret_cast<void*>(&nativeOffspringAttribute)),
+        nativeMethod("creativeTabItems", "(Ljava/lang/String;)[Ljava/lang/String;",
+                     reinterpret_cast<void*>(&nativeCreativeTabItems)),
+        nativeMethod("regionRead", "(Ljava/lang/String;II)[B", reinterpret_cast<void*>(&nativeRegionRead)),
+        nativeMethod("regionWrite", "(Ljava/lang/String;II[BI)V", reinterpret_cast<void*>(&nativeRegionWrite)),
+        nativeMethod("regionTimestamp", "(Ljava/lang/String;II)I", reinterpret_cast<void*>(&nativeRegionTimestamp)),
+        nativeMethod("regionFlush", "(Ljava/lang/String;Z)Z", reinterpret_cast<void*>(&nativeRegionFlush)),
         nativeMethod("levelValue", "([DI)F", reinterpret_cast<void*>(&nativeLevelValue)),
         nativeMethod("beaconScan", "(Ljava/lang/String;III)[I", reinterpret_cast<void*>(&nativeBeaconScan)),
         nativeMethod("leashPull", "([D[DZD[D[D[D)[D", reinterpret_cast<void*>(&nativeLeashPull)),

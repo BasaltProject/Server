@@ -36,7 +36,7 @@ basalt_module(server-bukkit
         src/BukkitWorldEnvNatives.cpp
         src/BukkitWorldEnvMoreNatives.cpp
         src/ShimHost.cpp
-    DEPENDS basalt::server-plugins basalt::wire-common basalt::wire-protocol
+    DEPENDS basalt::server-plugins basalt::server-registry basalt::server-world basalt::wire-common basalt::wire-protocol
 )
 target_include_directories(server-bukkit SYSTEM PUBLIC ${BASALT_JNI_INCLUDE_DIR} ${BASALT_JNI_INCLUDE_DIR}/linux
                                                       ${BASALT_JNI_INCLUDE_DIR}/darwin)

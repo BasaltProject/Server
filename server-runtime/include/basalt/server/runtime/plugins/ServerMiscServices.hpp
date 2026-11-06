@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/plugins/ServerScoreboards.hpp>
 #include <basalt/server/runtime/plugins/ServerSelectors.hpp>
 #include <basalt/server/runtime/plugins/ServerStructures.hpp>
+#include <basalt/server/runtime/plugins/ServerWorldgen.hpp>
 
 #include <memory>
 
@@ -27,6 +28,7 @@ struct MiscServices {
     std::unique_ptr<ServerLoot> loot;
     std::unique_ptr<ServerSelectors> selectors;
     std::unique_ptr<ServerStructures> structures;
+    std::unique_ptr<ServerWorldgen> worldgen;
 };
 
 } // namespace basalt::server::runtime::plugins

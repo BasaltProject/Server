@@ -311,6 +311,7 @@ public final class GenerateEntities {
         collect(closure, api);
         List<String> mine = new ArrayList<>();
         Map<String, String> provider = new LinkedHashMap<>();
+        Map<String, String> shadowed = new LinkedHashMap<>();
         for (String ops : allOps) {
             if (!closure.contains(apiBySimple.get(ops.substring(0, ops.length() - 3)))
                 || baseOps.get(base).contains(ops)) {
@@ -322,6 +323,7 @@ public final class GenerateEntities {
                     throw new IllegalStateException(ops + " covers " + key + " which the base stub layer stubs");
                 }
                 if (baseStubKeys.get(base).contains(key)) {
+                    shadowed.putIfAbsent(key, ops);
                     if (warned.add(ops + key)) {
                         System.err.println(ops + " is shadowed by the base layer for " + key);
                     }
@@ -345,9 +347,14 @@ public final class GenerateEntities {
                 System.err.println("covariant override in " + className + ": " + key);
             }
             String ops = provider.get(key);
+            boolean viaShadow = false;
+            if (ops == null && narrower) {
+                ops = shadowed.get(key);
+                viaShadow = ops != null;
+            }
             if (ops == null) {
                 body.append(GenerateBases.stub(method, api));
-            } else if (redeclared(closure, apiBySimple.get(ops.substring(0, ops.length() - 3)), key)) {
+            } else if (viaShadow || redeclared(closure, apiBySimple.get(ops.substring(0, ops.length() - 3)), key)) {
                 bridged.add(ops);
                 body.append(bridge(method, ops));
             }

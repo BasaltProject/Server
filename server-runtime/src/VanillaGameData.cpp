@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
+#include <basalt/server/runtime/datapack/DataFiles.hpp>
 #include <basalt/server/runtime/datapack/PackFiles.hpp>
 #include <basalt/server/runtime/datapack/ResourceStack.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
@@ -83,6 +84,15 @@ VanillaGameData::Jar VanillaGameData::jarOf(std::shared_ptr<const datapack::Reso
     };
 }
 
+namespace {
+world::realFluidTags::TagMembers gameEventTagsOf(const VanillaGameData::Jar& jar, const wire::common::Logger& logger) {
+    const auto reader = readerOf<world::realFluidTags::JarReader>(jar);
+    return datapack::resolveTags(
+        reader.entriesUnder, reader.readText, "game_event", [](const wire::common::Identifier&) { return true; },
+        logger);
+}
+} // namespace
+
 VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
     : lootTables({.readText = jar.readText, .entriesUnder = jar.entriesUnder}), biomeSpawns({.readText = jar.readText}),
       villagerTrades({.readText = jar.readText}), blockTransformers(jar.readText), jukeboxSongs(jar.readText),
@@ -94,6 +104,7 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       timelineTags(world::realTimelineTags::load(readerOf<world::realTimelineTags::JarReader>(jar), logger)),
       damageTypeTags(world::realDamageTypeTags::load(readerOf<world::realDamageTypeTags::JarReader>(jar), logger)),
       entityTags(world::realEntityTypeTags::load(readerOf<world::realEntityTypeTags::JarReader>(jar), logger)),
+      gameEventTags(gameEventTagsOf(jar, logger)),
       bannerPatterns(world::realBannerPatterns::load(readerOf<world::realBannerPatterns::JarReader>(jar), logger)),
       advancements(world::RealAdvancements::Jar{.entriesUnder = jar.entriesUnder, .readText = jar.readText}),
       enchantments({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
@@ -141,6 +152,7 @@ void VanillaGameData::reload(const Jar& jar, const wire::common::Logger& logger)
     timelineTags = world::realTimelineTags::load(readerOf<world::realTimelineTags::JarReader>(jar), logger);
     damageTypeTags = world::realDamageTypeTags::load(readerOf<world::realDamageTypeTags::JarReader>(jar), logger);
     entityTags = world::realEntityTypeTags::load(readerOf<world::realEntityTypeTags::JarReader>(jar), logger);
+    gameEventTags = gameEventTagsOf(jar, logger);
     bannerPatterns = world::realBannerPatterns::load(readerOf<world::realBannerPatterns::JarReader>(jar), logger);
     enchantmentTags = world::realEnchantmentTags::load(
         readerOf<world::realEnchantmentTags::JarReader>(jar),

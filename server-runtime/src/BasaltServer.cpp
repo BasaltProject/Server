@@ -695,6 +695,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                                          : registry == "items"        ? &vanillaData_.itemTags
                                                          : registry == "fluids"       ? &vanillaData_.fluidTags
                                                          : registry == "entity_types" ? &vanillaData_.entityTags
+                                                         : registry == "game_events"  ? &vanillaData_.gameEventTags
                                                                                       : nullptr;
         std::vector<std::string> flat;
         if (source == nullptr) {
@@ -743,6 +744,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             }
             sculkCatalysts_->drink(world, at, source[0], source[1], source[2], value);
             return true;
+        }
+        if (action == "update") {
+            return sculkCatalysts_ != nullptr && sculkCatalysts_->tick(world, at[0], at[1], at[2]);
         }
         return false;
     };
@@ -856,6 +860,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         plugins::ServerStructures::Hooks{.templates = &vanillaData_.structureTemplates,
                                          .blocks = [this] { return structureBlocks_.get(); },
                                          .worldFor = model.worldFor});
+    miscServices_.worldgen = std::make_unique<plugins::ServerWorldgen>(
+        plugins::ServerWorldgen::Hooks{.router = [this](std::string_view settings, std::int64_t seed) {
+            return options_.generators == nullptr ? nullptr : options_.generators->router(settings, seed);
+        }});
     miscServices_.loot =
         std::make_unique<plugins::ServerLoot>(plugins::ServerLoot::Hooks{.tables = &vanillaData_.lootTables,
                                                                          .villagerTrades = &vanillaData_.villagerTrades,
@@ -917,6 +925,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     parts.loot = miscServices_.loot.get();
     parts.selectors = miscServices_.selectors.get();
     parts.structures = miscServices_.structures.get();
+    parts.worldgen = miscServices_.worldgen.get();
     parts.ownerAt = [this](const std::string& name, double x, double z) -> sched::Owner* {
         const std::map<std::string, world::LoadedWorld*> loaded = worldRegistry_->worlds();
         const auto found = loaded.find(name);

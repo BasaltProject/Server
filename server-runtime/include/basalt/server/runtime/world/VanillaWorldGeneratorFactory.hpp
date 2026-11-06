@@ -13,8 +13,10 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -22,6 +24,10 @@ namespace basalt::server::world::terrain {
 class StrongholdStructureGenerator;
 class VillageStructureGenerator;
 } // namespace basalt::server::world::terrain
+
+namespace basalt::server::world::terrain {
+struct NoiseRouter;
+}
 
 namespace basalt::server::runtime::world {
 
@@ -65,6 +71,10 @@ public:
 
     [[nodiscard]] CacheStats cacheStats() const;
 
+    /// The noise router of a `noise_settings` for a seed, shared between callers; null when the jar lacks it.
+    [[nodiscard]] std::shared_ptr<const server::world::terrain::NoiseRouter> router(std::string_view settings,
+                                                                                    std::int64_t seed);
+
     [[nodiscard]] Generators create(const config::WorldDeclaration& declaration, const WorldMetadata& metadata,
                                     bool generateStructures = true);
 
@@ -84,6 +94,8 @@ private:
     bool structuresEnabled_ = true;
     /// Statistics do not keep unloaded worlds and generation caches alive.
     std::vector<std::weak_ptr<Built>> built_;
+    std::mutex routersMutex_;
+    std::vector<std::pair<std::string, std::shared_ptr<const server::world::terrain::NoiseRouter>>> routers_;
 };
 
 } // namespace basalt::server::runtime::world

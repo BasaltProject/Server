@@ -56,6 +56,9 @@ coroutine.yield function
 data table
 data.json function
 data.save function
+datafix table
+datafix.supports function
+datafix.upgrade function
 datapacks table
 datapacks.function_tags function
 datapacks.schedule function
@@ -185,6 +188,7 @@ recipes.reset function
 recipes.reset_brewing function
 recipes.smithing function
 registries table
+registries.creative_tab_items function
 registries.enchantment_data function
 registries.enchantment_ids function
 registries.item_data function
@@ -257,6 +261,7 @@ structures.ids function
 structures.place function
 structures.read function
 structures.remove function
+structures.scan function
 structures.write function
 t function
 tab_list function
@@ -294,6 +299,16 @@ utf8.offset function
 wait function
 warn function
 watch function
+worldgen table
+worldgen.column function
+worldgen.density function
+worldgen.height function
+worldgen.noise function
+worldgen.noise_create function
+worldgen.noise_range function
+worldgen.noise_release function
+worldgen.noise_sample function
+worldgen.shape function
 worlds table
 worlds.all function
 worlds.biomes function

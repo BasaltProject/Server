@@ -212,6 +212,29 @@ server::world::densityfunction::WorldgenReader VanillaWorldGeneratorFactory::wor
     };
 }
 
+std::shared_ptr<const terrain::NoiseRouter> VanillaWorldGeneratorFactory::router(std::string_view settings,
+                                                                                 std::int64_t seed) {
+    constexpr std::size_t kCached = 8;
+    const std::string key = std::string{settings} + '#' + std::to_string(seed);
+    const std::scoped_lock lock{routersMutex_};
+    for (const auto& [name, cached] : routers_) {
+        if (name == key) {
+            return cached;
+        }
+    }
+    std::expected<terrain::NoiseRouter, std::string> built =
+        terrain::noiseRouterData::load(settings, seed, worldgenReader());
+    if (!built.has_value()) {
+        return nullptr;
+    }
+    auto shared = std::make_shared<const terrain::NoiseRouter>(std::move(*built));
+    if (routers_.size() >= kCached) {
+        routers_.erase(routers_.begin());
+    }
+    routers_.emplace_back(key, shared);
+    return shared;
+}
+
 VanillaWorldGeneratorFactory::Generators
 VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration, const WorldMetadata& metadata,
                                      const bool generateStructures) {
