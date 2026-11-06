@@ -37,6 +37,24 @@ public final class NbtCodec {
         }
     }
 
+    public static byte[] toAnonymous(CompoundTag tag) {
+        byte[] named = toBytes(tag);
+        byte[] bare = new byte[named.length - 2];
+        bare[0] = named[0];
+        System.arraycopy(named, 3, bare, 1, named.length - 3);
+        return bare;
+    }
+
+    public static CompoundTag fromAnonymous(byte[] bare) {
+        if (bare == null || bare.length == 0) {
+            return null;
+        }
+        byte[] named = new byte[bare.length + 2];
+        named[0] = bare[0];
+        System.arraycopy(bare, 1, named, 3, bare.length - 1);
+        return fromBytes(named);
+    }
+
     public static CompoundTag fromBytes(byte[] bytes) {
         if (bytes == null || bytes.length == 0) {
             return null;

@@ -420,13 +420,34 @@ public interface LivingEntityOps extends LivingEntity, EntityOps, LivingExtraOps
     }
 
     default org.bukkit.inventory.ItemStack damageItemStack(org.bukkit.inventory.ItemStack stack, int amount) {
-        return stack == null || stack.getType().isAir() ? stack : stack.damage(amount, this);
+        if (stack == null || stack.getType().isAir() || amount <= 0 || !stack.hasItemMeta()
+            || !(stack.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable meta) || meta.isUnbreakable()
+            || this instanceof org.bukkit.entity.HumanEntity human && human.getGameMode() == org.bukkit.GameMode.CREATIVE) {
+            return stack;
+        }
+        int level = stack.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.UNBREAKING);
+        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+        int applied = 0;
+        for (int i = 0; i < amount; i++) {
+            if (level <= 0 || random.nextInt(level + 1) == 0) {
+                applied++;
+            }
+        }
+        int damage = meta.getDamage() + applied;
+        int max = stack.getType().getMaxDurability();
+        if (max > 0 && damage >= max) {
+            stack.setAmount(0);
+            return org.bukkit.inventory.ItemStack.empty();
+        }
+        meta.setDamage(damage);
+        stack.setItemMeta(meta);
+        return stack;
     }
 
     default void damageItemStack(org.bukkit.inventory.EquipmentSlot slot, int amount) {
         org.bukkit.inventory.ItemStack held = getEquipment().getItem(slot);
         if (held != null && !held.getType().isAir()) {
-            getEquipment().setItem(slot, held.damage(amount, this));
+            getEquipment().setItem(slot, damageItemStack(held, amount));
         }
     }
 }

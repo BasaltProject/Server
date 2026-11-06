@@ -28,32 +28,32 @@ public final class MenuTypes {
 
     static {
         for (int rows = 1; rows <= 6; rows++) {
-            add("generic_9x" + rows, InventoryType.CHEST, rows * 9, InventoryView.class);
+            add("generic_9x" + rows, "CHEST", rows * 9, InventoryView.class);
         }
-        add("generic_3x3", InventoryType.DISPENSER, 9, InventoryView.class);
-        add("crafter_3x3", InventoryType.CRAFTER, 9, org.bukkit.inventory.view.CrafterView.class);
-        add("anvil", InventoryType.ANVIL, 3, org.bukkit.inventory.view.AnvilView.class);
-        add("beacon", InventoryType.BEACON, 1, org.bukkit.inventory.view.BeaconView.class);
-        add("blast_furnace", InventoryType.BLAST_FURNACE, 3, org.bukkit.inventory.view.FurnaceView.class);
-        add("brewing_stand", InventoryType.BREWING, 5, org.bukkit.inventory.view.BrewingStandView.class);
-        add("crafting", InventoryType.WORKBENCH, 10, InventoryView.class);
-        add("enchantment", InventoryType.ENCHANTING, 2, org.bukkit.inventory.view.EnchantmentView.class);
-        add("furnace", InventoryType.FURNACE, 3, org.bukkit.inventory.view.FurnaceView.class);
-        add("grindstone", InventoryType.GRINDSTONE, 3, InventoryView.class);
-        add("hopper", InventoryType.HOPPER, 5, InventoryView.class);
-        add("lectern", InventoryType.LECTERN, 1, org.bukkit.inventory.view.LecternView.class);
-        add("loom", InventoryType.LOOM, 4, org.bukkit.inventory.view.LoomView.class);
-        add("merchant", InventoryType.MERCHANT, 3, org.bukkit.inventory.view.MerchantView.class);
-        add("shulker_box", InventoryType.SHULKER_BOX, 27, InventoryView.class);
-        add("smithing", InventoryType.SMITHING, 4, InventoryView.class);
-        add("smoker", InventoryType.SMOKER, 3, org.bukkit.inventory.view.FurnaceView.class);
-        add("cartography_table", InventoryType.CARTOGRAPHY, 3, InventoryView.class);
-        add("stonecutter", InventoryType.STONECUTTER, 2, org.bukkit.inventory.view.StonecutterView.class);
+        add("generic_3x3", "DISPENSER", 9, InventoryView.class);
+        add("crafter_3x3", "CRAFTER", 9, org.bukkit.inventory.view.CrafterView.class);
+        add("anvil", "ANVIL", 3, org.bukkit.inventory.view.AnvilView.class);
+        add("beacon", "BEACON", 1, org.bukkit.inventory.view.BeaconView.class);
+        add("blast_furnace", "BLAST_FURNACE", 3, org.bukkit.inventory.view.FurnaceView.class);
+        add("brewing_stand", "BREWING", 5, org.bukkit.inventory.view.BrewingStandView.class);
+        add("crafting", "WORKBENCH", 10, InventoryView.class);
+        add("enchantment", "ENCHANTING", 2, org.bukkit.inventory.view.EnchantmentView.class);
+        add("furnace", "FURNACE", 3, org.bukkit.inventory.view.FurnaceView.class);
+        add("grindstone", "GRINDSTONE", 3, InventoryView.class);
+        add("hopper", "HOPPER", 5, InventoryView.class);
+        add("lectern", "LECTERN", 1, org.bukkit.inventory.view.LecternView.class);
+        add("loom", "LOOM", 4, org.bukkit.inventory.view.LoomView.class);
+        add("merchant", "MERCHANT", 3, org.bukkit.inventory.view.MerchantView.class);
+        add("shulker_box", "SHULKER_BOX", 27, InventoryView.class);
+        add("smithing", "SMITHING", 4, InventoryView.class);
+        add("smoker", "SMOKER", 3, org.bukkit.inventory.view.FurnaceView.class);
+        add("cartography_table", "CARTOGRAPHY", 3, InventoryView.class);
+        add("stonecutter", "STONECUTTER", 2, org.bukkit.inventory.view.StonecutterView.class);
     }
 
     private MenuTypes() {}
 
-    private static void add(String id, InventoryType type, int size, Class<? extends InventoryView> view) {
+    private static void add(String id, String type, int size, Class<? extends InventoryView> view) {
         all.put(id, new BasaltMenuType(NamespacedKey.minecraft(id), type, size, view));
     }
 
@@ -67,7 +67,7 @@ public final class MenuTypes {
 
     public static BasaltMenuType of(InventoryType type, int size) {
         for (BasaltMenuType menu : all.values()) {
-            if (menu.type == type && (size < 0 || menu.size == size)) {
+            if (menu.type() == type && (size < 0 || menu.size == size)) {
                 return menu;
             }
         }
@@ -77,15 +77,19 @@ public final class MenuTypes {
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static final class BasaltMenuType implements MenuType.Typed {
         private final NamespacedKey key;
-        final InventoryType type;
+        private final String typeName;
         private final int size;
         private final Class<? extends InventoryView> view;
 
-        BasaltMenuType(NamespacedKey key, InventoryType type, int size, Class<? extends InventoryView> view) {
+        BasaltMenuType(NamespacedKey key, String typeName, int size, Class<? extends InventoryView> view) {
             this.key = key;
-            this.type = type;
+            this.typeName = typeName;
             this.size = size;
             this.view = view;
+        }
+
+        InventoryType type() {
+            return InventoryType.valueOf(typeName);
         }
 
         @Override
@@ -100,6 +104,7 @@ public final class MenuTypes {
 
         @Override
         public InventoryView create(HumanEntity player, Component title) {
+            InventoryType type = type();
             Inventory top = new CustomInventory(null, type, size, title);
             top = TypedInventories.wrap(top);
             BasaltInventoryView base = new BasaltInventoryView(player, top, title == null ? type.defaultTitle() : title,
@@ -134,7 +139,7 @@ public final class MenuTypes {
 
         @Override
         public org.bukkit.inventory.view.builder.InventoryViewBuilder builder() {
-            if (type == InventoryType.MERCHANT) {
+            if (type() == InventoryType.MERCHANT) {
                 return new MerchantBuilder(this, null, null);
             }
             return new LocationBuilder(this, null, null);
@@ -283,8 +288,8 @@ public final class MenuTypes {
             if (merchant == null) {
                 throw new IllegalStateException("A merchant menu needs a merchant");
             }
-            Component name = title == null ? menu.type.defaultTitle() : title;
-            Inventory top = TypedInventories.wrap(new CustomInventory(null, menu.type, 3, name));
+            Component name = title == null ? menu.type().defaultTitle() : title;
+            Inventory top = TypedInventories.wrap(new CustomInventory(null, menu.type(), 3, name));
             return new MerchantView(player, top, name, merchant);
         }
     }

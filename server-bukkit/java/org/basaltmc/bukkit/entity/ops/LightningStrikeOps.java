@@ -43,4 +43,9 @@ public interface LightningStrikeOps extends LightningStrike, Cored {
     default void setCausingPlayer(org.bukkit.entity.Player player) {
         core().set("bolt_cause", player == null ? -1 : player.getEntityId());
     }
+
+    @Override
+    default LightningStrike.Spigot spigot() {
+        return new LightningStrike.Spigot();
+    }
 }

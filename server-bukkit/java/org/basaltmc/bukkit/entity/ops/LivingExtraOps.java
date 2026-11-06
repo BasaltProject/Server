@@ -267,4 +267,47 @@ public interface LivingExtraOps extends LivingEntity, Cored {
     default float getUpwardsMovement() {
         return (float) core().real("move_up");
     }
+
+    default java.util.Set<java.util.UUID> getCollidableExemptions() {
+        return core().collidableExemptions;
+    }
+
+    default net.kyori.adventure.util.TriState getFrictionState() {
+        return switch (core().nbtInt("FrictionState")) {
+            case 1 -> net.kyori.adventure.util.TriState.FALSE;
+            case 2 -> net.kyori.adventure.util.TriState.TRUE;
+            default -> net.kyori.adventure.util.TriState.NOT_SET;
+        };
+    }
+
+    default void setFrictionState(net.kyori.adventure.util.TriState state) {
+        core().nbtSet("FrictionState", "short", switch (state == null ? net.kyori.adventure.util.TriState.NOT_SET
+            : state) {
+            case FALSE -> 1;
+            case TRUE -> 2;
+            case NOT_SET -> 0;
+        });
+    }
+
+    default net.kyori.adventure.key.Key getWaypointStyle() {
+        String style = core().nbtText("locator_bar_icon.style");
+        return net.kyori.adventure.key.Key.key(style == null || style.isEmpty() ? "minecraft:default" : style);
+    }
+
+    default void setWaypointStyle(net.kyori.adventure.key.Key style) {
+        core().nbtSet("locator_bar_icon.style", "string", style == null ? "minecraft:default" : style.asString());
+    }
+
+    default org.bukkit.Color getWaypointColor() {
+        return core().nbtValue("locator_bar_icon.color") instanceof Number rgb
+            ? org.bukkit.Color.fromRGB(rgb.intValue() & 0xFFFFFF) : null;
+    }
+
+    default void setWaypointColor(org.bukkit.Color color) {
+        if (color == null) {
+            core().nbtRemove("locator_bar_icon.color");
+        } else {
+            core().nbtSet("locator_bar_icon.color", "int", color.asRGB());
+        }
+    }
 }
