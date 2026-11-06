@@ -11,6 +11,6 @@ public enum ParticleStatus {
     public static final Codec<ParticleStatus> LEGACY_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.server.level.ParticleStatus.class, "LEGACY_CODEC");
     public static final StreamCodec<ByteBuf, ParticleStatus> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.server.level.ParticleStatus.class, "STREAM_CODEC");
     public Component caption() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ParticleStatus#caption");
+        return Component.translatable("options.particles." + name().toLowerCase(java.util.Locale.ROOT));
     }
 }

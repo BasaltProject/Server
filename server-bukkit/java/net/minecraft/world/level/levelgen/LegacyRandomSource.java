@@ -16,6 +16,10 @@ public class LegacyRandomSource implements BitRandomSource {
         setSeed(seed);
     }
 
+    public long rawState() {
+        return seed.get();
+    }
+
     @Override
     public RandomSource fork() {
         return new LegacyRandomSource(nextLong());

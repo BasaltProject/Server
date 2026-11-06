@@ -9,6 +9,6 @@ public interface PositionSourceType<T extends PositionSource> {
     MapCodec<T> codec();
     StreamCodec<? super RegistryFriendlyByteBuf, T> streamCodec();
     static <S extends PositionSourceType<T>, T extends PositionSource> S register(String name, S serializer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.gameevent.PositionSourceType#register");
+        return net.minecraft.core.Registry.register(net.minecraft.core.registries.BuiltInRegistries.POSITION_SOURCE_TYPE, name, serializer);
     }
 }

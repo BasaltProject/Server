@@ -107,6 +107,9 @@ public class ServerPlayer extends Player {
     }
 
     public ServerLevel level() {
+        if (player != null && player.getWorld() instanceof org.bukkit.craftbukkit.CraftWorld world) {
+            return world.getHandle();
+        }
         if (level == null) {
             throw Unsupported.hit("net.minecraft.server.level.ServerPlayer.level");
         }

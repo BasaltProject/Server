@@ -12,7 +12,7 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 public abstract class ExpandableContainerBase extends UniformContainerBase {
     protected final boolean expand;
     protected static <T extends ExpandableContainerBase> Products.P5<RecordCodecBuilder.Mu<T>, Boolean, Integer, Integer, Optional<Holder<LootItemCondition>>, Optional<Holder<LootItemFunction>>> expandableFields(RecordCodecBuilder.Instance<T> i) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.entries.ExpandableContainerBase#expandableFields");
+        return i.group(com.mojang.serialization.Codec.BOOL.optionalFieldOf("expand", false).forGetter(e -> e.expand)).and(uniformFields(i));
     }
     protected ExpandableContainerBase(boolean expand, int weight, int quality, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier) {
         super(weight, quality, condition, modifier);

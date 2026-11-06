@@ -16,7 +16,7 @@ public class DataFixers {
     }
     public static final int BLENDING_VERSION = 4997;
     public static FileFixerUpper getFileFixer() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.datafix.DataFixers#getFileFixer");
+        return new FileFixerUpper(null, java.util.List.of(), org.basaltmc.bukkit.WorldNatives.dataVersion());
     }
     public static CompletableFuture<?> optimize(Set<DSL.TypeReference> typesToOptimize) {
         return CompletableFuture.completedFuture(null);

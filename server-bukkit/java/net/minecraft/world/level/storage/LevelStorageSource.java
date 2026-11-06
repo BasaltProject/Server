@@ -272,22 +272,42 @@ public class LevelStorageSource {
         return new DirectoryValidator(path -> allowed.stream().anyMatch(matcher -> matcher.matches(path)));
     }
     public static WorldDataConfiguration readDataConfig(Dynamic<?> levelData) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#readDataConfig");
+        return WorldDataConfiguration.CODEC.parse(levelData).resultOrPartial(message -> { }).orElse(WorldDataConfiguration.DEFAULT);
     }
     public static WorldLoader.PackConfig getPackConfig(Dynamic<?> levelDataTag, PackRepository packRepository, boolean safeMode) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#getPackConfig");
+        return new WorldLoader.PackConfig(packRepository, readDataConfig(levelDataTag), safeMode, false);
     }
     public static LevelDataAndDimensions getLevelDataAndDimensions(LevelStorageAccess worldAccess, Dynamic<?> levelDataTag, WorldDataConfiguration dataConfiguration, Registry<LevelStem> datapackDimensions, HolderLookup.Provider registryAccess) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#getLevelDataAndDimensions");
+        net.minecraft.world.level.levelgen.WorldGenSettings settings = new WorldGenSettings(
+            net.minecraft.world.level.levelgen.WorldOptions.defaultWithRandomSeed(), new net.minecraft.world.level.levelgen.WorldDimensions(datapackDimensions));
+        net.minecraft.world.level.levelgen.WorldDimensions.Complete dimensions = settings.dimensions().bake(datapackDimensions);
+        return LevelDataAndDimensions.create(new BasaltWorldData(), settings, dimensions);
     }
     public static <T extends SavedData> DataResult<T> readExistingSavedData(LevelStorageAccess access, HolderLookup.Provider registryAccess, SavedDataType<T> savedDataType) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#readExistingSavedData");
+        Path location = savedDataType.id().withSuffix(".dat").resolveAgainst(access.getLevelPath(LevelResource.DATA));
+        net.minecraft.nbt.CompoundTag contents;
+        try {
+            contents = net.minecraft.nbt.NbtIo.readCompressed(location, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+        } catch (IOException e) {
+            return DataResult.error(e::getMessage);
+        }
+        return savedDataType.codec().parse(net.minecraft.resources.RegistryOps.create(net.minecraft.nbt.NbtOps.INSTANCE, registryAccess),
+            contents.getCompoundOrEmpty("data"));
     }
     public static void writeGameRules(WorldData worldData, Path worldFolder, GameRules gameRules) throws IOException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#writeGameRules");
+        writeSavedData(worldFolder, net.minecraft.nbt.NbtOps.INSTANCE, "game_rules", GameRules.codec(worldData.enabledFeatures()), gameRules);
     }
     public static void writeWorldGenSettings(RegistryAccess registryAccess, Path worldFolder, WorldGenSettings worldGenSettings) throws IOException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.LevelStorageSource#writeWorldGenSettings");
+        writeSavedData(worldFolder, net.minecraft.resources.RegistryOps.create(net.minecraft.nbt.NbtOps.INSTANCE, (HolderLookup.Provider) registryAccess),
+            "world_gen_settings", WorldGenSettings.CODEC, worldGenSettings);
+    }
+    private static <T> void writeSavedData(Path worldFolder, com.mojang.serialization.DynamicOps<net.minecraft.nbt.Tag> ops, String name, com.mojang.serialization.Codec<T> codec, T data) throws IOException {
+        net.minecraft.nbt.CompoundTag full = new net.minecraft.nbt.CompoundTag();
+        full.put("data", codec.encodeStart(ops, data).getOrThrow());
+        full.putInt("DataVersion", org.basaltmc.bukkit.WorldNatives.dataVersion());
+        Path path = worldFolder.resolve("data").resolve("minecraft").resolve(name + ".dat");
+        java.nio.file.Files.createDirectories(path.getParent());
+        net.minecraft.nbt.NbtIo.writeCompressed(full, path);
     }
     public String getName() {
         return "Anvil";

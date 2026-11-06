@@ -23,15 +23,17 @@ public record TagKey<T>(ResourceKey<? extends Registry<T>> registry, Identifier 
         return "TagKey[" + registry.identifier() + " / " + location + "]";
     }
     public static <T> Codec<TagKey<T>> codec(ResourceKey<? extends Registry<T>> registryName) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.tags.TagKey#codec");
+        return Identifier.CODEC.xmap(name -> create(registryName, name), TagKey::location);
     }
     public static <T> Codec<TagKey<T>> hashedCodec(ResourceKey<? extends Registry<T>> registryName) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.tags.TagKey#hashedCodec");
+        return com.mojang.serialization.Codec.STRING.comapFlatMap(text -> text.startsWith("#")
+            ? Identifier.read(text.substring(1)).map(name -> create(registryName, name))
+            : com.mojang.serialization.DataResult.error(() -> "Not a tag id"), key -> "#" + key.location());
     }
     public static <T> StreamCodec<ByteBuf, TagKey<T>> streamCodec(ResourceKey<? extends Registry<T>> registryName) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.tags.TagKey#streamCodec");
+        return Identifier.STREAM_CODEC.map(name -> create(registryName, name), TagKey::location);
     }
     public <E> Optional<TagKey<E>> cast(ResourceKey<? extends Registry<E>> registry) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.tags.TagKey#cast");
+        return isFor(registry) ? Optional.of((TagKey<E>) this) : Optional.empty();
     }
 }

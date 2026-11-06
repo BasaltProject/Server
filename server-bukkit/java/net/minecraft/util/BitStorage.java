@@ -22,6 +22,8 @@ public interface BitStorage {
 
     BitStorage copy();
     default void fill(int value) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.BitStorage#fill");
+        for (int index = 0, size = getSize(); index < size; index++) {
+            set(index, value);
+        }
     }
 }

@@ -95,6 +95,17 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
     private final ServerConnectionListener connection = new ServerConnectionListener();
     private DataFixer fixer;
 
+    private final java.util.List<Runnable> tickables = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private NotificationManager notifications;
+    private ServerActivityMonitor activityMonitor;
+    private Services serviceSet;
+    private CustomBossEvents bossEvents;
+    private SavedDataStorage dataStorage;
+    private TimerQueue<MinecraftServer> scheduledEvents;
+    private PacketProcessor packets;
+    private ServerDebugSubscribers debug;
+    private LevelLoadListener loadListener;
+
     protected MinecraftServer() {}
 
     public static MinecraftServer getServer() {
@@ -147,22 +158,44 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
     public static final Supplier<GameRules> DEFAULT_GAME_RULES = () -> new GameRules(net.minecraft.world.flag.FeatureFlagSet.of());
     public static final NameAndId ANONYMOUS_PLAYER_PROFILE = null;
     public static final String SERVER_THREAD_NAME = "Server thread";
-    protected final LevelStorageSource.LevelStorageAccess storageSource = null;
-    protected final PlayerDataStorage playerDataStorage = null;
-    protected final Proxy proxy = null;
-    protected final Services services = null;
-    protected final WorldData worldData = null;
+    protected LevelStorageSource.LevelStorageAccess storageSource;
+    protected PlayerDataStorage playerDataStorage;
+    protected Proxy proxy;
+    protected Services services;
+    protected WorldData worldData;
     public static <S extends MinecraftServer> S spin(Function<Thread, S> factory) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#spin");
+        java.util.concurrent.atomic.AtomicReference<S> reference = new java.util.concurrent.atomic.AtomicReference<>();
+        Thread thread = new Thread(null, () -> reference.get().runServer(), SERVER_THREAD_NAME);
+        S server = factory.apply(thread);
+        reference.set(server);
+        thread.start();
+        return server;
     }
     public MinecraftServer(Thread serverThread, LevelStorageSource.LevelStorageAccess storageSource, PackRepository packRepository, WorldStem worldStem, Optional<GameRules> gameRules, Proxy proxy, DataFixer fixerUpper, Services services, LevelLoadListener levelLoadListener, boolean propagatesCrashes, NotificationManager notificationManager) {
-        super((String) null, false);
+        super(SERVER_THREAD_NAME, propagatesCrashes);
+        this.storageSource = storageSource;
+        this.proxy = proxy;
+        this.services = services;
+        this.packRepository = packRepository;
+        this.fixer = fixerUpper;
+        this.loadListener = levelLoadListener;
+        this.notifications = notificationManager;
     }
     protected boolean initServer() throws IOException {
         return true;
     }
     public ChunkLoadStatusView createChunkLoadStatusView(int radius) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#createChunkLoadStatusView");
+        return new ChunkLoadStatusView() {
+            public void moveTo(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension, net.minecraft.world.level.ChunkPos centerChunk) {}
+
+            public net.minecraft.world.level.chunk.status.ChunkStatus get(int x, int z) {
+                return net.minecraft.world.level.chunk.status.ChunkStatus.FULL;
+            }
+
+            public int radius() {
+                return radius;
+            }
+        };
     }
     protected void loadLevel() {
     }
@@ -171,7 +204,7 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
     protected void createLevels() {
     }
     protected GlobalPos selectLevelLoadFocusPos() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#selectLevelLoadFocusPos");
+        return getRespawnData().globalPos();
     }
     public GameType getDefaultGameType() {
         return GameType.byId(org.bukkit.Bukkit.getDefaultGameMode().getValue());
@@ -218,7 +251,10 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
     protected void runServer() {
     }
     public NotificationManager notificationManager() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#notificationManager");
+        if (notifications == null) {
+            notifications = new NotificationManager();
+        }
+        return notifications;
     }
     protected void waitUntilNextTick() {
     }
@@ -243,7 +279,10 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return Path.of(".");
     }
     public ServerActivityMonitor getServerActivityMonitor() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#getServerActivityMonitor");
+        if (activityMonitor == null) {
+            activityMonitor = new ServerActivityMonitor(notificationManager(), 30);
+        }
+        return activityMonitor;
     }
     protected void onServerCrash(CrashReport report) {
     }
@@ -253,6 +292,7 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return false;
     }
     protected void tickServer(BooleanSupplier haveTime) {
+        tickables.forEach(Runnable::run);
     }
     protected void processPacketsAndTick(boolean sprinting) {
     }
@@ -271,7 +311,7 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
     public void forceGameTimeSynchronization() {
     }
     public void addTickable(Runnable tickable) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#addTickable");
+        tickables.add(tickable);
     }
     protected void setId(String serverId) {
         this.serverId = serverId;
@@ -331,13 +371,15 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return clockManager;
     }
     public SystemReport fillSystemReport(SystemReport systemReport) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#fillSystemReport");
+        systemReport.setDetail("Server Running", () -> Boolean.toString(isRunning()));
+        systemReport.setDetail("Player Count", () -> Integer.toString(org.bukkit.Bukkit.getOnlinePlayers().size()));
+        return systemReport;
     }
     public SystemReport fillServerSystemReport(SystemReport systemReport) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#fillServerSystemReport");
+        return fillSystemReport(systemReport);
     }
     public ModCheck getModdedStatus() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#getModdedStatus");
+        return new ModCheck(ModCheck.Confidence.PROBABLY_NOT, "Basalt native runtime");
     }
     public void sendSystemMessage(Component message) {
         org.bukkit.Bukkit.getConsoleSender().sendMessage(message.asAdventure());
@@ -497,7 +539,10 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         org.basaltmc.bukkit.WorldEnvNatives.setSetting("idle_timeout", String.valueOf(playerIdleTimeout));
     }
     public Services services() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#services");
+        if (serviceSet == null) {
+            serviceSet = new Services(null, null, null, null, null);
+        }
+        return serviceSet;
     }
     public ServerStatus getStatus() {
         ServerStatus.Players players = new ServerStatus.Players(org.bukkit.Bukkit.getMaxPlayers(), org.bukkit.Bukkit.getOnlinePlayers().size(),
@@ -511,7 +556,7 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return ABSOLUTE_MAX_WORLD_SIZE;
     }
     public boolean scheduleExecutables() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#scheduleExecutables");
+        return !isStopped();
     }
     public void executeIfPossible(Runnable command) {
         execute(command);
@@ -538,10 +583,14 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return functions;
     }
     public CompletableFuture<Void> reloadResources(Collection<String> packsToEnable) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#reloadResources");
+        org.basaltmc.bukkit.RestNatives.reloadData();
+        return CompletableFuture.completedFuture(null);
     }
     public static WorldDataConfiguration configurePackRepository(PackRepository packRepository, WorldDataConfiguration initialDataConfig, boolean initMode, boolean safeMode) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#configurePackRepository");
+        java.util.List<String> selected = safeMode ? java.util.List.of("vanilla")
+            : initMode ? initialDataConfig.dataPacks().getEnabled() : java.util.List.copyOf(packRepository.getSelectedIds());
+        java.util.List<String> disabled = packRepository.getAvailableIds().stream().filter(id -> !selected.contains(id)).toList();
+        return new WorldDataConfiguration(new net.minecraft.world.level.DataPackConfig(selected, disabled), initialDataConfig.enabledFeatures());
     }
     public void kickUnlistedPlayers() {
         if (org.bukkit.Bukkit.hasWhitelist()) {
@@ -596,7 +645,8 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return true;
     }
     public WorldGenSettings getWorldGenSettings() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#getWorldGenSettings");
+        org.bukkit.World main = org.bukkit.Bukkit.getWorlds().get(0);
+        return WorldGenSettings.of(new net.minecraft.world.level.levelgen.WorldOptions(main.getSeed(), main.canGenerateStructures(), false), registryAccess());
     }
     public RecipeManager getRecipeManager() {
         if (recipeManager == null) {
@@ -627,7 +677,10 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return stopwatches;
     }
     public CustomBossEvents getCustomBossEvents() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#getCustomBossEvents");
+        if (bossEvents == null) {
+            bossEvents = new CustomBossEvents();
+        }
+        return bossEvents;
     }
     public RandomSource getRandomSequence(Identifier key) {
         return getRandomSequences().get(key, org.bukkit.Bukkit.getWorlds().get(0).getSeed());
@@ -677,7 +730,16 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return false;
     }
     public void dumpServerProperties(Path path) throws IOException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#dumpServerProperties");
+        java.util.Properties out = new java.util.Properties();
+        net.minecraft.server.dedicated.DedicatedServerProperties current = DedicatedServer.instance().getProperties();
+        out.setProperty("level-name", current.levelName);
+        out.setProperty("server-port", Integer.toString(current.serverPort));
+        out.setProperty("max-players", Integer.toString(current.maxPlayers.get()));
+        out.setProperty("view-distance", Integer.toString(current.viewDistance.get()));
+        out.setProperty("motd", current.motd.get());
+        try (java.io.OutputStream stream = java.nio.file.Files.newOutputStream(path)) {
+            out.store(stream, "Server properties dump");
+        }
     }
     protected void endMetricsRecordingTick() {
     }
@@ -698,8 +760,12 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
     public boolean forceSynchronousWrites() {
         return false;
     }
+    private StructureTemplateManager templateManager;
     public StructureTemplateManager getStructureTemplateManager() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#getStructureTemplateManager");
+        if (templateManager == null) {
+            templateManager = new StructureTemplateManager(null, null, null, null);
+        }
+        return templateManager;
     }
     public WorldData getWorldData() {
         if (basaltWorldData == null) {
@@ -720,10 +786,10 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return reloadable;
     }
     public TextFilter createTextFilterForPlayer(ServerPlayer player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#createTextFilterForPlayer");
+        return TextFilter.DUMMY;
     }
     public ServerPlayerGameMode createGameModeForPlayer(ServerPlayer player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#createGameModeForPlayer");
+        return new ServerPlayerGameMode(player);
     }
     public GameType getForcedGameType() {
         return null;
@@ -763,10 +829,21 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return true;
     }
     public void handleCustomClickAction(Identifier id, Optional<Tag> payload) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#handleCustomClickAction");
+        // plugins observe custom click actions through the native event instead
     }
     public LevelLoadListener getLevelLoadListener() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#getLevelLoadListener");
+        if (loadListener != null) {
+            return loadListener;
+        }
+        return new LevelLoadListener() {
+            public void start(LevelLoadListener.Stage stage, int totalChunks) {}
+
+            public void update(LevelLoadListener.Stage stage, int currentChunks, int totalChunks) {}
+
+            public void finish(LevelLoadListener.Stage stage) {}
+
+            public void updateFocus(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension, net.minecraft.world.level.ChunkPos chunkPos) {}
+        };
     }
     public boolean setAutoSave(boolean enable) {
         for (org.bukkit.World world : org.bukkit.Bukkit.getWorlds()) {
@@ -784,10 +861,16 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return overworld().getGameRules();
     }
     public SavedDataStorage getDataStorage() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#getDataStorage");
+        if (dataStorage == null) {
+            dataStorage = new SavedDataStorage(Path.of("."), getFixerUpper(), registryAccess());
+        }
+        return dataStorage;
     }
     public TimerQueue<MinecraftServer> getScheduledEvents() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#getScheduledEvents");
+        if (scheduledEvents == null) {
+            scheduledEvents = new TimerQueue<>();
+        }
+        return scheduledEvents;
     }
     public GameRules getGameRules() {
         return overworld().getGameRules();
@@ -809,17 +892,23 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         org.basaltmc.bukkit.Natives.log(3, "Server", "Failed to handle packet " + packetType + ": " + throwable);
     }
     public ServerLinks serverLinks() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#serverLinks");
+        return ServerLinks.EMPTY;
     }
     protected int pauseWhenEmptySeconds() {
         String value = org.basaltmc.bukkit.WorldEnvNatives.setting("pause_when_empty_seconds");
         return value == null ? 60 : Integer.parseInt(value);
     }
     public PacketProcessor packetProcessor() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#packetProcessor");
+        if (packets == null) {
+            packets = new PacketProcessor(Thread.currentThread());
+        }
+        return packets;
     }
     public ServerDebugSubscribers debugSubscribers() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer#debugSubscribers");
+        if (debug == null) {
+            debug = new ServerDebugSubscribers(this);
+        }
+        return debug;
     }
     public static enum MultiplayerScope {
         OFF, LAN;
@@ -827,14 +916,14 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         return Component.literal(org.bukkit.Bukkit.getServer().getName());
         }
         public Component getTooltip() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer.MultiplayerScope#getTooltip");
+            return Component.translatable("menu.multiplayerOptions.network." + name().toLowerCase(java.util.Locale.ROOT) + ".tooltip");
         }
     }
     public static record ServerResourcePackInfo(UUID id, String url, String hash, boolean isRequired, Component prompt) {
     }
     static record ReloadableResources(CloseableResourceManager resourceManager, ReloadableServerResources managers) implements AutoCloseable {
         public void close() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.MinecraftServer.ReloadableResources#close");
+            resourceManager.close();
         }
     }
     static class TimeProfiler {

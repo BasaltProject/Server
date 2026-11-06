@@ -372,10 +372,21 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
         void accept(T entry, int count);
     }
     public static <T> Codec<PalettedContainer<T>> codecRW(Codec<T> elementCodec, Strategy<T> strategy, T defaultValue) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.PalettedContainer#codecRW");
+        PalettedContainerRO.Unpacker<T, PalettedContainer<T>> unpacker = PalettedContainer::unpack;
+        return packedCodec(elementCodec, strategy, defaultValue, unpacker);
     }
     public static <T> Codec<PalettedContainerRO<T>> codecRO(Codec<T> elementCodec, Strategy<T> strategy, T defaultValue) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.PalettedContainer#codecRO");
+        PalettedContainerRO.Unpacker<T, PalettedContainerRO<T>> unpacker = (s, data) -> unpack(s, data).map(container -> container);
+        return packedCodec(elementCodec, strategy, defaultValue, unpacker);
+    }
+    private static <T, C extends PalettedContainerRO<T>> Codec<C> packedCodec(Codec<T> elementCodec, Strategy<T> strategy,
+                                                                              T defaultValue,
+                                                                              PalettedContainerRO.Unpacker<T, C> unpacker) {
+        Codec<PackedData<T>> packed = com.mojang.serialization.codecs.RecordCodecBuilder.create(instance -> instance.group(
+            elementCodec.mapResult(net.minecraft.util.ExtraCodecs.orElsePartial(defaultValue)).listOf().fieldOf("palette")
+                .forGetter(PackedData::paletteEntries),
+            Codec.LONG_STREAM.lenientOptionalFieldOf("data").forGetter(PackedData::storage)).apply(instance, PackedData::new));
+        return packed.comapFlatMap(data -> unpacker.read(strategy, data), container -> container.pack(strategy));
     }
     public void read(FriendlyByteBuf buffer) {
         acquire();

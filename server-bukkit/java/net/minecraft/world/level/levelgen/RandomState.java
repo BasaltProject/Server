@@ -16,11 +16,24 @@ import net.minecraft.world.level.levelgen.densityfunction.DensitySamplerSet;
 import net.minecraft.world.level.levelgen.material.MaterialSystem;
 import net.minecraft.world.level.levelgen.synth.Noise;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.basaltmc.bukkit.facade.NativeDensityFunction;
+import org.basaltmc.bukkit.facade.NativeNoise;
 public class RandomState {
+    private static final String kDefaultSettings = "minecraft:overworld";
     private long seed;
     private boolean useLegacyRandom;
     private PositionalRandomFactory randomFactory;
     private String world;
+    private String settings = kDefaultSettings;
+    private final Map<ResourceKey<NormalNoise>, Noise> noiseInstances = new ConcurrentHashMap<>();
+    private final Map<Identifier, PositionalRandomFactory> positionalRandoms = new ConcurrentHashMap<>();
+    private final Map<DensityFunction, DensitySampler> samplers = new ConcurrentHashMap<>();
+    private final Deque<DensityBufferPool> bufferPools = new ArrayDeque<>();
+    private MaterialSystem materialSystem;
 
     protected RandomState() {
     }
@@ -45,40 +58,56 @@ public class RandomState {
         return Climate.Sampler.forWorld(world);
     }
     public static RandomState create(HolderGetter<NormalNoise> noises, long seed, NoiseGeneratorSettings settings) {
-        return ofSeed(seed, settings.useLegacyRandomSource());
+        return create(noises, seed, settings.useLegacyRandomSource(), settings.defaultBlock(), settings.seaLevel(), settings.noiseRouter());
     }
     public static RandomState create(HolderGetter<NormalNoise> noises, long seed, boolean useLegacyRandom, BlockState defaultBlock, int seaLevel, NoiseRouter noiseRouter) {
-        return ofSeed(seed, useLegacyRandom);
+        return new RandomState(noises, seed, useLegacyRandom, defaultBlock, seaLevel, noiseRouter);
     }
     private RandomState(HolderGetter<NormalNoise> noises, long seed, boolean useLegacyRandom, BlockState defaultBlock, int seaLevel, NoiseRouter router) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#<init>");
+        this.seed = seed;
+        this.useLegacyRandom = useLegacyRandom;
+        RandomSource base = useLegacyRandom ? new LegacyRandomSource(seed) : new XoroshiroRandomSource(seed);
+        this.randomFactory = base.forkPositional();
+        if (router != null && router.finalDensity() instanceof NativeDensityFunction nativeFunction) {
+            this.settings = nativeFunction.settings();
+        }
+        this.materialSystem = new MaterialSystem(this, defaultBlock, seaLevel, router == null ? null : router.chunkSurfaceLevel(), randomFactory.fromHashOf("surface").forkPositional());
     }
     public DensitySamplerSet samplersWithContext(SamplerContext context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#samplersWithContext");
+        return function -> getSampler(function).bind(context);
     }
     public Noise getOrCreateNoise(ResourceKey<NormalNoise> noise) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#getOrCreateNoise");
+        return noiseInstances.computeIfAbsent(noise, key -> NativeNoise.create(key.identifier().toString(), randomFactory.fromHashOf(key.identifier()), false));
     }
     public PositionalRandomFactory getOrCreateRandomFactory(Identifier name) {
-        return randomFactory.fromHashOf(name.toString()).forkPositional();
+        return positionalRandoms.computeIfAbsent(name, key -> randomFactory.fromHashOf(key).forkPositional());
     }
     public MaterialSystem surfaceSystem() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#surfaceSystem");
+        return materialSystem;
     }
     public DensitySampler getSampler(DensityFunction function) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#getSampler");
+        if (function instanceof NativeDensityFunction nativeFunction) {
+            return samplers.computeIfAbsent(function, key -> new NativeDensityFunction(nativeFunction.settings(), seed, nativeFunction.name()).compileSampler(null));
+        }
+        return samplers.computeIfAbsent(function, key -> key.compileSampler(null));
     }
     public float sampleBlockValueUncached(DensityFunction function, int x, int y, int z) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#sampleBlockValueUncached");
+        return getSampler(function).sampleValue(SamplerContext.EMPTY_UNCACHED, x, y, z);
     }
     public DensityBufferPool acquireDensityBufferPool() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#acquireDensityBufferPool");
+        synchronized (bufferPools) {
+            return bufferPools.isEmpty() ? new DensityBufferPool(20) : bufferPools.removeLast();
+        }
     }
     public void releaseDensityBufferPool(DensityBufferPool pool) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.RandomState#releaseDensityBufferPool");
+        synchronized (bufferPools) {
+            bufferPools.addLast(pool);
+        }
     }
     public void garbageCollect() {
-        return;
+        synchronized (bufferPools) {
+            bufferPools.forEach(DensityBufferPool::garbageCollect);
+        }
     }
     public long seed() {
         return seed;

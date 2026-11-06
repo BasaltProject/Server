@@ -57,7 +57,8 @@ public class FluidState extends StateHolder<Fluid, FluidState> implements TypedI
     public static final int AMOUNT_MAX = 9;
     public static final int AMOUNT_FULL = 8;
     public FluidState(Fluid owner, Property<?>[] propertyKeys, Comparable<?>[] propertyValues) {
-        super(org.basaltmc.bukkit.facade.NmsStub.nul(), (net.minecraft.world.level.block.state.properties.Property[]) null, (Comparable[]) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.FluidState#<init>");
+        super(owner, propertyKeys, propertyValues);
+        this.source = true;
     }
     public boolean isSourceOfType(Fluid fluidType) {
         return isSource() && owner == fluidType || isSource() && is(fluidType);

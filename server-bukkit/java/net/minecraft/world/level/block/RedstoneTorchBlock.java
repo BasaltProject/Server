@@ -57,7 +57,7 @@ public class RedstoneTorchBlock extends BaseTorchBlock {
         super.createBlockStateDefinition(builder);
     }
     protected Orientation randomOrientation(Level level, BlockState state) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.RedstoneTorchBlock#randomOrientation");
+        return net.minecraft.world.level.redstone.ExperimentalRedstoneUtils.initialOrientation(level, null, net.minecraft.core.Direction.UP);
     }
     public static class Toggle {
         public Toggle(BlockPos pos, long when) {

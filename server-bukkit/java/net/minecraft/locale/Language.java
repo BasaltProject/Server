@@ -54,7 +54,7 @@ public abstract class Language {
 
         @Override
         public FormattedCharSequence getVisualOrder(FormattedText logicalOrderText) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.locale.Language#getVisualOrder");
+            return output -> net.minecraft.util.StringDecomposer.iterateFormatted(logicalOrderText, net.minecraft.network.chat.Style.EMPTY, output);
         }
     };
     private static volatile Language instance = DEFAULT_INSTANCE;

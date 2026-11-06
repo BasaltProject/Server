@@ -517,7 +517,21 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     private PathTypeCache pathTypeCache;
     private LevelDebugSynchronizers debugSynchronizers;
     public ServerLevel(MinecraftServer server, Executor executor, LevelStorageSource.LevelStorageAccess levelStorage, ServerLevelData levelData, ResourceKey<Level> dimension, LevelStem levelStem, boolean isDebug, long biomeZoomSeed, List<CustomSpawner> customSpawners, boolean tickTime) {
-        super((net.minecraft.world.level.storage.WritableLevelData) null, (net.minecraft.resources.ResourceKey) null, (net.minecraft.core.RegistryAccess) null, (net.minecraft.core.Holder) null, false, false, (long) 0, (int) 0); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerLevel#<init>");
+        super(levelData, dimension, server.registryAccess(), levelStem == null ? null : levelStem.type(), false, isDebug, biomeZoomSeed, 1000000);
+        this.world = bind(dimension);
+        this.dimension = dimension;
+        this.entityManager = new PersistentEntitySectionManager(this);
+    }
+    private static CraftWorld bind(ResourceKey<Level> dimension) {
+        for (org.bukkit.World each : org.bukkit.Bukkit.getWorlds()) {
+            if (((CraftWorld) each).getHandle().dimension().equals(dimension)) {
+                return (CraftWorld) each;
+            }
+        }
+        String path = dimension.identifier().getPath();
+        org.bukkit.World.Environment environment = path.equals("the_nether") ? org.bukkit.World.Environment.NETHER
+            : path.equals("the_end") ? org.bukkit.World.Environment.THE_END : org.bukkit.World.Environment.NORMAL;
+        return (CraftWorld) org.bukkit.Bukkit.createWorld(new org.bukkit.WorldCreator(path).environment(environment));
     }
     public int getNextEntityId() {
         return org.basaltmc.bukkit.RestNatives.nextEntityId();

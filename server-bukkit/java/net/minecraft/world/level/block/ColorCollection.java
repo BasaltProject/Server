@@ -31,17 +31,17 @@ public record ColorCollection<T>(T white, T orange, T magenta, T lightBlue, T ye
             TriFunction<Id, Function<BlockBehaviour.Properties, Block>, BlockBehaviour.Properties, Block> register,
             BiFunction<DyeColor, BlockBehaviour.Properties, B> colorBlockFactory,
             Function<DyeColor, BlockBehaviour.Properties> propertiesSupplier) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.ColorCollection#registerBlocks");
+        return from(color -> register.apply(ids.pick(color), p -> colorBlockFactory.apply(color, p), propertiesSupplier.apply(color)));
     }
 
     public static <Id> ColorCollection<Item> registerBlockItems(ColorCollection<Id> ids, ColorCollection<Block> blocks,
             TriFunction<Id, Block, DyeColor, Item> itemFactory) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.ColorCollection#registerBlockItems");
+        return from(color -> itemFactory.apply(ids.pick(color), blocks.pick(color), color));
     }
 
     public static <Id> ColorCollection<Item> registerItems(ColorCollection<Id> ids,
             BiFunction<Id, DyeColor, Item> itemFactory) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.ColorCollection#registerItems");
+        return from(color -> itemFactory.apply(ids.pick(color), color));
     }
 
     public static ColorCollection<String> prefixWithColor(ColorCollection<String> ids) {

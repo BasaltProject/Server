@@ -141,7 +141,11 @@ public class Climate {
     public static class ParameterList<T> {
         private final List<Pair<ParameterPoint, T>> entries;
         public static <T> Codec<ParameterList<T>> codec(MapCodec<T> valueCodec) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.biome.Climate.ParameterList#codec");
+            Codec<Pair<ParameterPoint, T>> entry = com.mojang.serialization.codecs.RecordCodecBuilder.<Pair<ParameterPoint, T>>create(i -> i.group(
+                ParameterPoint.CODEC.fieldOf("parameters").forGetter(Pair::getFirst),
+                valueCodec.forGetter(Pair::getSecond)).apply(i, Pair::of));
+            return entry.listOf().flatXmap(list -> list.isEmpty() ? com.mojang.serialization.DataResult.error(() -> "List must have contents")
+                : com.mojang.serialization.DataResult.success(new ParameterList<T>(list)), list -> com.mojang.serialization.DataResult.success(list.values()));
         }
         public ParameterList(List<Pair<ParameterPoint, T>> values) {
             this.entries = List.copyOf(values);

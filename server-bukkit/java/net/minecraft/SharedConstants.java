@@ -6,7 +6,7 @@ import io.netty.util.ResourceLeakDetector.Level;
 import net.minecraft.world.level.ChunkPos;
 
 public class SharedConstants {
-    private static final WorldVersion kVersion = new WorldVersion() {
+    private static WorldVersion kVersion = new WorldVersion() {
         private final net.minecraft.world.level.storage.DataVersion data =
             new net.minecraft.world.level.storage.DataVersion(5023, "main");
 
@@ -28,6 +28,23 @@ public class SharedConstants {
         @Override
         public int protocolVersion() {
             return 777;
+        }
+
+        @Override
+        public net.minecraft.server.packs.metadata.pack.PackFormat packVersion(net.minecraft.server.packs.PackType packType) {
+            return packType == net.minecraft.server.packs.PackType.CLIENT_RESOURCES
+                ? new net.minecraft.server.packs.metadata.pack.PackFormat(RESOURCE_PACK_FORMAT_MAJOR, RESOURCE_PACK_FORMAT_MINOR)
+                : new net.minecraft.server.packs.metadata.pack.PackFormat(DATA_PACK_FORMAT_MAJOR, DATA_PACK_FORMAT_MINOR);
+        }
+
+        @Override
+        public java.util.Date buildTime() {
+            return java.util.Date.from(java.time.Instant.parse("2026-09-15T11:20:48Z"));
+        }
+
+        @Override
+        public boolean stable() {
+            return true;
         }
     };
 
@@ -160,15 +177,20 @@ public class SharedConstants {
     public static final float AVERAGE_RANDOM_TICKS_PER_BLOCK_PER_GAME_DAY = 17.578125F;
     public static final int WORLD_ICON_SIZE = 64;
     public static void setVersion(WorldVersion version) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.SharedConstants#setVersion");
+        kVersion = version;
     }
     public static void tryDetectVersion() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.SharedConstants#tryDetectVersion");
+        return;
     }
     public static int getProtocolVersion() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.SharedConstants#getProtocolVersion");
+        return kVersion.protocolVersion();
     }
     public static boolean debugVoidTerrain(ChunkPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.SharedConstants#debugVoidTerrain");
+        int x = pos.getMinBlockX();
+        int z = pos.getMinBlockZ();
+        if (DEBUG_ONLY_GENERATE_HALF_THE_WORLD) {
+            return z < 0;
+        }
+        return debugGenerateSquareTerrainWithoutNoise && (x > 8192 || x < 0 || z > 1024 || z < 0);
     }
 }

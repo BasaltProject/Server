@@ -14,22 +14,24 @@ public class FlowerBlock extends VegetationBlock implements SuspiciousEffectHold
     protected FlowerBlock(int index) {
         super(index);
     }
+    private SuspiciousStewEffects stewEffects = SuspiciousStewEffects.EMPTY;
     public FlowerBlock(Holder<MobEffect> suspiciousStewEffect, float effectSeconds, BlockBehaviour.Properties properties) {
-        super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
+        this(makeEffectList(suspiciousStewEffect, effectSeconds), properties);
     }
     public FlowerBlock(SuspiciousStewEffects suspiciousStewEffects, BlockBehaviour.Properties properties) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
+        this.stewEffects = suspiciousStewEffects;
     }
     protected static SuspiciousStewEffects makeEffectList(Holder<MobEffect> suspiciousStewEffect, float effectSeconds) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FlowerBlock#makeEffectList");
+        return new SuspiciousStewEffects(java.util.List.of(new SuspiciousStewEffects.Entry(suspiciousStewEffect, net.minecraft.util.Mth.floor(effectSeconds * 20.0F))));
     }
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         return super.getShape(state, level, pos, context);
     }
     public SuspiciousStewEffects getSuspiciousEffects() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FlowerBlock#getSuspiciousEffects");
+        return stewEffects;
     }
     public MobEffectInstance getBeeInteractionEffect() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.FlowerBlock#getBeeInteractionEffect");
+        return null;
     }
 }

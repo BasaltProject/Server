@@ -14,26 +14,39 @@ import net.minecraft.world.level.levelgen.feature.treedecorators.TreeDecorator;
 public record FallenTreeFeature(Holder trunkProvider, Object logLength, List stumpDecorators, List logDecorators) implements Feature {
     public static final MapCodec<FallenTreeFeature> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.level.levelgen.feature.FallenTreeFeature.class, "CODEC");
     public MapCodec<FallenTreeFeature> codec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.FallenTreeFeature#codec");
+        return CODEC;
     }
     public boolean place(WorldGenLevel level, ChunkGenerator chunkGenerator, RandomSource random, BlockPos origin) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.FallenTreeFeature#place");
+        net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider provider =
+            (net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider) trunkProvider.value();
+        String wood = org.basaltmc.bukkit.facade.NativeFeatures.woodOf(provider.getState(level, random, origin));
+        return wood != null && switch (wood) {
+            case "oak", "birch", "spruce", "jungle" -> org.basaltmc.bukkit.facade.NativeFeatures.placeTree(level, "fallen_" + wood, origin);
+            default -> false;
+        };
     }
     public static Builder builder(BlockStateProvider trunkProvider, IntProvider logLength) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.FallenTreeFeature#builder");
+        return new Builder(trunkProvider, logLength);
     }
     public static class Builder {
+        private final BlockStateProvider trunkProvider;
+        private final IntProvider logLength;
+        private final List<TreeDecorator> stumpDecorators = new java.util.ArrayList<>();
+        private final List<TreeDecorator> logDecorators = new java.util.ArrayList<>();
         public Builder(BlockStateProvider trunkProvider, IntProvider logLength) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.FallenTreeFeature.Builder#<init>");
+            this.trunkProvider = trunkProvider;
+            this.logLength = logLength;
         }
         public Builder stumpDecorator(TreeDecorator stumpDecorator) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.FallenTreeFeature.Builder#stumpDecorator");
+            stumpDecorators.add(stumpDecorator);
+            return this;
         }
         public Builder logDecorator(TreeDecorator logDecorator) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.FallenTreeFeature.Builder#logDecorator");
+            logDecorators.add(logDecorator);
+            return this;
         }
         public FallenTreeFeature build() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.FallenTreeFeature.Builder#build");
+            return new FallenTreeFeature(Holder.direct(trunkProvider), logLength, List.copyOf(stumpDecorators), List.copyOf(logDecorators));
         }
     }
 }

@@ -42,11 +42,16 @@ public abstract class Fluid {
     protected Fluid() {
 
     }
+    private StateDefinition<Fluid, FluidState> definition;
     protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.Fluid#createFluidStateDefinition");
     }
-    public StateDefinition<Fluid, FluidState> getStateDefinition() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.Fluid#getStateDefinition");
+    public synchronized StateDefinition<Fluid, FluidState> getStateDefinition() {
+        if (definition == null) {
+            StateDefinition.Builder<Fluid, FluidState> builder = new StateDefinition.Builder<>(this);
+            createFluidStateDefinition(builder);
+            definition = builder.create(Fluid::defaultFluidState, FluidState::new);
+        }
+        return definition;
     }
     protected void registerDefaultState(FluidState state) {
 
@@ -112,7 +117,11 @@ public abstract class Fluid {
         return state.getAABB(level, pos);
     }
     public Optional<SoundEvent> getPickupSound() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.Fluid#getPickupSound");
+        String path = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(this).getPath();
+        if (path.endsWith("water")) {
+            return Optional.of(net.minecraft.sounds.SoundEvents.byId("item.bucket.fill"));
+        }
+        return path.endsWith("lava") ? Optional.of(net.minecraft.sounds.SoundEvents.byId("item.bucket.fill_lava")) : Optional.empty();
     }
     public Holder.Reference<Fluid> builtInRegistryHolder() {
         return (Holder.Reference<Fluid>) net.minecraft.core.registries.BuiltInRegistries.FLUID.wrapAsHolder(this);

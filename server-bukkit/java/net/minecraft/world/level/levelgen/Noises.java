@@ -76,6 +76,6 @@ public class Noises {
     public static final ResourceKey<NormalNoise> NETHER_WART = key("nether_wart");
     public static final ResourceKey<NormalNoise> NETHER_STATE_SELECTOR = key("nether_state_selector");
     public static Noise instantiate(HolderGetter<NormalNoise> noises, PositionalRandomFactory context, ResourceKey<NormalNoise> name) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.Noises#instantiate");
+        return org.basaltmc.bukkit.facade.NativeNoise.create(name.identifier().toString(), context.fromHashOf(name.identifier()), false);
     }
 }

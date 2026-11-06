@@ -136,7 +136,7 @@ public class Util {
         throw new RuntimeException(throwable);
     }
     public static Type<?> fetchChoiceType(DSL.TypeReference reference, String name) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.Util#fetchChoiceType");
+        return net.minecraft.util.datafix.DataFixers.getDataFixer().getSchema(com.mojang.datafixers.DataFixUtils.makeKey(org.basaltmc.bukkit.WorldNatives.dataVersion())).getChoiceType(reference, name);
     }
     public static void runNamed(Runnable runnable, String name) {
         Thread thread = Thread.currentThread();
@@ -522,7 +522,7 @@ public class Util {
         return result.toString();
     }
     public static <K, V> SingleKeyCache<K, V> singleKeyCache(Function<K, V> computeValueFunction) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.Util#singleKeyCache");
+        return new SingleKeyCache<>(computeValueFunction);
     }
     public static <T, R> Function<T, R> memoize(Function<T, R> function) {
         java.util.concurrent.ConcurrentHashMap<T, R> cache = new java.util.concurrent.ConcurrentHashMap<>();
@@ -602,13 +602,15 @@ public class Util {
         return value -> map.getOrDefault(value, -1);
     }
     public static <A, B> Typed<B> writeAndReadTypedOrThrow(Typed<A> typed, Type<B> newType, UnaryOperator<Dynamic<?>> function) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.Util#writeAndReadTypedOrThrow");
+        Dynamic<?> written = typed.write().getOrThrow(IllegalStateException::new);
+        return readTypedOrThrow(newType, function.apply(written), true);
     }
     public static <T> Typed<T> readTypedOrThrow(Type<T> type, Dynamic<?> dynamic) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.Util#readTypedOrThrow");
+        return readTypedOrThrow(type, dynamic, false);
     }
     public static <T> Typed<T> readTypedOrThrow(Type<T> type, Dynamic<?> dynamic, boolean acceptPartial) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.Util#readTypedOrThrow");
+        com.mojang.serialization.DataResult<? extends com.mojang.datafixers.util.Pair<Typed<T>, ?>> result = type.readTyped(dynamic);
+        return result.getOrThrow(IllegalStateException::new).getFirst();
     }
     public static <T> List<T> copyAndAdd(List<T> list, T element) {
         java.util.ArrayList<T> copy = new java.util.ArrayList<>(list);

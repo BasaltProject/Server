@@ -37,6 +37,7 @@ public class SculkCatalystBlockEntity extends BlockEntity {
     public static class CatalystListener implements GameEventListener {
         public static final int PULSE_TICKS = 8;
         private final PositionSource positionSource;
+        private final SculkSpreader spreader = SculkSpreader.createLevelSpreader();
         public CatalystListener(BlockState blockState, PositionSource positionSource) {
             this.positionSource = positionSource;
         }
@@ -50,10 +51,11 @@ public class SculkCatalystBlockEntity extends BlockEntity {
             return GameEventListener.DeliveryMode.BY_DISTANCE;
         }
         public boolean handleGameEvent(ServerLevel level, Holder<GameEvent> event, GameEvent.Context context, Vec3 sourcePosition) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkCatalystBlockEntity.CatalystListener#handleGameEvent");
+            // The native catalyst system reacts to ENTITY_DIE.
+            return false;
         }
         public SculkSpreader getSculkSpreader() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkCatalystBlockEntity.CatalystListener#getSculkSpreader");
+            return spreader;
         }
     }
 }

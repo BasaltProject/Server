@@ -33,7 +33,9 @@ public class ServerAdvancementManager {
         return holder;
     }
     public AdvancementTree tree() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.ServerAdvancementManager#tree");
+        AdvancementTree tree = new AdvancementTree();
+        tree.addAll(getAllAdvancements());
+        return tree;
     }
     public Collection<AdvancementHolder> getAllAdvancements() {
         Map<Identifier, AdvancementHolder> all = new LinkedHashMap<>();

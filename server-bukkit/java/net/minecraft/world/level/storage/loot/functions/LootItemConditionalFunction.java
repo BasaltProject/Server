@@ -27,7 +27,7 @@ public abstract class LootItemConditionalFunction implements LootItemFunction, o
     }
     public abstract MapCodec<? extends LootItemConditionalFunction> codec();
     protected static <T extends LootItemConditionalFunction> Products.P1<RecordCodecBuilder.Mu<T>, Optional<Holder<LootItemCondition>>> commonFields(RecordCodecBuilder.Instance<T> i) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.functions.LootItemConditionalFunction#commonFields");
+        return i.group(LootItemCondition.CODEC.optionalFieldOf("condition").forGetter(f -> f.condition));
     }
     public final ItemStack apply(ItemStack itemStack, LootContext context) {
         if (condition.isPresent() && !condition.get().value().test(context)) {

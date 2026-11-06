@@ -38,10 +38,10 @@ public class FlowingFluid extends Fluid {
     public String toString() {
         return name;
     }
-    public static final BooleanProperty FALLING = null;
-    public static final IntegerProperty LEVEL = null;
+    public static final BooleanProperty FALLING = net.minecraft.world.level.block.state.properties.BlockStateProperties.FALLING;
+    public static final IntegerProperty LEVEL = net.minecraft.world.level.block.state.properties.BlockStateProperties.LEVEL_FLOWING;
     protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.material.FlowingFluid#createFluidStateDefinition");
+        builder.add(FALLING);
     }
     public Vec3 getFlow(BlockGetter level, BlockPos pos, FluidState fluidState) {
         return fluidState.getFlow(level, pos);

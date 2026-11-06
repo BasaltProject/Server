@@ -14,13 +14,16 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.levelgen.structure.templatesystem.loader.TemplatePathFactory;
 import net.minecraft.world.level.storage.LevelStorageSource;
 public class StructureTemplateManager {
+    private TemplatePathFactory worldTemplates;
     protected StructureTemplateManager() {
     }
     public static final String STRUCTURE_DIRECTORY_NAME = "structure";
     public static final FileToIdConverter WORLD_STRUCTURE_LISTER = null;
     public static final FileToIdConverter RESOURCE_TEXT_STRUCTURE_LISTER = null;
     public StructureTemplateManager(ResourceManager resourceManager, LevelStorageSource.LevelStorageAccess storage, DataFixer fixerUpper, HolderGetter<Block> blockLookup) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager#<init>");
+        worldTemplates = new TemplatePathFactory(storage == null
+            ? net.minecraft.server.MinecraftServer.getServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.GENERATED_DIR)
+            : storage.getLevelPath(net.minecraft.world.level.storage.LevelResource.GENERATED_DIR).normalize());
     }
     public StructureTemplate getOrCreate(Identifier id) {
         return get(id).orElseGet(StructureTemplate::new);
@@ -46,13 +49,15 @@ public class StructureTemplateManager {
             org.basaltmc.bukkit.facade.NbtCodec.toBytes(template.save(new net.minecraft.nbt.CompoundTag())), true)).orElse(false);
     }
     public static boolean save(Path file, StructureTemplate structureTemplate, boolean asText) throws IOException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager#save");
+        java.nio.file.Files.createDirectories(file.getParent());
+        java.nio.file.Files.write(file, org.basaltmc.bukkit.facade.NbtCodec.toBytes(structureTemplate.save(new net.minecraft.nbt.CompoundTag())));
+        return true;
     }
     public TemplatePathFactory worldTemplates() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager#worldTemplates");
+        return worldTemplates;
     }
     public TemplatePathFactory testTemplates() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager#testTemplates");
+        return null;
     }
     public void remove(Identifier id) {
         org.basaltmc.bukkit.LeftoverNatives.structureRemove(id.toString(), false);

@@ -4,7 +4,7 @@ package net.minecraft.server;
 import net.minecraft.server.dedicated.DedicatedServerProperties;
 public interface ServerInterface extends ServerInfo {
     default DedicatedServerProperties getProperties() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.ServerInterface#getProperties");
+        return net.minecraft.server.dedicated.DedicatedServer.instance().getProperties();
     }
     default String getServerIp() {
         return org.bukkit.Bukkit.getIp();

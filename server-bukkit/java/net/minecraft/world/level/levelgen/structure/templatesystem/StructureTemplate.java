@@ -51,21 +51,58 @@ public class StructureTemplate {
     }
     public void fillFromWorld(Level level, BlockPos position, Vec3i size, boolean inludeEntities, List<Block> ignoreBlocks) {
         if (level instanceof net.minecraft.server.level.ServerLevel server) {
+            org.basaltmc.bukkit.Blocks.flushAll();
             byte[] bytes = org.basaltmc.bukkit.LeftoverNatives.structureCapture(server.getWorld().getName(), position.getX(),
                 position.getY(), position.getZ(), size.getX(), size.getY(), size.getZ(), inludeEntities);
             if (bytes != null) {
-                data = org.basaltmc.bukkit.facade.NbtCodec.fromBytes(bytes);
+                data = org.basaltmc.bukkit.facade.NbtCodec.fromAnonymous(bytes);
             }
         }
     }
+    private Object[] scan(BlockPos position, StructurePlaceSettings settings, String block, boolean absolute) {
+        BlockPos pivot = settings.getRotationPivot();
+        Object[] scan = org.basaltmc.bukkit.LeftoverNatives.templateScan(org.basaltmc.bukkit.facade.NbtCodec.toAnonymous(data),
+            position.getX(), position.getY(), position.getZ(), settings.getRotation().ordinal(), settings.getMirror().ordinal(),
+            pivot.getX(), pivot.getZ(), block, absolute);
+        return scan == null ? new Object[] {new int[3], new int[0], new byte[0][], new int[0], new String[0]} : scan;
+    }
     public List<StructureBlockInfo> filterBlocks(BlockPos position, StructurePlaceSettings settings, Block block) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate#filterBlocks");
+        return filterBlocks(position, settings, block, true);
     }
     public List<JigsawBlockInfo> getJigsaws(BlockPos position, Rotation rotation) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate#getJigsaws");
+        Object[] scan = scan(position, new StructurePlaceSettings().setRotation(rotation), "", true);
+        int[] ints = (int[]) scan[3];
+        String[] text = (String[]) scan[4];
+        List<JigsawBlockInfo> found = new java.util.ArrayList<>();
+        for (int at = 0; at * 6 < ints.length; at++) {
+            String orientation = text[at * 6] + "_" + text[at * 6 + 1];
+            BlockState state = net.minecraft.world.level.block.Blocks.JIGSAW.defaultBlockState().setValue(
+                net.minecraft.world.level.block.state.properties.BlockStateProperties.ORIENTATION,
+                net.minecraft.world.level.block.state.properties.BlockStateProperties.OrientationValue.valueOf(
+                    orientation.toUpperCase(java.util.Locale.ROOT)));
+            found.add(new JigsawBlockInfo(new BlockPos(ints[at * 6], ints[at * 6 + 1], ints[at * 6 + 2]), state,
+                ints[at * 6 + 3] != 0 ? JigsawBlockEntity.JointType.ROLLABLE : JigsawBlockEntity.JointType.ALIGNED,
+                Identifier.parse(text[at * 6 + 2]),
+                (ResourceKey<StructureTemplatePool>) (ResourceKey) ResourceKey.create(
+                    net.minecraft.core.registries.Registries.TEMPLATE_POOL, Identifier.parse(text[at * 6 + 3])),
+                Identifier.parse(text[at * 6 + 4]), ints[at * 6 + 4], ints[at * 6 + 5]));
+        }
+        return found;
     }
     public ObjectArrayList<StructureBlockInfo> filterBlocks(BlockPos position, StructurePlaceSettings settings, Block block, boolean absolute) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate#filterBlocks");
+        Object[] scan = scan(position, settings, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).toString(), absolute);
+        int[] ints = (int[]) scan[1];
+        byte[][] tiles = (byte[][]) scan[2];
+        BoundingBox box = settings.getBoundingBox();
+        ObjectArrayList<StructureBlockInfo> result = new ObjectArrayList<>();
+        for (int at = 0; at * 4 < ints.length; at++) {
+            BlockPos pos = new BlockPos(ints[at * 4], ints[at * 4 + 1], ints[at * 4 + 2]);
+            if (box == null || box.isInside(pos)) {
+                result.add(new StructureBlockInfo(pos, Block.stateById(ints[at * 4 + 3]).rotate(settings.getRotation()),
+                    tiles[at] == null ? null : org.basaltmc.bukkit.facade.NbtCodec.fromAnonymous(tiles[at])));
+            }
+        }
+        return result;
     }
     public BlockPos calculateConnectedPosition(StructurePlaceSettings settings1, BlockPos connection1, StructurePlaceSettings settings2, BlockPos connection2) {
         return calculateRelativePosition(settings1, connection1).subtract(calculateRelativePosition(settings2, connection2));
@@ -77,18 +114,64 @@ public class StructureTemplate {
         if (!(level.getLevel() instanceof net.minecraft.server.level.ServerLevel server)) {
             return false;
         }
-        return org.basaltmc.bukkit.LeftoverNatives.structurePlace(org.basaltmc.bukkit.facade.NbtCodec.toBytes(data),
+        return org.basaltmc.bukkit.LeftoverNatives.structurePlace(org.basaltmc.bukkit.facade.NbtCodec.toAnonymous(data),
             server.getWorld().getName(), position.getX(), position.getY(), position.getZ(), settings.getRotation().ordinal(),
             settings.getMirror().ordinal(), 1.0F, settings.getRandom(position).nextLong(), !settings.isIgnoreEntities(), 0);
     }
     public static void updateShapeAtEdge(LevelAccessor level, int updateMode, DiscreteVoxelShape shape, BlockPos pos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate#updateShapeAtEdge");
+        updateShapeAtEdge(level, updateMode, shape, pos.getX(), pos.getY(), pos.getZ());
     }
     public static void updateShapeAtEdge(LevelAccessor level, int updateMode, DiscreteVoxelShape shape, int startX, int startY, int startZ) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate#updateShapeAtEdge");
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos neighbor = new BlockPos.MutableBlockPos();
+        shape.forAllFaces((direction, x, y, z) -> {
+            pos.set(startX + x, startY + y, startZ + z);
+            neighbor.setWithOffset(pos, direction);
+            BlockState state = level.getBlockState(pos);
+            BlockState neighborState = level.getBlockState(neighbor);
+            BlockState updated = state.updateShape(level, level, pos, direction, neighbor, neighborState, level.getRandom());
+            if (state != updated) {
+                level.setBlock(pos, updated, updateMode & -2);
+            }
+            BlockState neighborUpdated = neighborState.updateShape(level, level, neighbor, direction.getOpposite(), pos, updated,
+                level.getRandom());
+            if (neighborState != neighborUpdated) {
+                level.setBlock(neighbor, neighborUpdated, updateMode & -2);
+            }
+        });
     }
     public static List<StructureBlockInfo> processBlockInfos(ServerLevelAccessor level, BlockPos position, BlockPos referencePos, StructurePlaceSettings settings, List<StructureBlockInfo> blockInfoList) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate#processBlockInfos");
+        List<StructureBlockInfo> original = new java.util.ArrayList<>();
+        List<StructureBlockInfo> processed = new java.util.ArrayList<>();
+        boolean onlyInChunk = true;
+        for (StructureProcessor processor : settings.getProcessors()) {
+            if (processor.evaluatesEntirePieceState()) {
+                onlyInChunk = false;
+                break;
+            }
+        }
+        BoundingBox chunkBox = settings.getBoundingBox();
+        for (StructureBlockInfo info : blockInfoList) {
+            BlockPos pos = calculateRelativePosition(settings, info.pos()).offset(position);
+            if (onlyInChunk && chunkBox != null && !chunkBox.isInside(pos)) {
+                continue;
+            }
+            StructureBlockInfo current = new StructureBlockInfo(pos, info.state(), info.nbt() == null ? null : info.nbt().copy());
+            for (StructureProcessor processor : settings.getProcessors()) {
+                if (current == null) {
+                    break;
+                }
+                current = processor.processBlock(level, position, referencePos, info.pos(), current, settings);
+            }
+            if (current != null) {
+                processed.add(current);
+                original.add(info);
+            }
+        }
+        for (StructureProcessor processor : settings.getProcessors()) {
+            processed = processor.finalizeProcessing(level, position, referencePos, original, processed, settings);
+        }
+        return processed;
     }
     public Vec3i getSize(Rotation rotation) {
         Vec3i size = getSize();
