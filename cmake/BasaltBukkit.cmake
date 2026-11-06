@@ -40,7 +40,7 @@ function(basalt_bukkit_runtime)
     set(_shim "${BASALT_SHIM_DIR}")
     set(_deps "")
     if(NOT _shim)
-        if(EXISTS "${CMAKE_SOURCE_DIR}/shim/GNUmakefile")
+        if(EXISTS "${CMAKE_SOURCE_DIR}/shim/CMakeLists.txt")
             set(_shim "${CMAKE_BINARY_DIR}/shim")
             add_custom_target(basalt-shim ALL
                 COMMAND ${CMAKE_SOURCE_DIR}/server-bukkit/scripts/build-shim.sh ${CMAKE_SOURCE_DIR}/shim ${_shim}
