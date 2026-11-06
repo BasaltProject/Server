@@ -65,6 +65,8 @@ public final class BasaltTag<T extends Keyed> implements Tag<T> {
             case Tag.REGISTRY_ENTITY_TYPES:
                 EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(id);
                 return type == EntityType.UNKNOWN ? null : type;
+            case Tag.REGISTRY_GAME_EVENTS:
+                return org.bukkit.Registry.GAME_EVENT.get(NamespacedKey.fromString(id));
             default:
                 return null;
         }

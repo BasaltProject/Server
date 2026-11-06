@@ -215,6 +215,10 @@ final class StorageKinds {
                     tile.put("sherds", list);
                     return null;
                 }
+                case "startWobble":
+                    org.basaltmc.bukkit.WorldEnvNatives.blockEvent(tile.world.getName(), tile.x, tile.y, tile.z, 1,
+                        ((DecoratedPot.WobbleStyle) args[0]).ordinal());
+                    return null;
                 case "getSherds": {
                     Map<DecoratedPot.Side, Material> out = new EnumMap<>(DecoratedPot.Side.class);
                     List<Object> list = sherds(tile);

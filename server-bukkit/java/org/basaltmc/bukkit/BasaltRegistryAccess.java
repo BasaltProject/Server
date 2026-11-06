@@ -107,6 +107,15 @@ public final class BasaltRegistryAccess implements RegistryAccess {
     private static final java.util.Set<String> BUILT_IN =
         java.util.Set.of("block", "item", "worldgen/biome", "entity_type");
 
+    /** The constants of an API interface read this registry back, so they must start first or they see it half built. */
+    private static void initialized(Class<?> type) {
+        try {
+            Class.forName(type.getName(), true, type.getClassLoader());
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private static List<Keyed> entriesOf(String name, Class<?> type) {
         List<Keyed> out = new ArrayList<>();
         switch (name) {
@@ -134,6 +143,7 @@ public final class BasaltRegistryAccess implements RegistryAccess {
                 out.addAll(BasaltGameRule.all());
                 break;
             case "menu":
+                initialized(org.bukkit.inventory.MenuType.class);
                 out.addAll(org.basaltmc.bukkit.inv.MenuTypes.list());
                 break;
             case "mob_effect":

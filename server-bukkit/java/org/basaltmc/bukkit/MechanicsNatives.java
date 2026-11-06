@@ -31,6 +31,11 @@ public final class MechanicsNatives {
     public static native double[] stepUp(double[] colliders, double[] grounded, double groundedOffsetY, double mx,
         double my, double mz, float maxUpStep, double reachSquared);
     /** A level based value as its prefix program (see {@code LevelBasedValue.encode}) at a level. */
+    public static native String[] creativeTabItems(String tab);
+    public static native byte[] regionRead(String folder, int chunkX, int chunkZ);
+    public static native void regionWrite(String folder, int chunkX, int chunkZ, byte[] data, int timestamp);
+    public static native int regionTimestamp(String folder, int chunkX, int chunkZ);
+    public static native boolean regionFlush(String folder, boolean release);
     public static native float levelValue(double[] program, int level);
     /** The pyramid levels, then the colour and height of every beam section above the beacon. */
     public static native int[] beaconScan(String world, int x, int y, int z);

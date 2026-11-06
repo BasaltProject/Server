@@ -22,7 +22,7 @@ import org.bukkit.material.MaterialData;
 import org.bukkit.persistence.PersistentDataContainer;
 
 @DelegateDeserialization(ItemStack.class)
-public final class BasaltItemStack extends ItemStack {
+public class BasaltItemStack extends ItemStack {
     private Material type;
     private int amount;
     private Map<String, Object> components;

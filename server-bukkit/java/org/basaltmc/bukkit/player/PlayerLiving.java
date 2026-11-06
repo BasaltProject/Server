@@ -473,7 +473,7 @@ public abstract class PlayerLiving extends PlayerTail {
         if (isValid()) {
             return null;
         }
-        throw PlayerCalls.unsupported("Player#getRemovalReason");
+        return io.papermc.paper.entity.RemovalReason.DISCARDED;
     }
 
     @Override

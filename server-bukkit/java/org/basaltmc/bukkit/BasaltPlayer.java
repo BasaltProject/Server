@@ -31,13 +31,11 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
     private final String uuid;
     private final String name;
 
-    private final BasaltPermissible permissible;
-
     protected BasaltPlayer(UUID id, String name) {
         this.id = id;
         this.uuid = id.toString();
         this.name = name;
-        this.permissible = new BasaltPermissible(this, id);
+        this.perm = new BasaltPermissible(this, id);
     }
 
     private volatile org.bukkit.scoreboard.Scoreboard scoreboard;
@@ -60,7 +58,9 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
     }
 
     public void publishPermissions() {
-        permissible.publish();
+        if (perm instanceof BasaltPermissible own) {
+            own.publish();
+        }
     }
 
     @Override
@@ -279,62 +279,62 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
     @Override
     public void setOp(boolean value) {
         OfflineSupport.setOp(id, value);
-        permissible.recalculatePermissions();
+        perm.recalculatePermissions();
     }
 
     @Override
     public boolean isPermissionSet(String permission) {
-        return permissible.isPermissionSet(permission);
+        return perm.isPermissionSet(permission);
     }
 
     @Override
     public boolean isPermissionSet(Permission permission) {
-        return permissible.isPermissionSet(permission);
+        return perm.isPermissionSet(permission);
     }
 
     @Override
     public boolean hasPermission(String permission) {
-        return permissible.hasPermission(permission);
+        return perm.hasPermission(permission);
     }
 
     @Override
     public boolean hasPermission(Permission permission) {
-        return permissible.hasPermission(permission);
+        return perm.hasPermission(permission);
     }
 
     @Override
     public PermissionAttachment addAttachment(Plugin plugin) {
-        return permissible.addAttachment(plugin);
+        return perm.addAttachment(plugin);
     }
 
     @Override
     public PermissionAttachment addAttachment(Plugin plugin, int ticks) {
-        return permissible.addAttachment(plugin, ticks);
+        return perm.addAttachment(plugin, ticks);
     }
 
     @Override
     public PermissionAttachment addAttachment(Plugin plugin, String name, boolean value) {
-        return permissible.addAttachment(plugin, name, value);
+        return perm.addAttachment(plugin, name, value);
     }
 
     @Override
     public PermissionAttachment addAttachment(Plugin plugin, String name, boolean value, int ticks) {
-        return permissible.addAttachment(plugin, name, value, ticks);
+        return perm.addAttachment(plugin, name, value, ticks);
     }
 
     @Override
     public void removeAttachment(PermissionAttachment attachment) {
-        permissible.removeAttachment(attachment);
+        perm.removeAttachment(attachment);
     }
 
     @Override
     public void recalculatePermissions() {
-        permissible.recalculatePermissions();
+        perm.recalculatePermissions();
     }
 
     @Override
     public Set<PermissionAttachmentInfo> getEffectivePermissions() {
-        return permissible.getEffectivePermissions();
+        return perm.getEffectivePermissions();
     }
 
     @Override

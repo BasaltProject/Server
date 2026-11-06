@@ -203,6 +203,8 @@ final class Common {
                     return dispense(tile);
                 }
                 return Tile.kNone;
+            case "getBlockProjectileSource":
+                return tile.block.equals("dispenser") ? new DispenserSource(tile) : null;
             case "open":
                 return Lids.set(tile, true);
             case "close":

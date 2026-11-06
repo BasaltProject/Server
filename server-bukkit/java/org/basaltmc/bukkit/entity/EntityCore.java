@@ -43,6 +43,8 @@ public final class EntityCore {
     public volatile EntityType type;
     public final MetadataHolder metadata = new MetadataHolder();
     public final java.util.Set<String> tags = new java.util.HashSet<>();
+    public final java.util.Set<UUID> collidableExemptions = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     public final java.util.Map<org.bukkit.entity.memory.MemoryKey<?>, Object> memories =
         new java.util.concurrent.ConcurrentHashMap<>();
     public volatile org.bukkit.permissions.PermissibleBase permissions;

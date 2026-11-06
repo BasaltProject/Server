@@ -9,10 +9,12 @@ import org.bukkit.World;
 /** The class plugins find behind Bukkit.getServer(); its package name is how they recognise a CraftBukkit server. */
 public final class CraftServer extends BasaltServer {
     private final DedicatedServer console = DedicatedServer.instance();
+    private org.bukkit.command.CommandMap commandMap;
     private final Map<String, World> worlds = new java.util.concurrent.ConcurrentHashMap<>();
 
     public CraftServer(File root, File pluginsFolder) {
         super(root, pluginsFolder);
+        this.commandMap = getCommandMap();
     }
 
     public DedicatedServer getServer() {
