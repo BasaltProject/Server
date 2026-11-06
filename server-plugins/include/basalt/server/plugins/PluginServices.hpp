@@ -15,6 +15,7 @@
 #include <basalt/server/plugins/PluginServerControl.hpp>
 #include <basalt/server/plugins/PluginStructures.hpp>
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
+#include <basalt/server/plugins/PluginWorldgen.hpp>
 
 #include <array>
 #include <cstdint>
@@ -308,5 +309,7 @@ public:
     [[nodiscard]] virtual PluginSelectors& selectors() { return PluginSelectors::unavailable(); }
 
     [[nodiscard]] virtual PluginStructures& structures() { return PluginStructures::unavailable(); }
+
+    [[nodiscard]] virtual PluginWorldgen& worldgen() { return PluginWorldgen::unavailable(); }
 };
 } // namespace basalt::server::plugins

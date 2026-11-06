@@ -1,5 +1,9 @@
 #include "PluginMiscShared.hpp"
 
+#include <basalt/metamorph/datafix/DataFixer.hpp>
+#include <basalt/server/plugins/PluginDatafix.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
+
 namespace basalt::server::plugins::pluginApi::misc {
 using wire::lua::LuaArgs;
 
@@ -574,6 +578,94 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
         return 1;
     });
     lua.setField("capture");
+    wire::lua::pushHostFunction(lua, "structures.scan", [server](LuaArgs& args) {
+        const std::optional<std::vector<std::uint8_t>> bytes = snbtBytes(args, 1);
+        PluginTemplateScanRequest request;
+        if (args.isTable(2)) {
+            const auto number = [&args](std::string_view key) {
+                return static_cast<std::int32_t>(numberField(args, 2, key).value_or(0.0));
+            };
+            request.x = number("x");
+            request.y = number("y");
+            request.z = number("z");
+            request.rotation = number("rotation");
+            request.mirror = number("mirror");
+            request.pivotX = number("pivot_x");
+            request.pivotZ = number("pivot_z");
+            request.block = stringField(args, 2, "block").value_or(std::string{});
+            request.absolute = flagField(args, 2, "absolute").value_or(true);
+        }
+        const std::optional<PluginTemplateScan> scan =
+            bytes.has_value() ? server->services().structures().scan(*bytes, request) : std::nullopt;
+        if (!scan.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        args.pushTable();
+        args.pushInteger(scan->sizeX);
+        args.setField("x");
+        args.pushInteger(scan->sizeY);
+        args.setField("y");
+        args.pushInteger(scan->sizeZ);
+        args.setField("z");
+        args.setField("size");
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const PluginTemplateBlock& block : scan->blocks) {
+            args.pushTable();
+            args.pushInteger(block.x);
+            args.setField("x");
+            args.pushInteger(block.y);
+            args.setField("y");
+            args.pushInteger(block.z);
+            args.setField("z");
+            args.pushInteger(block.stateId);
+            args.setField("state");
+            const wire::common::Identifier* id = registry::blockStateDefinitions::blockOf(block.stateId);
+            args.pushString(id == nullptr ? std::string{} : id->toString());
+            args.setField("block");
+            if (!block.nbt.empty()) {
+                pushSnbt(args, block.nbt);
+                args.setField("nbt");
+            }
+            args.setIndex(position++);
+        }
+        args.setField("blocks");
+        args.pushTable();
+        position = 1;
+        for (const PluginTemplateJigsaw& jigsaw : scan->jigsaws) {
+            args.pushTable();
+            args.pushInteger(jigsaw.x);
+            args.setField("x");
+            args.pushInteger(jigsaw.y);
+            args.setField("y");
+            args.pushInteger(jigsaw.z);
+            args.setField("z");
+            args.pushString(jigsaw.front);
+            args.setField("front");
+            args.pushString(jigsaw.top);
+            args.setField("top");
+            args.pushBoolean(jigsaw.rollable);
+            args.setField("rollable");
+            args.pushString(jigsaw.name);
+            args.setField("name");
+            args.pushString(jigsaw.pool);
+            args.setField("pool");
+            args.pushString(jigsaw.target);
+            args.setField("target");
+            args.pushString(jigsaw.finalState);
+            args.setField("final_state");
+            args.pushInteger(jigsaw.placementPriority);
+            args.setField("placement_priority");
+            args.pushInteger(jigsaw.selectionPriority);
+            args.setField("selection_priority");
+            args.setIndex(position++);
+        }
+        args.setField("jigsaws");
+        return 1;
+    });
+    lua.setField("scan");
     wire::lua::pushHostFunction(lua, "structures.place", [server](LuaArgs& args) {
         const std::optional<std::vector<std::uint8_t>> bytes = snbtBytes(args, 1);
         if (!bytes.has_value() || !args.isTable(2)) {
@@ -596,5 +688,131 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
     });
     lua.setField("place");
     lua.setGlobal("structures");
+
+    lua.pushTable();
+    wire::lua::pushHostFunction(lua, "worldgen.shape", [server](LuaArgs& args) {
+        const std::optional<PluginTerrainShape> shape = server->services().worldgen().shape(args.checkString(1));
+        if (!shape.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        args.pushInteger(shape->minY);
+        args.setField("min_y");
+        args.pushInteger(shape->height);
+        args.setField("height");
+        args.pushInteger(shape->seaLevel);
+        args.setField("sea_level");
+        args.pushInteger(shape->defaultBlock);
+        args.setField("default_block");
+        args.pushInteger(shape->defaultFluid);
+        args.setField("default_fluid");
+        args.pushBoolean(shape->legacyRandomSource);
+        args.setField("legacy_random_source");
+        args.pushBoolean(shape->disableMobGeneration);
+        args.setField("disable_mob_generation");
+        return 1;
+    });
+    lua.setField("shape");
+    wire::lua::pushHostFunction(lua, "worldgen.density", [server](LuaArgs& args) {
+        const std::optional<double> value = server->services().worldgen().density(
+            args.checkString(1), args.checkInteger(2), args.checkString(3),
+            static_cast<std::int32_t>(args.checkInteger(4)), static_cast<std::int32_t>(args.checkInteger(5)),
+            static_cast<std::int32_t>(args.checkInteger(6)));
+        value.has_value() ? args.pushNumber(*value) : args.pushNil();
+        return 1;
+    });
+    lua.setField("density");
+    wire::lua::pushHostFunction(lua, "worldgen.noise", [server](LuaArgs& args) {
+        const std::optional<double> value =
+            server->services().worldgen().noise(args.checkString(1), args.checkInteger(2), args.checkString(3),
+                                                args.checkNumber(4), args.checkNumber(5), args.checkNumber(6));
+        value.has_value() ? args.pushNumber(*value) : args.pushNil();
+        return 1;
+    });
+    lua.setField("noise");
+    wire::lua::pushHostFunction(lua, "worldgen.noise_range", [server](LuaArgs& args) {
+        const auto range =
+            server->services().worldgen().noiseRange(args.checkString(1), args.checkInteger(2), args.checkString(3));
+        if (!range.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushNumber(range->first);
+        args.pushNumber(range->second);
+        return 2;
+    });
+    lua.setField("noise_range");
+    wire::lua::pushHostFunction(lua, "worldgen.noise_create", [server](LuaArgs& args) {
+        PluginNoiseSeed seed;
+        if (args.isTable(2)) {
+            seed.legacyRandom = flagField(args, 2, "legacy").value_or(false);
+            seed.low = static_cast<std::int64_t>(numberField(args, 2, "low").value_or(0.0));
+            seed.high = static_cast<std::int64_t>(numberField(args, 2, "high").value_or(0.0));
+            seed.legacyNether = flagField(args, 2, "nether").value_or(false);
+        }
+        const std::optional<std::int64_t> handle = server->services().worldgen().createNoise(args.checkString(1), seed);
+        handle.has_value() ? args.pushInteger(*handle) : args.pushNil();
+        return 1;
+    });
+    lua.setField("noise_create");
+    wire::lua::pushHostFunction(lua, "worldgen.noise_sample", [server](LuaArgs& args) {
+        const std::optional<double> value = server->services().worldgen().sampleNoise(
+            args.checkInteger(1), args.checkNumber(2), args.checkNumber(3), args.checkNumber(4));
+        value.has_value() ? args.pushNumber(*value) : args.pushNil();
+        return 1;
+    });
+    lua.setField("noise_sample");
+    wire::lua::pushHostFunction(lua, "worldgen.noise_release", [server](LuaArgs& args) {
+        server->services().worldgen().releaseNoise(args.checkInteger(1));
+        return 0;
+    });
+    lua.setField("noise_release");
+    wire::lua::pushHostFunction(lua, "worldgen.height", [server](LuaArgs& args) {
+        const std::string kind = args.isString(5) ? args.checkString(5) : std::string{"world_surface"};
+        if (kind != "world_surface" && kind != "ocean_floor") {
+            args.raise("worldgen.height kind is world_surface or ocean_floor");
+        }
+        const std::optional<std::int32_t> value = server->services().worldgen().baseHeight(
+            args.checkString(1), args.checkInteger(2), static_cast<std::int32_t>(args.checkInteger(3)),
+            static_cast<std::int32_t>(args.checkInteger(4)), kind == "ocean_floor");
+        value.has_value() ? args.pushInteger(*value) : args.pushNil();
+        return 1;
+    });
+    lua.setField("height");
+    wire::lua::pushHostFunction(lua, "worldgen.column", [server](LuaArgs& args) {
+        const std::vector<std::int32_t> states = server->services().worldgen().baseColumn(
+            args.checkString(1), args.checkInteger(2), static_cast<std::int32_t>(args.checkInteger(3)),
+            static_cast<std::int32_t>(args.checkInteger(4)));
+        if (states.empty()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        for (std::size_t index = 0; index < states.size(); ++index) {
+            args.pushInteger(states[index]);
+            args.setIndex(static_cast<std::int64_t>(index) + 1);
+        }
+        return 1;
+    });
+    lua.setField("column");
+    lua.setGlobal("worldgen");
+
+    lua.pushTable();
+    wire::lua::pushHostFunction(lua, "datafix.upgrade", [](LuaArgs& args) {
+        const std::optional<std::vector<std::uint8_t>> bytes = snbtBytes(args, 2);
+        const std::string type = args.checkString(1);
+        const auto from = static_cast<std::int32_t>(args.checkInteger(3));
+        const auto to = static_cast<std::int32_t>(args.integerOr(4, metamorph::datafix::kCurrentVersion));
+        pushSnbt(args, bytes.has_value() ? datafix::upgrade(type, *bytes, from, to) : std::nullopt);
+        return 1;
+    });
+    lua.setField("upgrade");
+    wire::lua::pushHostFunction(lua, "datafix.supports", [](LuaArgs& args) {
+        args.pushBoolean(datafix::supports(args.checkString(1)));
+        return 1;
+    });
+    lua.setField("supports");
+    lua.setGlobal("datafix");
 }
 } // namespace basalt::server::plugins::pluginApi::misc

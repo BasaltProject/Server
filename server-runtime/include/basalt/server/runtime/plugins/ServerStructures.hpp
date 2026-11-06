@@ -35,6 +35,8 @@ public:
                                                                    std::int32_t y, std::int32_t z, std::int32_t sizeX,
                                                                    std::int32_t sizeY, std::int32_t sizeZ,
                                                                    bool entities) override;
+    [[nodiscard]] std::optional<server::plugins::PluginTemplateScan>
+    scan(std::span<const std::uint8_t> structure, const server::plugins::PluginTemplateScanRequest& request) override;
     bool place(std::span<const std::uint8_t> structure,
                const server::plugins::PluginStructurePlacement& placement) override;
 

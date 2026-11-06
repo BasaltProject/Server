@@ -1,7 +1,13 @@
 #include "JniSupport.hpp"
 
+#include <basalt/server/plugins/PluginDatafix.hpp>
+#include <basalt/server/plugins/PluginStructures.hpp>
 #include <basalt/server/plugins/PluginWindow.hpp>
 #include <basalt/server/plugins/PluginWorldEnv.hpp>
+#include <basalt/server/plugins/PluginWorldgen.hpp>
+
+#include <cmath>
+#include <cstdint>
 
 namespace basalt::server::bukkit {
 namespace {
@@ -107,6 +113,196 @@ jboolean JNICALL nativeStructurePlace(JNIEnv* env, jclass, jbyteArray nbt, jstri
                                                       .entities = entities == JNI_TRUE,
                                                       .palette = palette};
     return flag(jni::onServer<bool>(false, [&] { return structures().place(data, placement); }));
+}
+
+jobjectArray JNICALL nativeTemplateScan(JNIEnv* env, jclass, jbyteArray nbt, jint x, jint y, jint z, jint rotation,
+                                        jint mirror, jint pivotX, jint pivotZ, jstring block, jboolean absolute) {
+    const std::vector<std::uint8_t> data = jni::bytesOf(env, nbt);
+    const plugins::PluginTemplateScanRequest request{.x = x,
+                                                     .y = y,
+                                                     .z = z,
+                                                     .rotation = rotation,
+                                                     .mirror = mirror,
+                                                     .pivotX = pivotX,
+                                                     .pivotZ = pivotZ,
+                                                     .block = toStd(env, block),
+                                                     .absolute = absolute == JNI_TRUE};
+    const std::optional<plugins::PluginTemplateScan> scan = jni::onServer<std::optional<plugins::PluginTemplateScan>>(
+        std::nullopt, [&] { return structures().scan(data, request); });
+    if (!scan.has_value()) {
+        return nullptr;
+    }
+    const auto ints = [env](const std::vector<jint>& values) {
+        jintArray array = env->NewIntArray(static_cast<jsize>(values.size()));
+        env->SetIntArrayRegion(array, 0, static_cast<jsize>(values.size()), values.data());
+        return array;
+    };
+    std::vector<jint> blocks;
+    for (const plugins::PluginTemplateBlock& entry : scan->blocks) {
+        blocks.insert(blocks.end(), {entry.x, entry.y, entry.z, entry.stateId});
+    }
+    jclass byteArrayClass = env->FindClass("[B");
+    jobjectArray tiles = env->NewObjectArray(static_cast<jsize>(scan->blocks.size()), byteArrayClass, nullptr);
+    for (std::size_t index = 0; index < scan->blocks.size(); ++index) {
+        if (!scan->blocks[index].nbt.empty()) {
+            jbyteArray bytes = jni::byteArrayOf(env, scan->blocks[index].nbt);
+            env->SetObjectArrayElement(tiles, static_cast<jsize>(index), bytes);
+            env->DeleteLocalRef(bytes);
+        }
+    }
+    std::vector<jint> jigsawInts;
+    std::vector<std::string> jigsawText;
+    for (const plugins::PluginTemplateJigsaw& entry : scan->jigsaws) {
+        jigsawInts.insert(jigsawInts.end(), {entry.x, entry.y, entry.z, entry.rollable ? 1 : 0, entry.placementPriority,
+                                             entry.selectionPriority});
+        jigsawText.insert(jigsawText.end(),
+                          {entry.front, entry.top, entry.name, entry.pool, entry.target, entry.finalState});
+    }
+    jclass object = env->FindClass("java/lang/Object");
+    jobjectArray result = env->NewObjectArray(5, object, nullptr);
+    jintArray size = ints({scan->sizeX, scan->sizeY, scan->sizeZ});
+    jintArray blockInts = ints(blocks);
+    jintArray jigsawIntArray = ints(jigsawInts);
+    jobjectArray jigsawTextArray = jni::stringArrayOf(env, jigsawText);
+    env->SetObjectArrayElement(result, 0, size);
+    env->SetObjectArrayElement(result, 1, blockInts);
+    env->SetObjectArrayElement(result, 2, tiles);
+    env->SetObjectArrayElement(result, 3, jigsawIntArray);
+    env->SetObjectArrayElement(result, 4, jigsawTextArray);
+    return result;
+}
+
+jbyteArray JNICALL nativeDatafix(JNIEnv* env, jclass, jstring type, jbyteArray nbt, jint from, jint to) {
+    return jni::byteArrayOf(env, plugins::datafix::upgrade(toStd(env, type), jni::bytesOf(env, nbt), from, to));
+}
+
+jboolean JNICALL nativeDatafixSupports(JNIEnv* env, jclass, jstring type) {
+    return flag(plugins::datafix::supports(toStd(env, type)));
+}
+
+jintArray JNICALL nativeTerrainShape(JNIEnv* env, jclass, jstring settings) {
+    const std::string name = toStd(env, settings);
+    const std::optional<plugins::PluginTerrainShape> shape = jni::onServer<std::optional<plugins::PluginTerrainShape>>(
+        std::nullopt, [&] { return BukkitBridge::current().services().worldgen().shape(name); });
+    if (!shape.has_value()) {
+        return nullptr;
+    }
+    const jint values[] = {shape->minY,
+                           shape->height,
+                           shape->seaLevel,
+                           shape->defaultBlock,
+                           shape->defaultFluid,
+                           shape->legacyRandomSource ? 1 : 0,
+                           shape->disableMobGeneration ? 1 : 0};
+    jintArray array = env->NewIntArray(7);
+    env->SetIntArrayRegion(array, 0, 7, values);
+    return array;
+}
+
+jdouble JNICALL nativeTerrainDensity(JNIEnv* env, jclass, jstring settings, jlong seed, jstring function, jint x,
+                                     jint y, jint z) {
+    const std::string name = toStd(env, settings);
+    const std::string router = toStd(env, function);
+    return jni::onServer<jdouble>(std::nan(""), [&] {
+        return BukkitBridge::current()
+            .services()
+            .worldgen()
+            .density(name, seed, router, x, y, z)
+            .value_or(std::nan(""));
+    });
+}
+
+jdouble JNICALL nativeTerrainNoise(JNIEnv* env, jclass, jstring settings, jlong seed, jstring noise, jdouble x,
+                                   jdouble y, jdouble z) {
+    const std::string name = toStd(env, settings);
+    const std::string id = toStd(env, noise);
+    return jni::onServer<jdouble>(std::nan(""), [&] {
+        return BukkitBridge::current().services().worldgen().noise(name, seed, id, x, y, z).value_or(std::nan(""));
+    });
+}
+
+jdoubleArray JNICALL nativeTerrainNoiseRange(JNIEnv* env, jclass, jstring settings, jlong seed, jstring noise) {
+    const std::string name = toStd(env, settings);
+    const std::string id = toStd(env, noise);
+    const auto range = jni::onServer<std::optional<std::pair<double, double>>>(
+        std::nullopt, [&] { return BukkitBridge::current().services().worldgen().noiseRange(name, seed, id); });
+    if (!range.has_value()) {
+        return nullptr;
+    }
+    const jdouble values[] = {range->first, range->second};
+    jdoubleArray array = env->NewDoubleArray(2);
+    env->SetDoubleArrayRegion(array, 0, 2, values);
+    return array;
+}
+
+plugins::PluginNoiseSeed noiseSeed(jboolean legacy, jlong low, jlong high, jboolean nether) {
+    return {.legacyRandom = legacy == JNI_TRUE, .low = low, .high = high, .legacyNether = nether == JNI_TRUE};
+}
+
+jlong JNICALL nativeNoiseCreate(JNIEnv* env, jclass, jstring noise, jboolean legacy, jlong low, jlong high,
+                                jboolean nether) {
+    const std::string id = toStd(env, noise);
+    const plugins::PluginNoiseSeed seed = noiseSeed(legacy, low, high, nether);
+    return jni::onServer<jlong>(
+        -1, [&] { return BukkitBridge::current().services().worldgen().createNoise(id, seed).value_or(-1); });
+}
+
+jlong JNICALL nativeNoiseCreateWith(JNIEnv* env, jclass, jdouble baseAmplitude, jint baseOctave, jint octaveCount,
+                                    jint normalize, jdoubleArray modifiers, jboolean legacy, jlong low, jlong high,
+                                    jboolean nether) {
+    plugins::PluginNoiseParameters parameters{
+        .baseAmplitude = baseAmplitude, .baseOctave = baseOctave, .octaveCount = octaveCount, .normalize = normalize};
+    const jsize count = env->GetArrayLength(modifiers);
+    parameters.amplitudeModifiers.resize(static_cast<std::size_t>(count));
+    env->GetDoubleArrayRegion(modifiers, 0, count, parameters.amplitudeModifiers.data());
+    const plugins::PluginNoiseSeed seed = noiseSeed(legacy, low, high, nether);
+    return jni::onServer<jlong>(
+        -1, [&] { return BukkitBridge::current().services().worldgen().createNoise(parameters, seed).value_or(-1); });
+}
+
+jdouble JNICALL nativeNoiseSample(JNIEnv*, jclass, jlong handle, jdouble x, jdouble y, jdouble z) {
+    return jni::onServer<jdouble>(std::nan(""), [&] {
+        return BukkitBridge::current().services().worldgen().sampleNoise(handle, x, y, z).value_or(std::nan(""));
+    });
+}
+
+jdoubleArray JNICALL nativeNoiseHandleRange(JNIEnv* env, jclass, jlong handle) {
+    const auto range = jni::onServer<std::optional<std::pair<double, double>>>(
+        std::nullopt, [&] { return BukkitBridge::current().services().worldgen().handleRange(handle); });
+    if (!range.has_value()) {
+        return nullptr;
+    }
+    const jdouble values[] = {range->first, range->second};
+    jdoubleArray array = env->NewDoubleArray(2);
+    env->SetDoubleArrayRegion(array, 0, 2, values);
+    return array;
+}
+
+void JNICALL nativeNoiseRelease(JNIEnv*, jclass, jlong handle) {
+    jni::onServer<bool>(false, [&] {
+        BukkitBridge::current().services().worldgen().releaseNoise(handle);
+        return true;
+    });
+}
+
+jint JNICALL nativeTerrainHeight(JNIEnv* env, jclass, jstring settings, jlong seed, jint x, jint z, jboolean floor) {
+    const std::string name = toStd(env, settings);
+    return jni::onServer<jint>(INT32_MIN, [&] {
+        return BukkitBridge::current()
+            .services()
+            .worldgen()
+            .baseHeight(name, seed, x, z, floor == JNI_TRUE)
+            .value_or(INT32_MIN);
+    });
+}
+
+jintArray JNICALL nativeTerrainColumn(JNIEnv* env, jclass, jstring settings, jlong seed, jint x, jint z) {
+    const std::string name = toStd(env, settings);
+    const std::vector<std::int32_t> states = jni::onServer<std::vector<std::int32_t>>(
+        {}, [&] { return BukkitBridge::current().services().worldgen().baseColumn(name, seed, x, z); });
+    jintArray array = env->NewIntArray(static_cast<jsize>(states.size()));
+    env->SetIntArrayRegion(array, 0, static_cast<jsize>(states.size()), states.data());
+    return array;
 }
 
 jbyteArray JNICALL nativeExplorerMap(JNIEnv* env, jclass, jstring world, jdouble x, jdouble y, jdouble z,
@@ -234,6 +430,24 @@ void registerLeftoverNatives(JNIEnv* env, jclass natives) {
                reinterpret_cast<void*>(&nativeStructureFile)),
         method("structureCapture", "(Ljava/lang/String;IIIIIIZ)[B", reinterpret_cast<void*>(&nativeStructureCapture)),
         method("structurePlace", "([BLjava/lang/String;IIIIIFJZI)Z", reinterpret_cast<void*>(&nativeStructurePlace)),
+        method("templateScan", "([BIIIIIIILjava/lang/String;Z)[Ljava/lang/Object;",
+               reinterpret_cast<void*>(&nativeTemplateScan)),
+        method("datafix", "(Ljava/lang/String;[BII)[B", reinterpret_cast<void*>(&nativeDatafix)),
+        method("datafixSupports", "(Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeDatafixSupports)),
+        method("terrainShape", "(Ljava/lang/String;)[I", reinterpret_cast<void*>(&nativeTerrainShape)),
+        method("terrainDensity", "(Ljava/lang/String;JLjava/lang/String;III)D",
+               reinterpret_cast<void*>(&nativeTerrainDensity)),
+        method("terrainNoise", "(Ljava/lang/String;JLjava/lang/String;DDD)D",
+               reinterpret_cast<void*>(&nativeTerrainNoise)),
+        method("terrainNoiseRange", "(Ljava/lang/String;JLjava/lang/String;)[D",
+               reinterpret_cast<void*>(&nativeTerrainNoiseRange)),
+        method("noiseCreate", "(Ljava/lang/String;ZJJZ)J", reinterpret_cast<void*>(&nativeNoiseCreate)),
+        method("noiseCreateWith", "(DIII[DZJJZ)J", reinterpret_cast<void*>(&nativeNoiseCreateWith)),
+        method("noiseSample", "(JDDD)D", reinterpret_cast<void*>(&nativeNoiseSample)),
+        method("noiseHandleRange", "(J)[D", reinterpret_cast<void*>(&nativeNoiseHandleRange)),
+        method("noiseRelease", "(J)V", reinterpret_cast<void*>(&nativeNoiseRelease)),
+        method("terrainHeight", "(Ljava/lang/String;JIIZ)I", reinterpret_cast<void*>(&nativeTerrainHeight)),
+        method("terrainColumn", "(Ljava/lang/String;JII)[I", reinterpret_cast<void*>(&nativeTerrainColumn)),
         method("registryData", "(Ljava/lang/String;Ljava/lang/String;)[B",
                reinterpret_cast<void*>(&nativeRegistryData)),
         method("entityDefaults", "(Ljava/lang/String;)[Ljava/lang/String;",

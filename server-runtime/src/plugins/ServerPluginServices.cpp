@@ -592,6 +592,10 @@ server::plugins::PluginStructures& ServerPluginServices::structures() {
     return parts_.structures == nullptr ? server::plugins::PluginStructures::unavailable() : *parts_.structures;
 }
 
+server::plugins::PluginWorldgen& ServerPluginServices::worldgen() {
+    return parts_.worldgen == nullptr ? server::plugins::PluginWorldgen::unavailable() : *parts_.worldgen;
+}
+
 server::plugins::PluginSelectors& ServerPluginServices::selectors() {
     return parts_.selectors == nullptr ? server::plugins::PluginSelectors::unavailable() : *parts_.selectors;
 }

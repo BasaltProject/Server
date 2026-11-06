@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 #include <basalt/server/runtime/world/SaplingGrowth.hpp>
+#include <basalt/server/world/terrain/decoration/tree/FallenTreeFeature.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeConfigs.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeature.hpp>
 
@@ -129,9 +130,10 @@ struct Grower {
     return std::nullopt;
 }
 
+using Placer = std::function<bool(server::world::Chunk&, random::RandomSource&)>;
+
 [[nodiscard]] std::optional<std::vector<PlannedBlock>> planConfig(WorldState& world, std::int32_t x, std::int32_t y,
-                                                                  std::int32_t z,
-                                                                  const trees::TreeConfiguration& config,
+                                                                  std::int32_t z, const Placer& placer,
                                                                   random::RandomSource& random, std::int32_t clear) {
     const server::world::Chunk* here = world.chunkIfLoaded(x >> 4, z >> 4);
     if (here == nullptr) {
@@ -165,7 +167,7 @@ struct Grower {
     }
 
     random::RandomSource worldgen = random::RandomSource::worldgen(random::RandomSource::legacy(random.nextLong()));
-    if (!trees::treeFeature::place(scratch, worldgen, kCentre, y, kCentre, config)) {
+    if (!placer(scratch, worldgen)) {
         return std::nullopt;
     }
 
@@ -189,7 +191,10 @@ struct Grower {
 [[nodiscard]] std::vector<BlockChange> plant(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                              const trees::TreeConfiguration& config, random::RandomSource& random,
                                              bool square) {
-    const std::optional<std::vector<PlannedBlock>> planned = planConfig(world, x, y, z, config, random, square ? 2 : 1);
+    const Placer placer = [&config, y](server::world::Chunk& scratch, random::RandomSource& worldgen) {
+        return trees::treeFeature::place(scratch, worldgen, kCentre, y, kCentre, config);
+    };
+    const std::optional<std::vector<PlannedBlock>> planned = planConfig(world, x, y, z, placer, random, square ? 2 : 1);
     std::vector<BlockChange> changes;
     for (const PlannedBlock& block : planned.value_or(std::vector<PlannedBlock>{})) {
         growthSupport::set(world, block.x, block.y, block.z, block.after, changes);
@@ -275,11 +280,34 @@ std::optional<std::vector<PlannedBlock>> planTree(WorldState& world, std::int32_
         {"tall_mangrove", &configs::tallMangrove()},
         {"cherry", &configs::cherry()},
     };
+    static const std::map<std::string, const trees::FallenTreeConfiguration*, std::less<>> fallenByName{
+        {"fallen_oak", &trees::fallenTreeConfigs::oak()},
+        {"fallen_birch", &trees::fallenTreeConfigs::birch()},
+        {"fallen_super_birch", &trees::fallenTreeConfigs::superBirch()},
+        {"fallen_spruce", &trees::fallenTreeConfigs::spruce()},
+        {"fallen_jungle", &trees::fallenTreeConfigs::jungle()},
+        {"fallen_poplar", &trees::fallenTreeConfigs::poplar()},
+    };
+    if (const auto fallen = fallenByName.find(tree); fallen != fallenByName.end()) {
+        const trees::FallenTreeConfiguration& config = *fallen->second;
+        return planConfig(
+            world, x, y, z,
+            [&config, y](server::world::Chunk& scratch, random::RandomSource& worldgen) {
+                return trees::fallenTreeFeature::place(scratch, worldgen, kCentre, y, kCentre, config);
+            },
+            random, 0);
+    }
     const auto found = byName.find(tree);
     if (found == byName.end()) {
         return std::nullopt;
     }
-    return planConfig(world, x, y, z, *found->second, random, 0);
+    const trees::TreeConfiguration& config = *found->second;
+    return planConfig(
+        world, x, y, z,
+        [&config, y](server::world::Chunk& scratch, random::RandomSource& worldgen) {
+            return trees::treeFeature::place(scratch, worldgen, kCentre, y, kCentre, config);
+        },
+        random, 0);
 }
 
 } // namespace basalt::server::runtime::world::saplingGrowth

@@ -202,6 +202,7 @@ basalt_module(server-runtime-core
         src/plugins/ServerDatapacks.cpp
         src/plugins/ServerMaps.cpp
         src/plugins/ServerStructures.cpp
+        src/plugins/ServerWorldgen.cpp
         src/plugins/ServerBiomeFacts.cpp
         src/plugins/ServerLoot.cpp
         src/plugins/ServerSelectors.cpp

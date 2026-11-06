@@ -1,6 +1,7 @@
 #include "PluginMiscShared.hpp"
 
 #include <basalt/server/plugins/PluginRecipeApi.hpp>
+#include <basalt/server/registry/CreativeTabs.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
 
 namespace basalt::server::plugins::pluginApi {
@@ -119,6 +120,12 @@ void installRecipes(LuaArgs& lua, PluginHost& host) {
         return 1;
     });
     lua.setField("potions");
+    wire::lua::pushHostFunction(lua, "registries.creative_tab_items", [](LuaArgs& args) {
+        const auto ids = registry::creativeTabItems(args.checkString(1));
+        misc::pushNames(args, std::vector<std::string>(ids.begin(), ids.end()));
+        return 1;
+    });
+    lua.setField("creative_tab_items");
     lua.setGlobal("registries");
 }
 } // namespace basalt::server::plugins::pluginApi

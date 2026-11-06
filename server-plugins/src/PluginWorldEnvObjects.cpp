@@ -893,6 +893,17 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                                                 static_cast<std::int32_t>(args.checkInteger(base + 6)), {}));
                     return 1;
                 })
+        .method("sculk_update",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    args.pushBoolean(env != nullptr &&
+                                     env->sculk("update", static_cast<std::int32_t>(args.checkInteger(base)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 2)), 0, 0, 0, 0,
+                                                {}));
+                    return 1;
+                })
         .method("drops",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);

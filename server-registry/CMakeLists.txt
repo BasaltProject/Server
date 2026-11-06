@@ -7,6 +7,7 @@ basalt_module(server-registry
         src/BlockShapes.cpp
         src/BlockSupport.cpp
         src/Blocks.cpp
+        src/CreativeTabItems.cpp
         src/Entities.cpp
         src/ItemFood.cpp
         src/ItemTools.cpp
