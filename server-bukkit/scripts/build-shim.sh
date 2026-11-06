@@ -12,8 +12,8 @@ skip() {
     exit 1
 }
 
-[ -f "$src/GNUmakefile" ] || skip "shim/ is empty (run: git submodule update --init)"
-for tool in make clang clang++ javac jar; do
+[ -f "$src/CMakeLists.txt" ] || skip "shim/ is empty (run: git submodule update --init)"
+for tool in cmake clang clang++ javac jar; do
     command -v "$tool" >/dev/null || skip "$tool is not installed"
 done
 ext="$(uname -s | tr A-Z a-z)"
@@ -27,34 +27,24 @@ process=compile
 if [ "$ext" = darwin ] && [ "$(uname -m)" = arm64 ]; then
     process=interpret
 fi
-configuration="$ext:$(uname -m):$process:fp"
-if [ -f "$out/$lib" ] && [ -f "$out/classpath.jar" ] \
-    && [ "$(cat "$out/build-configuration.txt" 2>/dev/null)" = "$configuration" ] \
-    && [ -z "$(find "$src" -newer "$out/$lib" -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.java' -o -name '*.mk' \) -print -quit)" ]; then
-    exit 0
-fi
-mkdir -p "$out"
-flags=()
+build="$out/shim-build"
+mkdir -p "$build"
 # The profiler walks native stacks through the frame pointer, and the Java machine is part of them.
-cflags=""
-[ "$ext" != darwin ] && cflags="-fno-omit-frame-pointer"
+flags=(-DCMAKE_BUILD_TYPE= -DBUILD_TESTING=OFF "-DSHIM_PROCESS=$process")
+[ "$ext" != darwin ] && flags+=(-DSHIM_FRAME_POINTER=ON)
+command -v ninja >/dev/null && flags+=(-G Ninja)
 if [ "$ext" != darwin ] && [ ! -f /usr/include/zlib.h ]; then
     mkdir -p "$out/zlib-stub"
     for candidate in /usr/lib/x86_64-linux-gnu/libz.so.1 /usr/lib/aarch64-linux-gnu/libz.so.1 /usr/lib64/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1; do
         [ -e "$candidate" ] && ln -sf "$candidate" "$out/zlib-stub/libz.so" && break
     done
-    cflags="$cflags -I$zlib"
-    flags+=("extra-lflags=-L$out/zlib-stub")
+    flags+=("-DZLIB_INCLUDE_DIR=$zlib" "-DZLIB_LIBRARY=$out/zlib-stub/libz.so")
 fi
-[ -n "$cflags" ] && flags+=("extra-cflags=$cflags")
-# Its rules only work inside the source tree, whose build/ folder is ignored by that repo.
-run_make() { make -C "$src" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)" use-clang=true "process=$process" "${flags[@]}" "$@"; }
-if ! { run_make build; } >"$out/shim-make.log" 2>&1; then
-    tail -n 60 "$out/shim-make.log" >&2
-    skip "the Shim build failed (see $out/shim-make.log)"
+if ! { CC=clang CXX=clang++ cmake -S "$src" -B "$build" "${flags[@]}" \
+    && cmake --build "$build" --parallel --target shim_jvm shim_classpath; } >"$out/shim-build.log" 2>&1; then
+    tail -n 60 "$out/shim-build.log" >&2
+    skip "the Shim build failed (see $out/shim-build.log)"
 fi
-built="$(dirname "$(ls -t "$src"/build/*/"$lib" 2>/dev/null | head -1)")"
-[ -f "$built/$lib" ] && [ -f "$built/classpath.jar" ] || skip "the Shim build left no $lib or classpath.jar (see $out/shim-make.log)"
-cp "$built/$lib" "$built/classpath.jar" "$out/"
-printf '%s\n' "$configuration" >"$out/build-configuration.txt"
+[ -f "$build/$lib" ] && [ -f "$build/classpath.jar" ] || skip "the Shim build left no $lib or classpath.jar (see $out/shim-build.log)"
+cp "$build/$lib" "$build/classpath.jar" "$out/"
 echo "Shim built in $out"
