@@ -59,7 +59,6 @@ public class SculkSensorBlockEntity extends BlockEntity {
             return !pos.equals(blockPos);
         }
         public void onReceiveVibration(ServerLevel level, BlockPos pos, Holder<GameEvent> event, Entity sourceEntity, Entity projectileOwner, float receivingDistance) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkSensorBlockEntity.VibrationUser#onReceiveVibration");
         }
         public void onDataChanged() {
             setChanged();

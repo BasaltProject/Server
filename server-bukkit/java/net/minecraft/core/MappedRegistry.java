@@ -27,6 +27,7 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
     private final Map<ResourceKey<T>, Holder.Reference<T>> byKey = new LinkedHashMap<>();
     private final Map<T, Holder.Reference<T>> byValue = new IdentityHashMap<>();
     private final Map<TagKey<T>, HolderSet.Named<T>> tags = new LinkedHashMap<>();
+    private volatile DataComponentLookup<T> components;
     private final IdMap<Holder<T>> holderIds = new HolderIds();
     private Runnable tagLoader;
     private Lifecycle lifecycle = Lifecycle.stable();
@@ -38,6 +39,7 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
 
     @Override
     public synchronized Holder.Reference<T> register(ResourceKey<T> resourceKey, T value) {
+        components = null;
         Holder.Reference<T> holder = new Holder.Reference<>(this, resourceKey, value);
         byId.add(holder);
         byLocation.put(resourceKey.identifier(), holder);
@@ -250,7 +252,12 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
         return byKey.containsKey(key);
     }
     public DataComponentLookup<T> componentLookup() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.MappedRegistry#componentLookup");
+        DataComponentLookup<T> found = components;
+        if (found == null) {
+            found = new DataComponentLookup<>(() -> listElements().<Holder<T>>map(element -> element).iterator());
+            components = found;
+        }
+        return found;
     }
     public Registry<T> freeze() {
         frozen = true;
@@ -269,7 +276,28 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
         return this;
     }
     public Registry.PendingTags<T> prepareTagReload(TagLoader.LoadResult<T> tags) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.MappedRegistry#prepareTagReload");
+        MappedRegistry<T> owner = this;
+        return new Registry.PendingTags<T>() {
+            @Override
+            public ResourceKey<? extends Registry<? extends T>> key() {
+                return tags.key();
+            }
+
+            @Override
+            public HolderLookup.RegistryLookup<T> lookup() {
+                return owner;
+            }
+
+            @Override
+            public void apply() {
+                owner.bindTags(tags.tags());
+            }
+
+            @Override
+            public int size() {
+                return tags.tags().size();
+            }
+        };
     }
     interface TagSet<T> {
         static <T> TagSet<T> unbound() {

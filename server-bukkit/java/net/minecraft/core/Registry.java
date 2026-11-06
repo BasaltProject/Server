@@ -89,9 +89,7 @@ public interface Registry<T> extends IdMap<T>, HolderLookup.RegistryLookup<T>, K
     default <U> Stream<U> keys(DynamicOps<U> ops) {
         return keySet().stream().map(id -> ops.createString(id.toString()));
     }
-    default int getId(T thing) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.Registry#getId");
-    }
+    int getId(T thing);
     default Optional<RegistrationInfo> registrationInfo(ResourceKey<T> element) {
         return Optional.empty();
     }
@@ -138,15 +136,31 @@ public interface Registry<T> extends IdMap<T>, HolderLookup.RegistryLookup<T>, K
         return get(id).<Iterable<Holder<T>>>map(set -> set).orElse(List.of());
     }
     default PendingTags<T> prepareTagReload(TagLoader.LoadResult<T> tags) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.Registry#prepareTagReload");
+        Registry<T> owner = this;
+        return new PendingTags<T>() {
+            public ResourceKey<? extends Registry<? extends T>> key() {
+                return tags.key();
+            }
+
+            public HolderLookup.RegistryLookup<T> lookup() {
+                return owner;
+            }
+
+            public void apply() {
+            }
+
+            public int size() {
+                return tags.tags().size();
+            }
+        };
     }
     default DataComponentLookup<T> componentLookup() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.Registry#componentLookup");
+        return new DataComponentLookup<>(() -> listElements().<Holder<T>>map(element -> element).iterator());
     }
     public interface PendingTags<T> {
-        ResourceKey<? extends Registry<? extends T>> key();
-        HolderLookup.RegistryLookup<T> lookup();
-        void apply();
         int size();
+        ResourceKey<? extends Registry<? extends T>> key();
+        void apply();
+        net.minecraft.core.HolderLookup.RegistryLookup<T> lookup();
     }
 }

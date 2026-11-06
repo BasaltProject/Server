@@ -18,10 +18,11 @@ public interface ResolvableInt {
     StreamCodec<ByteBuf, ResolvableInt> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.level.storage.loot.providers.number.ints.ResolvableInt.class, "STREAM_CODEC");
     int get(LootContext context, int defaultValue);
     static ResolvableInt fromKey(ResourceKey<ContextIntProvider> key) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.providers.number.ints.ResolvableInt#fromKey");
+        return new Reference(key);
     }
     static <T> int getFromItem(ItemStack itemStack, DataComponentType<T> componentType, Function<T, ResolvableInt> getter, LootContext context, int defaultValue) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.providers.number.ints.ResolvableInt#getFromItem");
+        T value = itemStack.get(componentType);
+        return value == null ? defaultValue : getter.apply(value).get(context, defaultValue);
     }
     public static record Constant(int value) implements ResolvableInt {
         public int get(LootContext context, int defaultValue) {
@@ -30,7 +31,8 @@ public interface ResolvableInt {
     }
     public static record Reference(ResourceKey<ContextIntProvider> key) implements ResolvableInt {
         public int get(LootContext context, int defaultValue) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.providers.number.ints.ResolvableInt.Reference#get");
+            return context.getResolver().lookup(net.minecraft.core.registries.Registries.CONTEXT_INT_PROVIDER)
+                .flatMap(lookup -> lookup.get(key)).map(holder -> holder.value().getInt(context)).orElse(defaultValue);
         }
     }
 }

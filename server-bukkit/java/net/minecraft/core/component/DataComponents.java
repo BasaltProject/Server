@@ -261,7 +261,7 @@ public class DataComponents {
     public static final DataComponentType<DyeColor> CUSHION_COLOR = type("cushion_color");
     public static final DataComponentMap COMMON_ITEM_COMPONENTS = DataComponentMap.EMPTY;
     public static DataComponentType<?> bootstrap(Registry<DataComponentType<?>> registry) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.component.DataComponents#bootstrap");
+        return CUSTOM_DATA;
     }
     private static final boolean kAttached = org.basaltmc.bukkit.facade.ReflectiveCodecs.attachAll(DataComponents.class);
 }

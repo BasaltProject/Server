@@ -27,6 +27,16 @@ public class ThreadingDetector {
         return name;
     }
     public static ReportedException makeThreadingException(String name, Thread threadThatFailedToAcquire) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.ThreadingDetector#makeThreadingException");
+        String error = "Accessing " + name + " from multiple threads";
+        IllegalStateException cause = new IllegalStateException(error + "\n" + stackOf(Thread.currentThread())
+            + (threadThatFailedToAcquire == null ? "" : "\n" + stackOf(threadThatFailedToAcquire)));
+        return new ReportedException(new net.minecraft.CrashReport(error, cause));
+    }
+    private static String stackOf(Thread thread) {
+        StringBuilder out = new StringBuilder(thread.getName()).append(':');
+        for (StackTraceElement frame : thread.getStackTrace()) {
+            out.append("\n\tat ").append(frame);
+        }
+        return out.toString();
     }
 }

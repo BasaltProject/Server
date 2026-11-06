@@ -235,7 +235,11 @@ public class ServerChunkCache extends ChunkSource {
         return RandomState.forWorld(world, level.getSeed(), false);
     }
     public ServerChunkCache(ServerLevel level, LevelStorageSource.LevelStorageAccess levelStorage, DataFixer fixerUpper, StructureTemplateManager structureTemplateManager, Executor executor, ChunkGenerator generator, int viewDistance, int simulationDistance, boolean syncWrites, ChunkStatusUpdateListener chunkStatusListener) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#<init>");
+        this.level = level;
+        this.world = level.getWorld().getName();
+        this.lightEngine = new ThreadedLevelLightEngine(world, level);
+        this.chunkMap = new ChunkMap(this, world);
+        kAll.add(this);
     }
     public ChunkAccess getChunk(int x, int z, ChunkStatus targetStatus, boolean loadOrGenerate) {
         return getChunk(x, z, loadOrGenerate);
@@ -363,7 +367,7 @@ public class ServerChunkCache extends ChunkSource {
         return level.getPoiManager();
     }
     public ChunkScanAccess chunkScanner() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ServerChunkCache#chunkScanner");
+        return (pos, visitor) -> java.util.concurrent.CompletableFuture.completedFuture(null);
     }
     public NaturalSpawner. SpawnState getLastSpawnState() {
         return null;

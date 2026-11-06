@@ -14,18 +14,12 @@ public interface WorldVersion {
     String name();
 
     int protocolVersion();
-    default PackFormat packVersion(PackType packType) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.WorldVersion#packVersion");
-    }
-    default Date buildTime() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.WorldVersion#buildTime");
-    }
-    default boolean stable() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.WorldVersion#stable");
-    }
+    PackFormat packVersion(PackType packType);
+    Date buildTime();
+    boolean stable();
     public static record Simple(String id, String name, DataVersion dataVersion, int protocolVersion, PackFormat resourcePackVersion, PackFormat datapackVersion, Date buildTime, boolean stable) implements WorldVersion {
         public PackFormat packVersion(PackType packType) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.WorldVersion.Simple#packVersion");
+            return packType == PackType.CLIENT_RESOURCES ? resourcePackVersion : datapackVersion;
         }
     }
 }

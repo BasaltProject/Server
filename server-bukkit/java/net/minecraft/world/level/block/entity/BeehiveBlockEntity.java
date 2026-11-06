@@ -115,7 +115,20 @@ public class BeehiveBlockEntity extends BlockEntity {
             return new Occupant(TypedEntityData.<EntityType<?>>of(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("bee")), new CompoundTag()), ticksInHive, kMinTicksInHive);
         }
         public Entity createEntity(Level level, BlockPos hivePos) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BeehiveBlockEntity.Occupant#createEntity");
+            CompoundTag tag = entityData.copyTagWithoutId();
+            for (String ignored : kIgnoredBeeTags) {
+                tag.remove(ignored);
+            }
+            Entity entity = net.minecraft.world.entity.EntityType.loadEntityRecursive(entityData.type(), tag, level,
+                net.minecraft.world.entity.EntitySpawnReason.LOAD, loaded -> loaded);
+            if (entity == null || !entity.getType().builtInRegistryHolder().is(net.minecraft.tags.EntityTypeTags.BEEHIVE_INHABITORS)) {
+                return null;
+            }
+            entity.setNoGravity(true);
+            if (entity instanceof net.minecraft.world.entity.animal.bee.Bee bee) {
+                bee.setHivePos(hivePos);
+            }
+            return entity;
         }
     }
 }

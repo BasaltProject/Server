@@ -39,11 +39,16 @@ public class DoorBlock extends Block {
     public static final EnumProperty<DoorHingeSide> HINGE = BlockStateProperties.DOOR_HINGE;
     public static final BooleanProperty OPEN = BlockStateProperties.OPEN;
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
+    private BlockSetType setType;
     protected DoorBlock(BlockSetType type, BlockBehaviour.Properties properties) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
+        this.setType = type;
     }
     public BlockSetType type() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.DoorBlock#type");
+        if (setType == null) {
+            setType = BlockSetTypes.of(this, "_door");
+        }
+        return setType;
     }
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         return super.getShape(state, level, pos, context);

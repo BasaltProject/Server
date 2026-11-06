@@ -17,7 +17,9 @@ public class MessageArgument implements SignedArgument<MessageArgument.Message> 
         return context.getArgument(name, Message.class).toComponent(context.getSource(), true);
     }
     public static void resolveChatMessage(CommandContext<CommandSourceStack> context, String name, Consumer<PlayerChatMessage> task) throws CommandSyntaxException {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.commands.arguments.MessageArgument#resolveChatMessage");
+        Message message = context.getArgument(name, Message.class);
+        Component component = message.toComponent(context.getSource(), true);
+        task.accept(PlayerChatMessage.system(message.text()).withUnsignedContent(component));
     }
     public Message parse(StringReader reader) throws CommandSyntaxException {
         return Message.parseText(reader, true);

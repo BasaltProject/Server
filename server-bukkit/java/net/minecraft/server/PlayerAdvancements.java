@@ -76,7 +76,7 @@ public class PlayerAdvancements {
     static record Data(Map<Identifier, AdvancementProgress> map) {
         public static final Codec<Data> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.server.PlayerAdvancements.Data.class, "CODEC");
         public void forEach(BiConsumer<Identifier, AdvancementProgress> consumer) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.PlayerAdvancements.Data#forEach");
+            map.entrySet().stream().sorted(java.util.Map.Entry.comparingByValue()).forEach(entry -> consumer.accept(entry.getKey(), entry.getValue()));
         }
     }
 }

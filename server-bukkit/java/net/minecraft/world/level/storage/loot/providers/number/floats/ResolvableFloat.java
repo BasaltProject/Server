@@ -18,10 +18,11 @@ public interface ResolvableFloat {
     StreamCodec<ByteBuf, ResolvableFloat> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.level.storage.loot.providers.number.floats.ResolvableFloat.class, "STREAM_CODEC");
     float get(LootContext context, float defaultValue);
     static ResolvableFloat fromKey(ResourceKey<ContextFloatProvider> key) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.providers.number.floats.ResolvableFloat#fromKey");
+        return new Reference(key);
     }
     static <T> float getFromItem(ItemStack itemStack, DataComponentType<T> componentType, Function<T, ResolvableFloat> getter, LootContext context, float defaultValue) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.providers.number.floats.ResolvableFloat#getFromItem");
+        T value = itemStack.get(componentType);
+        return value == null ? defaultValue : getter.apply(value).get(context, defaultValue);
     }
     public static record Constant(float value) implements ResolvableFloat {
         public float get(LootContext context, float defaultValue) {
@@ -30,7 +31,8 @@ public interface ResolvableFloat {
     }
     public static record Reference(ResourceKey<ContextFloatProvider> key) implements ResolvableFloat {
         public float get(LootContext context, float defaultValue) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.providers.number.floats.ResolvableFloat.Reference#get");
+            return context.getResolver().lookup(net.minecraft.core.registries.Registries.CONTEXT_FLOAT_PROVIDER)
+                .flatMap(lookup -> lookup.get(key)).map(holder -> holder.value().getFloat(context)).orElse(defaultValue);
         }
     }
 }

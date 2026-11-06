@@ -5,22 +5,30 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 public interface TaskScheduler<R extends Runnable> extends AutoCloseable {
-    default String name() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.thread.TaskScheduler#name");
-    }
-    default void schedule(R r) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.thread.TaskScheduler#schedule");
-    }
+    String name();
+    void schedule(R r);
     default void close() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.thread.TaskScheduler#close");
     }
-    default R wrapRunnable(Runnable runnable) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.thread.TaskScheduler#wrapRunnable");
-    }
+    R wrapRunnable(Runnable runnable);
     default <Source> CompletableFuture<Source> scheduleWithResult(Consumer<CompletableFuture<Source>> futureConsumer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.thread.TaskScheduler#scheduleWithResult");
+        CompletableFuture<Source> future = new CompletableFuture<>();
+        schedule(wrapRunnable(() -> futureConsumer.accept(future)));
+        return future;
     }
     static TaskScheduler<Runnable> wrapExecutor(String name, Executor executor) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.thread.TaskScheduler#wrapExecutor");
+        return new TaskScheduler<>() {
+            public String name() {
+                return name;
+            }
+            public void schedule(Runnable runnable) {
+                executor.execute(runnable);
+            }
+            public Runnable wrapRunnable(Runnable runnable) {
+                return runnable;
+            }
+            public String toString() {
+                return name;
+            }
+        };
     }
 }

@@ -31,14 +31,26 @@ public abstract class LootPoolEntryContainer implements ComposableEntryContainer
         out.append('}');
     }
     protected static <T extends LootPoolEntryContainer> Products.P2<RecordCodecBuilder.Mu<T>, Optional<Holder<LootItemCondition>>, Optional<Holder<LootItemFunction>>> commonFields(RecordCodecBuilder.Instance<T> i) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.entries.LootPoolEntryContainer#commonFields");
+        return i.group(LootItemCondition.CODEC.optionalFieldOf("condition").forGetter(e -> e.condition),
+            net.minecraft.world.level.storage.loot.functions.LootItemFunctions.CODEC.optionalFieldOf("modifier").forGetter(e -> e.modifier));
     }
     public void validate(ValidationContext output) {
         return;
     }
     protected abstract boolean expandRaw(LootContext context, Consumer<LootPoolEntry> output);
     public final boolean expand(LootContext context, Consumer<LootPoolEntry> output) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.entries.LootPoolEntryContainer#expand");
+        if (condition.isPresent() && !condition.get().value().test(context)) {
+            return false;
+        }
+        Consumer<LootPoolEntry> adjusted = modifier.isEmpty() ? output : raw -> output.accept(new LootPoolEntry() {
+            public int getWeight(float luck) {
+                return raw.getWeight(luck);
+            }
+            public void createItemStack(Consumer<net.minecraft.world.item.ItemStack> stacks, LootContext lootContext) {
+                raw.createItemStack(LootItemFunction.decorate(modifier, stacks, lootContext), lootContext);
+            }
+        });
+        return expandRaw(context, adjusted);
     }
     public abstract MapCodec<? extends LootPoolEntryContainer> codec();
     public static abstract class Builder<T extends Builder<T>> implements ConditionUserBuilder<T>, FunctionUserBuilder<T> {

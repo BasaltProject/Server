@@ -40,28 +40,60 @@ public class PlayerList {
     public static final Component CHAT_FILTERED_FULL = Component.translatable("chat.filtered_full");
     public static final Component DUPLICATE_LOGIN_DISCONNECT_MESSAGE = Component.translatable("multiplayer.disconnect.duplicate_login");
     private final MinecraftServer server;
+    private UserBanList bansList;
+    private IpBanList ipBansList;
+    private UserWhiteList whiteListList;
+    private ServerOpList opsList;
     public PlayerList(MinecraftServer server, LayeredRegistryAccess<RegistryLayer> registries, PlayerDataStorage playerIo, NotificationService notificationService) {
         this.server = server;
     }
     public void placeNewPlayer(Connection connection, ServerPlayer player, CommonListenerCookie cookie) {
     }
     protected void updateEntireScoreboard(ServerScoreboard scoreboard, ServerPlayer player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#updateEntireScoreboard");
+        player.bukkitPlayer().setScoreboard(player.bukkitPlayer().getScoreboard());
     }
     public void addWorldborderListener(ServerLevel level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#addWorldborderListener");
+        // the native runtime already broadcasts border changes to every viewer of the level
     }
     public Optional<CompoundTag> loadPlayerData(NameAndId nameAndId) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#loadPlayerData");
+        byte[] bytes = org.basaltmc.bukkit.MiscNatives.playerData(nameAndId.id().toString());
+        if (bytes == null || bytes.length == 0) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(net.minecraft.nbt.NbtIo.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes))));
+        } catch (java.io.IOException unreadable) {
+            return Optional.empty();
+        }
     }
     protected void save(ServerPlayer player) {
         (player.bukkitPlayer()).saveData();
     }
     public void remove(ServerPlayer player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#remove");
+        save(player);
     }
     public Component canPlayerLogin(SocketAddress address, NameAndId nameAndId) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#canPlayerLogin");
+        org.bukkit.Server server = org.bukkit.Bukkit.getServer();
+        org.bukkit.OfflinePlayer who = server.getOfflinePlayer(nameAndId.id());
+        if (who.isBanned()) {
+            org.bukkit.BanEntry<?> ban = server.getBanList(org.bukkit.BanList.Type.PROFILE).getBanEntry(who.getName());
+            net.minecraft.network.chat.MutableComponent reason = Component.translatable("multiplayer.disconnect.banned.reason",
+                ban == null || ban.getReason() == null ? "" : ban.getReason());
+            if (ban != null && ban.getExpiration() != null) {
+                reason.append(Component.translatable("multiplayer.disconnect.banned.expiration", ban.getExpiration().toString()));
+            }
+            return reason;
+        }
+        if (!isWhiteListed(nameAndId)) {
+            return Component.translatable("multiplayer.disconnect.not_whitelisted");
+        }
+        if (address instanceof java.net.InetSocketAddress inet && server.getIPBans().contains(inet.getAddress().getHostAddress())) {
+            return Component.translatable("multiplayer.disconnect.banned_ip.reason", "");
+        }
+        if (getPlayerCount() >= getMaxPlayers() && !canBypassPlayerLimit(nameAndId)) {
+            return Component.translatable("multiplayer.disconnect.server_full");
+        }
+        return null;
     }
     public boolean disconnectAllPlayersWithProfile(UUID playerId) {
         org.bukkit.entity.Player found = org.bukkit.Bukkit.getPlayer(playerId);
@@ -76,10 +108,12 @@ public class PlayerList {
         return serverPlayer;
     }
     public void sendActivePlayerEffects(ServerPlayer player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#sendActivePlayerEffects");
+        sendActiveEffects(player, player.connection);
     }
     public void sendActiveEffects(LivingEntity livingEntity, ServerGamePacketListenerImpl connection) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#sendActiveEffects");
+        for (net.minecraft.world.effect.MobEffectInstance effect : livingEntity.getActiveEffects()) {
+            connection.send(new net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket(livingEntity.getId(), effect, false));
+        }
     }
     public void sendPlayerPermissionLevel(ServerPlayer player) {
         (player.bukkitPlayer()).updateCommands();
@@ -127,10 +161,16 @@ public class PlayerList {
         return getServer().getPlayerNames();
     }
     public UserBanList getBans() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#getBans");
+        if (bansList == null) {
+            bansList = org.basaltmc.bukkit.facade.NativeLists.userBans();
+        }
+        return bansList;
     }
     public IpBanList getIpBans() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#getIpBans");
+        if (ipBansList == null) {
+            ipBansList = org.basaltmc.bukkit.facade.NativeLists.ipBans();
+        }
+        return ipBansList;
     }
     public void op(NameAndId nameAndId) {
         org.bukkit.Bukkit.getServer().getOfflinePlayer(nameAndId.id()).setOp(true);
@@ -169,13 +209,19 @@ public class PlayerList {
         org.bukkit.Bukkit.getServer().savePlayers();
     }
     public UserWhiteList getWhiteList() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#getWhiteList");
+        if (whiteListList == null) {
+            whiteListList = org.basaltmc.bukkit.facade.NativeLists.whitelist();
+        }
+        return whiteListList;
     }
     public String[] getWhiteListNames() {
         return org.bukkit.Bukkit.getServer().getWhitelistedPlayers().stream().map(org.bukkit.OfflinePlayer::getName).toArray(String[]::new);
     }
     public ServerOpList getOps() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#getOps");
+        if (opsList == null) {
+            opsList = org.basaltmc.bukkit.facade.NativeLists.operators();
+        }
+        return opsList;
     }
     public String[] getOpNames() {
         return org.bukkit.Bukkit.getServer().getOperators().stream().map(org.bukkit.OfflinePlayer::getName).toArray(String[]::new);
@@ -184,10 +230,12 @@ public class PlayerList {
         org.bukkit.Bukkit.getServer().reloadWhitelist();
     }
     public void sendLevelInfo(ServerPlayer player, ServerLevel level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#sendLevelInfo");
+        org.bukkit.entity.Player target = player.bukkitPlayer();
+        target.resetPlayerTime();
+        target.resetPlayerWeather();
     }
     public void sendAllPlayerInfo(ServerPlayer player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#sendAllPlayerInfo");
+        player.bukkitPlayer().updateInventory();
     }
     public int getPlayerCount() {
         return org.bukkit.Bukkit.getServer().getOnlinePlayers().size();
@@ -252,7 +300,7 @@ public class PlayerList {
         broadcastAll(new net.minecraft.network.protocol.game.ClientboundDisguisedChatPacket(message.unsignedContent() != null ? message.unsignedContent() : Component.literal(message.signedContent()), chatType));
     }
     public ServerStatsCounter getPlayerStats(Player player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.players.PlayerList#getPlayerStats");
+        return new net.minecraft.stats.ServerStatsCounter((ServerPlayer) player);
     }
     public PlayerAdvancements getPlayerAdvancements(ServerPlayer player) {
         return new PlayerAdvancements(null, this, server.getAdvancements(), null, player);

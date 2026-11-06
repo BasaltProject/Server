@@ -237,8 +237,8 @@ public class Items {
     public static final Item FLOWERING_AZALEA = named("flowering_azalea");
     public static final Item DEAD_BUSH = named("dead_bush");
     public static final Item FIREFLY_BUSH = named("firefly_bush");
-    public static final Item DRY_SHORT_GRASS = named("dry_short_grass");
-    public static final Item DRY_TALL_GRASS = named("dry_tall_grass");
+    public static final Item DRY_SHORT_GRASS = named("short_dry_grass");
+    public static final Item DRY_TALL_GRASS = named("tall_dry_grass");
     public static final Item SEAGRASS = named("seagrass");
     public static final Item SEA_PICKLE = named("sea_pickle");
     public static final ColorCollection<Item> WOOL = ColorCollection.from(color -> named(color.getName() + "_wool"));
@@ -304,7 +304,7 @@ public class Items {
     public static final Item STONE_SLAB = named("stone_slab");
     public static final Item SMOOTH_STONE_SLAB = named("smooth_stone_slab");
     public static final Item SANDSTONE_SLAB = named("sandstone_slab");
-    public static final Item CUT_STANDSTONE_SLAB = named("cut_standstone_slab");
+    public static final Item CUT_STANDSTONE_SLAB = named("cut_sandstone_slab");
     public static final Item PETRIFIED_OAK_SLAB = named("petrified_oak_slab");
     public static final Item COBBLESTONE_SLAB = named("cobblestone_slab");
     public static final Item BRICK_SLAB = named("brick_slab");

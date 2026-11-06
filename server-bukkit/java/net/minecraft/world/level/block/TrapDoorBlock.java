@@ -36,8 +36,10 @@ public class TrapDoorBlock extends HorizontalDirectionalBlock implements SimpleW
     public static final EnumProperty<Half> HALF = BlockStateProperties.HALF;
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
     public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
+    private BlockSetType setType;
     protected TrapDoorBlock(BlockSetType type, BlockBehaviour.Properties properties) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
+        this.setType = type;
     }
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         return super.getShape(state, level, pos, context);
@@ -52,7 +54,10 @@ public class TrapDoorBlock extends HorizontalDirectionalBlock implements SimpleW
         super.onExplosionHit(state, level, pos, explosion, onHit);
     }
     protected void playSound(Player player, Level level, BlockPos pos, boolean opening) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.TrapDoorBlock#playSound");
+        BlockSetType type = getType();
+        level.playSound(player, pos, opening ? type.trapdoorOpen() : type.trapdoorClose(), net.minecraft.sounds.SoundSource.BLOCKS, 1.0F,
+            level.getRandom().nextFloat() * 0.1F + 0.9F);
+        level.gameEvent(player, opening ? net.minecraft.world.level.gameevent.GameEvent.BLOCK_OPEN : net.minecraft.world.level.gameevent.GameEvent.BLOCK_CLOSE, pos);
     }
     protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, Orientation orientation, boolean movedByPiston) {
         super.neighborChanged(state, level, pos, block, orientation, movedByPiston);
@@ -70,6 +75,9 @@ public class TrapDoorBlock extends HorizontalDirectionalBlock implements SimpleW
         return super.updateShape(state, level, ticks, pos, directionToNeighbour, neighbourPos, neighbourState, random);
     }
     protected BlockSetType getType() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.TrapDoorBlock#getType");
+        if (setType == null) {
+            setType = BlockSetTypes.of(this, "_trapdoor");
+        }
+        return setType;
     }
 }

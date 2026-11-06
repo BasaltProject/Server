@@ -62,6 +62,16 @@ public class SoundEvents {
                 (net.minecraft.resources.ResourceKey) net.minecraft.core.registries.Registries.SOUND_EVENT, event.location()), event);
     }
 
+    private static Map<CowSoundVariants.SoundSet, CowSoundVariant> cowSounds() {
+        Map<CowSoundVariants.SoundSet, CowSoundVariant> sounds = new java.util.EnumMap<>(CowSoundVariants.SoundSet.class);
+        for (CowSoundVariants.SoundSet set : CowSoundVariants.SoundSet.values()) {
+            String prefix = "entity." + set.getSoundEventIdentifier() + ".";
+            sounds.put(set, new CowSoundVariant(refById(prefix + "ambient"), refById(prefix + "hurt"),
+                refById(prefix + "death"), refById(prefix + "step")));
+        }
+        return sounds;
+    }
+
     private static Holder.Reference<SoundEvent> refById(String id) {
         SoundEvent event = kById.get(id);
         if (event == null) {
@@ -503,7 +513,7 @@ public class SoundEvents {
     public static final SoundEvent CORAL_BLOCK_PLACE = of("CORAL_BLOCK_PLACE");
     public static final SoundEvent CORAL_BLOCK_STEP = of("CORAL_BLOCK_STEP");
     public static final SoundEvent COW_MILK = of("COW_MILK");
-    public static final Map<CowSoundVariants.SoundSet, CowSoundVariant> COW_SOUNDS = null;
+    public static final Map<CowSoundVariants.SoundSet, CowSoundVariant> COW_SOUNDS = cowSounds();
     public static final SoundEvent CRAFTER_CRAFT = of("CRAFTER_CRAFT");
     public static final SoundEvent CRAFTER_FAIL = of("CRAFTER_FAIL");
     public static final SoundEvent CREAKING_AMBIENT = of("CREAKING_AMBIENT");

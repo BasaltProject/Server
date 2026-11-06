@@ -57,6 +57,8 @@ public class ZeroBitStorage implements BitStorage {
         return this;
     }
     public void fill(int value) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.util.ZeroBitStorage#fill");
+        if (value != 0) {
+            throw new IllegalArgumentException("The value " + value + " is not in the range [0, 0]");
+        }
     }
 }

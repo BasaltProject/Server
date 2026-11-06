@@ -26,7 +26,10 @@ public abstract class UniformContainerBase extends LootPoolEntryContainer {
     }
     public abstract MapCodec<? extends UniformContainerBase> codec();
     protected static <T extends UniformContainerBase> Products.P4<RecordCodecBuilder.Mu<T>, Integer, Integer, Optional<Holder<LootItemCondition>>, Optional<Holder<LootItemFunction>>> uniformFields(RecordCodecBuilder.Instance<T> i) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.entries.UniformContainerBase#uniformFields");
+        return i.group(com.mojang.serialization.Codec.INT.optionalFieldOf("weight", 1).forGetter(e -> e.weight),
+            com.mojang.serialization.Codec.INT.optionalFieldOf("quality", 0).forGetter(e -> e.quality))
+            .and(commonFields(i).t1())
+            .and(net.minecraft.world.level.storage.loot.functions.LootItemFunctions.CODEC.optionalFieldOf("modifier").forGetter(e -> e.modifier));
     }
     public void validate(ValidationContext context) {
         return;

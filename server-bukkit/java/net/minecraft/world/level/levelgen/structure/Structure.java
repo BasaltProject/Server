@@ -23,6 +23,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderSet;
+import net.minecraft.core.QuartPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.Level;
@@ -39,17 +40,26 @@ import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilde
 public abstract class Structure {
     protected Structure() {
     }
-    public StructureStart generate(Holder selected, ResourceKey dimension, RegistryAccess registryAccess, ChunkGenerator chunkGenerator, BiomeSource biomeSource, Climate.Sampler climateSampler, RandomState randomState, StructureTemplateManager structureTemplateManager, long seed, ChunkPos sourceChunkPos, int references, LevelHeightAccessor heightAccessor, Predicate validBiome) {
-        throw Unsupported.hit("net.minecraft.world.level.levelgen.structure.Structure.generate");
+    public StructureStart generate(Holder<Structure> selected, ResourceKey<Level> dimension, RegistryAccess registryAccess, ChunkGenerator chunkGenerator, BiomeSource biomeSource, Climate.Sampler climateSampler, RandomState randomState, StructureTemplateManager structureTemplateManager, long seed, ChunkPos sourceChunkPos, int references, LevelHeightAccessor heightAccessor, Predicate<Holder<Biome>> validBiome) {
+        GenerationContext ctx = new GenerationContext(registryAccess, chunkGenerator, biomeSource, climateSampler, randomState, structureTemplateManager, seed, sourceChunkPos, heightAccessor, validBiome);
+        Optional<GenerationStub> generation = findValidGenerationPoint(ctx);
+        if (generation.isPresent()) {
+            StructureStart start = new StructureStart(this, sourceChunkPos, references, generation.get().getPiecesBuilder().build());
+            if (start.isValid()) {
+                return start;
+            }
+        }
+        StructureStart none = StructureStart.INVALID_START;
+        return none;
     }
     public static final Codec<Structure> DIRECT_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.levelgen.structure.Structure.class, "DIRECT_CODEC");
     public static final Codec<Holder<Structure>> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.levelgen.structure.Structure.class, "CODEC");
     protected StructureSettings settings;
     public static <S extends Structure> RecordCodecBuilder<S, StructureSettings> settingsCodec(RecordCodecBuilder.Instance<S> i) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#settingsCodec");
+        return StructureSettings.CODEC.forGetter(structure -> structure.settings);
     }
     public static <S extends Structure> MapCodec<S> simpleCodec(Function<StructureSettings, S> constructor) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#simpleCodec");
+        return RecordCodecBuilder.mapCodec(i -> i.group(settingsCodec(i)).apply(i, constructor));
     }
     protected Structure(StructureSettings settings) {
         this.settings = settings;
@@ -67,38 +77,51 @@ public abstract class Structure {
         return settings.terrainAdaptation();
     }
     public BoundingBox adjustBoundingBox(BoundingBox boundingBox) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#adjustBoundingBox");
+        return terrainAdaptation() != TerrainAdjustment.NONE ? boundingBox.inflatedBy(12) : boundingBox;
     }
     protected static Optional<GenerationStub> onTopOfChunkCenter(GenerationContext context, Heightmap.Types heightmap, Consumer<StructurePiecesBuilder> generator) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#onTopOfChunkCenter");
+        return context.couldValidBiomeExistOnTopOfChunkCenter() ? onTopOfChunkCenterWithoutBiomeCheck(context, heightmap, generator) : Optional.empty();
     }
     protected static Optional<GenerationStub> onTopOfChunkCenterWithoutBiomeCheck(GenerationContext context, Heightmap.Types heightmap, Consumer<StructurePiecesBuilder> generator) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#onTopOfChunkCenterWithoutBiomeCheck");
+        ChunkPos chunk = context.chunkPos();
+        int x = chunk.getMiddleBlockX();
+        int z = chunk.getMiddleBlockZ();
+        int y = context.chunkGenerator().getFirstOccupiedHeight(x, z, heightmap, context.heightAccessor(), context.randomState());
+        return Optional.of(new GenerationStub(new BlockPos(x, y, z), generator));
     }
     public void afterPlace(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random, BoundingBox chunkBB, ChunkPos chunkPos, PiecesContainer pieces) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#afterPlace");
+    }
+
+    private static int[] cornerHeights(GenerationContext context, int minX, int sizeX, int minZ, int sizeZ) {
+        ChunkGenerator generator = context.chunkGenerator();
+        int[] heights = new int[4];
+        for (int corner = 0; corner < 4; corner++) {
+            heights[corner] = generator.getFirstOccupiedHeight(minX + (corner >> 1) * sizeX, minZ + (corner & 1) * sizeZ,
+                Heightmap.Types.WORLD_SURFACE_WG, context.heightAccessor(), context.randomState());
+        }
+        return heights;
     }
     public static int getMeanFirstOccupiedHeight(GenerationContext context, int minX, int sizeX, int minZ, int sizeZ) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#getMeanFirstOccupiedHeight");
+        int[] heights = cornerHeights(context, minX, sizeX, minZ, sizeZ);
+        return (heights[0] + heights[1] + heights[2] + heights[3]) / 4;
     }
     protected static int getLowestY(GenerationContext context, int sizeX, int sizeZ) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#getLowestY");
+        return getLowestY(context, context.chunkPos().getMinBlockX(), context.chunkPos().getMinBlockZ(), sizeX, sizeZ);
     }
     protected static int getLowestY(GenerationContext context, int minX, int minZ, int sizeX, int sizeZ) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#getLowestY");
+        int[] heights = cornerHeights(context, minX, sizeX, minZ, sizeZ);
+        return Math.min(Math.min(heights[0], heights[1]), Math.min(heights[2], heights[3]));
     }
     protected BlockPos getLowestYIn5by5Box(GenerationContext context, int blockX, int blockZ, Rotation rotation) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#getLowestYIn5by5Box");
+        int offsetX = rotation == Rotation.CLOCKWISE_90 || rotation == Rotation.CLOCKWISE_180 ? -5 : 5;
+        int offsetZ = rotation == Rotation.CLOCKWISE_180 || rotation == Rotation.COUNTERCLOCKWISE_90 ? -5 : 5;
+        return new BlockPos(blockX, getLowestY(context, blockX, blockZ, offsetX, offsetZ), blockZ);
     }
-    protected Optional<GenerationStub> findGenerationPoint(GenerationContext context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#findGenerationPoint");
-    }
+    protected abstract Optional<GenerationStub> findGenerationPoint(GenerationContext context);
     public Optional<GenerationStub> findValidGenerationPoint(GenerationContext context) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#findValidGenerationPoint");
+        return findGenerationPoint(context).filter(context::isValidBiome);
     }
-    public StructureType<?> type() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure#type");
-    }
+    public abstract StructureType<?> type();
     public static record StructureSettings(HolderSet<Biome> biomes, Map<MobCategory, StructureSpawnOverride> spawnOverrides, GenerationStep.Decoration step, TerrainAdjustment terrainAdaptation) {
         public static final MapCodec<StructureSettings> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.level.levelgen.structure.Structure.StructureSettings.class, "CODEC");
         public StructureSettings(HolderSet<Biome> biomes) {
@@ -131,27 +154,47 @@ public abstract class Structure {
     }
     public static record GenerationContext(RegistryAccess registryAccess, ChunkGenerator chunkGenerator, BiomeSource biomeSource, Climate.Sampler climateSampler, BiomeResolver biomeResolver, RandomState randomState, StructureTemplateManager structureTemplateManager, WorldgenRandom random, long seed, ChunkPos chunkPos, LevelHeightAccessor heightAccessor, Predicate<Holder<Biome>> validBiome) {
         public GenerationContext(RegistryAccess registryAccess, ChunkGenerator chunkGenerator, BiomeSource biomeSource, Climate.Sampler climateSampler, RandomState randomState, StructureTemplateManager structureTemplateManager, long seed, ChunkPos chunkPos, LevelHeightAccessor heightAccessor, Predicate<Holder<Biome>> validBiome) {
-            this((RegistryAccess) null, (ChunkGenerator) null, (BiomeSource) null, (Climate.Sampler) null, (BiomeResolver) null, (RandomState) null, (StructureTemplateManager) null, (WorldgenRandom) null, (long) 0, (ChunkPos) null, (LevelHeightAccessor) null, (Predicate) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure.GenerationContext#<init>");
+            this(registryAccess, chunkGenerator, biomeSource, climateSampler, biomeSource.createResolver(climateSampler), randomState, structureTemplateManager, randomFor(seed, chunkPos), seed, chunkPos, heightAccessor, validBiome);
+        }
+        private static WorldgenRandom randomFor(long seed, ChunkPos chunkPos) {
+            WorldgenRandom random = new WorldgenRandom(new net.minecraft.world.level.levelgen.LegacyRandomSource(0L));
+            random.setLargeFeatureSeed(seed, chunkPos.x(), chunkPos.z());
+            return random;
         }
         public boolean isValidBiome(GenerationStub stub) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure.GenerationContext#isValidBiome");
+            BlockPos at = stub.position();
+            return validBiome.test(biomeResolver.getNoiseBiome(QuartPos.fromBlock(at.getX()), QuartPos.fromBlock(at.getY()), QuartPos.fromBlock(at.getZ())));
         }
         public boolean couldStructureExistInColumn(int blockX, int blockZ, int minBlockY, int maxBlockY) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure.GenerationContext#couldStructureExistInColumn");
+            int quartZ = QuartPos.fromBlock(blockZ);
+            int quartX = QuartPos.fromBlock(blockX);
+            int minQuart = QuartPos.fromBlock(minBlockY);
+            int maxQuart = QuartPos.fromBlock(maxBlockY);
+            BiomeResolver column = biomeSource.createResolverForChunk(climateSampler, quartX, minQuart, quartZ, 1, maxQuart - minQuart + 1, 1);
+            for (int quartY = minQuart; quartY <= maxQuart; quartY++) {
+                if (validBiome.test(column.getNoiseBiome(quartX, quartY, quartZ))) {
+                    return true;
+                }
+            }
+            return false;
         }
         public boolean couldValidBiomeExistInTerrainColumn(int blockX, int blockZ) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure.GenerationContext#couldValidBiomeExistInTerrainColumn");
+            return couldStructureExistInColumn(blockX, blockZ, heightAccessor.getMinY() - 1, heightAccessor.getMaxY());
         }
         public boolean couldValidBiomeExistOnTopOfChunkCenter() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure.GenerationContext#couldValidBiomeExistOnTopOfChunkCenter");
+            return couldValidBiomeExistInTerrainColumn(chunkPos.getMiddleBlockX(), chunkPos.getMiddleBlockZ());
         }
     }
     public static record GenerationStub(BlockPos position, Either<Consumer<StructurePiecesBuilder>, StructurePiecesBuilder> generator) {
         public GenerationStub(BlockPos position, Consumer<StructurePiecesBuilder> generator) {
-            this((BlockPos) null, (Either) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure.GenerationStub#<init>");
+            this(position, Either.left(generator));
         }
         public StructurePiecesBuilder getPiecesBuilder() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.structure.Structure.GenerationStub#getPiecesBuilder");
+            return generator.map(consumer -> {
+                StructurePiecesBuilder fresh = new StructurePiecesBuilder();
+                consumer.accept(fresh);
+                return fresh;
+            }, existing -> existing);
         }
     }
 }

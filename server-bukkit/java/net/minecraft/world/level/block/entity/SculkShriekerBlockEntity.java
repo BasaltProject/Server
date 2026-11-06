@@ -63,7 +63,12 @@ public class SculkShriekerBlockEntity extends BlockEntity {
             return !pos.equals(getBlockPos());
         }
         public void onReceiveVibration(ServerLevel level, BlockPos pos, Holder<GameEvent> event, Entity sourceEntity, Entity projectileOwner, float receivingDistance) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.SculkShriekerBlockEntity.VibrationUser#onReceiveVibration");
+            Entity cause = sourceEntity instanceof net.minecraft.server.level.ServerPlayer ? sourceEntity : projectileOwner;
+            if (cause instanceof net.minecraft.server.level.ServerPlayer player) {
+                BlockPos at = getBlockPos();
+                org.basaltmc.bukkit.WorldEnvNatives.sculk(level.getWorld().getName(), "shriek", at.getX(), at.getY(), at.getZ(), 0, 0, 0, 0,
+                    player.getUUID().toString());
+            }
         }
         public void onDataChanged() {
             setChanged();

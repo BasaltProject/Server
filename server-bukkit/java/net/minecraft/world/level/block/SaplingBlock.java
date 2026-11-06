@@ -32,7 +32,11 @@ public class SaplingBlock extends VegetationBlock implements BonemealableBlock {
         super.randomTick(state, level, pos, random);
     }
     public void advanceTree(ServerLevel level, BlockPos pos, BlockState state, RandomSource random) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.SaplingBlock#advanceTree");
+        if (state.getValue(STAGE) == 0) {
+            level.setBlock(pos, state.cycle(STAGE), 4);
+        } else {
+            org.basaltmc.bukkit.WorldEnvNatives.boneMeal(level.getWorld().getName(), pos.getX(), pos.getY(), pos.getZ());
+        }
     }
     public boolean isValidBonemealTarget(LevelReader level, BlockPos pos, BlockState state, BonemealSource source) {
         return true;

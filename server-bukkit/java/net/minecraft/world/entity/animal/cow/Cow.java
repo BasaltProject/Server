@@ -42,7 +42,9 @@ public class Cow extends AbstractCow {
             ? org.basaltmc.bukkit.facade.VariantHolders.of(net.minecraft.core.registries.Registries.COW_VARIANT, net.minecraft.world.entity.animal.cow.CowVariant.class, api.getVariant()) : null;
     }
     protected CowSoundVariant getSoundSet() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.cow.Cow#getSoundSet");
+        boolean moody = live() instanceof org.bukkit.entity.Cow api && api.getSoundVariant() != null
+            && api.getSoundVariant().getKey().getKey().equals("moody");
+        return net.minecraft.sounds.SoundEvents.COW_SOUNDS.get(moody ? CowSoundVariants.SoundSet.MOODY : CowSoundVariants.SoundSet.CLASSIC);
     }
     public EntityDimensions getDefaultDimensions(Pose pose) {
         return net.minecraft.world.entity.EntityDimensions.scalable(getBbWidth(), getBbHeight());

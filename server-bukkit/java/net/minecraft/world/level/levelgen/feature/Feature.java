@@ -22,18 +22,20 @@ public interface Feature {
     Codec<Holder<Feature>> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.levelgen.feature.Feature.class, "CODEC");
     Codec<HolderSet<Feature>> LIST_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.levelgen.feature.Feature.class, "LIST_CODEC");
     default MapCodec<? extends Feature> codec() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.Feature#codec");
+        throw Unsupported.hit("net.minecraft.world.level.levelgen.feature.Feature.codec");
     }
     default Stream<Holder<Feature>> getSubFeatures() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.Feature#getSubFeatures");
+        return Stream.empty();
     }
     default void setBlock(LevelWriter level, BlockPos pos, BlockState blockState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.Feature#setBlock");
+        level.setBlock(pos, blockState, 3);
     }
     default void safeSetBlock(WorldGenLevel level, BlockPos pos, BlockState state, Predicate<BlockState> canReplace) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.Feature#safeSetBlock");
+        if (canReplace.test(level.getBlockState(pos))) {
+            level.setBlock(pos, state, 2);
+        }
     }
     default void markAboveForPostProcessing(WorldGenLevel level, BlockPos placePos) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.feature.Feature#markAboveForPostProcessing");
+        // The native chunk pipeline settles features itself.
     }
 }

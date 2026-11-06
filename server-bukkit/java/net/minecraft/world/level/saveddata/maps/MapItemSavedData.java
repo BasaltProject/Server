@@ -64,10 +64,18 @@ public class MapItemSavedData extends SavedData {
     public static void addTargetDecoration(ItemStack itemStack, BlockPos position, String key, Holder<MapDecorationType> decorationType) {
     }
     public Packet<?> getUpdatePacket(MapId id, Player player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.saveddata.maps.MapItemSavedData#getUpdatePacket");
+        if (!holders.containsKey(player)) {
+            return null;
+        }
+        byte[] current = org.basaltmc.bukkit.MiscNatives.mapColors(id.id());
+        if (current != null && current.length == 16384) {
+            colors = current;
+        }
+        return new net.minecraft.network.protocol.game.ClientboundMapItemDataPacket(id, scale, locked, List.of(),
+            new MapPatch(0, 0, 128, 128, colors.clone()));
     }
     public HoldingPlayer getHoldingPlayer(Player player) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.saveddata.maps.MapItemSavedData#getHoldingPlayer");
+        return holders.computeIfAbsent(player, HoldingPlayer::new);
     }
     public boolean toggleBanner(LevelAccessor level, BlockPos pos) {
         return false;
@@ -124,6 +132,7 @@ public class MapItemSavedData extends SavedData {
         }
         return data;
     }
+    private final java.util.Map<Player, HoldingPlayer> holders = new java.util.WeakHashMap<>();
     public class HoldingPlayer {
         public final Player player;
         public int step;

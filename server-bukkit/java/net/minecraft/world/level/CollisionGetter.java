@@ -121,6 +121,19 @@ public interface CollisionGetter extends BlockGetter {
         return Optional.ofNullable(best);
     }
     default Optional<Vec3> findFreePosition(Entity source, VoxelShape allowedCenters, Vec3 preferredCenter, double sizeX, double sizeY, double sizeZ) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.CollisionGetter#findFreePosition");
+        if (allowedCenters.isEmpty()) {
+            return Optional.empty();
+        }
+        AABB searchArea = allowedCenters.bounds().inflate(sizeX, sizeY, sizeZ);
+        VoxelShape blocked = net.minecraft.world.phys.shapes.Shapes.empty();
+        for (VoxelShape shape : getBlockCollisions(source, searchArea)) {
+            if (getWorldBorder() != null && !getWorldBorder().isWithinBounds(shape.bounds())) {
+                continue;
+            }
+            for (AABB part : shape.toAabbs()) {
+                blocked = net.minecraft.world.phys.shapes.Shapes.or(blocked, net.minecraft.world.phys.shapes.Shapes.create(part.inflate(sizeX / 2.0, sizeY / 2.0, sizeZ / 2.0)));
+            }
+        }
+        return net.minecraft.world.phys.shapes.Shapes.join(allowedCenters, blocked, net.minecraft.world.phys.shapes.BooleanOp.ONLY_FIRST).closestPointTo(preferredCenter);
     }
 }

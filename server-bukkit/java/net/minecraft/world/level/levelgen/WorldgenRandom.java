@@ -13,6 +13,10 @@ public class WorldgenRandom extends LegacyRandomSource {
         this.randomSource = randomSource;
     }
 
+    public RandomSource inner() {
+        return randomSource;
+    }
+
     public int getCount() {
         return count;
     }

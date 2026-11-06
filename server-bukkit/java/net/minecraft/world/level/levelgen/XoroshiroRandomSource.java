@@ -29,6 +29,10 @@ public class XoroshiroRandomSource implements RandomSource {
         this.generator = generator;
     }
 
+    public Xoroshiro128PlusPlus generatorState() {
+        return generator;
+    }
+
     @Override
     public RandomSource fork() {
         return new XoroshiroRandomSource(generator.nextLong(), generator.nextLong());

@@ -14,6 +14,8 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class BlockEntityType<T extends BlockEntity> {
     private final Identifier key;
+    private BlockEntitySupplier<? extends T> factory;
+    private Set<Block> validBlocks = Set.of();
 
     protected BlockEntityType() {
         this.key = null;
@@ -42,9 +44,14 @@ public class BlockEntityType<T extends BlockEntity> {
         return (BlockEntityType<T>) of(Identifier.withDefaultNamespace(path));
     }
     public BlockEntityType(BlockEntitySupplier<? extends T> factory, Set<Block> validBlocks) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.entity.BlockEntityType#<init>");
+        this.key = null;
+        this.factory = factory;
+        this.validBlocks = Set.copyOf(validBlocks);
     }
     public T create(BlockPos worldPosition, BlockState blockState) {
+        if (factory != null) {
+            return factory.create(worldPosition, blockState);
+        }
         CompoundTag tag = new CompoundTag();
         tag.putString("id", key.toString());
         tag.putInt("x", worldPosition.getX());
@@ -53,6 +60,9 @@ public class BlockEntityType<T extends BlockEntity> {
         return (T) org.basaltmc.bukkit.facade.BlockEntityTypes.view(null, worldPosition, tag);
     }
     public boolean isValid(BlockState state) {
+        if (factory != null) {
+            return validBlocks.contains(state.getBlock());
+        }
         return key.toString().equals(org.basaltmc.bukkit.facade.BlockEntityTypes.typeOf(state.getBlock().blockKey()));
     }
     public Holder.Reference<BlockEntityType<?>> builtInRegistryHolder() {

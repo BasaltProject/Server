@@ -107,7 +107,7 @@ public class PersistentEntitySectionManager<T extends EntityAccess> implements A
         return Entity.view(level, id, UUID.fromString(strings[0]), type);
     }
     public PersistentEntitySectionManager(Class<T> entityClass, LevelCallback<T> callbacks, EntityPersistentStorage<T> permanentStorage) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.entity.PersistentEntitySectionManager#<init>");
+        this.level = null;
     }
     public boolean isTicking(ChunkPos pos) {
         return org.basaltmc.bukkit.WorldNatives.chunkLoaded(level.getWorld().getName(), pos.x(), pos.z());
@@ -165,13 +165,10 @@ public class PersistentEntitySectionManager<T extends EntityAccess> implements A
     }
     class Callback implements EntityInLevelCallback {
         private Callback(T entity, long currentSectionKey, EntitySection<T> currentSection) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.entity.PersistentEntitySectionManager.Callback#<init>");
         }
         public void onMove() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.entity.PersistentEntitySectionManager.Callback#onMove");
         }
         public void onRemove(Entity.RemovalReason reason) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.entity.PersistentEntitySectionManager.Callback#onRemove");
         }
     }
 }

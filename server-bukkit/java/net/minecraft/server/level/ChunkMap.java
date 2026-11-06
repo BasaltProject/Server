@@ -80,7 +80,9 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
     public static final int MAX_VIEW_DISTANCE = 32;
     public static final int FORCED_TICKET_LEVEL = 0;
     public ChunkMap(ServerLevel level, LevelStorageSource.LevelStorageAccess levelStorage, DataFixer dataFixer, StructureTemplateManager structureManager, Executor executor, BlockableEventLoop<Runnable> mainThreadExecutor, LightChunkGetter chunkGetter, ChunkGenerator generator, ChunkStatusUpdateListener chunkStatusListener, TicketStorage ticketStorage, int serverViewDistance, boolean syncWrites) {
-        super((net.minecraft.world.level.chunk.storage.RegionStorageInfo) null, (java.nio.file.Path) null, (com.mojang.datafixers.DataFixer) null, false, (net.minecraft.util.datafix.DataFixTypes) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.level.ChunkMap#<init>");
+        super((net.minecraft.world.level.chunk.storage.RegionStorageInfo) null, (java.nio.file.Path) null, (com.mojang.datafixers.DataFixer) null, false, (net.minecraft.util.datafix.DataFixTypes) null);
+        this.source = level.getChunkSource();
+        this.watcher = new ServerPlayer(new ChunkResender(level.getWorld().getName(), source));
     }
     protected ChunkGenerator generator() {
         return source.getGenerator();

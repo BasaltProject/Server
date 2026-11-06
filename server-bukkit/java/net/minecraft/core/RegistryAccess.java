@@ -28,7 +28,7 @@ public interface RegistryAccess extends HolderLookup.Provider {
         return registries().map(entry -> (ResourceKey<? extends Registry<?>>) entry.key());
     }
     static Frozen fromRegistryOfRegistries(Registry<? extends Registry<?>> registries) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.RegistryAccess#fromRegistryOfRegistries");
+        return new ImmutableRegistryAccess(registries.stream().map(registry -> (Registry<?>) registry).toList()).freeze();
     }
     default Frozen freeze() {
         RegistryAccess source = this;

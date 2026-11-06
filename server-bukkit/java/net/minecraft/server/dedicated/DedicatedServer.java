@@ -37,6 +37,8 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface 
 
     private DedicatedServer() {}
 
+    private DedicatedServerProperties properties;
+    private DedicatedServerSettings settings;
     public static DedicatedServer instance() {
         return kInstance;
     }
@@ -50,12 +52,39 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface 
         return super.registryAccess();
     }
     public DedicatedServer(Thread serverThread, LevelStorageSource.LevelStorageAccess levelStorageSource, PackRepository packRepository, WorldStem worldStem, Optional<GameRules> gameRules, DedicatedServerSettings settings, DataFixer fixerUpper, Services services, ManagementServer jsonRpcServer, NotificationManager notificationManager) {
-        super((Thread) null, (net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess) null, (net.minecraft.server.packs.repository.PackRepository) null, (net.minecraft.server.WorldStem) null, (java.util.Optional) null, (java.net.Proxy) null, (com.mojang.datafixers.DataFixer) null, (net.minecraft.server.Services) null, (net.minecraft.server.level.progress.LevelLoadListener) null, false, (net.minecraft.server.notifications.NotificationManager) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.dedicated.DedicatedServer#<init>");
+        super(serverThread, levelStorageSource, packRepository, worldStem, gameRules, java.net.Proxy.NO_PROXY, fixerUpper, services, null, true, notificationManager);
+        this.settings = settings;
+        this.properties = settings == null ? null : settings.getProperties();
     }
     public void setAllowFlight(boolean allowed) {
     }
     public DedicatedServerProperties getProperties() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.dedicated.DedicatedServer#getProperties");
+        DedicatedServerProperties current = properties;
+        if (current == null) {
+            java.util.Properties values = new java.util.Properties();
+            org.bukkit.Server server = org.bukkit.Bukkit.getServer();
+            values.setProperty("motd", server.getMotd());
+            values.setProperty("server-ip", server.getIp());
+            values.setProperty("server-port", Integer.toString(server.getPort()));
+            values.setProperty("max-players", Integer.toString(server.getMaxPlayers()));
+            values.setProperty("view-distance", Integer.toString(server.getViewDistance()));
+            values.setProperty("simulation-distance", Integer.toString(server.getSimulationDistance()));
+            values.setProperty("online-mode", Boolean.toString(server.getOnlineMode()));
+            values.setProperty("allow-flight", Boolean.toString(server.getAllowFlight()));
+            values.setProperty("white-list", Boolean.toString(server.hasWhitelist()));
+            values.setProperty("enforce-whitelist", Boolean.toString(server.isWhitelistEnforced()));
+            values.setProperty("hardcore", Boolean.toString(server.isHardcore()));
+            values.setProperty("gamemode", server.getDefaultGameMode().name().toLowerCase(java.util.Locale.ROOT));
+            values.setProperty("spawn-protection", Integer.toString(server.getSpawnRadius()));
+            if (!server.getWorlds().isEmpty()) {
+                values.setProperty("level-name", server.getWorlds().get(0).getName());
+                values.setProperty("difficulty", server.getWorlds().get(0).getDifficulty().name().toLowerCase(java.util.Locale.ROOT));
+                values.setProperty("generate-structures", Boolean.toString(server.getWorlds().get(0).canGenerateStructures()));
+            }
+            current = new DedicatedServerProperties(values);
+            properties = current;
+        }
+        return current;
     }
     public void setDifficulty(Difficulty difficulty) {
         setDifficulty(difficulty, false);
@@ -103,7 +132,7 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface 
         org.basaltmc.bukkit.WorldEnvNatives.setSetting("hide_online_players", String.valueOf(hide));
     }
     public void setOperatorUserPermissions(LevelBasedPermissionSet permissions) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.server.dedicated.DedicatedServer#setOperatorUserPermissions");
+        properties = getProperties().opPermissions.update(registryAccess(), permissions);
     }
     public int statusHeartbeatInterval() {
         return 0;

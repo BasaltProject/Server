@@ -22,6 +22,6 @@ public record PlacedFeature(Holder feature, List placement) {
     public static final Codec<HolderSet<PlacedFeature>> LIST_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.levelgen.placement.PlacedFeature.class, "LIST_CODEC");
     public static final Codec<List<HolderSet<PlacedFeature>>> LIST_OF_LISTS_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.levelgen.placement.PlacedFeature.class, "LIST_OF_LISTS_CODEC");
     public Stream<Holder<Feature>> getFeatures() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.levelgen.placement.PlacedFeature#getFeatures");
+        return Stream.of((Holder<Feature>) feature);
     }
 }

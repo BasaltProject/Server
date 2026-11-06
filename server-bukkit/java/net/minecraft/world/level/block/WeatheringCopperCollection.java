@@ -35,18 +35,21 @@ public record WeatheringCopperCollection<T>(ByState<T> weathering, ByState<T> wa
                 BiFunction<WeatheringCopper.WeatherState, BlockBehaviour.Properties, WaxedBlock> waxedBlockFactory,
                 BiFunction<WeatheringCopper.WeatherState, BlockBehaviour.Properties, WeatheringBlock> weatheringFactory,
                 Function<WeatheringCopper.WeatherState, BlockBehaviour.Properties> propertiesSupplier) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.WeatheringCopperCollection#registerBlocks");
+        return ids.apply(
+            weatheringIds -> ByState.zipMap(STATES, weatheringIds, (state, id) -> register.apply(id, p -> weatheringFactory.apply(state, p), propertiesSupplier.apply(state))),
+            waxedIds -> ByState.zipMap(STATES, waxedIds, (state, id) -> register.apply(id, p -> waxedBlockFactory.apply(state, p), propertiesSupplier.apply(state))));
     }
 
     public static <Id> WeatheringCopperCollection<Item> registerItems(WeatheringCopperCollection<Id> ids,
             WeatheringCopperCollection<Block> blocks, BiFunction<Id, Block, Item> itemFactory) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.WeatheringCopperCollection#registerItems");
+        return zipMap(ids, blocks, itemFactory);
     }
 
     public static WeatheringCopperCollection<BlockFamily> createFamily(
             BiFunction<String, WeatheringCopper.WeatherState, BlockFamily> waxedProvider,
             BiFunction<String, WeatheringCopper.WeatherState, BlockFamily> weatheringProvider) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.WeatheringCopperCollection#createFamily");
+        return PREFIXES.apply(prefixes -> ByState.zipMap(prefixes, STATES, weatheringProvider),
+            prefixes -> ByState.zipMap(prefixes, STATES, waxedProvider));
     }
 
     public List<T> asList() {

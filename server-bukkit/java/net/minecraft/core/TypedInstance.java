@@ -5,9 +5,7 @@ import java.util.stream.Stream;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 public interface TypedInstance<T> {
-    default Holder<T> typeHolder() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.TypedInstance#typeHolder");
-    }
+    Holder<T> typeHolder();
     default Stream<TagKey<T>> tags() {
         return typeHolder().tags();
     }

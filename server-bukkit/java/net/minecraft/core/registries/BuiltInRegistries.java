@@ -286,10 +286,10 @@ public class BuiltInRegistries {
     public static final Registry<Consumer<GameTestHelper>> TEST_FUNCTION = new MappedRegistry<>(net.minecraft.core.registries.Registries.TEST_FUNCTION);
     public static final Registry<? extends Registry<?>> REGISTRY = null;
     public static void bootStrap() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.registries.BuiltInRegistries#bootStrap");
+        return;
     }
     public static <T> HolderGetter<T> acquireBootstrapRegistrationLookup(Registry<T> registry) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.core.registries.BuiltInRegistries#acquireBootstrapRegistrationLookup");
+        return ((MappedRegistry<T>) registry).createRegistrationLookup();
     }
     interface RegistryBootstrap<T> {
         Object run(Registry<T> registry);

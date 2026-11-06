@@ -188,7 +188,9 @@ public class LevelChunkSection {
         return getBiomes().get(quartX, quartY, quartZ);
     }
     private LevelChunkSection(LevelChunkSection source) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunkSection#<init>");
+        this.states = source.getStates().copy();
+        this.biomes = source.getBiomes().copy();
+        recalcBlockCounts();
     }
     public void acquire() {
 
@@ -260,9 +262,17 @@ public class LevelChunkSection {
         return false;
     }
     public void fillBiomesFromNoise(BiomeResolver biomeResolver, int quartMinX, int quartMinY, int quartMinZ) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunkSection#fillBiomesFromNoise");
+        PalettedContainer<Holder<Biome>> fresh = getBiomes().recreate();
+        for (int x = 0; x < 4; x++) {
+            for (int y = 0; y < 4; y++) {
+                for (int z = 0; z < 4; z++) {
+                    fresh.getAndSetUnchecked(x, y, z, biomeResolver.getNoiseBiome(quartMinX + x, quartMinY + y, quartMinZ + z));
+                }
+            }
+        }
+        this.biomes = fresh;
     }
     public LevelChunkSection copy() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunkSection#copy");
+        return new LevelChunkSection(this);
     }
 }

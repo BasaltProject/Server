@@ -16,7 +16,24 @@ public class CreativeModeTabs {
     private static CreativeModeTab kSearch;
     private static CreativeModeTab.ItemDisplayParameters kParameters;
 
+    private static CreativeModeTab.DisplayItemsGenerator listed(String tab) {
+        return (parameters, output) -> {
+            if (tab.equals("op_blocks") && !parameters.hasPermissions()) {
+                return;
+            }
+            for (String id : org.basaltmc.bukkit.MechanicsNatives.creativeTabItems(tab)) {
+                Item item = BuiltInRegistries.ITEM.getValue(Identifier.withDefaultNamespace(id));
+                if (item != null) {
+                    output.accept(item);
+                }
+            }
+        };
+    }
+
     private static void add(Registry<CreativeModeTab> registry, String name, CreativeModeTab.Builder builder) {
+        if (!name.equals("search")) {
+            builder.displayItems(listed(name));
+        }
         CreativeModeTab tab = builder.build();
         Registry.register(registry, name, tab);
         kTabs.add(tab);
@@ -41,7 +58,21 @@ public class CreativeModeTabs {
         add(registry, "redstone_blocks", top(4, "itemGroup.redstone", () -> new ItemStack(Items.REDSTONE)));
         add(registry, "hotbar", top(5, "itemGroup.hotbar", () -> new ItemStack(Items.BOOKSHELF)).alignedRight().type(CreativeModeTab.Type.HOTBAR));
         add(registry, "search", top(6, "itemGroup.search", () -> new ItemStack(Items.COMPASS))
-            .displayItems((parameters, output) -> BuiltInRegistries.ITEM.stream().forEach(item -> output.accept(item, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY)))
+            .displayItems((parameters, output) -> {
+                java.util.Map<Item, List<ItemStack>> seen = new java.util.HashMap<>();
+                for (CreativeModeTab other : kTabs) {
+                    if (other.getType() == CreativeModeTab.Type.SEARCH) {
+                        continue;
+                    }
+                    for (ItemStack stack : other.getSearchTabDisplayItems()) {
+                        List<ItemStack> same = seen.computeIfAbsent(stack.getItem(), item -> new ArrayList<>());
+                        if (same.stream().noneMatch(known -> ItemStack.isSameItemSameComponents(known, stack))) {
+                            same.add(stack);
+                            output.accept(stack);
+                        }
+                    }
+                }
+            })
             .backgroundTexture(CreativeModeTab.createTextureLocation("item_search")).alignedRight().type(CreativeModeTab.Type.SEARCH));
         add(registry, "tools_and_utilities", bottom(0, "itemGroup.tools", () -> new ItemStack(Items.DIAMOND_PICKAXE)));
         add(registry, "combat", bottom(1, "itemGroup.combat", () -> new ItemStack(Items.NETHERITE_SWORD)));
@@ -88,8 +119,11 @@ public class CreativeModeTabs {
         }
         kParameters = new CreativeModeTab.ItemDisplayParameters(enabledFeatures, hasPermissions, lookup);
         for (CreativeModeTab tab : kTabs) {
-            tab.buildContents(kParameters);
+            if (tab != kSearch) {
+                tab.buildContents(kParameters);
+            }
         }
+        kSearch.buildContents(kParameters);
         return true;
     }
 }

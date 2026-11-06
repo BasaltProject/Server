@@ -365,7 +365,7 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
     public static final Codec<BlockState> FULL_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.block.state.BlockState.class, "FULL_CODEC");
     public static final Codec<BlockState> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.block.state.BlockState.class, "CODEC");
     public BlockState(Block owner, Property<?>[] propertyKeys, Comparable<?>[] propertyValues) {
-        super((net.minecraft.world.level.block.Block) null, (net.minecraft.world.level.block.state.properties.Property[]) null, (Comparable[]) null); throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.state.BlockState#<init>");
+        super(owner, propertyKeys, propertyValues);
     }
     protected BlockState asState() {
         return this;

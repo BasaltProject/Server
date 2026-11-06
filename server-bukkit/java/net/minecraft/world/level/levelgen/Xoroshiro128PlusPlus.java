@@ -16,6 +16,14 @@ public class Xoroshiro128PlusPlus {
         this(seed.seedLo(), seed.seedHi());
     }
 
+    public long stateLow() {
+        return seedLo;
+    }
+
+    public long stateHigh() {
+        return seedHi;
+    }
+
     public Xoroshiro128PlusPlus(long seedLo, long seedHi) {
         this.seedLo = seedLo;
         this.seedHi = seedHi;

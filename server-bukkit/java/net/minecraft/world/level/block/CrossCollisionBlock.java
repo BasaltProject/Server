@@ -17,17 +17,27 @@ public abstract class CrossCollisionBlock extends Block implements SimpleWaterlo
     protected CrossCollisionBlock(int index) {
         super(index);
     }
-    public static final BooleanProperty NORTH = PipeBlock.NORTH;
-    public static final BooleanProperty EAST = PipeBlock.EAST;
-    public static final BooleanProperty SOUTH = PipeBlock.SOUTH;
-    public static final BooleanProperty WEST = PipeBlock.WEST;
+    public static final BooleanProperty NORTH = BlockStateProperties.NORTH;
+    public static final BooleanProperty EAST = BlockStateProperties.EAST;
+    public static final BooleanProperty SOUTH = BlockStateProperties.SOUTH;
+    public static final BooleanProperty WEST = BlockStateProperties.WEST;
     public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
-    public static final Map<Direction, BooleanProperty> PROPERTY_BY_DIRECTION = null;
+    public static final Map<Direction, BooleanProperty> PROPERTY_BY_DIRECTION = Map.of(Direction.NORTH, NORTH, Direction.EAST, EAST, Direction.SOUTH, SOUTH, Direction.WEST, WEST);
     protected CrossCollisionBlock(float postWidth, float postHeight, float wallWidth, float wallHeight, float collisionHeight, BlockBehaviour.Properties properties) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
     }
     protected Function<BlockState, VoxelShape> makeShapes(float postWidth, float postHeight, float wallWidth, float wallBottom, float wallTop) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.block.CrossCollisionBlock#makeShapes");
+        VoxelShape post = Block.column(postWidth, 0.0, postHeight);
+        Map<Direction, VoxelShape> arms = net.minecraft.world.phys.shapes.Shapes.rotateHorizontal(Block.boxZ(wallWidth, wallBottom, wallTop, 0.0, 8.0));
+        return getShapeForEachState(state -> {
+            VoxelShape shape = post;
+            for (Map.Entry<Direction, BooleanProperty> entry : PROPERTY_BY_DIRECTION.entrySet()) {
+                if (state.getValue(entry.getValue())) {
+                    shape = net.minecraft.world.phys.shapes.Shapes.or(shape, arms.get(entry.getKey()));
+                }
+            }
+            return shape;
+        }, WATERLOGGED);
     }
     protected boolean propagatesSkylightDown(BlockState state) {
         return super.propagatesSkylightDown(state);

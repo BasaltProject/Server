@@ -51,7 +51,7 @@ public abstract class AbstractCow extends Animal {
         return live() instanceof org.bukkit.entity.AbstractCow api ? (float) api.getSoundVolume() : 0;
     }
     protected CowSoundVariant getSoundSet() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.entity.animal.cow.AbstractCow#getSoundSet");
+        return net.minecraft.sounds.SoundEvents.COW_SOUNDS.get(CowSoundVariants.SoundSet.CLASSIC);
     }
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         return net.minecraft.world.InteractionResult.PASS;

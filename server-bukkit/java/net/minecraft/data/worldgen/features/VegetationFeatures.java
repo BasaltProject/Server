@@ -75,7 +75,15 @@ public class VegetationFeatures {
         // registries come from the native datapack loader, so there is nothing to bootstrap
     }
     public static WeightedList.Builder<BlockState> leafLitterPatchBuilder(int minState, int maxState) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.VegetationFeatures#leafLitterPatchBuilder");
+        WeightedList.Builder<BlockState> builder = WeightedList.builder();
+        for (int amount = minState; amount <= maxState; amount++) {
+            for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                builder.add(net.minecraft.world.level.block.Blocks.LEAF_LITTER.defaultBlockState()
+                    .setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.SEGMENT_AMOUNT, amount)
+                    .setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, direction), 1);
+            }
+        }
+        return builder;
     }
     public static BlockPredicateFilter nearWaterPredicate(Block block) {
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.VegetationFeatures#nearWaterPredicate");

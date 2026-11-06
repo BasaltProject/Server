@@ -223,82 +223,101 @@ public abstract class DelegatingOps<T> implements DynamicOps<T> {
 
     @Override
     public ListBuilder<T> listBuilder() {
-        return delegate.listBuilder();
+        return new DelegateListBuilder(delegate.listBuilder());
     }
 
     @Override
     public RecordBuilder<T> mapBuilder() {
-        return delegate.mapBuilder();
+        return new DelegateRecordBuilder(delegate.mapBuilder());
     }
     protected class DelegateListBuilder implements ListBuilder<T> {
+        private final ListBuilder<T> original;
         protected DelegateListBuilder(ListBuilder<T> original) {
+            this.original = original;
         }
         public DynamicOps<T> ops() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateListBuilder#ops");
+            return DelegatingOps.this;
         }
         public DataResult<T> build(T prefix) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateListBuilder#build");
+            return original.build(prefix);
         }
         public ListBuilder<T> add(T value) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateListBuilder#add");
+            original.add(value);
+            return this;
         }
         public ListBuilder<T> add(DataResult<T> value) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateListBuilder#add");
+            original.add(value);
+            return this;
         }
         public <E> ListBuilder<T> add(E value, Encoder<E> encoder) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateListBuilder#add");
+            original.add(value, encoder);
+            return this;
         }
         public <E> ListBuilder<T> addAll(Iterable<E> values, Encoder<E> encoder) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateListBuilder#addAll");
+            original.addAll(values, encoder);
+            return this;
         }
         public ListBuilder<T> withErrorsFrom(DataResult<?> result) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateListBuilder#withErrorsFrom");
+            original.withErrorsFrom(result);
+            return this;
         }
         public ListBuilder<T> mapError(UnaryOperator<String> onError) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateListBuilder#mapError");
+            original.mapError(onError);
+            return this;
         }
         public DataResult<T> build(DataResult<T> prefix) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateListBuilder#build");
+            return original.build(prefix);
         }
     }
     protected class DelegateRecordBuilder implements RecordBuilder<T> {
+        private final RecordBuilder<T> original;
         protected DelegateRecordBuilder(RecordBuilder<T> original) {
+            this.original = original;
         }
         public DynamicOps<T> ops() {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#ops");
+            return DelegatingOps.this;
         }
         public RecordBuilder<T> add(T key, T value) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#add");
+            original.add(key, value);
+            return this;
         }
         public RecordBuilder<T> add(T key, DataResult<T> value) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#add");
+            original.add(key, value);
+            return this;
         }
         public RecordBuilder<T> add(DataResult<T> key, DataResult<T> value) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#add");
+            original.add(key, value);
+            return this;
         }
         public RecordBuilder<T> add(String key, T value) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#add");
+            original.add(key, value);
+            return this;
         }
         public RecordBuilder<T> add(String key, DataResult<T> value) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#add");
+            original.add(key, value);
+            return this;
         }
         public <E> RecordBuilder<T> add(String key, E value, Encoder<E> encoder) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#add");
+            original.add(key, value, encoder);
+            return this;
         }
         public RecordBuilder<T> withErrorsFrom(DataResult<?> result) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#withErrorsFrom");
+            original.withErrorsFrom(result);
+            return this;
         }
         public RecordBuilder<T> setLifecycle(Lifecycle lifecycle) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#setLifecycle");
+            original.setLifecycle(lifecycle);
+            return this;
         }
         public RecordBuilder<T> mapError(UnaryOperator<String> onError) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#mapError");
+            original.mapError(onError);
+            return this;
         }
         public DataResult<T> build(T prefix) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#build");
+            return original.build(prefix);
         }
         public DataResult<T> build(DataResult<T> prefix) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.resources.DelegatingOps.DelegateRecordBuilder#build");
+            return original.build(prefix);
         }
     }
 }

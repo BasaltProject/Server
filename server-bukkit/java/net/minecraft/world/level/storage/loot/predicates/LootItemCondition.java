@@ -18,10 +18,10 @@ public interface LootItemCondition extends LootContextUser, Predicate<LootContex
             return InvertedLootItemCondition.invert(this);
         }
         default AnyOfCondition.Builder or(Builder other) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.predicates.LootItemCondition.Builder#or");
+            return AnyOfCondition.anyOf(this, other);
         }
         default AllOfCondition.Builder and(Builder other) {
-            throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.storage.loot.predicates.LootItemCondition.Builder#and");
+            return AllOfCondition.allOf(this, other);
         }
     }
 }
