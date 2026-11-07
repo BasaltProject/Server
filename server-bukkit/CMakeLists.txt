@@ -1,8 +1,10 @@
 # The Bukkit compatibility layer, which embeds Basalt Shim. Added when cmake/BasaltBukkit.cmake finds a JDK.
 set(BASALT_JNI_INCLUDE_DIR "" CACHE PATH "Directory that holds jni.h (a JDK include directory)")
 if(NOT BASALT_JNI_INCLUDE_DIR)
-    file(GLOB BASALT_JDK_INCLUDES /usr/lib/jvm/*/include /Library/Java/JavaVirtualMachines/*/Contents/Home/include)
-    find_path(BASALT_JNI_INCLUDE_DIR_FOUND jni.h HINTS $ENV{JAVA_HOME}/include ${BASALT_JDK_INCLUDES})
+    file(GLOB BASALT_JDK_INCLUDES /usr/lib/jvm/*/include /usr/local/openjdk*/include
+         /Library/Java/JavaVirtualMachines/*/Contents/Home/include)
+    find_path(BASALT_JNI_INCLUDE_DIR_FOUND jni.h HINTS $ENV{JAVA_HOME}/include ${BASALT_JDK_INCLUDES}
+              NO_CMAKE_FIND_ROOT_PATH)
     set(BASALT_JNI_INCLUDE_DIR "${BASALT_JNI_INCLUDE_DIR_FOUND}")
 endif()
 if(NOT BASALT_JNI_INCLUDE_DIR)
@@ -39,7 +41,8 @@ basalt_module(server-bukkit
     DEPENDS basalt::server-plugins basalt::server-registry basalt::server-world basalt::wire-common basalt::wire-protocol
 )
 target_include_directories(server-bukkit SYSTEM PUBLIC ${BASALT_JNI_INCLUDE_DIR} ${BASALT_JNI_INCLUDE_DIR}/linux
-                                                      ${BASALT_JNI_INCLUDE_DIR}/darwin)
+                                                      ${BASALT_JNI_INCLUDE_DIR}/darwin ${BASALT_JNI_INCLUDE_DIR}/win32
+                                                      ${BASALT_JNI_INCLUDE_DIR}/freebsd)
 target_link_libraries(server-bukkit PUBLIC ${CMAKE_DL_LIBS})
 
 file(MAKE_DIRECTORY ${BASALT_BUKKIT_EMBED_DIR})
@@ -54,29 +57,38 @@ set_source_files_properties(src/BukkitEmbedded.cpp PROPERTIES OBJECT_DEPENDS "${
                             COMPILE_DEFINITIONS "BASALT_BUKKIT_EMBED_DIR=\"${BASALT_BUKKIT_EMBED_DIR}\"")
 
 if(BASALT_BUILD_TESTS)
-    add_test(NAME server-bukkit-stage-runtime-test
-        COMMAND ${CMAKE_COMMAND}
-            "-DSTAGE_SCRIPT=${CMAKE_SOURCE_DIR}/cmake/StageBukkitRuntime.cmake"
-            "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/stage-runtime-test"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/test/StageRuntimeTest.cmake")
+    if(NOT CMAKE_CROSSCOMPILING)
+        add_test(NAME server-bukkit-stage-runtime-test
+            COMMAND ${CMAKE_COMMAND}
+                "-DSTAGE_SCRIPT=${CMAKE_SOURCE_DIR}/cmake/StageBukkitRuntime.cmake"
+                "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/stage-runtime-test"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/test/StageRuntimeTest.cmake")
+    endif()
 
     basalt_test(server-bukkit-shim-smoke-test
         SOURCES test/ShimSmokeTest.cpp
         DEPENDS basalt::server-bukkit basalt::wire-protocol
     )
-    find_program(BASALT_TEST_JAVAC javac REQUIRED)
-    find_program(BASALT_TEST_JAVA java REQUIRED)
+    find_program(BASALT_TEST_JAVAC javac REQUIRED NO_CMAKE_FIND_ROOT_PATH)
+    find_program(BASALT_TEST_JAVA java REQUIRED NO_CMAKE_FIND_ROOT_PATH)
     set(BASALT_PATH_TEST_CLASSES "${CMAKE_CURRENT_BINARY_DIR}/path-test-classes")
-    add_test(NAME server-bukkit-path-translator-test
-        COMMAND ${CMAKE_COMMAND}
-            "-DJAVAC=${BASALT_TEST_JAVAC}" "-DJAVA=${BASALT_TEST_JAVA}"
-            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}" "-DOUT=${BASALT_PATH_TEST_CLASSES}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/test/PathTranslatorTest.cmake")
+    # A cross build's tests run on the target, which has no JDK
+    if(NOT CMAKE_CROSSCOMPILING)
+        add_test(NAME server-bukkit-path-translator-test
+            COMMAND ${CMAKE_COMMAND}
+                "-DJAVAC=${BASALT_TEST_JAVAC}" "-DJAVA=${BASALT_TEST_JAVA}"
+                "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}" "-DOUT=${BASALT_PATH_TEST_CLASSES}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/test/PathTranslatorTest.cmake")
+    endif()
+    set(BASALT_CP_SEP ":")
+    if(WIN32)
+        set(BASALT_CP_SEP "$<SEMICOLON>")
+    endif()
     set(BASALT_COMPAT_TEST_CLASSES "${CMAKE_CURRENT_BINARY_DIR}/compat-test-classes")
     add_custom_target(server-bukkit-compat-test-classes
         COMMAND ${CMAKE_COMMAND} -E make_directory "${BASALT_COMPAT_TEST_CLASSES}"
         COMMAND "${BASALT_TEST_JAVAC}" --release 25 -proc:none
-            -cp "${CMAKE_BINARY_DIR}/bukkit-runtime/basalt-bukkit.jar:${CMAKE_BINARY_DIR}/bukkit-runtime/lib/*"
+            -cp "${CMAKE_BINARY_DIR}/bukkit-runtime/basalt-bukkit.jar${BASALT_CP_SEP}${CMAKE_BINARY_DIR}/bukkit-runtime/lib/*"
             -d "${BASALT_COMPAT_TEST_CLASSES}" "${CMAKE_CURRENT_SOURCE_DIR}/test/java/RuntimeCompatibilityTest.java"
         COMMAND ${CMAKE_COMMAND} -E rm -f "${BASALT_COMPAT_TEST_CLASSES}/compatibility/MissingDependency.class"
         DEPENDS basalt-bukkit-runtime

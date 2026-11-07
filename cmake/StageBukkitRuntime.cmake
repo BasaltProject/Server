@@ -1,9 +1,15 @@
 # Copies the complete Bukkit runtime into the folder the server embeds.
 # Usage: cmake -DSHIM=<dir> -DRUNTIME=<dir> -DOUT=<dir> -P StageBukkitRuntime.cmake
-if(CMAKE_HOST_APPLE)
-    set(_lib libjvm.dylib)
-else()
-    set(_lib libjvm.so)
+# The library carries its platform's name: libjvm.dylib, libjvm.so or jvm.dll
+set(_lib "")
+foreach(_candidate libjvm.dylib libjvm.so jvm.dll)
+    if(EXISTS "${SHIM}/${_candidate}")
+        set(_lib ${_candidate})
+        break()
+    endif()
+endforeach()
+if(NOT _lib)
+    message(FATAL_ERROR "Bukkit runtime: ${SHIM} has no libjvm.dylib, libjvm.so or jvm.dll; see the Shim build log")
 endif()
 file(MAKE_DIRECTORY "${OUT}")
 set(_pieces

@@ -678,7 +678,7 @@ public final class NmsManifest {
             }
             try (Stream<Path> s = Files.walk(root)) {
                 s.filter(p -> p.toString().endsWith(".java")).forEach(p -> {
-                    String rel = root.relativize(p).toString();
+                    String rel = root.relativize(p).toString().replace('\\', '/');
                     skipTop.add(rel.substring(0, rel.length() - 5).replace('/', '.'));
                 });
             }
@@ -702,7 +702,7 @@ public final class NmsManifest {
             List<Path> handFiles;
             try (Stream<Path> w = Files.walk(root)) {
                 handFiles = w.filter(p -> p.toString().endsWith(".java")).filter(p -> {
-                    String rel = root.relativize(p).toString();
+                    String rel = root.relativize(p).toString().replace('\\', '/');
                     return index.containsKey(rel.substring(0, rel.length() - 5).replace('/', '.'));
                 }).toList();
             }

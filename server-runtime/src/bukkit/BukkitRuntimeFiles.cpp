@@ -20,6 +20,11 @@ namespace fs = std::filesystem;
 
 constexpr std::string_view kCacheRoot = ".basalt/bukkit";
 constexpr std::string_view kUnpackPrefix = "shim-";
+#ifdef _WIN32
+constexpr std::string_view kLibjvmName = "jvm.dll";
+#else
+constexpr std::string_view kLibjvmName = "libjvm";
+#endif
 constexpr std::size_t kMaxJarBytes = 128UL * 1024UL * 1024UL;
 
 [[nodiscard]] bool isFile(const fs::path& path) {
@@ -114,7 +119,7 @@ struct Coordinate {
     const fs::path directory = fs::absolute(
         fs::path{kCacheRoot} / (std::string{kUnpackPrefix} + assets::AssetCache::sha1Hex(identityBytes).substr(0, 16)));
     const std::array<std::pair<const char*, std::span<const std::uint8_t>>, 3> pieces{
-        {{"libjvm", embedded.libjvm},
+        {{kLibjvmName.data(), embedded.libjvm},
          {"classpath.jar", embedded.bootClasspath},
          {"basalt-bukkit.jar", embedded.runtimeJar}}};
     std::error_code error;
@@ -127,7 +132,8 @@ struct Coordinate {
             return std::unexpected(*failure);
         }
     }
-    fs::permissions(directory / "libjvm", fs::perms::owner_exec | fs::perms::group_exec, fs::perm_options::add, error);
+    fs::permissions(directory / kLibjvmName, fs::perms::owner_exec | fs::perms::group_exec, fs::perm_options::add,
+                    error);
     for (const fs::directory_entry& entry : fs::directory_iterator(kCacheRoot, error)) {
         const std::string name = entry.path().filename().string();
         if (name.starts_with(kUnpackPrefix) && name != directory.filename().string()) {
@@ -149,7 +155,7 @@ std::expected<BukkitRuntimeFiles, std::string> locateRuntime(const wire::common:
         return std::unexpected(directory.error());
     }
     BukkitRuntimeFiles files;
-    files.libjvm = (*directory / "libjvm").string();
+    files.libjvm = (*directory / kLibjvmName).string();
     files.bootClasspath = (*directory / "classpath.jar").string();
     files.runtimeJar = (*directory / "basalt-bukkit.jar").string();
 

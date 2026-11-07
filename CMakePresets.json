@@ -60,7 +60,6 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BASALT_WERROR": "ON",
-        "BASALT_BUILD_BUKKIT": "OFF",
         "ANDROID_PLATFORM": "android-29",
         "ANDROID_STL": "c++_static"
       }
@@ -86,17 +85,15 @@
       "inherits": "release",
       "displayName": "FreeBSD, native host target",
       "cacheVariables": {
-        "BASALT_BUILD_BUKKIT": "OFF",
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
       "name": "linux-musl",
       "inherits": "release",
-      "displayName": "Linux musl, static native host target",
+      "displayName": "Linux musl, native host target (static without the Bukkit layer)",
       "cacheVariables": {
         "BASALT_LINUX_MUSL": "ON",
-        "BASALT_BUILD_BUKKIT": "OFF",
         "CMAKE_BUILD_TYPE": "Release"
       }
     }

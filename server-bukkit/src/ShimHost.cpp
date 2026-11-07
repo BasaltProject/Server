@@ -2,7 +2,12 @@
 
 #include <array>
 #include <atomic>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <dlfcn.h>
+#endif
 
 namespace basalt::server::bukkit {
 namespace {
@@ -12,7 +17,11 @@ using CreateVm = jint (*)(JavaVM**, void**, void*);
     std::string out;
     for (const std::string& path : paths) {
         if (!out.empty()) {
+#ifdef _WIN32
+            out += ';';
+#else
             out += ':';
+#endif
         }
         out += path;
     }
@@ -23,11 +32,21 @@ using CreateVm = jint (*)(JavaVM**, void**, void*);
 ShimHost::~ShimHost() = default;
 
 std::expected<std::unique_ptr<ShimHost>, std::string> ShimHost::create(const ShimOptions& options) {
+#ifdef _WIN32
+    HMODULE module = LoadLibraryA(options.libjvm.c_str());
+    if (module == nullptr) {
+        return std::unexpected(std::string{"cannot load "} + options.libjvm + ": error " +
+                               std::to_string(GetLastError()));
+    }
+    void* library = module;
+    void* symbol = reinterpret_cast<void*>(GetProcAddress(module, "JNI_CreateJavaVM"));
+#else
     void* library = dlopen(options.libjvm.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (library == nullptr) {
         return std::unexpected(std::string{"cannot load "} + options.libjvm + ": " + dlerror());
     }
     void* symbol = dlsym(library, "JNI_CreateJavaVM");
+#endif
     if (symbol == nullptr) {
         return std::unexpected(options.libjvm + " has no JNI_CreateJavaVM");
     }
