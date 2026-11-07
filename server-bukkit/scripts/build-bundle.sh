@@ -8,6 +8,7 @@ work="${1:?work dir}"
 dest="${2:?runtime dir}"
 shim="${3:-}"
 
+native() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 sha1_of() { if command -v sha1sum >/dev/null; then sha1sum "$1"; else shasum -a 1 "$1"; fi; }
 
 skip() {
@@ -34,7 +35,7 @@ if [ "$stale" = 1 ]; then
     if [ ! -s "$work/bukkit-api.jar" ]; then
         IFS=: read -r _ artifact version <"$here/api.txt"
         url="https://repo.papermc.io/repository/maven-public/io/papermc/paper/$artifact/$version/$artifact-$version.jar"
-        curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 180 "$url" -o "$work/bukkit-api.part" || skip "could not download $url"
+        curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 180 "$url" -o "$(native "$work/bukkit-api.part")" || skip "could not download $url"
         [ "$(curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 180 "$url.sha1" | cut -c1-40)" = "$(sha1_of "$work/bukkit-api.part" | cut -c1-40)" ] \
             || skip "the SHA-1 of $url does not match"
         mv "$work/bukkit-api.part" "$work/bukkit-api.jar"
@@ -57,9 +58,11 @@ else
     cp "$here/deps.txt" "$dest/libs.txt"
 fi
 
-lib=libjvm.so
-[ "$(uname -s)" = Darwin ] && lib=libjvm.dylib
-if [ -n "$shim" ] && [ -f "$shim/$lib" ] && [ -f "$shim/classpath.jar" ]; then
+lib=""
+for candidate in libjvm.dylib libjvm.so jvm.dll; do
+    [ -n "$shim" ] && [ -f "$shim/$candidate" ] && lib="$candidate" && break
+done
+if [ -n "$lib" ] && [ -f "$shim/classpath.jar" ]; then
     for file in "$lib" classpath.jar; do
         cmp -s "$shim/$file" "$dest/shim/$file" || cp "$shim/$file" "$dest/shim/$file"
     done

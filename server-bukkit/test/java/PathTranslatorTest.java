@@ -10,7 +10,7 @@ public final class PathTranslatorTest {
 
     private static void is(String what, String path, Access access, String real) {
         Resolved r = t.resolve(Path.of(path));
-        String got = r.real() == null ? null : root.relativize(r.real()).toString();
+        String got = r.real() == null ? null : root.relativize(r.real()).toString().replace('\\', '/');
         if (r.access() != access || (real != null && !real.equals(got))) {
             throw new AssertionError(what + ": " + path + " -> " + r.access() + " " + got + " (" + r.rule() + ")");
         }
@@ -39,8 +39,9 @@ public final class PathTranslatorTest {
         is("world generated", "main/generated/minecraft/structure/a.nbt", Access.READ_WRITE,
             "generated/minecraft/structure/a.nbt");
         is("shadow idempotent", ".basalt/bukkit/shadow/root/x", Access.READ_WRITE, ".basalt/bukkit/shadow/root/x");
-        t.allowOutside(Path.of("/dev/null"), Access.READ_WRITE);
-        is("allowed outside", "/dev/null", Access.READ_WRITE, null);
+        Path outside = root.resolveSibling(root.getFileName() + "-outside").resolve("file");
+        t.allowOutside(outside, Access.READ_WRITE);
+        is("allowed outside", outside.toString(), Access.READ_WRITE, null);
         is("plugin data", "plugins/Foo/config.yml", Access.READ_WRITE, "plugins/Foo/config.yml");
         is("root file", "myfile.txt", Access.READ_WRITE, ".basalt/bukkit/shadow/root/myfile.txt");
         is("server.properties", "server.properties", Access.READ_WRITE, ".basalt/bukkit/shadow/root/server.properties");

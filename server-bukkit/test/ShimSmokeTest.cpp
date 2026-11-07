@@ -15,6 +15,12 @@
 #include <span>
 #include <string>
 
+#ifdef _WIN32
+constexpr const char* kLibjvmFile = "jvm.dll";
+#else
+constexpr const char* kLibjvmFile = "libjvm";
+#endif
+
 namespace fs = std::filesystem;
 using namespace basalt::server::bukkit;
 
@@ -71,7 +77,7 @@ TEST_CASE("the embedded Shim boots and resolves the Bukkit runtime over JNI") {
         REQUIRE(stream.good());
         return fs::absolute(path).string();
     };
-    ShimOptions options{.libjvm = unpack("libjvm", embedded.libjvm),
+    ShimOptions options{.libjvm = unpack(kLibjvmFile, embedded.libjvm),
                         .bootClasspath = unpack("classpath.jar", embedded.bootClasspath),
                         .classpath = {unpack("basalt-bukkit.jar", embedded.runtimeJar)}};
     for (const fs::directory_entry& jar : fs::directory_iterator(fs::path{BASALT_TEST_RUNTIME_DIR} / "lib")) {

@@ -39,9 +39,8 @@ jobs:
           ref: ${{ inputs.ref }}
 
       - uses: actions/setup-java@v4
-        if: inputs.target != 'Windows-arm64'
         with:
-          distribution: temurin
+          distribution: ${{ inputs.target == 'Windows-arm64' && 'microsoft' || 'temurin' }}
           java-version: "25"
 
       - name: Install the toolchain
@@ -60,6 +59,24 @@ jobs:
         with:
           path: ~/libcxx-*
           key: libcxx-${{ inputs.target }}-${{ hashFiles('.github/scripts/select-compiler.sh') }}
+
+      - name: Install the MinGW toolchain for Shim
+        if: runner.os == 'Windows'
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ inputs.target == 'Windows-arm64' && 'CLANGARM64' || 'CLANG64' }}
+          update: false
+          install: >-
+            ${{ inputs.target == 'Windows-arm64' && 'mingw-w64-clang-aarch64' || 'mingw-w64-clang-x86_64' }}-clang
+            ${{ inputs.target == 'Windows-arm64' && 'mingw-w64-clang-aarch64' || 'mingw-w64-clang-x86_64' }}-lld
+            ${{ inputs.target == 'Windows-arm64' && 'mingw-w64-clang-aarch64' || 'mingw-w64-clang-x86_64' }}-ninja
+            ${{ inputs.target == 'Windows-arm64' && 'mingw-w64-clang-aarch64' || 'mingw-w64-clang-x86_64' }}-zlib
+
+      - name: Point the build at the MinGW toolchain
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "BASALT_SHIM_MINGW_BIN=${{ steps.msys2.outputs.msys2-location }}\\${{ inputs.target == 'Windows-arm64' && 'clangarm64' || 'clang64' }}\\bin" >>"$GITHUB_ENV"
 
       - name: Select the compiler
         shell: bash

@@ -3,6 +3,10 @@
 #ifdef __APPLE__
 #define BASALT_EMBED_SECTION ".section __DATA,__const\n"
 #define BASALT_EMBED_SYMBOL(name) "_" #name
+#elif defined(_WIN32)
+// 64-bit Windows does not decorate C names
+#define BASALT_EMBED_SECTION ".section .rdata,\"dr\"\n"
+#define BASALT_EMBED_SYMBOL(name) #name
 #else
 #define BASALT_EMBED_SECTION ".section .rodata\n"
 #define BASALT_EMBED_SYMBOL(name) #name
