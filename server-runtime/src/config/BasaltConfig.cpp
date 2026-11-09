@@ -300,6 +300,10 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
             std::string{server->string("resource-pack-prompt").value_or(defaults.resourcePackPrompt)};
         config.gamemode = std::string{server->string("gamemode").value_or(defaults.gamemode)};
         config.whitelist = server->boolean("whitelist").value_or(defaults.whitelist);
+        if (server->find("update-checker") != nullptr && !server->boolean("update-checker").has_value()) {
+            return std::unexpected(std::string{path} + ": update-checker must be true or false");
+        }
+        config.updateChecker = server->boolean("update-checker").value_or(defaults.updateChecker);
         for (const auto& [key, target] :
              {std::pair<const char*, std::int32_t*>{"pause-when-empty-seconds", &config.pauseWhenEmptySeconds},
               std::pair<const char*, std::int32_t*>{"spawn-protection", &config.spawnProtection}}) {

@@ -1,12 +1,15 @@
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
+#include <basalt/server/runtime/UpdateChecker.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 
+#include <stop_token>
 #include <string>
 
 namespace basalt::server::runtime {
@@ -52,6 +55,19 @@ void BasaltServer::startQuery() {
             return info;
         },
         logger_);
+}
+
+void BasaltServer::startUpdateCheck() {
+    if (!config_->updateChecker || !updateChecker::parseVersion(buildInfo::kVersion).has_value()) {
+        return;
+    }
+    updateChecker_ = std::jthread{[this](const std::stop_token& stop) {
+        wire::common::nameCurrentThread("UpdateCheck");
+        if (!accepting_.load() || stop.stop_requested()) {
+            return;
+        }
+        updateChecker::checkAndAnnounce(buildInfo::kVersion, logger_, stop);
+    }};
 }
 
 } // namespace basalt::server::runtime

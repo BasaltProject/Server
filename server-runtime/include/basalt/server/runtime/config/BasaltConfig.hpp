@@ -51,6 +51,7 @@ struct BasaltConfig {
     std::int32_t pauseWhenEmptySeconds = 60;
     /// parity: `spawn-protection`.
     std::int32_t spawnProtection = 16;
+    bool updateChecker = true;
     wire::auth::forwarding::ProxyForwarding forwarding;
     remote::RemoteSettings remote;
     ServerTuning tuning;

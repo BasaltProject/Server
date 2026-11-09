@@ -238,6 +238,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         return line + ".";
     });
     config::forwardingConfig::announce(config_->forwarding, config_->onlineMode, config_->port, logger_);
+    startUpdateCheck();
     if (options_.onReady) {
         options_.onReady();
     }
@@ -362,6 +363,10 @@ void BasaltServer::shutdown() {
 
     serverWatchdog_.reset();
     query_.reset();
+    updateChecker_.request_stop();
+    if (updateChecker_.joinable() && updateChecker_.get_id() != std::this_thread::get_id()) {
+        updateChecker_.join();
+    }
     tickLoop_->stop();
     // The joined tick thread no longer owns the plugin lifecycle. Disable
     // callbacks are synchronous on this thread and must still be able to use

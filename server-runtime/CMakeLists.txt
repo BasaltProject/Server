@@ -364,6 +364,7 @@ basalt_module(server-runtime-core
         src/ServerListStatus.cpp
         src/ServerMetrics.cpp
         src/StatusEffectSystem.cpp
+        src/UpdateChecker.cpp
         src/VanillaGameData.cpp
         src/WorldRegistry.cpp
         src/SubstituteLabels.cpp

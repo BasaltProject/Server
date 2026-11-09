@@ -125,6 +125,10 @@ max-chained-neighbor-updates = 1000000
 # the playable area is never wider than twice this, whatever size the border is set to. 1 to 29999984.
 max-world-size = 29999984
 
+# Check GitHub at startup for newer releases (or newer nightlies, on a nightly build) and log a warning when this
+# build is behind.
+update-checker = true
+
 [network]
 # The two editions are two doors into the same server: the same worlds, the same
 # players, the same chat. Neither is a layer on top of the other, so each one has

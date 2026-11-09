@@ -192,6 +192,8 @@ private:
 
     void startQuery();
 
+    void startUpdateCheck();
+
     void reportOrphanedPluginData();
 
     void awaitShutdown();
@@ -386,6 +388,7 @@ private:
 
     std::vector<ConnectionThread> connections_;
     std::jthread watchdog_;
+    std::jthread updateChecker_;
 };
 
 } // namespace basalt::server::runtime

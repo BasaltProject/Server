@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/runtime/UpdateChecker.hpp>
 #include <basalt/server/runtime/config/BasaltConfig.hpp>
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
@@ -67,6 +68,7 @@ TEST_CASE("the commented default is what a vanilla server would have been") {
     CHECK(config.port == 25565);
     CHECK(config.maxPlayers == 80);
     CHECK(config.onlineMode);
+    CHECK(config.updateChecker);
     CHECK(config.gamemode == "survival");
     CHECK_FALSE(config.whitelist);
     CHECK_FALSE(config.forwarding.enabled());
@@ -416,5 +418,104 @@ TEST_CASE("Java listen addresses are explicit literals with optional IPv6 dual s
         const auto root = toml::parse("[network.java]\n" + std::string{text});
         REQUIRE(root);
         CHECK_FALSE(BasaltConfig::fromToml(*root, "config/server.toml"));
+    }
+}
+
+TEST_CASE("update-checker defaults to true and can be disabled in server.toml") {
+    CHECK(parsed("").updateChecker);
+    CHECK(parsed("[server]\nupdate-checker = true\n").updateChecker);
+    CHECK_FALSE(parsed("[server]\nupdate-checker = false\n").updateChecker);
+
+    const auto invalid = toml::parse("[server]\nupdate-checker = \"no\"\n");
+    REQUIRE(invalid.has_value());
+    CHECK_FALSE(BasaltConfig::fromToml(*invalid, "config/server.toml").has_value());
+}
+
+TEST_CASE("update checker compares releases and nightlies on their own channels") {
+    namespace uc = basalt::server::runtime::updateChecker;
+
+    CHECK_FALSE(uc::parseVersion("0.0.0-dev").has_value());
+    CHECK_FALSE(uc::parseVersion("26.3.0-dev").has_value());
+    CHECK_FALSE(uc::parseVersion("26.3.2-ci18").has_value());
+    CHECK_FALSE(uc::parseVersion("26.3.0").has_value());
+    CHECK_FALSE(uc::parseVersion("26.3.2-n0").has_value());
+
+    const auto rel = uc::parseVersion("v26.3.2");
+    REQUIRE(rel.has_value());
+    CHECK_FALSE(rel->isNightly());
+    CHECK(rel->base == std::vector<std::int32_t>{26, 3, 2});
+    CHECK(rel->raw == "26.3.2");
+
+    const auto nightly = uc::parseVersion("Nightly 26.3.2-n5");
+    REQUIRE(nightly.has_value());
+    CHECK(nightly->isNightly());
+    CHECK(nightly->base == std::vector<std::int32_t>{26, 3, 2});
+    CHECK(nightly->nightly == 5);
+    CHECK(nightly->raw == "26.3.2-n5");
+
+    constexpr std::string_view kReleasesJson = R"([
+        {"tag_name": "v26.3.3", "name": "26.3.3", "prerelease": false, "draft": false},
+        {"tag_name": "v26.3.2", "name": "26.3.2", "prerelease": false, "draft": false},
+        {"tag_name": "v26.3.1", "name": "26.3.1", "prerelease": false, "draft": false},
+        {"tag_name": "nightly", "name": "Nightly 26.3.3-n4", "prerelease": true, "draft": false}
+    ])";
+
+    // Up-to-date release logs nothing.
+    CHECK_FALSE(uc::evaluate("26.3.3", kReleasesJson).has_value());
+    // Development and CI builds never announce updates.
+    CHECK_FALSE(uc::evaluate("26.3.0-dev", kReleasesJson).has_value());
+    CHECK_FALSE(uc::evaluate("26.3.1-ci4", kReleasesJson).has_value());
+
+    // Release build behind by 2 releases only reports releases, never the nightly.
+    const auto releaseBehind = uc::evaluate("26.3.1", kReleasesJson);
+    REQUIRE(releaseBehind.has_value());
+    CHECK(releaseBehind->channel == uc::Channel::Release);
+    CHECK(releaseBehind->latestVersion == "26.3.3");
+    CHECK(releaseBehind->buildsBehind == 2);
+    CHECK(releaseBehind->message().find("2 releases behind") != std::string::npos);
+    CHECK(releaseBehind->message().find("bug fixes, features and security fixes") != std::string::npos);
+
+    // Nightly build on the same base release reports how many nightlies behind it is.
+    const auto nightlySameBase = uc::evaluate("26.3.3-n1", kReleasesJson);
+    REQUIRE(nightlySameBase.has_value());
+    CHECK(nightlySameBase->channel == uc::Channel::Nightly);
+    CHECK(nightlySameBase->latestVersion == "26.3.3-n4");
+    CHECK(nightlySameBase->buildsBehind == 3);
+    CHECK(nightlySameBase->releasesBehind == 0);
+    CHECK(nightlySameBase->message().find("3 nightly builds behind") != std::string::npos);
+
+    // Up-to-date nightly logs nothing.
+    CHECK_FALSE(uc::evaluate("26.3.3-n4", kReleasesJson).has_value());
+
+    // Nightly build from an older base release reports both the releases and nightlies passed.
+    const auto nightlyOlderBase = uc::evaluate("26.3.2-n2", kReleasesJson);
+    REQUIRE(nightlyOlderBase.has_value());
+    CHECK(nightlyOlderBase->channel == uc::Channel::Nightly);
+    CHECK(nightlyOlderBase->latestVersion == "26.3.3-n4");
+    CHECK(nightlyOlderBase->releasesBehind == 1);
+    CHECK(nightlyOlderBase->buildsBehind == 4);
+    CHECK(nightlyOlderBase->message().find("1 release and 4 nightly builds behind") != std::string::npos);
+
+    // checkAndAnnounce logs a warning only when behind.
+    {
+        const CapturedLog log;
+        uc::checkAndAnnounce("26.3.3", basalt::wire::common::Logger{"Server"}, {},
+                             [kReleasesJson](std::string_view) { return std::optional<std::string>{kReleasesJson}; });
+        CHECK(log.size() == 0);
+    }
+    {
+        const CapturedLog log;
+        uc::checkAndAnnounce("26.3.2", basalt::wire::common::Logger{"Server"}, {},
+                             [kReleasesJson](std::string_view) { return std::optional<std::string>{kReleasesJson}; });
+        CHECK(log.saidSomethingWith("1 release behind"));
+    }
+    if (std::getenv("BASALT_TEST_LIVE_UPDATE_CHECK") != nullptr) {
+        const CapturedLog releaseLog;
+        uc::checkAndAnnounce("26.3.1", basalt::wire::common::Logger{"Server"});
+        CHECK(releaseLog.saidSomethingWith("A new release of Basalt Server is available:"));
+
+        const CapturedLog nightlyLog;
+        uc::checkAndAnnounce("26.3.2-n1", basalt::wire::common::Logger{"Server"});
+        CHECK(nightlyLog.saidSomethingWith("A new nightly build of Basalt Server is available:"));
     }
 }
