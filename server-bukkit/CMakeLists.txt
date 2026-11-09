@@ -69,8 +69,25 @@ if(BASALT_BUILD_TESTS)
         SOURCES test/ShimSmokeTest.cpp
         DEPENDS basalt::server-bukkit basalt::wire-protocol
     )
-    find_program(BASALT_TEST_JAVAC javac REQUIRED NO_CMAKE_FIND_ROOT_PATH)
-    find_program(BASALT_TEST_JAVA java REQUIRED NO_CMAKE_FIND_ROOT_PATH)
+    # Runners ship an older system javac that can shadow PATH lookups; prefer JAVA_HOME outright.
+    # Do not preset BASALT_TEST_* to "": find_program skips searching when the variable is already set.
+    foreach(_tool javac java)
+        string(TOUPPER "${_tool}" _tool_var)
+        set(_basalt_jdk_tool "")
+        if(DEFINED ENV{JAVA_HOME})
+            foreach(_candidate "$ENV{JAVA_HOME}/bin/${_tool}" "$ENV{JAVA_HOME}/bin/${_tool}.exe")
+                if(EXISTS "${_candidate}")
+                    set(_basalt_jdk_tool "${_candidate}")
+                    break()
+                endif()
+            endforeach()
+        endif()
+        if(_basalt_jdk_tool)
+            set(BASALT_TEST_${_tool_var} "${_basalt_jdk_tool}")
+        else()
+            find_program(BASALT_TEST_${_tool_var} ${_tool} HINTS $ENV{JAVA_HOME}/bin REQUIRED NO_CACHE NO_CMAKE_FIND_ROOT_PATH)
+        endif()
+    endforeach()
     set(BASALT_PATH_TEST_CLASSES "${CMAKE_CURRENT_BINARY_DIR}/path-test-classes")
     # A cross build's tests run on the target, which has no JDK
     if(NOT CMAKE_CROSSCOMPILING)

@@ -53,7 +53,15 @@ function(basalt_bukkit_runtime)
             if(CMAKE_CROSSCOMPILING)
                 set(_cross_file "${CMAKE_BINARY_DIR}/shim-cross-args.txt")
                 set(_cross_args "")
-                foreach(_name CMAKE_TOOLCHAIN_FILE ANDROID_ABI ANDROID_PLATFORM ANDROID_STL CMAKE_SYSTEM_NAME
+                # Shim must not configure through the vcpkg toolchain; pass the toolchain vcpkg chainloads instead
+                set(_shim_toolchain "${CMAKE_TOOLCHAIN_FILE}")
+                if(NOT "${VCPKG_CHAINLOAD_TOOLCHAIN_FILE}" STREQUAL "" AND "${_shim_toolchain}" MATCHES "vcpkg\\.cmake$")
+                    set(_shim_toolchain "${VCPKG_CHAINLOAD_TOOLCHAIN_FILE}")
+                endif()
+                if(NOT "${_shim_toolchain}" STREQUAL "")
+                    string(APPEND _cross_args "-DCMAKE_TOOLCHAIN_FILE=${_shim_toolchain}\n")
+                endif()
+                foreach(_name ANDROID_ABI ANDROID_PLATFORM ANDROID_STL CMAKE_SYSTEM_NAME
                               CMAKE_SYSTEM_PROCESSOR CMAKE_C_COMPILER CMAKE_CXX_COMPILER CMAKE_ASM_COMPILER
                               CMAKE_C_COMPILER_TARGET CMAKE_CXX_COMPILER_TARGET CMAKE_ASM_COMPILER_TARGET
                               CMAKE_SYSROOT CMAKE_CXX_FLAGS CMAKE_EXE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS
@@ -83,7 +91,7 @@ function(basalt_bukkit_runtime)
             endif()
             add_custom_target(basalt-shim ALL
                 COMMAND ${_shim_env} ${BASALT_BASH} ${CMAKE_SOURCE_DIR}/server-bukkit/scripts/build-shim.sh ${CMAKE_SOURCE_DIR}/shim ${_shim}
-                        ${CMAKE_SOURCE_DIR}/wire/third_party/zlib ${_cross_file}
+                        ${BASALT_ZLIB_INCLUDE_DIR} ${_cross_file}
                 COMMENT "Building Basalt Shim (the embedded Java machine)"
                 VERBATIM
             )
