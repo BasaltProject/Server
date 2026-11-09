@@ -63,10 +63,10 @@ constexpr auto kRequestTimeout = std::chrono::seconds{10};
     return numbers;
 }
 
-[[nodiscard]] std::string stringField(const wire::common::JsonObject& object, std::string_view key) {
+[[nodiscard]] std::string_view stringField(const wire::common::JsonObject& object, std::string_view key) {
     const wire::common::JsonValue* value = object.find(key);
     const std::string* text = value == nullptr ? nullptr : value->get<std::string>();
-    return text == nullptr ? std::string{} : *text;
+    return text == nullptr ? std::string_view{} : std::string_view{*text};
 }
 
 [[nodiscard]] bool boolField(const wire::common::JsonObject& object, std::string_view key) {
@@ -117,8 +117,8 @@ void collectReleaseObject(const wire::common::JsonObject& object, Catalog& catal
     if (boolField(object, "draft")) {
         return;
     }
-    const std::string tag = stringField(object, "tag_name");
-    const std::string title = stringField(object, "name");
+    const std::string_view tag = stringField(object, "tag_name");
+    const std::string_view title = stringField(object, "name");
     const bool prerelease = boolField(object, "prerelease");
 
     if (tag == "nightly" || prerelease) {
