@@ -87,8 +87,6 @@ TEST_CASE("every commented default is valid TOML") {
         {"server.toml", kServerDefaultToml},
         {"server_list.toml", kServerListDefaultToml},
         {"tab_list.toml", kTabListDefaultToml},
-        {"world_mobs.toml", kWorldMobsDefaultToml},
-        {"world_mobs_local.toml", kWorldMobsLocalDefaultToml},
         {"world_settings.toml", kWorldSettingsDefaultToml},
         {"worlds.toml", kWorldsDefaultToml},
     };
@@ -102,9 +100,10 @@ TEST_CASE("every commented default is valid TOML") {
 
 TEST_CASE("the generated mob defaults are vanilla's") {
     const std::string root = scratch("config-mobs");
-    const std::expected<MobSettings, std::string> loaded = loadMobDefaults(ConfigDirectory{root});
+    const std::expected<WorldsConfig, std::string> loaded = WorldsConfig::load(ConfigDirectory{root}, root + "/worlds");
     REQUIRE(loaded.has_value());
-    CHECK(*loaded == MobSettings::vanilla());
+    CHECK_FALSE(fileIO::exists(root + "/worlds/mobs.toml"));
+    CHECK(loaded->settingsFor(loaded->defaultWorld()).mobs == MobSettings::vanilla());
 }
 
 TEST_CASE("an override naming an unknown field is refused with the file") {
@@ -117,11 +116,10 @@ TEST_CASE("an override naming an unknown field is refused with the file") {
 }
 
 TEST_CASE("the generated world rules read back as vanilla's") {
-    const std::string text = std::string{kWorldsDefaultToml} + worldRulesTemplate(true);
-    const auto parsed = toml::parse(text);
+    const auto parsed = toml::parse(kWorldsDefaultToml);
     REQUIRE(parsed.has_value());
     CHECK(WorldSettings::from(parsed->table("defaults"), WorldSettings::vanilla()) == WorldSettings::vanilla());
-    CHECK(toml::parse(std::string{kWorldSettingsDefaultToml} + worldRulesTemplate(false)).has_value());
+    CHECK(toml::parse(kWorldSettingsDefaultToml).has_value());
 }
 
 TEST_CASE("an override reads drops, name lists and refuses an unknown goal") {

@@ -131,14 +131,6 @@ struct WorldRules {
     friend bool operator==(const WorldRules&, const WorldRules&) = default;
 };
 
-/// Shared with the gameplay half of the template, which lives in its own file.
-[[nodiscard]] std::string renderRulesTemplate(std::string_view text, bool forDefaults);
-
-[[nodiscard]] std::string_view tuningRulesTemplate() noexcept;
-
 void readTuningRules(const wire::common::toml::TomlTable& table, TuningRules& rules);
-
-/// The commented sections of the rules, as `[defaults.x]` for worlds.toml or commented `[x]` for a world's own file.
-[[nodiscard]] std::string worldRulesTemplate(bool forDefaults);
 
 } // namespace basalt::server::runtime::config

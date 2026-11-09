@@ -1,6 +1,5 @@
 #pragma once
 
-#include <basalt/server/runtime/config/ConfigDirectory.hpp>
 #include <basalt/wire/common/toml/Toml.hpp>
 
 #include <array>
@@ -169,12 +168,6 @@ struct MobSettings {
 
     friend bool operator==(const MobSettings&, const MobSettings&) = default;
 };
-
-/// config/worlds/mobs.toml, generated on first run: the defaults every world inherits.
-[[nodiscard]] std::expected<MobSettings, std::string> loadMobDefaults(const ConfigDirectory& directory);
-
-/// worlds/<name>/mobs.toml over the defaults; a broken file costs that world its overrides, logged by name.
-[[nodiscard]] MobSettings loadWorldMobs(const std::string& worldDirectory, const MobSettings& defaults);
 
 [[nodiscard]] std::string_view mobCategoryKey(std::size_t index);
 

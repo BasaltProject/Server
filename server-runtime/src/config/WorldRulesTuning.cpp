@@ -11,79 +11,6 @@ namespace {
 using wire::common::toml::TomlTable;
 using wire::common::toml::TomlValue;
 
-constexpr std::string_view kGameplayTemplate = R"([fire]
-# Ticks a fire waits before it spreads or burns out; each tick adds a random 0 to 9 on top, as vanilla does. Vanilla
-# is 30. Anything else is NOT VANILLA.
-tick-delay = 30
-
-[hunger]
-# Exhaustion each action adds, vanilla's values. Anything else is NOT VANILLA.
-sprint-exhaustion = 0.1
-swim-exhaustion = 0.01
-jump-exhaustion = 0.05
-sprint-jump-exhaustion = 0.2
-combat-exhaustion = 0.1
-# Spent every time natural regeneration heals with a food bar of 18 or more.
-regen-exhaustion = 6.0
-
-[growth-height]
-# How tall a plant may grow before it stops. Anything but vanilla's value is NOT VANILLA.
-cactus = 3
-sugar-cane = 3
-bamboo = 16
-
-[sounds]
-# How far from the event, in blocks, players hear it. 0 is vanilla: the whole server hears it.
-dragon-death-radius = 0.0
-wither-spawn-radius = 0.0
-
-[chunks]
-# Chunks around the world spawn that stay loaded without a player. Vanilla keeps 1.
-keep-spawn-loaded-range = 1
-# Chunks the server snapshots in one go while it saves; each batch is a short turn on the tick thread, so a lower
-# number smooths the tick and makes a save take longer.
-autosave-batch-size = 8
-# Chunks beyond a player's view distance that stay loaded before the unloading sweep takes them.
-unload-margin = 4
-
-[combat]
-# NOT VANILLA. Hitting something with a knockback weapon does not stop the attacker from sprinting.
-keep-sprint-on-attack = false
-
-[block-updates]
-# NOT VANILLA. Stops those blocks from reshaping when a neighbour changes (a note block keeps its instrument).
-disable-noteblock-updates = false
-disable-tripwire-updates = false
-disable-chorus-plant-updates = false
-disable-mushroom-block-updates = false
-
-[explosions]
-# NOT VANILLA. The most primed TNT that may go off in one tick; the rest wait for the next tick. -1 is no limit.
-max-tnt-per-tick = -1
-
-[maps]
-# Markers a map may track before an item frame refuses to show it. Vanilla is 256.
-item-frame-cursor-limit = 256
-# Ticks between the checks that keep a map in an item frame up to date. Vanilla is 10.
-item-frame-cursor-update-interval = 10
-
-[end]
-# NOT VANILLA. Leaving the End for the first time takes the player straight home, without the credits.
-disable-credits = false
-
-[leash]
-# How far a leashed mob may get from its holder, in blocks, before the lead snaps. Vanilla is 12.
-max-distance = 12.0
-
-[command-blocks]
-# Permission level the commands of command blocks and command block minecarts run at, 0 to 4. Vanilla is 2.
-permission-level = 2
-
-[collisions]
-# Whether players push each other. Vanilla is true; false is NOT VANILLA.
-enable-player-collisions = true
-)";
-
 [[nodiscard]] std::int32_t whole(const TomlTable& table, std::string_view key, std::int32_t fallback,
                                  std::int64_t least, std::int64_t most) {
     return ruleErrors::whole(table, key, fallback, least, most);
@@ -94,8 +21,6 @@ enable-player-collisions = true
 }
 
 } // namespace
-
-std::string_view tuningRulesTemplate() noexcept { return kGameplayTemplate; }
 
 void readTuningRules(const TomlTable& table, TuningRules& rules) {
     if (const TomlTable* fire = table.table("fire"); fire != nullptr) {

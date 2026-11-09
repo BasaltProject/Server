@@ -109,3 +109,605 @@ loot-refill-max-seconds = 172800
 loot-max-refills = -1
 # How long a player must wait to loot a refilled container they already looted. -1 is never.
 loot-reloot-seconds = -1
+
+# Rules that change how this world plays. Every value shown is vanilla's.
+# Anything that differs from vanilla is marked NOT VANILLA. Read when a world loads, so editing needs a restart.
+
+[defaults.gamerules]
+# Initial game rules of a world that is being created. A world that already has its level data keeps
+# its own rules, and /gamerule still changes them afterwards. Names are the vanilla 26.3 ones, so
+# pvp, spawn_monsters, advance_time and advance_weather live here too.
+# keep_inventory = true
+# pvp = false
+# random_tick_speed = 6
+
+[defaults.growth]
+# How often plants try to grow, as a percent of vanilla's chance. 100 is vanilla, 0 stops the plant,
+# 200 makes it grow twice as often. Anything but 100 is NOT VANILLA.
+# Wheat, carrots, potatoes, beetroots, torchflower and pitcher plants.
+crops = 100
+# Pumpkin and melon stems.
+stems = 100
+saplings = 100
+cactus = 100
+sugar-cane = 100
+bamboo = 100
+vines = 100
+kelp = 100
+cave-vines = 100
+twisting-vines = 100
+weeping-vines = 100
+nether-wart = 100
+sweet-berries = 100
+cocoa = 100
+mushrooms = 100
+chorus-flower = 100
+
+[defaults.hopper]
+# Ticks a hopper rests after moving an item. Vanilla is 8; anything else is NOT VANILLA.
+transfer-ticks = 8
+# Items moved each time a hopper acts, from the same stack. Vanilla is 1; anything else is NOT VANILLA.
+amount = 1
+# A hopper only looks for work on ticks that are a multiple of this. Vanilla is 1, every tick.
+check-ticks = 1
+
+[defaults.environment]
+# One in this many chances per chunk and tick, while it thunders, that lightning strikes there.
+thunder-chance = 100000
+# How far, in blocks of the destination dimension times 8 for the Nether, a portal looks for an existing
+# portal to come out of (vanilla: 128 around the destination in the Overworld, 16 in the Nether).
+portal-search-radius = 128
+# How far from the wanted spot a new portal may be built when none is found.
+portal-create-radius = 16
+# Whether falling out of the world hurts. Turn it off for a sky world that should never kill.
+void-damage = true
+# NOT VANILLA. Rain can still fall but it never thunders, so there is no lightning and no skeleton traps.
+disable-thunder = false
+# NOT VANILLA. Explosions still hurt but never push anything: players, mobs, items and primed TNT stay put.
+disable-explosion-knockback = false
+# NOT VANILLA. Weather no longer freezes still water into ice or piles snow on the ground.
+disable-ice-and-snow = false
+# NOT VANILLA. Players at or above this height in the Nether take void damage, which keeps them off the roof.
+# 0 turns it off, as vanilla has it.
+nether-ceiling-void-damage-height = 0
+# Ticks a bobber waits for a fish to come, drawn between the two (before Lure shortens it). Vanilla is 100 to 600.
+fishing-min-wait-ticks = 100
+fishing-max-wait-ticks = 600
+
+[defaults.border]
+# The world border a world STARTS with. A world that already has a saved border keeps it,
+# and /worldborder changes it afterwards. Size is the full width in blocks.
+size = 59999968.0
+center-x = 0.0
+center-z = 0.0
+damage-per-block = 0.2
+damage-buffer = 5.0
+warning-distance = 5
+warning-time = 15
+
+[defaults.anti-xray]
+# NOT VANILLA. Hides ores from clients that cheat by reading the chunk data they are sent. Blocks that
+# touch nothing see-through are replaced in the chunk packets; whoever mines next to them is sent the
+# real blocks. Players on Bedrock are not covered yet.
+enabled = false
+# 1: the hidden blocks are shown as the plain rock of the dimension (stone, deepslate, netherrack or end stone).
+# 2: the hidden blocks and the replacement blocks are all shown as random hidden blocks, fake ores included.
+# 3: as 2, but a whole layer of a section gets the same fake block, which is much cheaper.
+engine-mode = 1
+# Blocks that are hidden. In modes 2 and 3 they also make up the fake ores, so leave out blocks with
+# an inventory.
+hidden-blocks = ["copper_ore", "deepslate_copper_ore", "gold_ore", "deepslate_gold_ore", "iron_ore", "deepslate_iron_ore", "coal_ore", "deepslate_coal_ore", "lapis_ore", "deepslate_lapis_ore", "mossy_cobblestone", "obsidian", "diamond_ore", "deepslate_diamond_ore", "redstone_ore", "deepslate_redstone_ore", "clay", "emerald_ore", "deepslate_emerald_ore"]
+# Modes 2 and 3 only: ordinary blocks that are swapped for fake ores as well.
+replacement-blocks = ["stone", "oak_planks", "deepslate"]
+# Only blocks below this height are touched, rounded down to a multiple of 16.
+max-block-height = 64
+# When a block is broken, the hidden blocks within this many blocks of it (0 to 2) are sent for real.
+update-radius = 2
+# Treat lava as solid, so ores behind a lava lake stay hidden.
+lava-obscures = false
+# Let players with the permission basalt.antixray.bypass see everything.
+use-permission = false
+
+[defaults.fire]
+# Ticks a fire waits before it spreads or burns out; each tick adds a random 0 to 9 on top, as vanilla does. Vanilla
+# is 30. Anything else is NOT VANILLA.
+tick-delay = 30
+
+[defaults.hunger]
+# Exhaustion each action adds, vanilla's values. Anything else is NOT VANILLA.
+sprint-exhaustion = 0.1
+swim-exhaustion = 0.01
+jump-exhaustion = 0.05
+sprint-jump-exhaustion = 0.2
+combat-exhaustion = 0.1
+# Spent every time natural regeneration heals with a food bar of 18 or more.
+regen-exhaustion = 6.0
+
+[defaults.growth-height]
+# How tall a plant may grow before it stops. Anything but vanilla's value is NOT VANILLA.
+cactus = 3
+sugar-cane = 3
+bamboo = 16
+
+[defaults.sounds]
+# How far from the event, in blocks, players hear it. 0 is vanilla: the whole server hears it.
+dragon-death-radius = 0.0
+wither-spawn-radius = 0.0
+
+[defaults.chunks]
+# Chunks around the world spawn that stay loaded without a player. Vanilla keeps 1.
+keep-spawn-loaded-range = 1
+# Chunks the server snapshots in one go while it saves; each batch is a short turn on the tick thread, so a lower
+# number smooths the tick and makes a save take longer.
+autosave-batch-size = 8
+# Chunks beyond a player's view distance that stay loaded before the unloading sweep takes them.
+unload-margin = 4
+
+[defaults.combat]
+# NOT VANILLA. Hitting something with a knockback weapon does not stop the attacker from sprinting.
+keep-sprint-on-attack = false
+
+[defaults.block-updates]
+# NOT VANILLA. Stops those blocks from reshaping when a neighbour changes (a note block keeps its instrument).
+disable-noteblock-updates = false
+disable-tripwire-updates = false
+disable-chorus-plant-updates = false
+disable-mushroom-block-updates = false
+
+[defaults.explosions]
+# NOT VANILLA. The most primed TNT that may go off in one tick; the rest wait for the next tick. -1 is no limit.
+max-tnt-per-tick = -1
+
+[defaults.maps]
+# Markers a map may track before an item frame refuses to show it. Vanilla is 256.
+item-frame-cursor-limit = 256
+# Ticks between the checks that keep a map in an item frame up to date. Vanilla is 10.
+item-frame-cursor-update-interval = 10
+
+[defaults.end]
+# NOT VANILLA. Leaving the End for the first time takes the player straight home, without the credits.
+disable-credits = false
+
+[defaults.leash]
+# How far a leashed mob may get from its holder, in blocks, before the lead snaps. Vanilla is 12.
+max-distance = 12.0
+
+[defaults.command-blocks]
+# Permission level the commands of command blocks and command block minecarts run at, 0 to 4. Vanilla is 2.
+permission-level = 2
+
+[defaults.collisions]
+# Whether players push each other. Vanilla is true; false is NOT VANILLA.
+enable-player-collisions = true
+
+# Gameplay rules, ported from the options Purpur offers. Applied when the world loads: restart to change them.
+
+[defaults.gameplay.blocks]
+# Block behaviour.
+# Adjacent water sources that turn flowing water into a new source (vanilla 2). NOT VANILLA if changed.
+water-infinite-required-sources = 2
+# Adjacent lava sources that turn flowing lava into a new source. -1 leaves it to the lava_source_conversion game rule (vanilla).
+lava-infinite-required-sources = -1
+# Ticks between lava flow steps in the Nether (vanilla 10).
+lava-speed-nether = 10
+# Ticks between lava flow steps outside the Nether (vanilla 30).
+lava-speed-not-nether = 30
+# Most blocks a sponge may absorb in one go, itself included (vanilla 65).
+sponge-absorption-area = 65
+# How far from the sponge water is looked for, in blocks (vanilla 6).
+sponge-absorption-radius = 6
+# Most blocks one piston may push (vanilla 12).
+piston-block-push-limit = 12
+# How many powered rails away a signal still reaches (vanilla 8).
+powered-rail-activation-range = 8
+# NOT VANILLA when true. A sneaking player standing on magma is hurt too.
+magma-block-damage-when-sneaking = false
+# Sleeping in a bed outside the overworld explodes it (vanilla true). False makes the use do nothing.
+bed-explode = true
+# Power of that explosion (vanilla 5.0).
+bed-explosion-power = 5.0
+# The bed explosion starts fires (vanilla true).
+bed-explosion-fire = true
+# A campfire is lit when placed (vanilla true). Placed in water it is never lit.
+campfire-lit-when-placed = true
+# A cactus breaks when a solid block touches its side (vanilla true).
+cactus-breaks-from-solid-neighbors = true
+# Coral dies a few seconds after it leaves water (vanilla true).
+coral-die-outside-water = true
+# NOT VANILLA when true. A chest opens even with a solid block on top (vanilla false).
+chest-open-with-solid-block-on-top = false
+# NOT VANILLA when true. A sponge soaks up lava as well as water.
+sponge-absorbs-lava = false
+# NOT VANILLA when true. A sponge turns mud it touches into clay.
+sponge-absorbs-water-from-mud = false
+# NOT VANILLA when true. A note block sounds even with a block on top.
+note-block-ignore-above = false
+# How far a one-level beacon reaches, in blocks (vanilla 20).
+beacon-effect-range-level-1 = 20
+# Range of a two-level beacon (vanilla 30).
+beacon-effect-range-level-2 = 30
+# Range of a three-level beacon (vanilla 40).
+beacon-effect-range-level-3 = 40
+# Range of a four-level beacon (vanilla 50).
+beacon-effect-range-level-4 = 50
+# NOT VANILLA when true. Tinted glass above a beacon no longer stops its effects.
+beacon-allow-effects-with-tinted-glass = false
+# A charged respawn anchor explodes when used outside the Nether (vanilla true). False makes the use do nothing.
+respawn-anchor-explode = true
+# Power of that explosion (vanilla 5.0).
+respawn-anchor-explosion-power = 5.0
+# That explosion starts fires (vanilla true).
+respawn-anchor-explosion-fire = true
+# An end crystal without its base plate explodes when destroyed (vanilla true).
+end-crystal-baseless-explode = true
+# Power of that explosion (vanilla 6.0).
+end-crystal-baseless-explosion-power = 6.0
+# That explosion starts fires (vanilla false).
+end-crystal-baseless-explosion-fire = false
+# An end crystal with its base plate explodes when destroyed (vanilla true).
+end-crystal-base-explode = true
+# Power of that explosion (vanilla 6.0).
+end-crystal-base-explosion-power = 6.0
+# That explosion starts fires (vanilla false).
+end-crystal-base-explosion-fire = false
+# NOT VANILLA when true. End crystals can be placed on any block, not only obsidian and bedrock.
+end-crystal-place-anywhere = false
+# The dragon egg teleports when clicked or hit (vanilla true).
+dragon-egg-teleport = true
+# NOT VANILLA when above 0. Health a player loses per hit when standing on a stonecutter.
+stonecutter-damage = 0.0
+# NOT VANILLA when true. A spawner stops while it is powered by redstone.
+spawner-deactivate-by-redstone = false
+# How far a lightning rod pulls a strike in, in blocks (vanilla 128).
+lightning-rod-range = 128
+# NOT VANILLA when true. Nothing tramples farmland by landing on it.
+farmland-disable-trampling = false
+# NOT VANILLA when true. Only players trample farmland.
+farmland-only-players-trample = false
+# NOT VANILLA when true. Feather falling at least as deep as the fall stops trampling.
+farmland-feather-fall-distance-affects-trampling = false
+# NOT VANILLA when 0 or more. Trample whenever the fall is at least this far, with no random roll. -1 keeps vanilla.
+farmland-trample-height = -1.0
+# Age at which kelp stops growing taller, 0 to 25 (vanilla 25).
+kelp-max-growth-age = 25
+# Age at which cave vines stop growing, 0 to 25 (vanilla 25).
+cave-vines-max-growth-age = 25
+# Age at which twisting vines stop growing, 0 to 25 (vanilla 25).
+twisting-vines-max-growth-age = 25
+# Age at which weeping vines stop growing, 0 to 25 (vanilla 25).
+weeping-vines-max-growth-age = 25
+# Ticks a big dripleaf stays unstable before it tilts (vanilla 10).
+big-dripleaf-tilt-delay-unstable = 10
+# Ticks a big dripleaf stays partly tilted (vanilla 10).
+big-dripleaf-tilt-delay-partial = 10
+# Ticks a big dripleaf stays fully tilted before it rights itself (vanilla 100).
+big-dripleaf-tilt-delay-full = 100
+# NOT VANILLA when true. A bubble column over magma pushes up instead of pulling down.
+magma-block-reverse-bubble-column-flow = false
+# NOT VANILLA when true. A bubble column over soul sand pulls down instead of pushing up.
+soul-sand-reverse-bubble-column-flow = false
+# Each repair makes the next one dearer (vanilla true). False keeps repairs at their base cost.
+anvil-cumulative-cost = true
+# Bees a hive can hold (vanilla 3). A hive with its own MaxBees keeps that.
+beehive-max-bees-inside = 3
+# NOT VANILLA when true. Bone meal grows a cactus one block taller, up to three.
+cactus-affected-by-bonemeal = false
+# NOT VANILLA when true. Bone meal grows sugar cane one block taller, up to three.
+sugar-cane-affected-by-bonemeal = false
+# NOT VANILLA when true. Bone meal ages nether wart by one stage.
+nether-wart-affected-by-bonemeal = false
+# "default" follows the mob_griefing game rule, "true" or "false" forces whether mobs trample farmland.
+farmland-mob-griefing-override = "default"
+# "default" follows the mob_griefing game rule, "true" or "false" forces whether a large fireball sets fire where it lands.
+fireballs-mob-griefing-override = "default"
+# NOT VANILLA when true. Two observers facing each other no longer set one another off, which ends observer clocks.
+observer-disable-clock = false
+# NOT VANILLA when above 0. End crystals packed more than this many into one another explode.
+end-crystal-cramming-amount = 0
+# NOT VANILLA when true. A bed that explodes for players outside the overworld also explodes under a sleeping villager.
+bed-explode-on-villager-sleep = false
+# NOT VANILLA when true. Sneaking while breaking a double slab breaks only the half you are looking at.
+slab-break-individual-slabs-when-sneaking = false
+# NOT VANILLA when true. A pickaxe (iron or better) with Silk Touch drops the spawner with its mob.
+silk-touch-spawner-enabled = false
+# Silk Touch level the pickaxe needs to take a spawner.
+silk-touch-minimal-level = 1
+# NOT VANILLA when true. A ripe wheat, carrot, potato or beetroot crop broken with a hoe is replanted for one of its seeds.
+hoe-replant-crops = false
+# NOT VANILLA when true. Ripe nether wart broken with a hoe is replanted for one of its seeds.
+hoe-replant-nether-warts = false
+# NOT VANILLA when true. `&` colour codes (and `&#rrggbb`) typed on a sign colour its text.
+sign-allow-colors = false
+# NOT VANILLA when true. `&` colour codes typed into an anvil rename colour the item name.
+anvil-allow-colors = false
+# NOT VANILLA when true, with anvil-allow-colors. The typed name is read as MiniMessage instead of `&` codes.
+anvil-use-mini-message = false
+# Chance per random tick that a turtle egg on sand cracks or hatches (the 26.3 turtle_egg_hatch_chance attribute, vanilla 0.002).
+turtle-egg-hatch-chance = 0.002
+# "default" follows mob_griefing, "true" or "false" forces whether mobs landing on turtle eggs break them. Players always can.
+turtle-egg-mob-griefing-override = "default"
+
+[defaults.gameplay.mechanics]
+# Rules of the world that are not one block or item.
+# Ticks between player drowning hits once the air is gone (vanilla 20).
+drowning-ticks-per-damage = 20
+# Health lost by one player drowning hit, 2.0 being one heart (vanilla 2.0).
+drowning-damage = 2.0
+# Health restored by one regeneration pulse on a player (vanilla 1.0).
+health-regen-amount = 1.0
+# Health lost by one poison pulse on a player (vanilla 1.0).
+poison-degeneration-amount = 1.0
+# Health lost by one wither pulse on a player (vanilla 1.0).
+wither-degeneration-amount = 1.0
+# Exhaustion added per tick by the hunger effect, per level (vanilla 0.005).
+hunger-exhaustion-amount = 0.005
+# Durability an elytra loses every second of flight (vanilla 1).
+elytra-damage-per-second = 1
+# NOT VANILLA when above 0. Extra durability an elytra loses per firework boost.
+elytra-damage-per-firework-boost = 0
+# Milk clears bad omen and raid omen (vanilla true). False lets them survive.
+milk-cures-bad-omen = true
+# Milk clears beneficial effects too (vanilla true).
+milk-clears-beneficial-effects = true
+# NOT VANILLA when above 0. Seconds a player must wait before starting another raid.
+raid-cooldown-seconds = 0
+# NOT VANILLA when above 0. Seconds a player must wait before feeding the same kind of animal into love again.
+animal-breeding-cooldown-seconds = 0
+# Skipping the night by sleeping clears rain (vanilla true).
+rain-stops-after-sleep = true
+# Skipping the night by sleeping clears thunder (vanilla true).
+thunder-stops-after-sleep = true
+# Ticks the bright half of the day lasts (vanilla 12000). NOT VANILLA if changed.
+daylight-daytime-ticks = 12000
+# Ticks the dark half of the day lasts (vanilla 12000). NOT VANILLA if changed.
+daylight-nighttime-ticks = 12000
+# Ticks after a player hit a mob during which its death counts as a player kill for drops and experience (vanilla 100). Melee only.
+mob-last-hurt-by-player-time = 100
+# Mobs and other non-player entities can travel through portals (vanilla true).
+entities-can-use-portals = true
+# NOT VANILLA when true. Riders are put out of a boat as soon as it runs aground.
+boat-eject-players-on-land = false
+
+[defaults.gameplay.player]
+# Player rules.
+# Damage multiplier of a player critical hit (vanilla 1.5).
+critical-damage-multiplier = 1.5
+# NOT VANILLA when true. A totem anywhere in the inventory saves from death, not only in a hand.
+totem-of-undying-works-in-inventory = false
+# Ticks a player waits between picking up experience orbs (vanilla 2).
+exp-pickup-delay-ticks = 2
+# Sleeping through the night can skip it (vanilla true). False keeps the night whatever the sleepers.
+can-skip-night = true
+# NOT VANILLA when true. Monsters near a bed no longer stop a player sleeping.
+sleep-ignore-nearby-mobs = false
+# NOT VANILLA when true. A creative player kills whatever they hit in one blow.
+creative-one-punch = false
+
+[defaults.gameplay.items]
+# Item and projectile rules.
+# Fall damage dealt to the thrower when a pearl lands (vanilla 5.0).
+ender-pearl-damage = 5.0
+# Ticks before a player can throw another ender pearl (vanilla 20).
+ender-pearl-cooldown = 20
+# The same for a creative player (vanilla 20).
+ender-pearl-creative-cooldown = 20
+# Chance that a landing pearl spawns an endermite (vanilla 0.05).
+ender-pearl-endermite-spawn-chance = 0.05
+# Damage a snowball deals. -1 is vanilla: nothing, or 3 to a blaze.
+snowball-damage = -1
+# Inaccuracy of an arrow shot from a bow; 0 flies straight (vanilla 1.0).
+projectile-offset-bow = 1.0
+# Inaccuracy of a crossbow bolt (vanilla 1.0).
+projectile-offset-crossbow = 1.0
+# Inaccuracy of a thrown egg (vanilla 1.0).
+projectile-offset-egg = 1.0
+# Inaccuracy of a thrown ender pearl (vanilla 1.0).
+projectile-offset-ender-pearl = 1.0
+# Inaccuracy of a thrown splash or lingering potion (vanilla 1.0).
+projectile-offset-throwable-potion = 1.0
+# Inaccuracy of a thrown trident (vanilla 1.0).
+projectile-offset-trident = 1.0
+# Inaccuracy of a thrown snowball (vanilla 1.0).
+projectile-offset-snowball = 1.0
+# Inaccuracy of a thrown wind charge (vanilla 1.0).
+projectile-offset-wind-charge = 1.0
+# Top speed of a minecart in blocks per tick, when minecart_improvements is off (vanilla 0.4).
+minecart-max-speed = 0.4
+# NOT VANILLA when true. A minecart can be placed on any block, not only on rails.
+minecart-place-anywhere = false
+# Speed a powered rail adds to a minecart, when minecart_improvements is off (vanilla 0.06).
+powered-rail-boost-modifier = 0.06
+# NOT VANILLA when below 0. A loyal trident that sinks under this height flies home instead of being lost.
+trident-loyalty-void-return-height = 0.0
+# A shulker box item that burns, blows up or is pricked away spills its contents (vanilla true).
+shulker-box-drop-contents-when-destroyed = true
+
+# Mob, spawning and entity-lifetime settings, inherited by every world and overridable in
+# worlds/<name>/settings.toml under [mobs.*]. Every value below is vanilla's own. Restart to apply.
+
+[defaults.mobs.caps]
+# Mobs of a category that may be alive in the area around the players (vanilla's "mob cap", scaled by the
+# number of loaded spawn chunks). 0 stops natural spawning of that category.
+monster = 70
+creature = 10
+ambient = 15
+axolotls = 5
+underground-water-creature = 5
+water-creature = 5
+water-ambient = 20
+
+[defaults.mobs.spawn-interval-ticks]
+# A category is tried for natural spawning once every this many ticks. Vanilla tries creatures (animals) every
+# 400 ticks and everything else every tick. 0 stops natural spawning of that category.
+monster = 1
+creature = 400
+ambient = 1
+axolotls = 1
+underground-water-creature = 1
+water-creature = 1
+water-ambient = 1
+
+[defaults.mobs.spawning]
+# NOT VANILLA when true. Skips the world-wide cap check, so only each player's own share of the cap limits
+# spawning near them: one busy player no longer starves everyone else's surroundings.
+per-player-mob-spawns = false
+# How far from a player, in chunks, natural spawning reaches. Vanilla spawns within 8 chunks (128 blocks).
+range-chunks = 8
+# NOT VANILLA when 0 or more. Monsters then spawn wherever the brightness (sky and block light together) is at
+# most this level, replacing vanilla's own darkness rules. -1 keeps vanilla's.
+monster-max-light-level = -1
+
+[defaults.mobs.despawn]
+# sphere is vanilla: distance to the nearest player is measured in three dimensions. cylinder ignores height.
+shape = "sphere"
+# A mob must have gone this many ticks without a player near before it may despawn at random (vanilla 600).
+idle-ticks-before-random = 600
+# Between the soft and hard ranges, a mob that has idled long enough despawns with a chance of 1 in this
+# number each tick (vanilla 800).
+random-odds = 800
+
+# Per category: farther than hard-range from every player a mob despawns at once, between soft-range and
+# hard-range it may despawn at random, and inside soft-range it never does. Ranges are in blocks.
+[defaults.mobs.despawn.monster]
+soft-range = 32
+hard-range = 128
+[defaults.mobs.despawn.creature]
+soft-range = 32
+hard-range = 128
+[defaults.mobs.despawn.ambient]
+soft-range = 32
+hard-range = 128
+[defaults.mobs.despawn.axolotls]
+soft-range = 32
+hard-range = 128
+[defaults.mobs.despawn.underground-water-creature]
+soft-range = 32
+hard-range = 128
+[defaults.mobs.despawn.water-creature]
+soft-range = 32
+hard-range = 128
+[defaults.mobs.despawn.water-ambient]
+soft-range = 32
+hard-range = 64
+
+[defaults.mobs.items]
+# Ticks a dropped item lives before it vanishes (vanilla 6000, five minutes).
+despawn-ticks = 6000
+# Blocks around an item within which same-kind items merge into one stack (vanilla 0.5).
+merge-radius = 0.5
+
+[defaults.mobs.experience]
+# Blocks around an experience orb within which orbs of the same size merge (vanilla 0.5).
+merge-radius = 0.5
+
+[defaults.mobs.projectiles]
+# Ticks an arrow stays stuck in the ground before it vanishes (vanilla 1200).
+arrow-despawn-ticks = 1200
+# The same for a thrown trident that does not return to its owner (vanilla 1200).
+trident-despawn-ticks = 1200
+
+[defaults.mobs.tracking-range]
+# How far, in chunks, an entity of the category is shown to a player. 0 keeps vanilla's own range for each
+# entity type; a larger value is capped by the player's view distance.
+animals = 0
+monsters = 0
+misc = 0
+display = 0
+other = 0
+
+[defaults.mobs.phantoms]
+# Seconds between phantom spawn attempts are drawn between these two values (vanilla 60 to 119).
+spawn-attempt-min-seconds = 60
+spawn-attempt-max-seconds = 119
+# A player who has not rested for this many ticks starts attracting phantoms (vanilla 72000, one hour).
+insomnia-ticks = 72000
+
+[defaults.mobs.pillager-patrols]
+# Ticks between patrol attempts (vanilla 12000 plus up to 1200 more at random).
+interval-ticks = 12000
+interval-jitter-ticks = 1200
+# An attempt goes ahead with a chance of 1 in this number (vanilla 5).
+attempt-odds = 5
+# World time, in ticks, before patrols may start (vanilla 120000, five days).
+start-ticks = 120000
+
+[defaults.mobs.wandering-trader]
+# Ticks between the day-long countdowns that may bring a trader (vanilla 24000).
+spawn-delay-ticks = 24000
+# Percent chance a trader comes when the countdown ends: it starts at the minimum, grows by the increase each
+# miss up to the maximum, and returns to the minimum after a spawn (vanilla 25, 75 and 25).
+min-spawn-chance = 25
+max-spawn-chance = 75
+spawn-chance-increase = 25
+# Ticks between checks of the countdown (vanilla 1200).
+check-interval-ticks = 1200
+
+# Per entity type tweaks. Each [defaults.mobs.overrides.<entity_type>] table lists only the fields to change; a field left out
+# is vanilla's value for that type. <entity_type> is a type name such as zombie (minecraft: is implied).
+# Attribute fields replace the base value each time a mob enters the world, spawned or loaded.
+#
+# Attributes (numbers):
+#   max-health, attack-damage, movement-speed, follow-range, armor, armor-toughness, knockback-resistance,
+#   attack-knockback, flying-speed, jump-strength, scale, safe-fall-distance, fall-damage-multiplier,
+#   explosion-knockback-resistance, oxygen-bonus, gravity, step-height, tempt-range
+#   max-health-min/max, movement-speed-min/max, jump-strength-min/max
+#       a value drawn uniformly per mob between the two (one bound alone fixes the value); the plain field wins
+# Rewards:
+#   experience-multiplier   number: multiplies the experience a death drops (0 drops none)
+#   always-drop-exp         true: drops experience even when no player landed the killing blow
+#   drops-enabled           false removes its death loot
+#   drops-replace           true: the drops below replace its loot instead of adding to it
+#   [defaults.mobs.overrides.<type>.drops.<item>]   one table per extra drop, with chance (0 to 1), min and max (0 to 64)
+# Behaviour (true or false):
+#   burn-in-daylight          burns in sunlight (or stops burning)
+#   no-ai                     does nothing at all, like a mob with NoAI
+#   persistent                never despawns
+#   can-pick-up-loot          picks up items it walks over
+#   no-gravity                floats without falling
+#   collidable                pushes and is pushed by other entities
+#   can-swim                  navigation may route through water and the mob floats in it
+#   opens-doors               navigation may open doors
+#   passes-doors              navigation may walk through open doors
+#   takes-damage-from-water   water and rain hurt it, one heart of damage per tick like an enderman's
+#   mob-griefing              overrides the world's mobGriefing rule for this type
+#   can-breed                 false: feeding it never starts love
+#   explode-when-killed       a creeper that dies also explodes
+#   ridable                   a player clicking it with an empty hand, not crouching, rides it
+#   controllable              its rider steers it with the movement keys and jump (walking and swimming mobs)
+#   ridable-in-water          riders are dropped when it is in water unless true
+# Spawning (natural spawns only):
+#   spawn-enabled             false stops natural spawning of this type
+#   spawn-weight              whole number: replaces the weight of its spawn entries (0 removes them)
+#   spawn-min-light, spawn-max-light, spawn-min-y, spawn-max-y   limits on where it may spawn
+#   spawn-biomes              list of biome names or #tags it may spawn in, such as ["minecraft:plains", "#minecraft:is_forest"]
+#   baby-chance, jockey-chance   chances (0 to 1) of a baby zombie and of its chicken jockey (vanilla 0.05 both)
+#   jockey-only-babies, jockey-try-existing-chickens   zombie jockey rules (vanilla true and true)
+#   charged-chance            chance (0 to 1) a creeper spawns charged (vanilla 0)
+# Whole numbers:
+#   max-no-damage-ticks  invulnerability after a hit, in ticks
+#   max-air-supply       air it holds underwater, in ticks
+#   breed-cooldown       ticks before an animal can breed again (vanilla 6000)
+#   offspring-min, offspring-max, offspring-chance   number of babies from one breeding and the chance of any
+#   despawn-soft-range, despawn-hard-range   despawn distances in blocks for this type
+#   explosion-radius     power of a creeper's blast (vanilla 3)
+#   ridable-max-y        riders are dropped above this height
+# Lists of names:
+#   breeding-items   items that feed it, replacing the vanilla ones (and what tempts it)
+#   disabled-goals   AI goals removed from it, such as panic, look_at_player, avoid_entity, melee_attack,
+#                    nearest_attackable_player, breed, tempt, follow_owner
+#
+# [defaults.mobs.overrides.zombie]
+# max-health = 40.0
+# burn-in-daylight = false
+# [defaults.mobs.overrides.cow]
+# breed-cooldown = 1200
+# ridable = true
+# controllable = true
+# disabled-goals = ["panic"]
+# [defaults.mobs.overrides.cow.drops.diamond]
+# chance = 0.5
+# min = 1
+# max = 2
+# [defaults.mobs.overrides.creeper]
+# explosion-radius = 1
+# mob-griefing = false

@@ -53,6 +53,15 @@ std::expected<WorldSettings, std::string> WorldSettings::parse(const TomlTable* 
     if (scope.error().has_value()) {
         return std::unexpected(std::string{file} + ": " + *scope.error());
     }
+    if (table != nullptr) {
+        if (const TomlTable* mobs = table->table("mobs"); mobs != nullptr) {
+            std::expected<MobSettings, std::string> parsedMobs = MobSettings::from(*mobs, inherited.mobs, file);
+            if (!parsedMobs.has_value()) {
+                return std::unexpected(parsedMobs.error());
+            }
+            settings.mobs = *std::move(parsedMobs);
+        }
+    }
     return settings;
 }
 
@@ -79,6 +88,12 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
     settings.lootMaxRefills = ruleErrors::whole(*table, "loot-max-refills", inherited.lootMaxRefills, -1, kMost);
     settings.lootRelootSeconds =
         ruleErrors::whole(*table, "loot-reloot-seconds", inherited.lootRelootSeconds, -1, kMost);
+    if (const TomlTable* mobs = table->table("mobs"); mobs != nullptr) {
+        if (std::expected<MobSettings, std::string> parsedMobs = MobSettings::from(*mobs, inherited.mobs, "");
+            parsedMobs.has_value()) {
+            settings.mobs = *std::move(parsedMobs);
+        }
+    }
     settings.rules = WorldRules::from(table, inherited.rules);
     const GameplayRules inheritedRules = inherited.gameplay.ptr != nullptr ? *inherited.gameplay.ptr : GameplayRules{};
     settings.gameplay =
@@ -225,26 +240,23 @@ WorldSettings WorldsConfig::settingsFor(const WorldDeclaration& world) const {
     const std::string directory = worldsRoot_ + "/" + world.name;
     const std::string path = directory + "/settings.toml";
     const std::optional<std::string> text = wire::io::fileIO::readText(path);
-    WorldSettings settings = defaults_;
-    settings.mobs = loadWorldMobs(directory, defaults_.mobs);
     if (!text.has_value()) {
         // Asked rather than left to the write failing: what is being decided is whether the world exists.
         if (wire::io::fileIO::isDirectory(directory)) {
-            wire::io::fileIO::writeText(path, std::string{kWorldSettingsDefaultToml} + worldRulesTemplate(false) +
-                                                  std::string{kGameplayWorldSettingsDefaultToml});
+            wire::io::fileIO::writeText(path, kWorldSettingsDefaultToml);
         }
-        return settings;
+        return defaults_;
     }
     const std::expected<TomlTable, wire::common::toml::TomlError> parsed = wire::common::toml::parse(*text);
     // An unparsable settings file loses one world's preferences, not the server's configuration.
     if (!parsed.has_value()) {
-        return settings;
+        return defaults_;
     }
-    std::expected<WorldSettings, std::string> checked = WorldSettings::parse(&*parsed, settings, path);
+    std::expected<WorldSettings, std::string> checked = WorldSettings::parse(&*parsed, defaults_, path);
     if (!checked.has_value()) {
         const wire::common::Logger logger{"Config"};
         logger.warn([&checked] { return checked.error() + " This world keeps the default settings."; });
-        return settings;
+        return defaults_;
     }
     return *std::move(checked);
 }
@@ -302,9 +314,7 @@ std::expected<WorldsConfig, std::string> WorldsConfig::load(const ConfigDirector
                                                             const std::string& worldsRoot,
                                                             const wire::common::Logger& logger) {
     const std::string path = directory.pathOf(kFileName);
-    const std::expected<TomlTable, std::string> root =
-        directory.load(kFileName, std::string{kWorldsDefaultToml} + worldRulesTemplate(true) +
-                                      std::string{kGameplayWorldsDefaultToml});
+    const std::expected<TomlTable, std::string> root = directory.load(kFileName, kWorldsDefaultToml);
     if (!root.has_value()) {
         return std::unexpected(root.error());
     }
@@ -313,12 +323,7 @@ std::expected<WorldsConfig, std::string> WorldsConfig::load(const ConfigDirector
     if (!parsedDefaults.has_value()) {
         return std::unexpected(parsedDefaults.error());
     }
-    WorldSettings defaults = *std::move(parsedDefaults);
-    std::expected<MobSettings, std::string> mobs = loadMobDefaults(directory);
-    if (!mobs.has_value()) {
-        return std::unexpected(mobs.error());
-    }
-    defaults.mobs = *std::move(mobs);
+    const WorldSettings defaults = *std::move(parsedDefaults);
     const TomlTable* declared = root->table("worlds");
 
     std::vector<WorldDeclaration> worlds;

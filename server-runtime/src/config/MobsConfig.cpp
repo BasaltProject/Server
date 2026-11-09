@@ -1,9 +1,6 @@
 #include <basalt/server/registry/Registries.hpp>
-#include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/wire/common/Identifier.hpp>
-#include <basalt/wire/common/logging/Logger.hpp>
-#include <basalt/wire/io/FileIO.hpp>
 
 #include <algorithm>
 #include <array>
@@ -594,38 +591,6 @@ std::expected<MobSettings, std::string> MobSettings::from(const TomlTable& table
         return std::unexpected(*error);
     }
     return settings;
-}
-
-std::expected<MobSettings, std::string> loadMobDefaults(const ConfigDirectory& directory) {
-    const ConfigDirectory worlds{directory.root() + "/worlds"};
-    const std::expected<TomlTable, std::string> root = worlds.load("mobs.toml", kWorldMobsDefaultToml);
-    if (!root.has_value()) {
-        return std::unexpected(root.error());
-    }
-    return MobSettings::from(*root, MobSettings::vanilla(), worlds.pathOf("mobs.toml"));
-}
-
-MobSettings loadWorldMobs(const std::string& worldDirectory, const MobSettings& defaults) {
-    const std::string path = worldDirectory + "/mobs.toml";
-    const std::optional<std::string> text = wire::io::fileIO::readText(path);
-    if (!text.has_value()) {
-        if (wire::io::fileIO::isDirectory(worldDirectory)) {
-            wire::io::fileIO::writeText(path, kWorldMobsLocalDefaultToml);
-        }
-        return defaults;
-    }
-    const wire::common::Logger logger{"Config"};
-    const std::expected<TomlTable, wire::common::toml::TomlError> parsed = wire::common::toml::parse(*text);
-    if (!parsed.has_value()) {
-        logger.warn([&path] { return path + " is not valid TOML; this world keeps the default mob settings."; });
-        return defaults;
-    }
-    std::expected<MobSettings, std::string> settings = MobSettings::from(*parsed, defaults, path);
-    if (!settings.has_value()) {
-        logger.warn([&settings] { return settings.error() + " This world keeps the default mob settings."; });
-        return defaults;
-    }
-    return *std::move(settings);
 }
 
 } // namespace basalt::server::runtime::config
