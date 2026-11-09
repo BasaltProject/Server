@@ -38,7 +38,7 @@ jobs:
           submodules: true
           ref: ${{ inputs.ref }}
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: ${{ inputs.target == 'Windows-arm64' && 'microsoft' || 'temurin' }}
           java-version: "25"
