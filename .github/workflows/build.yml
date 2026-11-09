@@ -125,7 +125,7 @@ jobs:
               .github/scripts/smoke-binary.sh "$binary"
             done
           '
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: basalt-server-${{ matrix.target }}
           path: build/linux-musl/bin/
@@ -249,7 +249,7 @@ jobs:
           arch: x86_64
           disk-size: 3072M
           script: .github/scripts/test-android.sh build/android-x64
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: basalt-server-${{ matrix.target }}
           path: build/${{ matrix.preset }}/bin/
@@ -371,7 +371,7 @@ jobs:
                 ldd "$binary"
                 .github/scripts/smoke-binary.sh "$binary"
             done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: basalt-server-${{ matrix.target }}
           path: build/freebsd/bin/
