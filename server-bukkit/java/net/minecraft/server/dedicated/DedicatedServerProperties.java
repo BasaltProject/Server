@@ -21,6 +21,18 @@ import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldOptions;
 
 public class DedicatedServerProperties extends Settings<DedicatedServerProperties> {
+    private static String nativeText(String key, String fallback) {
+        try {
+            String value = org.basaltmc.bukkit.WorldEnvNatives.setting(key);
+            return value == null ? fallback : value;
+        } catch (Throwable unbound) {
+            return fallback;
+        }
+    }
+    private static boolean nativeFlag(String key, boolean fallback) {
+        return Boolean.parseBoolean(nativeText(key, String.valueOf(fallback)));
+    }
+
     public static final String MANAGEMENT_SERVER_TLS_ENABLED_KEY = "management-server-tls-enabled";
     public static final String MANAGEMENT_SERVER_TLS_KEYSTORE_KEY = "management-server-tls-keystore";
     public static final String MANAGEMENT_SERVER_TLS_KEYSTORE_PASSWORD_KEY = "management-server-tls-keystore-password";
@@ -37,11 +49,11 @@ public class DedicatedServerProperties extends Settings<DedicatedServerPropertie
     public final MutableValue<GameType> gameMode = getMutable("gamemode", dispatchNumberOrString(GameType::byId, GameType::byName), GameType::getName, GameType.SURVIVAL);
     public final String levelName = get("level-name", "world");
     public final int serverPort = get("server-port", 25565);
-    public final boolean managementServerEnabled = get("management-server-enabled", false);
-    public final String managementServerHost = get("management-server-host", "localhost");
-    public final int managementServerPort = get("management-server-port", 0);
-    public final String managementServerSecret = get("management-server-secret", java.util.UUID.randomUUID().toString().replace("-", ""));
-    public final boolean managementServerTlsEnabled = get(MANAGEMENT_SERVER_TLS_ENABLED_KEY, true);
+    public final boolean managementServerEnabled = get("management-server-enabled", nativeFlag("management_enabled", false));
+    public final String managementServerHost = get("management-server-host", nativeText("management_host", "localhost"));
+    public final int managementServerPort = get("management-server-port", Integer.parseInt(nativeText("management_port", "0")));
+    public final String managementServerSecret = get("management-server-secret", net.minecraft.server.jsonrpc.security.SecurityConfig.generateSecretKey());
+    public final boolean managementServerTlsEnabled = get(MANAGEMENT_SERVER_TLS_ENABLED_KEY, nativeFlag("management_tls", true));
     public final String managementServerTlsKeystore = get(MANAGEMENT_SERVER_TLS_KEYSTORE_KEY, "");
     public final String managementServerTlsKeystorePassword = get(MANAGEMENT_SERVER_TLS_KEYSTORE_PASSWORD_KEY, "");
     public final String managementServerAllowedOrigins = get("management-server-allowed-origins", "");

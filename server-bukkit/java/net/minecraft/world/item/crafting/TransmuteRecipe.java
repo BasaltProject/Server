@@ -31,7 +31,7 @@ public class TransmuteRecipe extends NormalCraftingRecipe {
         TransmuteResult.STREAM_CODEC, o -> o.result,
         net.minecraft.network.codec.ByteBufCodecs.BOOL, o -> o.addMaterialCountToResult,
         TransmuteRecipe::new);
-    public static final RecipeSerializer<TransmuteRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<TransmuteRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient input;
     private final Ingredient material;
     private final MinMaxBounds.Ints materialCount;

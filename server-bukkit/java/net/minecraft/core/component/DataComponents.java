@@ -136,7 +136,7 @@ public class DataComponents {
         return add(name, (codec == null ? builder : builder.persistent(codec)).build(name));
     }
 
-    static final EncoderCache ENCODER_CACHE = null;
+    static final EncoderCache ENCODER_CACHE = new EncoderCache(512);
     public static final DataComponentType<CustomData> CUSTOM_DATA = type("custom_data");
     public static final DataComponentType<Integer> MAX_STACK_SIZE = wire("max_stack_size", Codec.INT, net.minecraft.network.codec.ByteBufCodecs.VAR_INT);
     public static final DataComponentType<Integer> MAX_DAMAGE = wire("max_damage", Codec.INT, net.minecraft.network.codec.ByteBufCodecs.VAR_INT);

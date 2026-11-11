@@ -43,8 +43,8 @@ public class Camel extends AbstractHorse {
     public static final float BABY_SCALE = 0.6F;
     public static final int DASH_COOLDOWN_TICKS = 55;
     public static final int MAX_HEAD_Y_ROT = 30;
-    public static final EntityDataAccessor<Boolean> DASH = null;
-    public static final EntityDataAccessor<Long> LAST_POSE_CHANGE_TICK = null;
+    public static final EntityDataAccessor<Boolean> DASH = net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN.createAccessor(19);
+    public static final EntityDataAccessor<Long> LAST_POSE_CHANGE_TICK = net.minecraft.network.syncher.EntityDataSerializers.LONG.createAccessor(20);
     public final AnimationState sitAnimationState = null;
     public final AnimationState sitPoseAnimationState = null;
     public final AnimationState sitUpAnimationState = null;

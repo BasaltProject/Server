@@ -63,7 +63,7 @@ public class BlockItem extends Item {
             return InteractionResult.FAIL;
         }
         BlockPos pos = context.getClickedPos();
-        Player player = context.getPlayer();
+        final Player player = context.getPlayer();
         ItemStack stack = context.getItemInHand();
         BlockState placed = level.getBlockState(pos);
         if (placed.is(wanted.getBlock())) {

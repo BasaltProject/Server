@@ -29,7 +29,16 @@ public class FireBlock extends BaseFireBlock {
     public static final BooleanProperty SOUTH = PipeBlock.SOUTH;
     public static final BooleanProperty WEST = PipeBlock.WEST;
     public static final BooleanProperty UP = PipeBlock.UP;
-    public static final Map<Direction, BooleanProperty> PROPERTY_BY_DIRECTION = null;
+    public static final Map<Direction, BooleanProperty> PROPERTY_BY_DIRECTION = withoutDown();
+    private static Map<Direction, BooleanProperty> withoutDown() {
+        Map<Direction, BooleanProperty> map = new java.util.EnumMap<>(Direction.class);
+        PipeBlock.PROPERTY_BY_DIRECTION.forEach((direction, property) -> {
+            if (direction != Direction.DOWN) {
+                map.put(direction, property);
+            }
+        });
+        return java.util.Collections.unmodifiableMap(map);
+    }
     public FireBlock(BlockBehaviour.Properties properties) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null, (float) 0);
     }

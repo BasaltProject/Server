@@ -25,7 +25,7 @@ import net.minecraft.world.level.block.entity.BannerPattern;
 import net.minecraft.world.level.block.entity.BannerPatternLayers;
 import net.minecraft.world.level.block.entity.BannerPatterns;
 public class Raid {
-    public static final SpawnPlacementType RAVAGER_SPAWN_PLACEMENT_TYPE = null;
+    public static final SpawnPlacementType RAVAGER_SPAWN_PLACEMENT_TYPE = net.minecraft.world.entity.SpawnPlacements.getPlacementType(net.minecraft.world.entity.EntityTypes.RAVAGER);
     public static final MapCodec<Raid> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.entity.raid.Raid.class, "MAP_CODEC");
     public static final int VILLAGE_RADIUS_BUFFER = 16;
     public static final int MAX_NO_ACTION_TIME = 2400;

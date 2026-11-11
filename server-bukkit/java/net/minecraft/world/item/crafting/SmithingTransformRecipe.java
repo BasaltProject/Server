@@ -22,7 +22,7 @@ public class SmithingTransformRecipe extends SimpleSmithingRecipe {
         Ingredient.OPTIONAL_CONTENTS_STREAM_CODEC, o -> o.addition,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         SmithingTransformRecipe::new);
-    public static final RecipeSerializer<SmithingTransformRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<SmithingTransformRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Optional<Ingredient> template;
     private final Ingredient base;
     private final Optional<Ingredient> addition;

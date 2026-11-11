@@ -130,7 +130,7 @@ public class LivingEntity extends Entity implements Attackable, WaypointTransmit
     protected static final int LIVING_ENTITY_FLAG_IS_USING = 1;
     protected static final int LIVING_ENTITY_FLAG_OFF_HAND = 2;
     protected static final int LIVING_ENTITY_FLAG_SPIN_ATTACK = 4;
-    protected static final EntityDataAccessor<Byte> DATA_LIVING_ENTITY_FLAGS = null;
+    protected static final EntityDataAccessor<Byte> DATA_LIVING_ENTITY_FLAGS = net.minecraft.network.syncher.EntityDataSerializers.BYTE.createAccessor(8);
     protected static final EntityDimensions SLEEPING_DIMENSIONS = EntityDimensions.fixed(0.2F, 0.2F).withEyeHeight(0.2F);
     public static final float EXTRA_RENDER_CULLING_SIZE_WITH_BIG_HAT = 0.5F;
     public static final float DEFAULT_BABY_SCALE = 0.5F;
@@ -149,7 +149,8 @@ public class LivingEntity extends Entity implements Attackable, WaypointTransmit
     public static final float ELYTRA_HORIZONTAL_AIR_DRAG = 0.99F;
     public static final float ELYTRA_VERTICAL_AIR_DRAG = 0.98F;
     public static final float BASE_SWIM_SPEED = 0.02F;
-    public static final Predicate<LivingEntity> PLAYER_NOT_WEARING_DISGUISE_ITEM = null;
+    public static final Predicate<LivingEntity> PLAYER_NOT_WEARING_DISGUISE_ITEM = living -> !(living instanceof Player player)
+        || !player.getItemBySlot(EquipmentSlot.HEAD).is(net.minecraft.tags.ItemTags.GAZE_DISGUISE_EQUIPMENT);
     public int removeArrowTime;
     public int removeStingerTime;
     public int hurtTime;

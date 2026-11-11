@@ -22,7 +22,7 @@ public class ImbueRecipe extends NormalCraftingRecipe {
         Ingredient.CONTENTS_STREAM_CODEC, o -> o.material,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         ImbueRecipe::new);
-    public static final RecipeSerializer<ImbueRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<ImbueRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient source;
     private final Ingredient material;
     private final ItemStackTemplate result;

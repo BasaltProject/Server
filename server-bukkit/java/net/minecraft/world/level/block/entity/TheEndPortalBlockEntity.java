@@ -13,6 +13,10 @@ public class TheEndPortalBlockEntity extends BlockEntity {
         super(BlockEntityType.named("end_portal"), worldPosition, blockState);
     }
 
+    protected TheEndPortalBlockEntity(BlockEntityType<?> type, BlockPos worldPosition, BlockState blockState) {
+        super(type, worldPosition, blockState);
+    }
+
     public TheEndPortalBlockEntity(ServerLevel level, BlockPos pos, CompoundTag nbt) {
         super(level, pos, nbt);
     }

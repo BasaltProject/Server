@@ -1,0 +1,15 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.util.profiling.jfr.event;
+import java.net.SocketAddress;
+import jdk.jfr.EventType;
+import jdk.jfr.Label;
+import jdk.jfr.Name;
+@Name("minecraft.PacketReceived")
+@Label("Packet Received")
+public class PacketReceivedEvent extends PacketEvent {
+    public static final String NAME = "minecraft.PacketReceived";
+    public static final EventType TYPE = EventType.getEventType(PacketReceivedEvent.class);
+    public PacketReceivedEvent(String protocolId, String packetDirection, String packetId, SocketAddress remoteAddress, int readableBytes) {
+        super(protocolId, packetDirection, packetId, remoteAddress, readableBytes);
+    }
+}

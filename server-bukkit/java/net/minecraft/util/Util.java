@@ -78,10 +78,31 @@ public class Util {
     public static final int LINEAR_LOOKUP_THRESHOLD = 8;
     public static final long NANOS_PER_MILLI = 1000000L;
     public static final long MILLIS_PER_SECOND = 1000L;
-    public static final Ticker TICKER = null;
+    public static final Ticker TICKER = Ticker.systemTicker();
     public static final UUID NIL_UUID = new UUID(0L, 0L);
-    public static final FileSystemProvider ZIP_FILE_SYSTEM_PROVIDER = null;
-    public static final Escaper CONTROL_CHARACTER_ESCAPER = null;
+    public static final FileSystemProvider ZIP_FILE_SYSTEM_PROVIDER = FileSystemProvider.installedProviders().stream()
+        .filter(provider -> provider.getScheme().equalsIgnoreCase("jar")).findFirst().orElse(null);
+    public static final Escaper CONTROL_CHARACTER_ESCAPER = controlEscaper();
+    private static Escaper controlEscaper() {
+        com.google.common.escape.Escapers.Builder builder = com.google.common.escape.Escapers.builder();
+        for (char c = 0; c <= 255; c++) {
+            if (!Character.isISOControl(c)) {
+                continue;
+            }
+            String text = switch (c) {
+                case 7 -> "\\a";
+                case '\b' -> "\\b";
+                case '\t' -> "\\t";
+                case '\n' -> "\\n";
+                case 11 -> "\\v";
+                case '\f' -> "\\f";
+                case '\r' -> "\\r";
+                default -> String.format("\\x%02X", (int) c);
+            };
+            builder.addEscape(c, text);
+        }
+        return builder.build();
+    }
     public static <K, V> Collector<Map.Entry<? extends K, ? extends V>, ?, Map<K, V>> toMap() {
         return Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue);
     }

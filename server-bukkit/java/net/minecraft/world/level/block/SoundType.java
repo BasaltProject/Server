@@ -2,11 +2,11 @@
 package net.minecraft.world.level.block;
 import net.minecraft.sounds.SoundEvent;
 public class SoundType {
-    public static final SoundType EMPTY = of("empty");
+    public static final SoundType EMPTY = new SoundType(1.0F, 1.0F, net.minecraft.sounds.SoundEvents.EMPTY, net.minecraft.sounds.SoundEvents.EMPTY, net.minecraft.sounds.SoundEvents.EMPTY, net.minecraft.sounds.SoundEvents.EMPTY, net.minecraft.sounds.SoundEvents.EMPTY);
     public static final SoundType WOOD = of("wood");
     public static final SoundType GRAVEL = of("gravel");
     public static final SoundType GRASS = of("grass");
-    public static final SoundType LILY_PAD = of("lily_pad");
+    public static final SoundType LILY_PAD = new SoundType(1.0F, 1.0F, net.minecraft.sounds.SoundEvents.BIG_DRIPLEAF_BREAK, net.minecraft.sounds.SoundEvents.BIG_DRIPLEAF_STEP, net.minecraft.sounds.SoundEvents.LILY_PAD_PLACE, net.minecraft.sounds.SoundEvents.BIG_DRIPLEAF_HIT, net.minecraft.sounds.SoundEvents.BIG_DRIPLEAF_FALL);
     public static final SoundType STONE = of("stone");
     public static final SoundType METAL = of(1.0F, 1.5F, "metal");
     public static final SoundType GLASS = of("glass");
@@ -25,7 +25,7 @@ public class SoundType {
     public static final SoundType SCAFFOLDING = of("scaffolding");
     public static final SoundType SWEET_BERRY_BUSH = of("sweet_berry_bush");
     public static final SoundType CROP = of("crop");
-    public static final SoundType HARD_CROP = of("hard_crop");
+    public static final SoundType HARD_CROP = new SoundType(1.0F, 1.0F, net.minecraft.sounds.SoundEvents.WOOD_BREAK, net.minecraft.sounds.SoundEvents.WOOD_STEP, net.minecraft.sounds.SoundEvents.CROP_PLANTED, net.minecraft.sounds.SoundEvents.WOOD_HIT, net.minecraft.sounds.SoundEvents.WOOD_FALL);
     public static final SoundType VINE = of("vine");
     public static final SoundType NETHER_WART = of("nether_wart");
     public static final SoundType LANTERN = of("lantern");
@@ -52,7 +52,7 @@ public class SoundType {
     public static final SoundType NETHER_GOLD_ORE = of("nether_gold_ore");
     public static final SoundType GILDED_BLACKSTONE = of("gilded_blackstone");
     public static final SoundType CANDLE = of("candle");
-    public static final SoundType AMETHYST = of("amethyst");
+    public static final SoundType AMETHYST = new SoundType(1.0F, 1.0F, net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_BREAK, net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_STEP, net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_PLACE, net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_HIT, net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_FALL);
     public static final SoundType AMETHYST_CLUSTER = of("amethyst_cluster");
     public static final SoundType SMALL_AMETHYST_BUD = of("small_amethyst_bud");
     public static final SoundType MEDIUM_AMETHYST_BUD = of("medium_amethyst_bud");
@@ -86,7 +86,7 @@ public class SoundType {
     public static final SoundType SCULK = of("sculk");
     public static final SoundType SCULK_VEIN = of("sculk_vein");
     public static final SoundType SCULK_SHRIEKER = of("sculk_shrieker");
-    public static final SoundType GLOW_LICHEN = of("glow_lichen");
+    public static final SoundType GLOW_LICHEN = new SoundType(1.0F, 1.0F, net.minecraft.sounds.SoundEvents.GRASS_BREAK, net.minecraft.sounds.SoundEvents.VINE_STEP, net.minecraft.sounds.SoundEvents.GRASS_PLACE, net.minecraft.sounds.SoundEvents.GRASS_HIT, net.minecraft.sounds.SoundEvents.GRASS_FALL);
     public static final SoundType DEEPSLATE = of("deepslate");
     public static final SoundType DEEPSLATE_BRICKS = of("deepslate_bricks");
     public static final SoundType DEEPSLATE_TILES = of("deepslate_tiles");
@@ -112,7 +112,7 @@ public class SoundType {
     public static final SoundType SUSPICIOUS_SAND = of("suspicious_sand");
     public static final SoundType SUSPICIOUS_GRAVEL = of("suspicious_gravel");
     public static final SoundType DECORATED_POT = of("decorated_pot");
-    public static final SoundType DECORATED_POT_CRACKED = of("decorated_pot_cracked");
+    public static final SoundType DECORATED_POT_CRACKED = new SoundType(1.0F, 1.0F, net.minecraft.sounds.SoundEvents.DECORATED_POT_SHATTER, net.minecraft.sounds.SoundEvents.DECORATED_POT_STEP, net.minecraft.sounds.SoundEvents.DECORATED_POT_PLACE, net.minecraft.sounds.SoundEvents.DECORATED_POT_HIT, net.minecraft.sounds.SoundEvents.DECORATED_POT_FALL);
     public static final SoundType TRIAL_SPAWNER = of("trial_spawner");
     public static final SoundType SPONGE = of("sponge");
     public static final SoundType WET_SPONGE = of("wet_sponge");

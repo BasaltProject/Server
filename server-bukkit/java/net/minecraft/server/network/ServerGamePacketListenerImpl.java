@@ -89,7 +89,11 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
     public ServerPlayer player;
     public final PlayerChunkSender chunkSender = null;
     public ServerGamePacketListenerImpl(MinecraftServer server, Connection connection, ServerPlayer player, CommonListenerCookie cookie) {
-        super((net.minecraft.server.MinecraftServer) null, (net.minecraft.network.Connection) null, (net.minecraft.server.network.CommonListenerCookie) null);
+        super(server, connection, cookie);
+        this.player = player;
+        if (player != null) {
+            player.connection = this;
+        }
     }
     public void tick() {
 
@@ -104,6 +108,17 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
     }
     public boolean shouldHandleMessage(Packet<?> packet) {
         return isAcceptingMessages();
+    }
+    public void disconnect(DisconnectionDetails details) {
+        org.bukkit.entity.Player bukkit = player == null ? null : player.bukkitPlayer();
+        if (bukkit != null && bukkit.isOnline()) {
+            bukkit.kick(details.reason().asAdventure());
+        } else {
+            super.disconnect(details);
+        }
+    }
+    public void disconnect(Component reason) {
+        disconnect(new DisconnectionDetails(reason));
     }
     protected GameProfile playerProfile() {
         return new GameProfile((player.bukkitPlayer()).getUniqueId(), (player.bukkitPlayer()).getName());

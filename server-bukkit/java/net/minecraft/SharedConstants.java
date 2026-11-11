@@ -143,7 +143,7 @@ public class SharedConstants {
     public static final boolean DEBUG_SUBTITLES = false;
     public static final int DEBUG_FAKE_LATENCY_MS = 0;
     public static final int DEBUG_FAKE_JITTER_MS = 0;
-    public static final ResourceLeakDetector.Level NETTY_LEAK_DETECTION = null;
+    public static final ResourceLeakDetector.Level NETTY_LEAK_DETECTION = ResourceLeakDetector.Level.DISABLED;
     public static final boolean COMMAND_STACK_TRACES = false;
     public static final boolean DEBUG_WORLD_RECREATE = false;
     public static final boolean DEBUG_SHOW_SERVER_DEBUG_VALUES = false;
@@ -166,7 +166,7 @@ public class SharedConstants {
     public static final int MAX_CHAINED_NEIGHBOR_UPDATES = 1000000;
     public static final int MAX_RENDER_DISTANCE = 32;
     public static final int MAX_CLOUD_DISTANCE = 128;
-    public static final char[] ILLEGAL_FILE_CHARACTERS = null;
+    public static final char[] ILLEGAL_FILE_CHARACTERS = {'/', '\n', '\r', '\t', '\u0000', '\f', '`', '?', '*', '\\', '<', '>', '|', '"', ':'};
     public static final int TICKS_PER_SECOND = 20;
     public static final int MILLIS_PER_TICK = 50;
     public static final int TICKS_PER_MINUTE = 1200;

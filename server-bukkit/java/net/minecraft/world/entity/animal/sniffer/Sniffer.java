@@ -126,7 +126,7 @@ public class Sniffer extends Animal {
     }
     public static enum State {
         IDLING, FEELING_HAPPY, SCENTING, SNIFFING, SEARCHING, DIGGING, RISING;
-        public static final IntFunction<State> BY_ID = null;
+        public static final IntFunction<State> BY_ID = id -> values()[id >= 0 && id < values().length ? id : 0];
         public static final StreamCodec<ByteBuf, State> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.entity.animal.sniffer.Sniffer.State.class, "STREAM_CODEC");
         public int id() {
             return ordinal();

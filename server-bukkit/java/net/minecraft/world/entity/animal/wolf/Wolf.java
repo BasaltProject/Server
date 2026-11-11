@@ -40,7 +40,7 @@ import net.minecraft.world.phys.Vec3;
 public class Wolf extends TamableAnimal implements NeutralMob {
     private long angerEndTime = -1L;
     private net.minecraft.world.entity.EntityReference<net.minecraft.world.entity.LivingEntity> angerTarget;
-    public static final TargetingConditions.Selector PREY_SELECTOR = null;
+    public static final TargetingConditions.Selector PREY_SELECTOR = (target, level) -> target.is(net.minecraft.world.entity.EntityTypes.SHEEP) || target.is(net.minecraft.world.entity.EntityTypes.RABBIT) || target.is(net.minecraft.world.entity.EntityTypes.FOX);
     public static final float DEFAULT_TAIL_ANGLE = 0;
     public Wolf(EntityType<? extends Wolf> type, Level level) {
         super(type, level);

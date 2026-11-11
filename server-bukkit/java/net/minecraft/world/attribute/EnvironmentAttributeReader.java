@@ -4,7 +4,14 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.phys.Vec3;
 public interface EnvironmentAttributeReader {
-    EnvironmentAttributeReader EMPTY = null;
+    EnvironmentAttributeReader EMPTY = new EnvironmentAttributeReader() {
+        public <Value> Value getDimensionValue(EnvironmentAttribute<Value> attribute) {
+            return attribute.defaultValue();
+        }
+        public <Value> Value getValue(EnvironmentAttribute<Value> attribute, Vec3 pos, SpatialAttributeInterpolator biomeInterpolator) {
+            return attribute.defaultValue();
+        }
+    };
     <Value> Value getDimensionValue(EnvironmentAttribute<Value> attribute);
     default <Value> Value getValue(EnvironmentAttribute<Value> attribute, BlockPos pos) {
         return getValue(attribute, Vec3.atCenterOf(pos));

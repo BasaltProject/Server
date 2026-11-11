@@ -154,9 +154,10 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
     public static final String VANILLA_BRAND = "vanilla";
     public static final int SPAWN_POSITION_SEARCH_RADIUS = 5;
     public static final int ABSOLUTE_MAX_WORLD_SIZE = 29999984;
-    public static final LevelSettings DEMO_SETTINGS = null;
+    public static final LevelSettings DEMO_SETTINGS = new LevelSettings("Demo World", net.minecraft.world.level.GameType.SURVIVAL,
+        LevelSettings.DifficultySettings.DEFAULT, false, net.minecraft.world.level.WorldDataConfiguration.DEFAULT);
     public static final Supplier<GameRules> DEFAULT_GAME_RULES = () -> new GameRules(net.minecraft.world.flag.FeatureFlagSet.of());
-    public static final NameAndId ANONYMOUS_PLAYER_PROFILE = null;
+    public static final NameAndId ANONYMOUS_PLAYER_PROFILE = new NameAndId(net.minecraft.util.Util.NIL_UUID, "Anonymous Player");
     public static final String SERVER_THREAD_NAME = "Server thread";
     protected LevelStorageSource.LevelStorageAccess storageSource;
     protected PlayerDataStorage playerDataStorage;
@@ -540,7 +541,7 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
     }
     public Services services() {
         if (serviceSet == null) {
-            serviceSet = new Services(null, null, null, null, null);
+            serviceSet = Services.create(null, new java.io.File("."));
         }
         return serviceSet;
     }
@@ -892,7 +893,17 @@ public class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> imple
         org.basaltmc.bukkit.Natives.log(3, "Server", "Failed to handle packet " + packetType + ": " + throwable);
     }
     public ServerLinks serverLinks() {
-        return ServerLinks.EMPTY;
+        String[] flat = org.basaltmc.bukkit.MiscNatives.linkList();
+        java.util.List<ServerLinks.Entry> entries = new java.util.ArrayList<>();
+        for (int i = 0; i + 2 < flat.length; i += 3) {
+            java.net.URI url = java.net.URI.create(flat[i + 2]);
+            if (flat[i].isEmpty()) {
+                entries.add(ServerLinks.Entry.custom(org.basaltmc.bukkit.facade.ChatJson.fromAdventure(org.basaltmc.bukkit.misc.Json.component(flat[i + 1])), url));
+                continue;
+            }
+            entries.add(ServerLinks.KnownLinkType.valueOf(flat[i].toUpperCase(java.util.Locale.ROOT)).create(url));
+        }
+        return entries.isEmpty() ? ServerLinks.EMPTY : new ServerLinks(entries);
     }
     protected int pauseWhenEmptySeconds() {
         String value = org.basaltmc.bukkit.WorldEnvNatives.setting("pause_when_empty_seconds");

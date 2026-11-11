@@ -12,7 +12,7 @@ import net.minecraft.world.level.storage.loot.ValidationContext;
 import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 public abstract class CompositeEntryBase extends LootPoolEntryContainer {
-    public static final ProblemReporter.Problem NO_CHILDREN_PROBLEM = null;
+    public static final ProblemReporter.Problem NO_CHILDREN_PROBLEM = () -> "Empty children list";
     protected final List<LootPoolEntryContainer> children;
     protected CompositeEntryBase(List<LootPoolEntryContainer> children, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier) {
         super(condition, modifier);

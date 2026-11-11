@@ -22,7 +22,7 @@ public class BookCloningRecipe extends CustomRecipe {
         MinMaxBounds.Ints.STREAM_CODEC, o -> o.allowedGenerations,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         BookCloningRecipe::new);
-    public static final RecipeSerializer<BookCloningRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<BookCloningRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient source;
     private final Ingredient material;
     private final MinMaxBounds.Ints allowedGenerations;

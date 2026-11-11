@@ -113,7 +113,7 @@ public class Biome {
         if (!level.isInsideBuildHeight(pos.getY()) || level.getBrightness(LightLayer.BLOCK, pos) >= 10) {
             return false;
         }
-        BlockState state = level.getBlockState(pos);
+        final BlockState state = level.getBlockState(pos);
         if (!level.getFluidState(pos).is(net.minecraft.world.level.material.Fluids.WATER) || !(state.getBlock() instanceof LiquidBlock)) {
             return false;
         }
@@ -147,7 +147,7 @@ public class Biome {
         if (!level.isInsideBuildHeight(pos.getY()) || level.getBrightness(LightLayer.BLOCK, pos) >= 10) {
             return false;
         }
-        BlockState state = level.getBlockState(pos);
+        final BlockState state = level.getBlockState(pos);
         return (state.isAir() || state.is(Blocks.SNOW)) && Blocks.SNOW.defaultBlockState().canSurvive(level, pos);
     }
 

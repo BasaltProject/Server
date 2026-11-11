@@ -32,6 +32,10 @@ public class SculkSensorBlockEntity extends BlockEntity {
         super(BlockEntityType.named("sculk_sensor"), worldPosition, blockState);
     }
 
+    protected SculkSensorBlockEntity(BlockEntityType<?> type, BlockPos worldPosition, BlockState blockState) {
+        super(type, worldPosition, blockState);
+    }
+
     public SculkSensorBlockEntity(ServerLevel level, BlockPos pos, CompoundTag nbt) {
         super(level, pos, nbt);
     }

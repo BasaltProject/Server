@@ -1,0 +1,14 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.util.filefix.operations;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import net.minecraft.util.filefix.FileFixUtil;
+import net.minecraft.util.worldupdate.UpgradeProgress;
+
+public record DeleteFileOrEmptyDirectory(String target) implements FileFixOperation {
+    @Override
+    public void fix(Path baseDirectory, UpgradeProgress progress) throws IOException {
+        FileFixUtil.deleteFileOrEmptyDirectory(baseDirectory, target);
+    }
+}

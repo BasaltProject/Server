@@ -18,8 +18,8 @@ public class StructureTemplateManager {
     protected StructureTemplateManager() {
     }
     public static final String STRUCTURE_DIRECTORY_NAME = "structure";
-    public static final FileToIdConverter WORLD_STRUCTURE_LISTER = null;
-    public static final FileToIdConverter RESOURCE_TEXT_STRUCTURE_LISTER = null;
+    public static final FileToIdConverter WORLD_STRUCTURE_LISTER = new FileToIdConverter("structure", ".nbt");
+    public static final FileToIdConverter RESOURCE_TEXT_STRUCTURE_LISTER = new FileToIdConverter("structure", ".snbt");
     public StructureTemplateManager(ResourceManager resourceManager, LevelStorageSource.LevelStorageAccess storage, DataFixer fixerUpper, HolderGetter<Block> blockLookup) {
         worldTemplates = new TemplatePathFactory(storage == null
             ? net.minecraft.server.MinecraftServer.getServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.GENERATED_DIR)

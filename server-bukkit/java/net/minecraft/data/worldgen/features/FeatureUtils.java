@@ -11,8 +11,9 @@ import net.minecraft.world.level.levelgen.feature.Feature;
 public final class FeatureUtils {
     private FeatureUtils() {}
 
-    public static ResourceKey<Object> createKey(String name) {
-        return ResourceKey.create(Registries.CONFIGURED_FEATURE, Identifier.withDefaultNamespace(name));
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static <T> ResourceKey<T> createKey(String name) {
+        return (ResourceKey) ResourceKey.create(Registries.CONFIGURED_FEATURE, Identifier.withDefaultNamespace(name));
     }
     public static void bootstrap(BootstrapContext<Feature> context) {
         // registries come from the native datapack loader, so there is nothing to bootstrap

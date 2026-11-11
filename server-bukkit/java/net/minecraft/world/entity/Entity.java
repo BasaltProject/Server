@@ -260,6 +260,9 @@ public class Entity implements Nameable, EntityAccess, ScoreHolder, SyncedDataHo
     }
 
     private String world() {
+        if (level == null) {
+            throw new IllegalStateException("Entity " + getClass().getSimpleName() + " is not attached to a level");
+        }
         return level.getWorld().getName();
     }
 
@@ -458,7 +461,7 @@ public class Entity implements Nameable, EntityAccess, ScoreHolder, SyncedDataHo
     protected static final int FLAG_ONFIRE = 0;
     protected static final int FLAG_GLOWING = 6;
     protected static final int FLAG_FALL_FLYING = 7;
-    protected static final EntityDataAccessor<Pose> DATA_POSE = null;
+    protected static final EntityDataAccessor<Pose> DATA_POSE = net.minecraft.network.syncher.EntityDataSerializers.POSE.createAccessor(6);
     public boolean needsSync;
     public boolean syncPosition;
     public boolean syncVelocity;

@@ -18,7 +18,7 @@ public class FireworkRocketRecipe extends CustomRecipe {
         Ingredient.CONTENTS_STREAM_CODEC, o -> o.star,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         FireworkRocketRecipe::new);
-    public static final RecipeSerializer<FireworkRocketRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<FireworkRocketRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient shell;
     private final Ingredient fuel;
     private final Ingredient star;

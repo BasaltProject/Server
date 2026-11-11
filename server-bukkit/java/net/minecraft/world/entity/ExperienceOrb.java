@@ -12,7 +12,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 public class ExperienceOrb extends Entity {
-    protected static final EntityDataAccessor<Integer> DATA_VALUE = SynchedEntityData.defineId(ExperienceOrb.class, net.minecraft.network.syncher.EntityDataSerializers.INT);
+    protected static final EntityDataAccessor<Integer> DATA_VALUE = net.minecraft.network.syncher.EntityDataSerializers.INT.createAccessor(8);
     public ExperienceOrb(Level level, double x, double y, double z, int value) {
         this(EntityTypes.EXPERIENCE_ORB, level);
         setPos(x, y, z);

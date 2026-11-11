@@ -44,7 +44,11 @@ public class Villager extends AbstractVillager implements VillagerDataHolder, Re
 
     public static final int BREEDING_FOOD_THRESHOLD = 12;
     public static final float SPEED_MODIFIER = 0.5F;
-    public static final Map<MemoryModuleType<GlobalPos>, BiPredicate<Villager, Holder<PoiType>>> POI_MEMORIES = null;
+    public static final Map<MemoryModuleType<GlobalPos>, BiPredicate<Villager, Holder<PoiType>>> POI_MEMORIES = Map.of(
+        MemoryModuleType.HOME, (villager, poiType) -> poiType.is(net.minecraft.world.entity.ai.village.poi.PoiTypes.HOME),
+        MemoryModuleType.JOB_SITE, (villager, poiType) -> villager.getVillagerData().profession().value().heldJobSite().test(poiType),
+        MemoryModuleType.POTENTIAL_JOB_SITE, (villager, poiType) -> VillagerProfession.ALL_ACQUIRABLE_JOBS.test(poiType),
+        MemoryModuleType.MEETING_POINT, (villager, poiType) -> poiType.is(net.minecraft.world.entity.ai.village.poi.PoiTypes.MEETING));
     public Villager(EntityType<? extends Villager> entityType, Level level) {
         super(entityType, level);
     }

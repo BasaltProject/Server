@@ -16,7 +16,7 @@ public class BrewingRecipe implements Recipe<BrewingInput> {
         PotionIngredient.STREAM_CODEC, o -> o.reagent,
         ItemStackTemplate.STREAM_CODEC, o -> o.output,
         BrewingRecipe::new);
-    public static final RecipeSerializer<BrewingRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<BrewingRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Recipe.CommonInfo commonInfo = new Recipe.CommonInfo(false);
     private final PotionIngredient input;
     private final PotionIngredient reagent;

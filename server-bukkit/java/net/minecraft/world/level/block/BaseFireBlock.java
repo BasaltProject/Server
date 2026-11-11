@@ -17,7 +17,7 @@ public abstract class BaseFireBlock extends Block {
     protected BaseFireBlock(int index) {
         super(index);
     }
-    protected static final VoxelShape SHAPE = null;
+    protected static final VoxelShape SHAPE = Block.column(16.0, 0.0, 1.0);
     public BaseFireBlock(BlockBehaviour.Properties properties, float fireDamage) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
     }
@@ -29,7 +29,7 @@ public abstract class BaseFireBlock extends Block {
         return below.is(net.minecraft.tags.BlockTags.SOUL_FIRE_BASE_BLOCKS) ? Blocks.SOUL_FIRE.defaultBlockState() : Blocks.FIRE.defaultBlockState();
     }
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return super.getShape(state, level, pos, context);
+        return SHAPE;
     }
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
         super.animateTick(state, level, pos, random);

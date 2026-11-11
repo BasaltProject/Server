@@ -446,10 +446,18 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         return false;
     }
     public void replaceWithPacketData(int chunkX, int chunkZ, ClientboundLevelChunkPacketData chunkData) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#replaceWithPacketData");
+        FriendlyByteBuf buffer = chunkData.getReadBuffer();
+        clearAllBlockEntities();
+        for (LevelChunkSection section : sections) {
+            section.read(buffer);
+        }
+        chunkData.getHeightmaps().forEach(this::setHeightmap);
+        initializeLightSources();
     }
     public void replaceBiomes(FriendlyByteBuf buffer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.level.chunk.LevelChunk#replaceBiomes");
+        for (LevelChunkSection section : sections) {
+            section.readBiomes(buffer);
+        }
     }
     public void setLoaded(boolean loaded) {
 

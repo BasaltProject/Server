@@ -27,7 +27,7 @@ public abstract class Behavior<E extends LivingEntity> implements BehaviorContro
     public Behavior(Map<MemoryModuleType<?>, MemoryStatus> entryCondition, int minDuration, int maxDuration) {
         this.minDuration = minDuration;
         this.maxDuration = maxDuration;
-        this.entryCondition = entryCondition;
+        this.entryCondition = entryCondition == null ? Map.of() : entryCondition;
     }
 
     @Override

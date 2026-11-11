@@ -16,7 +16,8 @@ import net.minecraft.world.level.saveddata.SavedDataType;
 /** The raids of one world, read from the native raid system. */
 public class Raids extends SavedData {
     public static final Codec<Raids> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.raid.Raids.class, "CODEC");
-    public static final SavedDataType<Raids> TYPE = null;
+    public static final SavedDataType<Raids> TYPE = new SavedDataType<Raids>(net.minecraft.resources.Identifier.withDefaultNamespace("raids"), Raids::new, CODEC,
+        net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_RAIDS);
 
     private final org.bukkit.World world;
 

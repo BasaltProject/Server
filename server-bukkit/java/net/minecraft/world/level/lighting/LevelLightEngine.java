@@ -19,7 +19,7 @@ public class LevelLightEngine implements LightEventListener {
         return;
     }
     public static final int LIGHT_SECTION_PADDING = 1;
-    public static final LevelLightEngine EMPTY = null;
+    public static final LevelLightEngine EMPTY = new LevelLightEngine();
     protected final LevelHeightAccessor levelHeightAccessor;
     public LevelLightEngine(LightChunkGetter chunkSource, boolean hasBlockLight, boolean hasSkyLight) {
         this.levelHeightAccessor = chunkSource == null ? null : chunkSource.getLevel();

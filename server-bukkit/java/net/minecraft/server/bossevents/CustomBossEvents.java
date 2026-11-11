@@ -12,7 +12,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 public class CustomBossEvents extends SavedData {
-    public static final SavedDataType<CustomBossEvents> TYPE = null;
+    public static final SavedDataType<CustomBossEvents> TYPE = new SavedDataType<>(net.minecraft.resources.Identifier.withDefaultNamespace("custom_boss_events"), CustomBossEvents::new, com.mojang.serialization.MapCodec.unitCodec(CustomBossEvents::new), net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_CUSTOM_BOSS_EVENTS);
     private final Map<Identifier, CustomBossEvent> events = new LinkedHashMap<>();
 
     public CustomBossEvent get(Identifier id) {

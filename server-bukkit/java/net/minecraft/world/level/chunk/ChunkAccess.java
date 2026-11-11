@@ -50,6 +50,11 @@ import net.minecraft.world.ticks.SavedTick;
 public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeResolver {
     private final Map<Structure, it.unimi.dsi.fastutil.longs.LongSet> kReferences = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<Structure, StructureStart> kStarts = new java.util.concurrent.ConcurrentHashMap<>();
+    private BiomeGenerationSettings kCarverBiome;
+    private boolean[] kBlockEmptiness;
+    private boolean[] kSkyEmptiness;
+    private SWMRNibbleArray[] kBlockNibbles;
+    private SWMRNibbleArray[] kSkyNibbles;
     private final ShortList[] kPostProcessing = new ShortList[32];
 
     protected final ChunkPos chunkPos;
@@ -64,6 +69,9 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         this.chunkPos = chunkPos;
         this.sections = levelChunkSections;
         this.heightAccessor = levelHeightAccessor;
+        this.levelHeightAccessor = levelHeightAccessor;
+        this.blendingData = blendingData;
+        this.postProcessing = kPostProcessing;
         this.upgradeData = upgradeData;
         this.inhabitedTime = value;
     }
@@ -80,7 +88,10 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         return true;
     }
     public BiomeGenerationSettings carverBiome(Supplier source) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.carverBiome");
+        if (kCarverBiome == null) {
+            kCarverBiome = (BiomeGenerationSettings) source.get();
+        }
+        return kCarverBiome;
     }
     public BlockHitResult clip(ClipContext clipContext) {
         return heightAccessor instanceof net.minecraft.world.level.BlockGetter getter ? getter.clip(clipContext)
@@ -99,7 +110,13 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         return voxelShape == null ? null : voxelShape.clip(vec3, vec32, blockPos);
     }
     public void fillBiomesFromNoise(BiomeResolver biomeResolver) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.fillBiomesFromNoise");
+        int quartMinX = net.minecraft.core.QuartPos.fromBlock(chunkPos.getMinBlockX());
+        int quartMinZ = net.minecraft.core.QuartPos.fromBlock(chunkPos.getMinBlockZ());
+        LevelHeightAccessor accessor = getHeightAccessorForGeneration();
+        for (int sectionY = accessor.getMinSectionY(); sectionY <= accessor.getMaxSectionY(); sectionY++) {
+            getSection(getSectionIndexFromSectionY(sectionY)).fillBiomesFromNoise(biomeResolver, quartMinX,
+                net.minecraft.core.QuartPos.fromSection(sectionY), quartMinZ);
+        }
     }
     public void findBlocks(Predicate<net.minecraft.world.level.block.state.BlockState> predicate, BiConsumer<net.minecraft.core.BlockPos, net.minecraft.world.level.block.state.BlockState> consumer) {
         for (int y = getMinY(); y <= getMaxY(); y++) {
@@ -124,7 +141,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBelowZeroRetrogen");
     }
     public BlendingData getBlendingData() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlendingData");
+        return blendingData;
     }
     public Set getBlockEntitiesPos() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getBlockEntitiesPos");
@@ -226,7 +243,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         return getBlockState(blockPos).getLightEmission();
     }
     public GameEventListenerRegistry getListenerRegistry(int section) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getListenerRegistry");
+        return GameEventListenerRegistry.NOOP;
     }
     public int getMaxSectionY() {
         return getMaxY() >> 4;
@@ -283,7 +300,10 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         return getSections().length;
     }
     public ChunkSkyLightSources getSkyLightSources() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSkyLightSources");
+        if (skyLightSources == null && heightAccessor != null) {
+            skyLightSources = new ChunkSkyLightSources(heightAccessor);
+        }
+        return skyLightSources;
     }
     public StructureStart getStartForStructure(Structure structure) {
         return kStarts.get(structure);
@@ -304,7 +324,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         return;
     }
     public BlockHitResult isBlockInLine(ClipBlockStateContext clipBlockStateContext) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isBlockInLine");
+        return heightAccessor instanceof net.minecraft.world.level.BlockGetter getter ? getter.isBlockInLine(clipBlockStateContext) : null;
     }
     public boolean isInsideBuildHeight(int value) {
         return value >= getMinY() && value <= getMaxY();
@@ -367,7 +387,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setBlockState");
     }
     public void setHeightmap(Heightmap.Types key, long[] data) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setHeightmap");
+        getOrCreateHeightmapUnprimed(key).setRawData(this, key, data);
     }
     public void setInhabitedTime(long inhabitedTime) {
         this.inhabitedTime = inhabitedTime;
@@ -379,28 +399,28 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         kStarts.put(structure, structureStart);
     }
     public boolean[] starlight$getBlockEmptinessMap() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$getBlockEmptinessMap");
+        return kBlockEmptiness;
     }
     public SWMRNibbleArray[] starlight$getBlockNibbles() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$getBlockNibbles");
+        return kBlockNibbles;
     }
     public boolean[] starlight$getSkyEmptinessMap() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$getSkyEmptinessMap");
+        return kSkyEmptiness;
     }
     public SWMRNibbleArray[] starlight$getSkyNibbles() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$getSkyNibbles");
+        return kSkyNibbles;
     }
     public void starlight$setBlockEmptinessMap(boolean[] flags) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$setBlockEmptinessMap");
+        kBlockEmptiness = flags;
     }
     public void starlight$setBlockNibbles(SWMRNibbleArray[] sWMRNibbleArrays) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$setBlockNibbles");
+        kBlockNibbles = sWMRNibbleArrays;
     }
     public void starlight$setSkyEmptinessMap(boolean[] flags) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$setSkyEmptinessMap");
+        kSkyEmptiness = flags;
     }
     public void starlight$setSkyNibbles(SWMRNibbleArray[] sWMRNibbleArrays) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.starlight$setSkyNibbles");
+        kSkyNibbles = sWMRNibbleArrays;
     }
     public boolean tryMarkSaved() {
         return true;
@@ -409,13 +429,13 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
     public record PackedTicks(List blocks, List fluids) {
     }
     public static final int NO_FILLED_SECTION = -1;
-    protected final ShortList[] postProcessing = null;
-    protected final BlendingData blendingData = null;
-    protected final Map<Heightmap.Types, Heightmap> heightmaps = null;
+    protected final ShortList[] postProcessing;
+    protected final BlendingData blendingData;
+    protected final Map<Heightmap.Types, Heightmap> heightmaps = new java.util.EnumMap<>(Heightmap.Types.class);
     protected ChunkSkyLightSources skyLightSources;
-    protected final Map<BlockPos, CompoundTag> pendingBlockEntities = null;
-    protected final Map<BlockPos, BlockEntity> blockEntities = null;
-    protected final LevelHeightAccessor levelHeightAccessor = null;
+    protected final Map<BlockPos, CompoundTag> pendingBlockEntities = new java.util.HashMap<>();
+    protected final Map<BlockPos, BlockEntity> blockEntities = new java.util.HashMap<>();
+    protected final LevelHeightAccessor levelHeightAccessor;
     public void markPosForPostProcessing(BlockPos blockPos) {
         int section = (blockPos.getY() - getMinY()) >> 4;
         getOrCreateOffsetList(kPostProcessing, section).add((short) ((blockPos.getX() & 15) | ((blockPos.getY() & 15) << 4)

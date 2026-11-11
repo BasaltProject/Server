@@ -115,7 +115,7 @@ public class ItemStack implements DataComponentHolder, ItemInstance {
     }
 
     public void applyComponents(DataComponentPatch changes) {
-        patch = changes;
+        patch = changes == null ? DataComponentPatch.EMPTY : changes;
     }
 
     public Component getItemName() {
@@ -202,7 +202,7 @@ public class ItemStack implements DataComponentHolder, ItemInstance {
     }
     public ItemStack(Holder<Item> item, int count, DataComponentPatch components) {
         this(item, count);
-        this.patch = components;
+        this.patch = components == null ? DataComponentPatch.EMPTY : components;
     }
     private ItemStack(Holder<Item> item, int count, PatchedDataComponentMap components) {
         this(item, count);

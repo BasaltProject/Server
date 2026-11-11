@@ -15,7 +15,7 @@ public class BannerDuplicateRecipe extends CustomRecipe {
         Ingredient.CONTENTS_STREAM_CODEC, o -> o.banner,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         BannerDuplicateRecipe::new);
-    public static final RecipeSerializer<BannerDuplicateRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<BannerDuplicateRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient banner;
     private final ItemStackTemplate result;
 

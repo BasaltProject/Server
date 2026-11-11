@@ -25,7 +25,7 @@ import net.minecraft.world.phys.Vec3;
 public class IronGolem extends AbstractGolem implements NeutralMob {
     private long angerEndTime = -1L;
     private net.minecraft.world.entity.EntityReference<net.minecraft.world.entity.LivingEntity> angerTarget;
-    protected static final EntityDataAccessor<Byte> DATA_FLAGS_ID = null;
+    protected static final EntityDataAccessor<Byte> DATA_FLAGS_ID = net.minecraft.network.syncher.EntityDataSerializers.BYTE.createAccessor(16);
     public IronGolem(EntityType<? extends IronGolem> type, Level level) {
         super(type, level);
     }

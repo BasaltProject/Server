@@ -54,21 +54,21 @@ public class VillagerTrades {
     public static final ResourceKey<VillagerTrade> SHEPHERD_2_BLACK_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_2_BLACK_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_2_LIGHT_BLUE_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_2_LIGHT_BLUE_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_2_LIME_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_2_LIME_DYE_EMERALD");
-    public static final ColorCollection<ResourceKey<VillagerTrade>> SHEPHERD_2_EMERALD_WOOL = null;
-    public static final ColorCollection<ResourceKey<VillagerTrade>> SHEPHERD_2_EMERALD_CARPETS = null;
+    public static final ColorCollection<ResourceKey<VillagerTrade>> SHEPHERD_2_EMERALD_WOOL = ColorCollection.NAMES.map(c -> resourceKey("shepherd/2/emerald_" + c + "_wool"));
+    public static final ColorCollection<ResourceKey<VillagerTrade>> SHEPHERD_2_EMERALD_CARPETS = ColorCollection.NAMES.map(c -> resourceKey("shepherd/2/emerald_" + c + "_carpet"));
     public static final ResourceKey<VillagerTrade> SHEPHERD_3_YELLOW_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_3_YELLOW_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_3_LIGHT_GRAY_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_3_LIGHT_GRAY_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_3_ORANGE_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_3_ORANGE_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_3_RED_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_3_RED_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_3_PINK_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_3_PINK_DYE_EMERALD");
-    public static final ColorCollection<ResourceKey<VillagerTrade>> SHEPHERD_3_EMERALD_BED = null;
+    public static final ColorCollection<ResourceKey<VillagerTrade>> SHEPHERD_3_EMERALD_BED = ColorCollection.NAMES.map(c -> resourceKey("shepherd/3/emerald_" + c + "_bed"));
     public static final ResourceKey<VillagerTrade> SHEPHERD_4_BROWN_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_4_BROWN_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_4_PURPLE_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_4_PURPLE_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_4_BLUE_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_4_BLUE_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_4_GREEN_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_4_GREEN_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_4_MAGENTA_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_4_MAGENTA_DYE_EMERALD");
     public static final ResourceKey<VillagerTrade> SHEPHERD_4_CYAN_DYE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_4_CYAN_DYE_EMERALD");
-    public static final ColorCollection<ResourceKey<VillagerTrade>> SHEPHERD_4_EMERALD_BANNER = null;
+    public static final ColorCollection<ResourceKey<VillagerTrade>> SHEPHERD_4_EMERALD_BANNER = ColorCollection.NAMES.map(c -> resourceKey("shepherd/4/emerald_" + c + "_banner"));
     public static final ResourceKey<VillagerTrade> SHEPHERD_5_EMERALD_PAINTING = org.basaltmc.bukkit.trade.TradeKeys.trade("SHEPHERD_5_EMERALD_PAINTING");
     public static final ResourceKey<VillagerTrade> FLETCHER_1_STICK_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("FLETCHER_1_STICK_EMERALD");
     public static final ResourceKey<VillagerTrade> FLETCHER_1_EMERALD_ARROW = org.basaltmc.bukkit.trade.TradeKeys.trade("FLETCHER_1_EMERALD_ARROW");
@@ -211,8 +211,8 @@ public class VillagerTrades {
     public static final ResourceKey<VillagerTrade> MASON_3_EMERALD_POLISHED_DIORITE = org.basaltmc.bukkit.trade.TradeKeys.trade("MASON_3_EMERALD_POLISHED_DIORITE");
     public static final ResourceKey<VillagerTrade> MASON_3_EMERALD_POLISHED_GRANTITE = org.basaltmc.bukkit.trade.TradeKeys.trade("MASON_3_EMERALD_POLISHED_GRANTITE");
     public static final ResourceKey<VillagerTrade> MASON_4_QUARTZ_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("MASON_4_QUARTZ_EMERALD");
-    public static final ColorCollection<ResourceKey<VillagerTrade>> MASON_4_EMERALD_TERRACOTTA = null;
-    public static final ColorCollection<ResourceKey<VillagerTrade>> MASON_4_EMERALD_GLAZED_TERRACOTTA = null;
+    public static final ColorCollection<ResourceKey<VillagerTrade>> MASON_4_EMERALD_TERRACOTTA = ColorCollection.NAMES.map(c -> resourceKey("mason/4/emerald_" + c + "_terracotta"));
+    public static final ColorCollection<ResourceKey<VillagerTrade>> MASON_4_EMERALD_GLAZED_TERRACOTTA = ColorCollection.NAMES.map(c -> resourceKey("mason/4/emerald_" + c + "_glazed_terracotta"));
     public static final ResourceKey<VillagerTrade> MASON_5_EMERALD_QUARTZ_PILLAR = org.basaltmc.bukkit.trade.TradeKeys.trade("MASON_5_EMERALD_QUARTZ_PILLAR");
     public static final ResourceKey<VillagerTrade> MASON_5_EMERALD_QUARTZ_BLOCK = org.basaltmc.bukkit.trade.TradeKeys.trade("MASON_5_EMERALD_QUARTZ_BLOCK");
     public static final ResourceKey<VillagerTrade> WANDERING_TRADER_WATER_BOTTLE_EMERALD = org.basaltmc.bukkit.trade.TradeKeys.trade("WANDERING_TRADER_WATER_BOTTLE_EMERALD");
@@ -276,7 +276,7 @@ public class VillagerTrades {
     public static final ResourceKey<VillagerTrade> WANDERING_TRADER_EMERALD_PALE_OAK_SAPLING = org.basaltmc.bukkit.trade.TradeKeys.trade("WANDERING_TRADER_EMERALD_PALE_OAK_SAPLING");
     public static final ResourceKey<VillagerTrade> WANDERING_TRADER_EMERALD_POPLAR_SAPLING = org.basaltmc.bukkit.trade.TradeKeys.trade("WANDERING_TRADER_EMERALD_POPLAR_SAPLING");
     public static final ResourceKey<VillagerTrade> WANDERING_TRADER_EMERALD_MANGROVE_PROPAGULE = org.basaltmc.bukkit.trade.TradeKeys.trade("WANDERING_TRADER_EMERALD_MANGROVE_PROPAGULE");
-    public static final ColorCollection<ResourceKey<VillagerTrade>> WANDERING_TRADER_EMERALD_DYE = null;
+    public static final ColorCollection<ResourceKey<VillagerTrade>> WANDERING_TRADER_EMERALD_DYE = ColorCollection.NAMES.map(c -> resourceKey("wandering_trader/emerald_" + c + "_dye"));
     public static final ResourceKey<VillagerTrade> WANDERING_TRADER_EMERALD_BRAIN_CORAL_BLOCK = org.basaltmc.bukkit.trade.TradeKeys.trade("WANDERING_TRADER_EMERALD_BRAIN_CORAL_BLOCK");
     public static final ResourceKey<VillagerTrade> WANDERING_TRADER_EMERALD_BUBBLE_CORAL_BLOCK = org.basaltmc.bukkit.trade.TradeKeys.trade("WANDERING_TRADER_EMERALD_BUBBLE_CORAL_BLOCK");
     public static final ResourceKey<VillagerTrade> WANDERING_TRADER_EMERALD_FIRE_CORAL_BLOCK = org.basaltmc.bukkit.trade.TradeKeys.trade("WANDERING_TRADER_EMERALD_FIRE_CORAL_BLOCK");
@@ -320,27 +320,59 @@ public class VillagerTrades {
         return HolderSet.direct(types);
     }
     public static Holder<LootItemCondition> villagerTypeRestriction(HolderSet<VillagerType> villagerTypes) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.trading.VillagerTrades#villagerTypeRestriction");
+        return Holder.<LootItemCondition>direct(new net.minecraft.world.level.storage.loot.predicates.LootItemEntityPropertyCondition(
+            java.util.Optional.of(net.minecraft.advancements.predicates.entity.EntityPredicate.Builder.entity()
+                .components(net.minecraft.advancements.predicates.DataComponentMatchers.Builder.components()
+                    .partial(net.minecraft.core.component.predicates.DataComponentPredicates.VILLAGER_VARIANT,
+                        net.minecraft.core.component.predicates.VillagerTypePredicate.villagerTypes(villagerTypes)).build()).build()),
+            net.minecraft.world.level.storage.loot.LootContext.EntityTarget.THIS));
     }
     public static List<Holder<LootItemFunction>> enchantedBook(HolderGetter<Item> items, HolderSet<Enchantment> options) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.trading.VillagerTrades#enchantedBook");
+        ItemPredicate.Builder anyEnchants = new ItemPredicate.Builder().of(items, net.minecraft.world.item.Items.ENCHANTED_BOOK)
+            .withComponents(storedEnchantments(net.minecraft.advancements.predicates.MinMaxBounds.Ints.ANY));
+        return discardItemIfItsNot(new net.minecraft.world.level.storage.loot.functions.EnchantRandomlyFunction.Builder()
+            .withOptions(options).allowingIncompatibleEnchantments().includeAdditionalCostComponent(), anyEnchants);
     }
     public static List<Holder<LootItemFunction>> enchantedBook(HolderGetter<Item> items, Holder<Enchantment> enchantment, int level) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.trading.VillagerTrades#enchantedBook");
+        ItemPredicate.Builder exactLevel = new ItemPredicate.Builder().of(items, net.minecraft.world.item.Items.ENCHANTED_BOOK)
+            .withComponents(storedEnchantments(net.minecraft.advancements.predicates.MinMaxBounds.Ints.exactly(level)));
+        return discardItemIfItsNot(new net.minecraft.world.level.storage.loot.functions.SetEnchantmentsFunction.Builder()
+            .withEnchantment(enchantment, net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProviders.exactly(level)), exactLevel);
     }
     public static List<Holder<LootItemFunction>> enchantedItem(HolderGetter<Item> items, HolderSet<Enchantment> options, Item expectedItem) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.trading.VillagerTrades#enchantedItem");
+        ItemPredicate.Builder anyEnchants = new ItemPredicate.Builder().of(items, expectedItem)
+            .withComponents(enchantments(net.minecraft.advancements.predicates.MinMaxBounds.Ints.ANY));
+        return discardItemIfItsNot(new net.minecraft.world.level.storage.loot.functions.EnchantWithLevelsFunction.Builder(
+            net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProviders.between(5, 19))
+            .withOptions(options).includeAdditionalCostComponent(), anyEnchants);
     }
     public static List<Holder<LootItemFunction>> enchantedItem(HolderGetter<Item> items, Holder<Enchantment> enchantment, int level, Item expectedItem) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.trading.VillagerTrades#enchantedItem");
+        ItemPredicate.Builder exactLevel = new ItemPredicate.Builder().of(items, expectedItem)
+            .withComponents(enchantments(net.minecraft.advancements.predicates.MinMaxBounds.Ints.exactly(level)));
+        return discardItemIfItsNot(new net.minecraft.world.level.storage.loot.functions.SetEnchantmentsFunction.Builder()
+            .withEnchantment(enchantment, net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProviders.exactly(level)), exactLevel);
+    }
+    private static net.minecraft.advancements.predicates.DataComponentMatchers storedEnchantments(net.minecraft.advancements.predicates.MinMaxBounds.Ints levels) {
+        return net.minecraft.advancements.predicates.DataComponentMatchers.Builder.components().partial(
+            net.minecraft.core.component.predicates.DataComponentPredicates.STORED_ENCHANTMENTS,
+            net.minecraft.core.component.predicates.EnchantmentsPredicate.storedEnchantments(
+                List.of(new net.minecraft.advancements.predicates.EnchantmentPredicate(java.util.Optional.empty(), levels)))).build();
+    }
+    private static net.minecraft.advancements.predicates.DataComponentMatchers enchantments(net.minecraft.advancements.predicates.MinMaxBounds.Ints levels) {
+        return net.minecraft.advancements.predicates.DataComponentMatchers.Builder.components().partial(
+            net.minecraft.core.component.predicates.DataComponentPredicates.ENCHANTMENTS,
+            net.minecraft.core.component.predicates.EnchantmentsPredicate.enchantments(
+                List.of(new net.minecraft.advancements.predicates.EnchantmentPredicate(java.util.Optional.empty(), levels)))).build();
     }
     public static ItemPredicate.Builder anyValidMap() {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.trading.VillagerTrades#anyValidMap");
+        return new ItemPredicate.Builder().withComponents(net.minecraft.advancements.predicates.DataComponentMatchers.Builder.components()
+            .any(net.minecraft.core.component.DataComponents.MAP_ID).build());
     }
     public static Holder<LootItemFunction> discardItemIfItsNot(ItemPredicate.Builder test) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.trading.VillagerTrades#discardItemIfItsNot");
+        return Holder.<LootItemFunction>direct(net.minecraft.world.level.storage.loot.functions.FilteredFunction.filtered(test.build())
+            .onFail(net.minecraft.world.level.storage.loot.functions.DiscardItem.discardItem().build()).build());
     }
     public static List<Holder<LootItemFunction>> discardItemIfItsNot(LootItemFunction.Builder function, ItemPredicate.Builder preserveCondition) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.world.item.trading.VillagerTrades#discardItemIfItsNot");
+        return List.of(Holder.direct(function.build()), discardItemIfItsNot(preserveCondition));
     }
 }

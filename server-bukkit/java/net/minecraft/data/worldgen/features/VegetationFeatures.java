@@ -86,6 +86,14 @@ public class VegetationFeatures {
         return builder;
     }
     public static BlockPredicateFilter nearWaterPredicate(Block block) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.data.worldgen.features.VegetationFeatures#nearWaterPredicate");
+        net.minecraft.world.level.material.Fluid[] water = {net.minecraft.world.level.material.Fluids.WATER, net.minecraft.world.level.material.Fluids.FLOWING_WATER};
+        net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate anyWaterBeside = net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate.anyOf(
+            net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate.matchesFluids(net.minecraft.core.CompositeDirection.EAST_DOWN, water),
+            net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate.matchesFluids(net.minecraft.core.CompositeDirection.WEST_DOWN, water),
+            net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate.matchesFluids(net.minecraft.core.CompositeDirection.SOUTH_DOWN, water),
+            net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate.matchesFluids(net.minecraft.core.CompositeDirection.NORTH_DOWN, water));
+        return BlockPredicateFilter.forPredicate(net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate.allOf(
+            net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate.ONLY_IN_AIR_PREDICATE,
+            net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate.wouldSurvive(block), anyWaterBeside));
     }
 }

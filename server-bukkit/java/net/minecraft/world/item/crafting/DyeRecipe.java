@@ -22,7 +22,7 @@ public class DyeRecipe extends NormalCraftingRecipe {
         Ingredient.CONTENTS_STREAM_CODEC, o -> o.dye,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         DyeRecipe::new);
-    public static final RecipeSerializer<DyeRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<DyeRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient target;
     private final Ingredient dye;
     private final ItemStackTemplate result;

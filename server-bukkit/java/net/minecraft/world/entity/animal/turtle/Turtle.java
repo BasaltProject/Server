@@ -38,7 +38,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 public class Turtle extends Animal {
-    public static final TargetingConditions.Selector BABY_ON_LAND_SELECTOR = null;
+    public static final TargetingConditions.Selector BABY_ON_LAND_SELECTOR = (target, level) -> target.isBaby() && !target.isInWater();
     public Turtle(EntityType<? extends Turtle> type, Level level) {
         super(type, level);
     }

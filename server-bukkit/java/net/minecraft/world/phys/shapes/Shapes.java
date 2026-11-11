@@ -35,10 +35,22 @@ public final class Shapes {
         return create(aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY, aabb.maxZ);
     }
     static int findBits(double min, double max) {
-        throw new UnsupportedOperationException("net.minecraft.world.phys.shapes.Shapes#findBits");
+        if (min < -1.0E-7 || max > 1.0000001) {
+            return -1;
+        }
+        for (int bits = 0; bits <= 3; bits++) {
+            int steps = 1 << bits;
+            double lo = min * steps;
+            double hi = max * steps;
+            double slack = 1.0E-7 * steps;
+            if (Math.abs(lo - Math.round(lo)) < slack && Math.abs(hi - Math.round(hi)) < slack) {
+                return bits;
+            }
+        }
+        return -1;
     }
     static long lcm(int first, int second) {
-        throw new UnsupportedOperationException("net.minecraft.world.phys.shapes.Shapes#lcm");
+        return (long) first * (second / com.google.common.math.IntMath.gcd(first, second));
     }
     public static VoxelShape or(VoxelShape first, VoxelShape second) {
         return join(first, second, BooleanOp.OR);
@@ -96,7 +108,21 @@ public final class Shapes {
         return !joinIsNotEmpty(VoxelShape.BLOCK, joinUnoptimized(shape, occluder, BooleanOp.OR), BooleanOp.ONLY_FIRST);
     }
     static IndexMerger createIndexMerger(int cost, DoubleList first, DoubleList second, boolean firstOnlyMatters, boolean secondOnlyMatters) {
-        throw new UnsupportedOperationException("net.minecraft.world.phys.shapes.Shapes#createIndexMerger");
+        int lastFirst = first.size() - 1;
+        int lastSecond = second.size() - 1;
+        if (first instanceof CubePointRange && second instanceof CubePointRange
+            && (long) cost * lcm(lastFirst, lastSecond) <= 256L) {
+            return new DiscreteCubeMerger(lastFirst, lastSecond);
+        }
+        boolean firstBelow = first.getDouble(lastFirst) < second.getDouble(0) - 1.0E-7;
+        boolean secondBelow = second.getDouble(lastSecond) < first.getDouble(0) - 1.0E-7;
+        if (firstBelow || secondBelow) {
+            return firstBelow ? new NonOverlappingMerger(first, second, false) : new NonOverlappingMerger(second, first, true);
+        }
+        if (lastFirst == lastSecond && java.util.Objects.equals(first, second)) {
+            return new IdenticalMerger(first);
+        }
+        return new IndirectMerger(first, second, firstOnlyMatters, secondOnlyMatters);
     }
     public static VoxelShape rotate(VoxelShape shape, OctahedralGroup rotation) {
         throw new UnsupportedOperationException("net.minecraft.world.phys.shapes.Shapes#rotate");
@@ -105,7 +131,17 @@ public final class Shapes {
         throw new UnsupportedOperationException("net.minecraft.world.phys.shapes.Shapes#rotate");
     }
     static DoubleList flipAxisIfNeeded(DoubleList newAxis, boolean flip, double newRelative, double oldRelative) {
-        throw new UnsupportedOperationException("net.minecraft.world.phys.shapes.Shapes#flipAxisIfNeeded");
+        boolean untouched = !flip && newRelative == oldRelative;
+        if (untouched) {
+            return newAxis;
+        }
+        int count = newAxis.size();
+        it.unimi.dsi.fastutil.doubles.DoubleArrayList shifted = new it.unimi.dsi.fastutil.doubles.DoubleArrayList(count);
+        for (int at = 0; at < count; at++) {
+            double value = newAxis.getDouble(flip ? count - 1 - at : at) - newRelative;
+            shifted.add(flip ? oldRelative - value : value + oldRelative);
+        }
+        return shifted;
     }
     public static boolean equal(VoxelShape first, VoxelShape second) {
         return !joinIsNotEmpty(first, second, BooleanOp.NOT_SAME);

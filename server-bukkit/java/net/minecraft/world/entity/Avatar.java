@@ -24,8 +24,8 @@ public abstract class Avatar extends LivingEntity {
         Pose.SPIN_ATTACK, SWIM_LIKE, Pose.CROUCHING, EntityDimensions.scalable(0.6F, 1.5F).withEyeHeight(1.27F)
             .withAttachments(EntityAttachments.builder().attach(EntityAttachment.VEHICLE, DEFAULT_VEHICLE_ATTACHMENT)),
         Pose.DYING, EntityDimensions.fixed(0.2F, 0.2F).withEyeHeight(DEFAULT_EYE_HEIGHT));
-    protected static final EntityDataAccessor<HumanoidArm> DATA_PLAYER_MAIN_HAND = null;
-    protected static final EntityDataAccessor<Byte> DATA_PLAYER_MODE_CUSTOMISATION = null;
+    protected static final EntityDataAccessor<HumanoidArm> DATA_PLAYER_MAIN_HAND = net.minecraft.network.syncher.EntityDataSerializers.HUMANOID_ARM.createAccessor(15);
+    protected static final EntityDataAccessor<Byte> DATA_PLAYER_MODE_CUSTOMISATION = net.minecraft.network.syncher.EntityDataSerializers.BYTE.createAccessor(16);
     protected Avatar(EntityType<? extends LivingEntity> type, Level level) {
         super(type, level);
     }

@@ -20,7 +20,7 @@ public class ShapelessRecipe extends NormalCraftingRecipe {
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         Ingredient.CONTENTS_STREAM_CODEC.apply(net.minecraft.network.codec.ByteBufCodecs.list()), o -> o.ingredients,
         ShapelessRecipe::new);
-    public static final RecipeSerializer<ShapelessRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<ShapelessRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final ItemStackTemplate result;
     private final List<Ingredient> ingredients;
 

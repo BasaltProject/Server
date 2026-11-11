@@ -23,7 +23,7 @@ public class LadderBlock extends Block implements SimpleWaterloggedBlock {
     }
     public static final EnumProperty<Direction> FACING = HorizontalDirectionalBlock.FACING;
     public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
-    public static final Map<Direction, VoxelShape> SHAPES = null;
+    public static final Map<Direction, VoxelShape> SHAPES = net.minecraft.world.phys.shapes.Shapes.rotateHorizontal(Block.boxZ(16.0, 13.0, 16.0));
     protected LadderBlock(BlockBehaviour.Properties properties) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
     }

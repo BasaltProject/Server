@@ -5,4 +5,7 @@ public interface HolderOwner<T> {
     default boolean canSerializeIn(HolderOwner<T> owner) {
         return owner == this;
     }
+    default boolean canSerialize(HolderOwner<T> owner) {
+        return canSerializeIn(owner);
+    }
 }

@@ -21,7 +21,7 @@ public class ShapedRecipe extends NormalCraftingRecipe {
         ShapedRecipePattern.STREAM_CODEC, o -> o.pattern,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         ShapedRecipe::new);
-    public static final RecipeSerializer<ShapedRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<ShapedRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final ShapedRecipePattern pattern;
     private final ItemStackTemplate result;
 

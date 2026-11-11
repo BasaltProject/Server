@@ -25,6 +25,11 @@ public abstract class LootItemConditionalFunction implements LootItemFunction, o
         org.basaltmc.bukkit.loot.LootJson.optional(out, "condition", condition);
         out.append('}');
     }
+    public final String bareJson() {
+        StringBuilder out = new StringBuilder("{");
+        writeFunction(out);
+        return out.append('}').toString();
+    }
     public abstract MapCodec<? extends LootItemConditionalFunction> codec();
     protected static <T extends LootItemConditionalFunction> Products.P1<RecordCodecBuilder.Mu<T>, Optional<Holder<LootItemCondition>>> commonFields(RecordCodecBuilder.Instance<T> i) {
         return i.group(LootItemCondition.CODEC.optionalFieldOf("condition").forGetter(f -> f.condition));

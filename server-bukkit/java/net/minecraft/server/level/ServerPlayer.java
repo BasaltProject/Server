@@ -121,7 +121,7 @@ public class ServerPlayer extends Player {
     public static final String ENDER_PEARLS_TAG = "ender_pearls";
     public static final String ENDER_PEARL_DIMENSION_TAG = "ender_pearl_dimension";
     public static final String TAG_DIMENSION = "Dimension";
-    public final ServerPlayerGameMode gameMode = null;
+    public final ServerPlayerGameMode gameMode = new ServerPlayerGameMode(this);
     public boolean seenCredits;
     public final Object object = null;
     public boolean wonGame;
@@ -518,10 +518,13 @@ public class ServerPlayer extends Player {
         teleportTo(x, y, z);
     }
     public void crit(Entity entity) {
+        connection.send(new net.minecraft.network.protocol.game.ClientboundAnimatePacket(entity, 4));
     }
     public void magicCrit(Entity entity) {
+        connection.send(new net.minecraft.network.protocol.game.ClientboundAnimatePacket(entity, 5));
     }
     public void onUpdateAbilities() {
+        connection.send(new net.minecraft.network.protocol.game.ClientboundPlayerAbilitiesPacket(getAbilities()));
     }
     public boolean setGameMode(GameType mode) {
         player.setGameMode(org.bukkit.GameMode.getByValue(mode.getId()));
@@ -710,12 +713,16 @@ public class ServerPlayer extends Player {
     }
     public void onItemPickup(ItemEntity entity) {
     }
+    private RemoteChatSession chatSession;
     public void setChatSession(RemoteChatSession chatSession) {
+        this.chatSession = chatSession;
     }
     public RemoteChatSession getChatSession() {
-        return null;
+        return chatSession;
     }
     public void indicateDamage(double xd, double zd) {
+        connection.send(new net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket(getId(),
+            (float) (Math.atan2(zd, xd) * (180.0D / Math.PI) - getYRot())));
     }
     public boolean startRiding(Entity entityToRide, boolean force, boolean sendEventAndTriggers) {
         return ((org.bukkit.entity.Entity) entityToRide.getBukkitEntity()).addPassenger(player);
@@ -825,6 +832,6 @@ public class ServerPlayer extends Player {
     }
     public static record SavedPosition(Optional<ResourceKey<Level>> dimension, Optional<Vec3> position, Optional<Vec2> rotation) {
         public static final MapCodec<SavedPosition> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.server.level.ServerPlayer.SavedPosition.class, "MAP_CODEC");
-        public static final SavedPosition EMPTY = null;
+        public static final SavedPosition EMPTY = new SavedPosition(Optional.empty(), Optional.empty(), Optional.empty());
     }
 }

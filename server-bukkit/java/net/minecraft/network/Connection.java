@@ -11,7 +11,12 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.function.Consumer;
 import javax.crypto.Cipher;
+import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.handshake.ClientIntent;
+import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
+import net.minecraft.network.protocol.login.LoginProtocols;
+import net.minecraft.network.protocol.status.StatusProtocols;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.login.ClientLoginPacketListener;
@@ -27,6 +32,11 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
     private PacketListener packetListener;
     private DisconnectionDetails disconnectionDetails;
     private boolean handledDisconnection;
+    private long windowStart = System.nanoTime();
+    private int sentInWindow;
+    private int receivedInWindow;
+    private float sentAverage;
+    private float receivedAverage;
 
     public Connection(Channel channel) {
         this.channel = channel;
@@ -35,10 +45,15 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
     public Channel getChannel() {
         return channel;
     }
-    public static final Marker ROOT_MARKER = null;
-    public static final Marker PACKET_MARKER = null;
-    public static final Marker PACKET_RECEIVED_MARKER = null;
-    public static final Marker PACKET_SENT_MARKER = null;
+    public static final Marker ROOT_MARKER = org.slf4j.MarkerFactory.getMarker("NETWORK");
+    public static final Marker PACKET_MARKER = packetMarker("NETWORK_PACKETS", ROOT_MARKER);
+    public static final Marker PACKET_RECEIVED_MARKER = packetMarker("PACKET_RECEIVED", PACKET_MARKER);
+    public static final Marker PACKET_SENT_MARKER = packetMarker("PACKET_SENT", PACKET_MARKER);
+    private static Marker packetMarker(String name, Marker parent) {
+        Marker marker = org.slf4j.MarkerFactory.getMarker(name);
+        marker.add(parent);
+        return marker;
+    }
     public Connection(PacketFlow receiving) {
         this.receiving = receiving;
     }
@@ -64,16 +79,27 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
         this.packetListener = packetListener;
     }
     public void initiateServerboundStatusConnection(String hostName, int port, ClientStatusPacketListener listener) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.Connection#initiateServerboundStatusConnection");
+        initiateServerboundConnection(hostName, port, StatusProtocols.SERVERBOUND, StatusProtocols.CLIENTBOUND, listener, ClientIntent.STATUS);
     }
     public void initiateServerboundPlayConnection(String hostName, int port, ClientLoginPacketListener listener) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.Connection#initiateServerboundPlayConnection");
+        initiateServerboundConnection(hostName, port, LoginProtocols.SERVERBOUND, LoginProtocols.CLIENTBOUND, listener, ClientIntent.LOGIN);
     }
     public <S extends ServerboundPacketListener, C extends ClientboundPacketListener> void initiateServerboundPlayConnection(String hostName, int port, ProtocolInfo<S> outbound, ProtocolInfo<C> inbound, C listener, boolean transfer) {
-        throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.Connection#initiateServerboundPlayConnection");
+        initiateServerboundConnection(hostName, port, outbound, inbound, listener, transfer ? ClientIntent.TRANSFER : ClientIntent.LOGIN);
+    }
+    private <S extends ServerboundPacketListener, C extends ClientboundPacketListener> void initiateServerboundConnection(String hostName, int port, ProtocolInfo<S> outbound, ProtocolInfo<C> inbound, C listener, ClientIntent intent) {
+        if (outbound.id() != inbound.id()) {
+            throw new IllegalStateException("Mismatched initial protocols");
+        }
+        runOnceConnected(connection -> {
+            connection.setupInboundProtocol(inbound, listener);
+            connection.send(new ClientIntentionPacket(SharedConstants.getProtocolVersion(), hostName, port, intent));
+            connection.setupOutboundProtocol(outbound);
+        });
     }
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void receive(Packet<?> packet) {
+        receivedInWindow++;
         if (packetListener != null && isConnected()) {
             ((Packet) packet).handle(packetListener);
         }
@@ -85,6 +111,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
         send(packet, listener, true);
     }
     public void send(Packet<?> packet, ChannelFutureListener listener, boolean flush) {
+        sentInWindow++;
         if (channel == null) {
             return;
         }
@@ -101,7 +128,11 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
             channel.flush();
         }
     }
+    private int ticks;
     public void tick() {
+        if (++ticks % 20 == 0) {
+            tickSecond();
+        }
     }
     protected void tickSecond() {
     }
@@ -132,9 +163,11 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
         return receiving.getOpposite();
     }
     public static Connection connectToServer(InetSocketAddress address, EventLoopGroupHolder eventLoopGroupHolder, LocalSampleLogger bandwidthLogger) {
+        // Needs a real io.netty Bootstrap and event loop, which Basalt does not run.
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.Connection#connectToServer");
     }
     public static ChannelFuture connect(InetSocketAddress address, EventLoopGroupHolder eventLoopGroupHolder, Connection connection) {
+        // io.netty Bootstrap only.
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.Connection#connect");
     }
     public void configurePacketHandler(ChannelPipeline pipeline) {
@@ -147,6 +180,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
 
     }
     public static Connection connectToLocalServer(SocketAddress address) {
+        // io.netty LocalChannel only.
         throw org.basaltmc.bukkit.facade.NmsStub.unsupported("net.minecraft.network.Connection#connectToLocalServer");
     }
     public static Connection fromChannel(Channel channel, PacketFlow flow, LocalSampleLogger bandwidthLogger) {
@@ -185,11 +219,22 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
         packetListener.onDisconnect(disconnectionDetails != null ? disconnectionDetails
             : new DisconnectionDetails(Component.literal("Disconnected")));
     }
-    public float getAverageReceivedPackets() {
-        return 0.0F;
+    public synchronized float getAverageReceivedPackets() {
+        rollWindow();
+        return receivedAverage;
     }
-    public float getAverageSentPackets() {
-        return 0.0F;
+    public synchronized float getAverageSentPackets() {
+        rollWindow();
+        return sentAverage;
+    }
+    private void rollWindow() {
+        long now = System.nanoTime();
+        for (; now - windowStart >= 1_000_000_000L; windowStart += 1_000_000_000L) {
+            sentAverage = sentAverage * 0.75F + sentInWindow * 0.25F;
+            receivedAverage = receivedAverage * 0.75F + receivedInWindow * 0.25F;
+            sentInWindow = 0;
+            receivedInWindow = 0;
+        }
     }
     public void setBandwidthLogger(LocalSampleLogger bandwidthLogger) {
 

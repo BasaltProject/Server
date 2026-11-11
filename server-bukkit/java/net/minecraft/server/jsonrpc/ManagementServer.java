@@ -12,7 +12,7 @@ import net.minecraft.server.jsonrpc.security.AuthenticationHandler;
 import net.minecraft.server.notifications.NotificationManager;
 import org.basaltmc.bukkit.WorldEnvNatives;
 
-/** The management API is hosted by the Basalt server on its own API port; this class reports and tracks it. */
+/** The management protocol is served by the native server on its own port; this class reports and tracks it. */
 public class ManagementServer {
     private final HostAndPort hostAndPort;
     private final List<Connection> connections = new CopyOnWriteArrayList<>();
@@ -26,7 +26,7 @@ public class ManagementServer {
     }
 
     public boolean scheduleHeartbeat(NotificationManager notificationManager, long period) {
-        return false;
+        return WorldEnvNatives.setSetting("status_heartbeat_interval", String.valueOf(Math.max(0L, period)));
     }
 
     public void onConnected(Connection connection) {
@@ -52,8 +52,12 @@ public class ManagementServer {
     public void tick() {}
 
     public int getPort() {
-        String port = WorldEnvNatives.setting("api_port");
+        String port = WorldEnvNatives.setting("management_port");
         return port == null ? hostAndPort.getPort() : Integer.parseInt(port);
+    }
+
+    public boolean usesTls() {
+        return Boolean.parseBoolean(WorldEnvNatives.setting("management_tls"));
     }
 
     void forEachConnection(Consumer<Connection> action) {
@@ -61,8 +65,8 @@ public class ManagementServer {
     }
 
     private static void requireApi() {
-        if (!Boolean.parseBoolean(WorldEnvNatives.setting("api_enabled"))) {
-            throw new IllegalStateException("The management API is turned off in the Basalt server configuration (network.api)");
+        if (!Boolean.parseBoolean(WorldEnvNatives.setting("management_enabled"))) {
+            throw new IllegalStateException("The management server is turned off in config/server.toml ([network.management])");
         }
     }
 }

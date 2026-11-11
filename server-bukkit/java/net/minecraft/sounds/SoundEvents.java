@@ -72,6 +72,52 @@ public class SoundEvents {
         return sounds;
     }
 
+    private static Map<CatSoundVariants.SoundSet, CatSoundVariant> catSounds() {
+        Map<CatSoundVariants.SoundSet, CatSoundVariant> sounds = new java.util.EnumMap<>(CatSoundVariants.SoundSet.class);
+        for (CatSoundVariants.SoundSet set : CatSoundVariants.SoundSet.values()) {
+            String p = "entity." + set.getSoundEventIdentifier() + ".";
+            sounds.put(set, new CatSoundVariant(new CatSoundVariant.CatSoundSet(refById(p + "ambient"), refById(p + "stray_ambient"),
+                refById(p + "hiss"), refById(p + "hurt"), refById(p + "death"), refById(p + "eat"), refById(p + "beg_for_food"),
+                refById(p + "purr"), refById(p + "purreow")), new CatSoundVariant.CatSoundSet(CAT_AMBIENT_BABY, CAT_STRAY_AMBIENT_BABY,
+                CAT_HISS_BABY, CAT_HURT_BABY, CAT_DEATH_BABY, CAT_EAT_BABY, CAT_BEG_FOR_FOOD_BABY, CAT_PURR_BABY, CAT_PURREOW_BABY)));
+        }
+        return sounds;
+    }
+
+    private static Map<ChickenSoundVariants.SoundSet, ChickenSoundVariant> chickenSounds() {
+        Map<ChickenSoundVariants.SoundSet, ChickenSoundVariant> sounds = new java.util.EnumMap<>(ChickenSoundVariants.SoundSet.class);
+        for (ChickenSoundVariants.SoundSet set : ChickenSoundVariants.SoundSet.values()) {
+            String p = "entity." + set.getSoundEventIdentifier() + ".";
+            sounds.put(set, new ChickenSoundVariant(new ChickenSoundVariant.ChickenSoundSet(refById(p + "ambient"), refById(p + "hurt"),
+                refById(p + "death"), CHICKEN_STEP), new ChickenSoundVariant.ChickenSoundSet(CHICKEN_AMBIENT_BABY, CHICKEN_HURT_BABY,
+                CHICKEN_DEATH_BABY, CHICKEN_STEP_BABY)));
+        }
+        return sounds;
+    }
+
+    private static Map<PigSoundVariants.SoundSet, PigSoundVariant> pigSounds() {
+        Map<PigSoundVariants.SoundSet, PigSoundVariant> sounds = new java.util.EnumMap<>(PigSoundVariants.SoundSet.class);
+        for (PigSoundVariants.SoundSet set : PigSoundVariants.SoundSet.values()) {
+            String p = "entity." + set.getSoundEventIdentifier() + ".";
+            sounds.put(set, new PigSoundVariant(new PigSoundVariant.PigSoundSet(refById(p + "ambient"), refById(p + "hurt"),
+                refById(p + "death"), PIG_STEP, refById(p + "eat")), new PigSoundVariant.PigSoundSet(PIG_AMBIENT_BABY, PIG_HURT_BABY,
+                PIG_DEATH_BABY, PIG_STEP_BABY, PIG_EAT_BABY)));
+        }
+        return sounds;
+    }
+
+    private static Map<WolfSoundVariants.SoundSet, WolfSoundVariant> wolfSounds() {
+        Map<WolfSoundVariants.SoundSet, WolfSoundVariant> sounds = new java.util.EnumMap<>(WolfSoundVariants.SoundSet.class);
+        for (WolfSoundVariants.SoundSet set : WolfSoundVariants.SoundSet.values()) {
+            String p = "entity." + set.getSoundEventIdentifier() + ".";
+            sounds.put(set, new WolfSoundVariant(new WolfSoundVariant.WolfSoundSet(refById(p + "ambient"), refById(p + "death"),
+                refById(p + "growl"), refById(p + "hurt"), refById(p + "pant"), refById(p + "whine"), WOLF_STEP),
+                new WolfSoundVariant.WolfSoundSet(WOLF_AMBIENT_BABY, WOLF_DEATH_BABY, WOLF_GROWL_BABY, WOLF_HURT_BABY,
+                WOLF_PANT_BABY, WOLF_WHINE_BABY, WOLF_STEP_BABY)));
+        }
+        return sounds;
+    }
+
     private static Holder.Reference<SoundEvent> refById(String id) {
         SoundEvent event = kById.get(id);
         if (event == null) {
@@ -80,6 +126,11 @@ public class SoundEvents {
         return new Holder.Reference<SoundEvent>((net.minecraft.core.Registry<SoundEvent>) null,
             (net.minecraft.resources.ResourceKey<SoundEvent>) (Object) net.minecraft.resources.ResourceKey.create(
                 (net.minecraft.resources.ResourceKey) net.minecraft.core.registries.Registries.SOUND_EVENT, event.location()), event);
+    }
+
+    private static SoundEvent id(String id) {
+        SoundEvent event = kById.get(id);
+        return event != null ? event : SoundEvent.createVariableRangeEvent(net.minecraft.resources.Identifier.withDefaultNamespace(id));
     }
 
     private static SoundEvent of(String field) {
@@ -92,7 +143,7 @@ public class SoundEvents {
     public static final SoundEvent ALLAY_HURT = of("ALLAY_HURT");
     public static final SoundEvent ALLAY_ITEM_GIVEN = of("ALLAY_ITEM_GIVEN");
     public static final SoundEvent ALLAY_ITEM_TAKEN = of("ALLAY_ITEM_TAKEN");
-    public static final SoundEvent ALLAY_THROW = of("ALLAY_THROW");
+    public static final SoundEvent ALLAY_THROW = id("entity.allay.item_thrown");
     public static final Holder.Reference<SoundEvent> AMBIENT_CAVE = ref("AMBIENT_CAVE");
     public static final Holder.Reference<SoundEvent> AMBIENT_BASALT_DELTAS_ADDITIONS = ref("AMBIENT_BASALT_DELTAS_ADDITIONS");
     public static final Holder.Reference<SoundEvent> AMBIENT_BASALT_DELTAS_LOOP = ref("AMBIENT_BASALT_DELTAS_LOOP");
@@ -195,12 +246,12 @@ public class SoundEvents {
     public static final SoundEvent AZALEA_LEAVES_PLACE = of("AZALEA_LEAVES_PLACE");
     public static final SoundEvent AZALEA_LEAVES_STEP = of("AZALEA_LEAVES_STEP");
     public static final SoundEvent BABY_NAUTILUS_AMBIENT = of("BABY_NAUTILUS_AMBIENT");
-    public static final SoundEvent BABY_NAUTILUS_AMBIENT_ON_LAND = of("BABY_NAUTILUS_AMBIENT_ON_LAND");
+    public static final SoundEvent BABY_NAUTILUS_AMBIENT_ON_LAND = id("entity.baby_nautilus.ambient_land");
     public static final SoundEvent BABY_NAUTILUS_DEATH = of("BABY_NAUTILUS_DEATH");
-    public static final SoundEvent BABY_NAUTILUS_DEATH_ON_LAND = of("BABY_NAUTILUS_DEATH_ON_LAND");
+    public static final SoundEvent BABY_NAUTILUS_DEATH_ON_LAND = id("entity.baby_nautilus.death_land");
     public static final SoundEvent BABY_NAUTILUS_EAT = of("BABY_NAUTILUS_EAT");
     public static final SoundEvent BABY_NAUTILUS_HURT = of("BABY_NAUTILUS_HURT");
-    public static final SoundEvent BABY_NAUTILUS_HURT_ON_LAND = of("BABY_NAUTILUS_HURT_ON_LAND");
+    public static final SoundEvent BABY_NAUTILUS_HURT_ON_LAND = id("entity.baby_nautilus.hurt_land");
     public static final SoundEvent NAUTILUS_RIDING = of("NAUTILUS_RIDING");
     public static final SoundEvent BABY_NAUTILUS_SWIM = of("BABY_NAUTILUS_SWIM");
     public static final SoundEvent BAMBOO_BREAK = of("BAMBOO_BREAK");
@@ -252,7 +303,7 @@ public class SoundEvents {
     public static final SoundEvent BEEHIVE_EXIT = of("BEEHIVE_EXIT");
     public static final SoundEvent BEEHIVE_SHEAR = of("BEEHIVE_SHEAR");
     public static final SoundEvent BEEHIVE_WORK = of("BEEHIVE_WORK");
-    public static final SoundEvent BELL_BLOCK = of("BELL_BLOCK");
+    public static final SoundEvent BELL_BLOCK = id("block.bell.use");
     public static final SoundEvent BELL_RESONATE = of("BELL_RESONATE");
     public static final SoundEvent BIG_DRIPLEAF_BREAK = of("BIG_DRIPLEAF_BREAK");
     public static final SoundEvent BIG_DRIPLEAF_FALL = of("BIG_DRIPLEAF_FALL");
@@ -295,19 +346,19 @@ public class SoundEvents {
     public static final SoundEvent BREEZE_DEATH = of("BREEZE_DEATH");
     public static final SoundEvent BREEZE_HURT = of("BREEZE_HURT");
     public static final SoundEvent BREEZE_WHIRL = of("BREEZE_WHIRL");
-    public static final Holder.Reference<SoundEvent> BREEZE_WIND_CHARGE_BURST = ref("BREEZE_WIND_CHARGE_BURST");
+    public static final Holder.Reference<SoundEvent> BREEZE_WIND_CHARGE_BURST = refById("entity.breeze.wind_burst");
     public static final SoundEvent BREWING_STAND_BREW = of("BREWING_STAND_BREW");
-    public static final SoundEvent BRUSH_GENERIC = of("BRUSH_GENERIC");
-    public static final SoundEvent BRUSH_SAND = of("BRUSH_SAND");
-    public static final SoundEvent BRUSH_GRAVEL = of("BRUSH_GRAVEL");
-    public static final SoundEvent BRUSH_SAND_COMPLETED = of("BRUSH_SAND_COMPLETED");
-    public static final SoundEvent BRUSH_GRAVEL_COMPLETED = of("BRUSH_GRAVEL_COMPLETED");
+    public static final SoundEvent BRUSH_GENERIC = id("item.brush.brushing.generic");
+    public static final SoundEvent BRUSH_SAND = id("item.brush.brushing.sand");
+    public static final SoundEvent BRUSH_GRAVEL = id("item.brush.brushing.gravel");
+    public static final SoundEvent BRUSH_SAND_COMPLETED = id("item.brush.brushing.sand.complete");
+    public static final SoundEvent BRUSH_GRAVEL_COMPLETED = id("item.brush.brushing.gravel.complete");
     public static final SoundEvent BUBBLE_COLUMN_BUBBLE_POP = of("BUBBLE_COLUMN_BUBBLE_POP");
     public static final SoundEvent BUBBLE_COLUMN_UPWARDS_AMBIENT = of("BUBBLE_COLUMN_UPWARDS_AMBIENT");
     public static final SoundEvent BUBBLE_COLUMN_UPWARDS_INSIDE = of("BUBBLE_COLUMN_UPWARDS_INSIDE");
     public static final SoundEvent BUBBLE_COLUMN_WHIRLPOOL_AMBIENT = of("BUBBLE_COLUMN_WHIRLPOOL_AMBIENT");
     public static final SoundEvent BUBBLE_COLUMN_WHIRLPOOL_INSIDE = of("BUBBLE_COLUMN_WHIRLPOOL_INSIDE");
-    public static final SoundEvent BUBBLE_POP = of("BUBBLE_POP");
+    public static final SoundEvent BUBBLE_POP = id("ui.hud.bubble_pop");
     public static final SoundEvent BUCKET_EMPTY = of("BUCKET_EMPTY");
     public static final SoundEvent BUCKET_EMPTY_AXOLOTL = of("BUCKET_EMPTY_AXOLOTL");
     public static final SoundEvent BUCKET_EMPTY_FISH = of("BUCKET_EMPTY_FISH");
@@ -364,16 +415,16 @@ public class SoundEvents {
     public static final SoundEvent CANDLE_HIT = of("CANDLE_HIT");
     public static final SoundEvent CANDLE_PLACE = of("CANDLE_PLACE");
     public static final SoundEvent CANDLE_STEP = of("CANDLE_STEP");
-    public static final Holder.Reference<SoundEvent> CAT_AMBIENT_BABY = ref("CAT_AMBIENT_BABY");
-    public static final Holder.Reference<SoundEvent> CAT_STRAY_AMBIENT_BABY = ref("CAT_STRAY_AMBIENT_BABY");
-    public static final Holder.Reference<SoundEvent> CAT_DEATH_BABY = ref("CAT_DEATH_BABY");
-    public static final Holder.Reference<SoundEvent> CAT_EAT_BABY = ref("CAT_EAT_BABY");
-    public static final Holder.Reference<SoundEvent> CAT_HISS_BABY = ref("CAT_HISS_BABY");
-    public static final Holder.Reference<SoundEvent> CAT_BEG_FOR_FOOD_BABY = ref("CAT_BEG_FOR_FOOD_BABY");
-    public static final Holder.Reference<SoundEvent> CAT_HURT_BABY = ref("CAT_HURT_BABY");
-    public static final Holder.Reference<SoundEvent> CAT_PURR_BABY = ref("CAT_PURR_BABY");
-    public static final Holder.Reference<SoundEvent> CAT_PURREOW_BABY = ref("CAT_PURREOW_BABY");
-    public static final Map<CatSoundVariants.SoundSet, CatSoundVariant> CAT_SOUNDS = null;
+    public static final Holder.Reference<SoundEvent> CAT_AMBIENT_BABY = refById("entity.baby_cat.ambient");
+    public static final Holder.Reference<SoundEvent> CAT_STRAY_AMBIENT_BABY = refById("entity.baby_cat.stray_ambient");
+    public static final Holder.Reference<SoundEvent> CAT_DEATH_BABY = refById("entity.baby_cat.death");
+    public static final Holder.Reference<SoundEvent> CAT_EAT_BABY = refById("entity.baby_cat.eat");
+    public static final Holder.Reference<SoundEvent> CAT_HISS_BABY = refById("entity.baby_cat.hiss");
+    public static final Holder.Reference<SoundEvent> CAT_BEG_FOR_FOOD_BABY = refById("entity.baby_cat.beg_for_food");
+    public static final Holder.Reference<SoundEvent> CAT_HURT_BABY = refById("entity.baby_cat.hurt");
+    public static final Holder.Reference<SoundEvent> CAT_PURR_BABY = refById("entity.baby_cat.purr");
+    public static final Holder.Reference<SoundEvent> CAT_PURREOW_BABY = refById("entity.baby_cat.purreow");
+    public static final Map<CatSoundVariants.SoundSet, CatSoundVariant> CAT_SOUNDS = catSounds();
     public static final SoundEvent CAVE_VINES_BREAK = of("CAVE_VINES_BREAK");
     public static final SoundEvent CAVE_VINES_FALL = of("CAVE_VINES_FALL");
     public static final SoundEvent CAVE_VINES_HIT = of("CAVE_VINES_HIT");
@@ -418,13 +469,13 @@ public class SoundEvents {
     public static final SoundEvent CHEST_CLOSE = of("CHEST_CLOSE");
     public static final SoundEvent CHEST_LOCKED = of("CHEST_LOCKED");
     public static final SoundEvent CHEST_OPEN = of("CHEST_OPEN");
-    public static final Holder.Reference<SoundEvent> CHICKEN_AMBIENT_BABY = ref("CHICKEN_AMBIENT_BABY");
-    public static final Holder.Reference<SoundEvent> CHICKEN_DEATH_BABY = ref("CHICKEN_DEATH_BABY");
+    public static final Holder.Reference<SoundEvent> CHICKEN_AMBIENT_BABY = refById("entity.baby_chicken.ambient");
+    public static final Holder.Reference<SoundEvent> CHICKEN_DEATH_BABY = refById("entity.baby_chicken.death");
     public static final SoundEvent CHICKEN_EGG = of("CHICKEN_EGG");
-    public static final Holder.Reference<SoundEvent> CHICKEN_HURT_BABY = ref("CHICKEN_HURT_BABY");
+    public static final Holder.Reference<SoundEvent> CHICKEN_HURT_BABY = refById("entity.baby_chicken.hurt");
     public static final Holder.Reference<SoundEvent> CHICKEN_STEP = ref("CHICKEN_STEP");
-    public static final Holder.Reference<SoundEvent> CHICKEN_STEP_BABY = ref("CHICKEN_STEP_BABY");
-    public static final Map<ChickenSoundVariants.SoundSet, ChickenSoundVariant> CHICKEN_SOUNDS = null;
+    public static final Holder.Reference<SoundEvent> CHICKEN_STEP_BABY = refById("entity.baby_chicken.step");
+    public static final Map<ChickenSoundVariants.SoundSet, ChickenSoundVariant> CHICKEN_SOUNDS = chickenSounds();
     public static final SoundEvent CHISELED_BOOKSHELF_BREAK = of("CHISELED_BOOKSHELF_BREAK");
     public static final SoundEvent CHISELED_BOOKSHELF_FALL = of("CHISELED_BOOKSHELF_FALL");
     public static final SoundEvent CHISELED_BOOKSHELF_HIT = of("CHISELED_BOOKSHELF_HIT");
@@ -488,8 +539,8 @@ public class SoundEvents {
     public static final SoundEvent COPPER_GOLEM_SPIN = of("COPPER_GOLEM_SPIN");
     public static final SoundEvent COPPER_GOLEM_WEATHERED_SPIN = of("COPPER_GOLEM_WEATHERED_SPIN");
     public static final SoundEvent COPPER_GOLEM_OXIDIZED_SPIN = of("COPPER_GOLEM_OXIDIZED_SPIN");
-    public static final SoundEvent COPPER_GOLEM_ITEM_GET = of("COPPER_GOLEM_ITEM_GET");
-    public static final SoundEvent COPPER_GOLEM_ITEM_NO_GET = of("COPPER_GOLEM_ITEM_NO_GET");
+    public static final SoundEvent COPPER_GOLEM_ITEM_GET = id("entity.copper_golem.no_item_get");
+    public static final SoundEvent COPPER_GOLEM_ITEM_NO_GET = id("entity.copper_golem.no_item_no_get");
     public static final SoundEvent COPPER_GOLEM_ITEM_DROP = of("COPPER_GOLEM_ITEM_DROP");
     public static final SoundEvent COPPER_GOLEM_ITEM_NO_DROP = of("COPPER_GOLEM_ITEM_NO_DROP");
     public static final SoundEvent COPPER_GOLEM_BECOME_STATUE = of("COPPER_GOLEM_BECOME_STATUE");
@@ -539,7 +590,7 @@ public class SoundEvents {
     public static final SoundEvent CREEPER_HURT = of("CREEPER_HURT");
     public static final SoundEvent CREEPER_PRIMED = of("CREEPER_PRIMED");
     public static final SoundEvent CROP_BREAK = of("CROP_BREAK");
-    public static final SoundEvent CROP_PLANTED = of("CROP_PLANTED");
+    public static final SoundEvent CROP_PLANTED = id("item.crop.plant");
     public static final SoundEvent CROSSBOW_HIT = of("CROSSBOW_HIT");
     public static final Holder<SoundEvent> CROSSBOW_LOADING_END = ref("CROSSBOW_LOADING_END");
     public static final Holder<SoundEvent> CROSSBOW_LOADING_MIDDLE = ref("CROSSBOW_LOADING_MIDDLE");
@@ -552,7 +603,7 @@ public class SoundEvents {
     public static final SoundEvent CUSHION_PLACE = of("CUSHION_PLACE");
     public static final SoundEvent CUSHION_SIT = of("CUSHION_SIT");
     public static final SoundEvent CUSHION_GET_UP = of("CUSHION_GET_UP");
-    public static final SoundEvent DEAD_BUSH_IDLE = of("DEAD_BUSH_IDLE");
+    public static final SoundEvent DEAD_BUSH_IDLE = id("block.deadbush.idle");
     public static final SoundEvent DECORATED_POT_BREAK = of("DECORATED_POT_BREAK");
     public static final SoundEvent DECORATED_POT_FALL = of("DECORATED_POT_FALL");
     public static final SoundEvent DECORATED_POT_HIT = of("DECORATED_POT_HIT");
@@ -609,7 +660,7 @@ public class SoundEvents {
     public static final SoundEvent DRIPSTONE_BLOCK_PLACE = of("DRIPSTONE_BLOCK_PLACE");
     public static final SoundEvent DRIPSTONE_BLOCK_HIT = of("DRIPSTONE_BLOCK_HIT");
     public static final SoundEvent DRIPSTONE_BLOCK_FALL = of("DRIPSTONE_BLOCK_FALL");
-    public static final SoundEvent DRY_GRASS = of("DRY_GRASS");
+    public static final SoundEvent DRY_GRASS = id("block.dry_grass.ambient");
     public static final SoundEvent POINTED_DRIPSTONE_BREAK = of("POINTED_DRIPSTONE_BREAK");
     public static final SoundEvent POINTED_DRIPSTONE_STEP = of("POINTED_DRIPSTONE_STEP");
     public static final SoundEvent POINTED_DRIPSTONE_PLACE = of("POINTED_DRIPSTONE_PLACE");
@@ -734,7 +785,7 @@ public class SoundEvents {
     public static final SoundEvent FROGLIGHT_HIT = of("FROGLIGHT_HIT");
     public static final SoundEvent FROGLIGHT_PLACE = of("FROGLIGHT_PLACE");
     public static final SoundEvent FROGLIGHT_STEP = of("FROGLIGHT_STEP");
-    public static final SoundEvent FROGSPAWNSTEP = of("FROGSPAWNSTEP");
+    public static final SoundEvent FROGSPAWNSTEP = id("block.frogspawn.step");
     public static final SoundEvent FROGSPAWN_BREAK = of("FROGSPAWN_BREAK");
     public static final SoundEvent FROGSPAWN_FALL = of("FROGSPAWN_FALL");
     public static final SoundEvent FROGSPAWN_HATCH = of("FROGSPAWN_HATCH");
@@ -880,10 +931,10 @@ public class SoundEvents {
     public static final SoundEvent TRIAL_SPAWNER_OPEN_SHUTTER = of("TRIAL_SPAWNER_OPEN_SHUTTER");
     public static final SoundEvent TRIAL_SPAWNER_CLOSE_SHUTTER = of("TRIAL_SPAWNER_CLOSE_SHUTTER");
     public static final SoundEvent TRIAL_SPAWNER_EJECT_ITEM = of("TRIAL_SPAWNER_EJECT_ITEM");
-    public static final Holder.Reference<SoundEvent> HARNESS_EQUIP = ref("HARNESS_EQUIP");
-    public static final SoundEvent HARNESS_UNEQUIP = of("HARNESS_UNEQUIP");
-    public static final SoundEvent HARNESS_GOGGLES_UP = of("HARNESS_GOGGLES_UP");
-    public static final SoundEvent HARNESS_GOGGLES_DOWN = of("HARNESS_GOGGLES_DOWN");
+    public static final Holder.Reference<SoundEvent> HARNESS_EQUIP = refById("entity.happy_ghast.equip");
+    public static final SoundEvent HARNESS_UNEQUIP = id("entity.happy_ghast.unequip");
+    public static final SoundEvent HARNESS_GOGGLES_UP = id("entity.happy_ghast.harness_goggles_up");
+    public static final SoundEvent HARNESS_GOGGLES_DOWN = id("entity.happy_ghast.harness_goggles_down");
     public static final Holder.Reference<SoundEvent> HOE_TILL = ref("HOE_TILL");
     public static final SoundEvent HOGLIN_AMBIENT = of("HOGLIN_AMBIENT");
     public static final SoundEvent HOGLIN_ANGRY = of("HOGLIN_ANGRY");
@@ -900,33 +951,33 @@ public class SoundEvents {
     public static final SoundEvent HONEY_BLOCK_SLIDE = of("HONEY_BLOCK_SLIDE");
     public static final SoundEvent HONEY_BLOCK_STEP = of("HONEY_BLOCK_STEP");
     public static final SoundEvent HONEYCOMB_WAX_ON = of("HONEYCOMB_WAX_ON");
-    public static final Holder.Reference<SoundEvent> HONEY_DRINK = ref("HONEY_DRINK");
+    public static final Holder.Reference<SoundEvent> HONEY_DRINK = refById("item.honey_bottle.drink");
     public static final int GOAT_HORN_VARIANT_COUNT = 8;
     public static final ImmutableList<Holder.Reference<SoundEvent>> GOAT_HORN_SOUND_VARIANTS = ImmutableList.of(
         refById("item.goat_horn.sound.0"), refById("item.goat_horn.sound.1"), refById("item.goat_horn.sound.2"),
         refById("item.goat_horn.sound.3"), refById("item.goat_horn.sound.4"), refById("item.goat_horn.sound.5"),
         refById("item.goat_horn.sound.6"), refById("item.goat_horn.sound.7"));
     public static final SoundEvent HORSE_AMBIENT = of("HORSE_AMBIENT");
-    public static final SoundEvent HORSE_AMBIENT_BABY = of("HORSE_AMBIENT_BABY");
+    public static final SoundEvent HORSE_AMBIENT_BABY = id("entity.baby_horse.ambient");
     public static final SoundEvent HORSE_ANGRY = of("HORSE_ANGRY");
-    public static final SoundEvent HORSE_ANGRY_BABY = of("HORSE_ANGRY_BABY");
+    public static final SoundEvent HORSE_ANGRY_BABY = id("entity.baby_horse.angry");
     public static final Holder.Reference<SoundEvent> HORSE_ARMOR = ref("HORSE_ARMOR");
     public static final Holder.Reference<SoundEvent> HORSE_ARMOR_UNEQUIP = ref("HORSE_ARMOR_UNEQUIP");
     public static final SoundEvent HORSE_BREATHE = of("HORSE_BREATHE");
-    public static final SoundEvent HORSE_BREATHE_BABY = of("HORSE_BREATHE_BABY");
+    public static final SoundEvent HORSE_BREATHE_BABY = id("entity.baby_horse.breathe");
     public static final SoundEvent HORSE_DEATH = of("HORSE_DEATH");
-    public static final SoundEvent HORSE_DEATH_BABY = of("HORSE_DEATH_BABY");
+    public static final SoundEvent HORSE_DEATH_BABY = id("entity.baby_horse.death");
     public static final SoundEvent HORSE_EAT = of("HORSE_EAT");
-    public static final SoundEvent HORSE_EAT_BABY = of("HORSE_EAT_BABY");
+    public static final SoundEvent HORSE_EAT_BABY = id("entity.baby_horse.eat");
     public static final SoundEvent HORSE_GALLOP = of("HORSE_GALLOP");
     public static final SoundEvent HORSE_HURT = of("HORSE_HURT");
-    public static final SoundEvent HORSE_HURT_BABY = of("HORSE_HURT_BABY");
+    public static final SoundEvent HORSE_HURT_BABY = id("entity.baby_horse.hurt");
     public static final SoundEvent HORSE_JUMP = of("HORSE_JUMP");
     public static final SoundEvent HORSE_LAND = of("HORSE_LAND");
-    public static final SoundEvent HORSE_LAND_BABY = of("HORSE_LAND_BABY");
+    public static final SoundEvent HORSE_LAND_BABY = id("entity.baby_horse.land");
     public static final Holder.Reference<SoundEvent> HORSE_SADDLE = ref("HORSE_SADDLE");
     public static final SoundEvent HORSE_STEP = of("HORSE_STEP");
-    public static final SoundEvent HORSE_STEP_BABY = of("HORSE_STEP_BABY");
+    public static final SoundEvent HORSE_STEP_BABY = id("entity.baby_horse.step");
     public static final SoundEvent HORSE_STEP_WOOD = of("HORSE_STEP_WOOD");
     public static final SoundEvent HOSTILE_BIG_FALL = of("HOSTILE_BIG_FALL");
     public static final SoundEvent HOSTILE_DEATH = of("HOSTILE_DEATH");
@@ -1045,7 +1096,7 @@ public class SoundEvents {
     public static final SoundEvent MOOSHROOM_CONVERT = of("MOOSHROOM_CONVERT");
     public static final SoundEvent MOOSHROOM_EAT = of("MOOSHROOM_EAT");
     public static final SoundEvent MOOSHROOM_MILK = of("MOOSHROOM_MILK");
-    public static final SoundEvent MOOSHROOM_MILK_SUSPICIOUSLY = of("MOOSHROOM_MILK_SUSPICIOUSLY");
+    public static final SoundEvent MOOSHROOM_MILK_SUSPICIOUSLY = id("entity.mooshroom.suspicious_milk");
     public static final SoundEvent MOOSHROOM_SHEAR = of("MOOSHROOM_SHEAR");
     public static final SoundEvent MOSS_CARPET_BREAK = of("MOSS_CARPET_BREAK");
     public static final SoundEvent MOSS_CARPET_FALL = of("MOSS_CARPET_FALL");
@@ -1112,43 +1163,43 @@ public class SoundEvents {
     public static final Holder.Reference<SoundEvent> MUSIC_END = ref("MUSIC_END");
     public static final Holder.Reference<SoundEvent> MUSIC_GAME = ref("MUSIC_GAME");
     public static final Holder.Reference<SoundEvent> MUSIC_MENU = ref("MUSIC_MENU");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_BASALT_DELTAS = ref("MUSIC_BIOME_BASALT_DELTAS");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_CRIMSON_FOREST = ref("MUSIC_BIOME_CRIMSON_FOREST");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_DEEP_DARK = ref("MUSIC_BIOME_DEEP_DARK");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_DRIPSTONE_CAVES = ref("MUSIC_BIOME_DRIPSTONE_CAVES");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_GROVE = ref("MUSIC_BIOME_GROVE");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_JAGGED_PEAKS = ref("MUSIC_BIOME_JAGGED_PEAKS");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_LUSH_CAVES = ref("MUSIC_BIOME_LUSH_CAVES");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SWAMP = ref("MUSIC_BIOME_SWAMP");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_FOREST = ref("MUSIC_BIOME_FOREST");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_OLD_GROWTH_TAIGA = ref("MUSIC_BIOME_OLD_GROWTH_TAIGA");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_MEADOW = ref("MUSIC_BIOME_MEADOW");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_CHERRY_GROVE = ref("MUSIC_BIOME_CHERRY_GROVE");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_NETHER_WASTES = ref("MUSIC_BIOME_NETHER_WASTES");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_FROZEN_PEAKS = ref("MUSIC_BIOME_FROZEN_PEAKS");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SNOWY_SLOPES = ref("MUSIC_BIOME_SNOWY_SLOPES");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SOUL_SAND_VALLEY = ref("MUSIC_BIOME_SOUL_SAND_VALLEY");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_STONY_PEAKS = ref("MUSIC_BIOME_STONY_PEAKS");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_WARPED_FOREST = ref("MUSIC_BIOME_WARPED_FOREST");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_FLOWER_FOREST = ref("MUSIC_BIOME_FLOWER_FOREST");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_DESERT = ref("MUSIC_BIOME_DESERT");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_BADLANDS = ref("MUSIC_BIOME_BADLANDS");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_JUNGLE = ref("MUSIC_BIOME_JUNGLE");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SPARSE_JUNGLE = ref("MUSIC_BIOME_SPARSE_JUNGLE");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_BAMBOO_JUNGLE = ref("MUSIC_BIOME_BAMBOO_JUNGLE");
-    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SULFUR_CAVES = ref("MUSIC_BIOME_SULFUR_CAVES");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_BASALT_DELTAS = refById("music.nether.basalt_deltas");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_CRIMSON_FOREST = refById("music.nether.crimson_forest");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_DEEP_DARK = refById("music.overworld.deep_dark");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_DRIPSTONE_CAVES = refById("music.overworld.dripstone_caves");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_GROVE = refById("music.overworld.grove");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_JAGGED_PEAKS = refById("music.overworld.jagged_peaks");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_LUSH_CAVES = refById("music.overworld.lush_caves");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SWAMP = refById("music.overworld.swamp");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_FOREST = refById("music.overworld.forest");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_OLD_GROWTH_TAIGA = refById("music.overworld.old_growth_taiga");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_MEADOW = refById("music.overworld.meadow");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_CHERRY_GROVE = refById("music.overworld.cherry_grove");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_NETHER_WASTES = refById("music.nether.nether_wastes");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_FROZEN_PEAKS = refById("music.overworld.frozen_peaks");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SNOWY_SLOPES = refById("music.overworld.snowy_slopes");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SOUL_SAND_VALLEY = refById("music.nether.soul_sand_valley");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_STONY_PEAKS = refById("music.overworld.stony_peaks");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_WARPED_FOREST = refById("music.nether.warped_forest");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_FLOWER_FOREST = refById("music.overworld.flower_forest");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_DESERT = refById("music.overworld.desert");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_BADLANDS = refById("music.overworld.badlands");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_JUNGLE = refById("music.overworld.jungle");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SPARSE_JUNGLE = refById("music.overworld.sparse_jungle");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_BAMBOO_JUNGLE = refById("music.overworld.bamboo_jungle");
+    public static final Holder.Reference<SoundEvent> MUSIC_BIOME_SULFUR_CAVES = refById("music.overworld.sulfur_caves");
     public static final Holder.Reference<SoundEvent> MUSIC_UNDER_WATER = ref("MUSIC_UNDER_WATER");
     public static final SoundEvent NAUTILUS_AMBIENT = of("NAUTILUS_AMBIENT");
-    public static final SoundEvent NAUTILUS_AMBIENT_ON_LAND = of("NAUTILUS_AMBIENT_ON_LAND");
+    public static final SoundEvent NAUTILUS_AMBIENT_ON_LAND = id("entity.nautilus.ambient_land");
     public static final SoundEvent NAUTILUS_DASH = of("NAUTILUS_DASH");
-    public static final SoundEvent NAUTILUS_DASH_ON_LAND = of("NAUTILUS_DASH_ON_LAND");
+    public static final SoundEvent NAUTILUS_DASH_ON_LAND = id("entity.nautilus.dash_land");
     public static final SoundEvent NAUTILUS_DASH_READY = of("NAUTILUS_DASH_READY");
-    public static final SoundEvent NAUTILUS_DASH_READY_ON_LAND = of("NAUTILUS_DASH_READY_ON_LAND");
+    public static final SoundEvent NAUTILUS_DASH_READY_ON_LAND = id("entity.nautilus.dash_ready_land");
     public static final SoundEvent NAUTILUS_DEATH = of("NAUTILUS_DEATH");
-    public static final SoundEvent NAUTILUS_DEATH_ON_LAND = of("NAUTILUS_DEATH_ON_LAND");
+    public static final SoundEvent NAUTILUS_DEATH_ON_LAND = id("entity.nautilus.death_land");
     public static final SoundEvent NAUTILUS_EAT = of("NAUTILUS_EAT");
     public static final SoundEvent NAUTILUS_HURT = of("NAUTILUS_HURT");
-    public static final SoundEvent NAUTILUS_HURT_ON_LAND = of("NAUTILUS_HURT_ON_LAND");
+    public static final SoundEvent NAUTILUS_HURT_ON_LAND = id("entity.nautilus.hurt_land");
     public static final SoundEvent NAUTILUS_SWIM = of("NAUTILUS_SWIM");
     public static final SoundEvent NETHER_BRICKS_BREAK = of("NETHER_BRICKS_BREAK");
     public static final SoundEvent NETHER_BRICKS_STEP = of("NETHER_BRICKS_STEP");
@@ -1156,7 +1207,7 @@ public class SoundEvents {
     public static final SoundEvent NETHER_BRICKS_HIT = of("NETHER_BRICKS_HIT");
     public static final SoundEvent NETHER_BRICKS_FALL = of("NETHER_BRICKS_FALL");
     public static final SoundEvent NETHER_WART_BREAK = of("NETHER_WART_BREAK");
-    public static final SoundEvent NETHER_WART_PLANTED = of("NETHER_WART_PLANTED");
+    public static final SoundEvent NETHER_WART_PLANTED = id("item.nether_wart.plant");
     public static final SoundEvent NETHER_WOOD_BREAK = of("NETHER_WOOD_BREAK");
     public static final SoundEvent NETHER_WOOD_FALL = of("NETHER_WOOD_FALL");
     public static final SoundEvent NETHER_WOOD_HIT = of("NETHER_WOOD_HIT");
@@ -1172,7 +1223,7 @@ public class SoundEvents {
     public static final SoundEvent NETHER_WOOD_PRESSURE_PLATE_CLICK_ON = of("NETHER_WOOD_PRESSURE_PLATE_CLICK_ON");
     public static final SoundEvent NETHER_WOOD_FENCE_GATE_CLOSE = of("NETHER_WOOD_FENCE_GATE_CLOSE");
     public static final SoundEvent NETHER_WOOD_FENCE_GATE_OPEN = of("NETHER_WOOD_FENCE_GATE_OPEN");
-    public static final SoundEvent EMPTY = of("EMPTY");
+    public static final SoundEvent EMPTY = id("intentionally_empty");
     public static final SoundEvent PACKED_MUD_BREAK = of("PACKED_MUD_BREAK");
     public static final SoundEvent PACKED_MUD_FALL = of("PACKED_MUD_FALL");
     public static final SoundEvent PACKED_MUD_HIT = of("PACKED_MUD_HIT");
@@ -1320,12 +1371,12 @@ public class SoundEvents {
     public static final SoundEvent PHANTOM_SWOOP = of("PHANTOM_SWOOP");
     public static final Holder.Reference<SoundEvent> PIG_SADDLE = ref("PIG_SADDLE");
     public static final Holder.Reference<SoundEvent> PIG_STEP = ref("PIG_STEP");
-    public static final Holder.Reference<SoundEvent> PIG_STEP_BABY = ref("PIG_STEP_BABY");
-    public static final Holder.Reference<SoundEvent> PIG_AMBIENT_BABY = ref("PIG_AMBIENT_BABY");
-    public static final Holder.Reference<SoundEvent> PIG_EAT_BABY = ref("PIG_EAT_BABY");
-    public static final Holder.Reference<SoundEvent> PIG_HURT_BABY = ref("PIG_HURT_BABY");
-    public static final Holder.Reference<SoundEvent> PIG_DEATH_BABY = ref("PIG_DEATH_BABY");
-    public static final Map<PigSoundVariants.SoundSet, PigSoundVariant> PIG_SOUNDS = null;
+    public static final Holder.Reference<SoundEvent> PIG_STEP_BABY = refById("entity.baby_pig.step");
+    public static final Holder.Reference<SoundEvent> PIG_AMBIENT_BABY = refById("entity.baby_pig.ambient");
+    public static final Holder.Reference<SoundEvent> PIG_EAT_BABY = refById("entity.baby_pig.eat");
+    public static final Holder.Reference<SoundEvent> PIG_HURT_BABY = refById("entity.baby_pig.hurt");
+    public static final Holder.Reference<SoundEvent> PIG_DEATH_BABY = refById("entity.baby_pig.death");
+    public static final Map<PigSoundVariants.SoundSet, PigSoundVariant> PIG_SOUNDS = pigSounds();
     public static final SoundEvent PIGLIN_ADMIRING_ITEM = of("PIGLIN_ADMIRING_ITEM");
     public static final SoundEvent PIGLIN_AMBIENT = of("PIGLIN_AMBIENT");
     public static final SoundEvent PIGLIN_ANGRY = of("PIGLIN_ANGRY");
@@ -1453,21 +1504,21 @@ public class SoundEvents {
     public static final SoundEvent SCAFFOLDING_HIT = of("SCAFFOLDING_HIT");
     public static final SoundEvent SCAFFOLDING_PLACE = of("SCAFFOLDING_PLACE");
     public static final SoundEvent SCAFFOLDING_STEP = of("SCAFFOLDING_STEP");
-    public static final SoundEvent SCULK_BLOCK_SPREAD = of("SCULK_BLOCK_SPREAD");
-    public static final SoundEvent SCULK_BLOCK_CHARGE = of("SCULK_BLOCK_CHARGE");
-    public static final SoundEvent SCULK_BLOCK_BREAK = of("SCULK_BLOCK_BREAK");
-    public static final SoundEvent SCULK_BLOCK_FALL = of("SCULK_BLOCK_FALL");
-    public static final SoundEvent SCULK_BLOCK_HIT = of("SCULK_BLOCK_HIT");
-    public static final SoundEvent SCULK_BLOCK_PLACE = of("SCULK_BLOCK_PLACE");
-    public static final SoundEvent SCULK_BLOCK_STEP = of("SCULK_BLOCK_STEP");
+    public static final SoundEvent SCULK_BLOCK_SPREAD = id("block.sculk.spread");
+    public static final SoundEvent SCULK_BLOCK_CHARGE = id("block.sculk.charge");
+    public static final SoundEvent SCULK_BLOCK_BREAK = id("block.sculk.break");
+    public static final SoundEvent SCULK_BLOCK_FALL = id("block.sculk.fall");
+    public static final SoundEvent SCULK_BLOCK_HIT = id("block.sculk.hit");
+    public static final SoundEvent SCULK_BLOCK_PLACE = id("block.sculk.place");
+    public static final SoundEvent SCULK_BLOCK_STEP = id("block.sculk.step");
     public static final SoundEvent SCULK_CATALYST_BLOOM = of("SCULK_CATALYST_BLOOM");
     public static final SoundEvent SCULK_CATALYST_BREAK = of("SCULK_CATALYST_BREAK");
     public static final SoundEvent SCULK_CATALYST_FALL = of("SCULK_CATALYST_FALL");
     public static final SoundEvent SCULK_CATALYST_HIT = of("SCULK_CATALYST_HIT");
     public static final SoundEvent SCULK_CATALYST_PLACE = of("SCULK_CATALYST_PLACE");
     public static final SoundEvent SCULK_CATALYST_STEP = of("SCULK_CATALYST_STEP");
-    public static final SoundEvent SCULK_CLICKING = of("SCULK_CLICKING");
-    public static final SoundEvent SCULK_CLICKING_STOP = of("SCULK_CLICKING_STOP");
+    public static final SoundEvent SCULK_CLICKING = id("block.sculk_sensor.clicking");
+    public static final SoundEvent SCULK_CLICKING_STOP = id("block.sculk_sensor.clicking_stop");
     public static final SoundEvent SCULK_SENSOR_BREAK = of("SCULK_SENSOR_BREAK");
     public static final SoundEvent SCULK_SENSOR_FALL = of("SCULK_SENSOR_FALL");
     public static final SoundEvent SCULK_SENSOR_HIT = of("SCULK_SENSOR_HIT");
@@ -1801,8 +1852,8 @@ public class SoundEvents {
     public static final SoundEvent WARDEN_SONIC_CHARGE = of("WARDEN_SONIC_CHARGE");
     public static final SoundEvent WARDEN_STEP = of("WARDEN_STEP");
     public static final SoundEvent WARDEN_TENDRIL_CLICKS = of("WARDEN_TENDRIL_CLICKS");
-    public static final SoundEvent WAXED_HANGING_SIGN_INTERACT_FAIL = of("WAXED_HANGING_SIGN_INTERACT_FAIL");
-    public static final SoundEvent WAXED_SIGN_INTERACT_FAIL = of("WAXED_SIGN_INTERACT_FAIL");
+    public static final SoundEvent WAXED_HANGING_SIGN_INTERACT_FAIL = id("block.hanging_sign.waxed_interact_fail");
+    public static final SoundEvent WAXED_SIGN_INTERACT_FAIL = id("block.sign.waxed_interact_fail");
     public static final SoundEvent WATER_AMBIENT = of("WATER_AMBIENT");
     public static final SoundEvent WEATHER_END_FLASH = of("WEATHER_END_FLASH");
     public static final SoundEvent WEATHER_RAIN = of("WEATHER_RAIN");
@@ -1818,7 +1869,7 @@ public class SoundEvents {
     public static final SoundEvent WET_SPONGE_HIT = of("WET_SPONGE_HIT");
     public static final SoundEvent WET_SPONGE_PLACE = of("WET_SPONGE_PLACE");
     public static final SoundEvent WET_SPONGE_STEP = of("WET_SPONGE_STEP");
-    public static final Holder.Reference<SoundEvent> WIND_CHARGE_BURST = ref("WIND_CHARGE_BURST");
+    public static final Holder.Reference<SoundEvent> WIND_CHARGE_BURST = refById("entity.wind_charge.wind_burst");
     public static final SoundEvent WIND_CHARGE_THROW = of("WIND_CHARGE_THROW");
     public static final SoundEvent WITCH_AMBIENT = of("WITCH_AMBIENT");
     public static final SoundEvent WITCH_CELEBRATE = of("WITCH_CELEBRATE");
@@ -1837,19 +1888,19 @@ public class SoundEvents {
     public static final SoundEvent WITHER_SKELETON_STEP = of("WITHER_SKELETON_STEP");
     public static final SoundEvent WITHER_SPAWN = of("WITHER_SPAWN");
     public static final Holder.Reference<SoundEvent> WOLF_ARMOR_BREAK = ref("WOLF_ARMOR_BREAK");
-    public static final Holder.Reference<SoundEvent> WOLF_AMBIENT_BABY = ref("WOLF_AMBIENT_BABY");
+    public static final Holder.Reference<SoundEvent> WOLF_AMBIENT_BABY = refById("entity.baby_wolf.ambient");
     public static final SoundEvent WOLF_ARMOR_CRACK = of("WOLF_ARMOR_CRACK");
     public static final SoundEvent WOLF_ARMOR_DAMAGE = of("WOLF_ARMOR_DAMAGE");
     public static final SoundEvent WOLF_ARMOR_REPAIR = of("WOLF_ARMOR_REPAIR");
-    public static final Holder.Reference<SoundEvent> WOLF_DEATH_BABY = ref("WOLF_DEATH_BABY");
-    public static final Holder.Reference<SoundEvent> WOLF_GROWL_BABY = ref("WOLF_GROWL_BABY");
-    public static final Holder.Reference<SoundEvent> WOLF_HURT_BABY = ref("WOLF_HURT_BABY");
-    public static final Holder.Reference<SoundEvent> WOLF_PANT_BABY = ref("WOLF_PANT_BABY");
+    public static final Holder.Reference<SoundEvent> WOLF_DEATH_BABY = refById("entity.baby_wolf.death");
+    public static final Holder.Reference<SoundEvent> WOLF_GROWL_BABY = refById("entity.baby_wolf.growl");
+    public static final Holder.Reference<SoundEvent> WOLF_HURT_BABY = refById("entity.baby_wolf.hurt");
+    public static final Holder.Reference<SoundEvent> WOLF_PANT_BABY = refById("entity.baby_wolf.pant");
     public static final SoundEvent WOLF_SHAKE = of("WOLF_SHAKE");
     public static final Holder.Reference<SoundEvent> WOLF_STEP = ref("WOLF_STEP");
-    public static final Holder.Reference<SoundEvent> WOLF_STEP_BABY = ref("WOLF_STEP_BABY");
-    public static final Holder.Reference<SoundEvent> WOLF_WHINE_BABY = ref("WOLF_WHINE_BABY");
-    public static final Map<WolfSoundVariants.SoundSet, WolfSoundVariant> WOLF_SOUNDS = null;
+    public static final Holder.Reference<SoundEvent> WOLF_STEP_BABY = refById("entity.baby_wolf.step");
+    public static final Holder.Reference<SoundEvent> WOLF_WHINE_BABY = refById("entity.baby_wolf.whine");
+    public static final Map<WolfSoundVariants.SoundSet, WolfSoundVariant> WOLF_SOUNDS = wolfSounds();
     public static final SoundEvent WOODEN_DOOR_CLOSE = of("WOODEN_DOOR_CLOSE");
     public static final SoundEvent WOODEN_DOOR_OPEN = of("WOODEN_DOOR_OPEN");
     public static final SoundEvent WOODEN_TRAPDOOR_CLOSE = of("WOODEN_TRAPDOOR_CLOSE");
@@ -1889,16 +1940,16 @@ public class SoundEvents {
     public static final SoundEvent ZOMBIE_HURT = of("ZOMBIE_HURT");
     public static final SoundEvent ZOMBIE_INFECT = of("ZOMBIE_INFECT");
     public static final SoundEvent ZOMBIE_NAUTILUS_AMBIENT = of("ZOMBIE_NAUTILUS_AMBIENT");
-    public static final SoundEvent ZOMBIE_NAUTILUS_AMBIENT_ON_LAND = of("ZOMBIE_NAUTILUS_AMBIENT_ON_LAND");
+    public static final SoundEvent ZOMBIE_NAUTILUS_AMBIENT_ON_LAND = id("entity.zombie_nautilus.ambient_land");
     public static final SoundEvent ZOMBIE_NAUTILUS_DASH = of("ZOMBIE_NAUTILUS_DASH");
-    public static final SoundEvent ZOMBIE_NAUTILUS_DASH_ON_LAND = of("ZOMBIE_NAUTILUS_DASH_ON_LAND");
+    public static final SoundEvent ZOMBIE_NAUTILUS_DASH_ON_LAND = id("entity.zombie_nautilus.dash_land");
     public static final SoundEvent ZOMBIE_NAUTILUS_DASH_READY = of("ZOMBIE_NAUTILUS_DASH_READY");
-    public static final SoundEvent ZOMBIE_NAUTILUS_DASH_READY_ON_LAND = of("ZOMBIE_NAUTILUS_DASH_READY_ON_LAND");
+    public static final SoundEvent ZOMBIE_NAUTILUS_DASH_READY_ON_LAND = id("entity.zombie_nautilus.dash_ready_land");
     public static final SoundEvent ZOMBIE_NAUTILUS_DEATH = of("ZOMBIE_NAUTILUS_DEATH");
-    public static final SoundEvent ZOMBIE_NAUTILUS_DEATH_ON_LAND = of("ZOMBIE_NAUTILUS_DEATH_ON_LAND");
+    public static final SoundEvent ZOMBIE_NAUTILUS_DEATH_ON_LAND = id("entity.zombie_nautilus.death_land");
     public static final SoundEvent ZOMBIE_NAUTILUS_EAT = of("ZOMBIE_NAUTILUS_EAT");
     public static final SoundEvent ZOMBIE_NAUTILUS_HURT = of("ZOMBIE_NAUTILUS_HURT");
-    public static final SoundEvent ZOMBIE_NAUTILUS_HURT_ON_LAND = of("ZOMBIE_NAUTILUS_HURT_ON_LAND");
+    public static final SoundEvent ZOMBIE_NAUTILUS_HURT_ON_LAND = id("entity.zombie_nautilus.hurt_land");
     public static final SoundEvent ZOMBIE_NAUTILUS_SWIM = of("ZOMBIE_NAUTILUS_SWIM");
     public static final SoundEvent ZOMBIFIED_PIGLIN_AMBIENT = of("ZOMBIFIED_PIGLIN_AMBIENT");
     public static final SoundEvent ZOMBIFIED_PIGLIN_ANGRY = of("ZOMBIFIED_PIGLIN_ANGRY");
@@ -1911,9 +1962,9 @@ public class SoundEvents {
     public static final SoundEvent ZOMBIE_VILLAGER_DEATH = of("ZOMBIE_VILLAGER_DEATH");
     public static final SoundEvent ZOMBIE_VILLAGER_HURT = of("ZOMBIE_VILLAGER_HURT");
     public static final SoundEvent ZOMBIE_VILLAGER_STEP = of("ZOMBIE_VILLAGER_STEP");
-    public static final SoundEvent APPLY_EFFECT_BAD_OMEN = of("APPLY_EFFECT_BAD_OMEN");
-    public static final SoundEvent APPLY_EFFECT_TRIAL_OMEN = of("APPLY_EFFECT_TRIAL_OMEN");
-    public static final SoundEvent APPLY_EFFECT_RAID_OMEN = of("APPLY_EFFECT_RAID_OMEN");
+    public static final SoundEvent APPLY_EFFECT_BAD_OMEN = id("event.mob_effect.bad_omen");
+    public static final SoundEvent APPLY_EFFECT_TRIAL_OMEN = id("event.mob_effect.trial_omen");
+    public static final SoundEvent APPLY_EFFECT_RAID_OMEN = id("event.mob_effect.raid_omen");
     public static final Holder.Reference<SoundEvent> SADDLE_UNEQUIP = ref("SADDLE_UNEQUIP");
     public static final Holder.Reference<SoundEvent> NAUTILUS_SADDLE_UNDERWATER_EQUIP = ref("NAUTILUS_SADDLE_UNDERWATER_EQUIP");
     public static final Holder.Reference<SoundEvent> NAUTILUS_SADDLE_EQUIP = ref("NAUTILUS_SADDLE_EQUIP");
@@ -1927,10 +1978,10 @@ public class SoundEvents {
     public static final SoundEvent POTENT_SULFUR_PLACE = of("POTENT_SULFUR_PLACE");
     public static final SoundEvent POTENT_SULFUR_HIT = of("POTENT_SULFUR_HIT");
     public static final SoundEvent POTENT_SULFUR_FALL = of("POTENT_SULFUR_FALL");
-    public static final SoundEvent GEYSER_ERUPTION_START = of("GEYSER_ERUPTION_START");
-    public static final SoundEvent GEYSER_ERUPTION_ACTIVE = of("GEYSER_ERUPTION_ACTIVE");
-    public static final SoundEvent GEYSER_CONTINUOUS_START = of("GEYSER_CONTINUOUS_START");
-    public static final SoundEvent GEYSER_CONTINUOUS_ACTIVE = of("GEYSER_CONTINUOUS_ACTIVE");
+    public static final SoundEvent GEYSER_ERUPTION_START = id("block.potent_sulfur.geyser_eruption");
+    public static final SoundEvent GEYSER_ERUPTION_ACTIVE = id("block.potent_sulfur.geyser_eruption_active");
+    public static final SoundEvent GEYSER_CONTINUOUS_START = id("block.potent_sulfur.geyser_continuous_eruption");
+    public static final SoundEvent GEYSER_CONTINUOUS_ACTIVE = id("block.potent_sulfur.geyser_continuous_eruption_active");
     public static final SoundEvent CINNABAR_BREAK = of("CINNABAR_BREAK");
     public static final SoundEvent CINNABAR_STEP = of("CINNABAR_STEP");
     public static final SoundEvent CINNABAR_PLACE = of("CINNABAR_PLACE");
@@ -1967,12 +2018,12 @@ public class SoundEvents {
     public static final Holder<SoundEvent> SULFUR_CUBE_HOT_HIT = ref("SULFUR_CUBE_HOT_HIT");
     public static final Holder<SoundEvent> SULFUR_CUBE_HOT_PUSH = ref("SULFUR_CUBE_HOT_PUSH");
     public static final SoundEvent SULFUR_CUBE_SQUISH = of("SULFUR_CUBE_SQUISH");
-    public static final SoundEvent NOXIOUS_GAS = of("NOXIOUS_GAS");
-    public static final SoundEvent SULFUR_CUBE_SMALL_DEATH = of("SULFUR_CUBE_SMALL_DEATH");
-    public static final SoundEvent SULFUR_CUBE_SMALL_HURT = of("SULFUR_CUBE_SMALL_HURT");
-    public static final SoundEvent SULFUR_CUBE_SMALL_JUMP = of("SULFUR_CUBE_SMALL_JUMP");
-    public static final SoundEvent SULFUR_CUBE_SMALL_SQUISH = of("SULFUR_CUBE_SMALL_SQUISH");
-    public static final SoundEvent SULFUR_CUBE_SMALL_EAT = of("SULFUR_CUBE_SMALL_EAT");
+    public static final SoundEvent NOXIOUS_GAS = id("block.potent_sulfur.noxious_gas");
+    public static final SoundEvent SULFUR_CUBE_SMALL_DEATH = id("entity.small_sulfur_cube.death");
+    public static final SoundEvent SULFUR_CUBE_SMALL_HURT = id("entity.small_sulfur_cube.hurt");
+    public static final SoundEvent SULFUR_CUBE_SMALL_JUMP = id("entity.small_sulfur_cube.jump");
+    public static final SoundEvent SULFUR_CUBE_SMALL_SQUISH = id("entity.small_sulfur_cube.squish");
+    public static final SoundEvent SULFUR_CUBE_SMALL_EAT = id("entity.small_sulfur_cube.eat");
     public static final SoundEvent SHELF_MUSHROOM_BREAK = of("SHELF_MUSHROOM_BREAK");
     public static final SoundEvent SHELF_MUSHROOM_FALL = of("SHELF_MUSHROOM_FALL");
     public static final SoundEvent SHELF_MUSHROOM_PLACE = of("SHELF_MUSHROOM_PLACE");

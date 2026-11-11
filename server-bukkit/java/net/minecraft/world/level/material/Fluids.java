@@ -25,5 +25,13 @@ public class Fluids {
     public static final FlowingFluid FLOWING_LAVA = new FlowingFluid("flowing_lava", 30);
     public static final FlowingFluid LAVA = new FlowingFluid("lava", 30);
 
+    static {
+        for (Fluid fluid : new Fluid[] {EMPTY, FLOWING_WATER, WATER, FLOWING_LAVA, LAVA}) {
+            for (FluidState state : fluid.getStateDefinition().getPossibleStates()) {
+                Fluid.FLUID_STATE_REGISTRY.add(state);
+            }
+        }
+    }
+
     private Fluids() {}
 }

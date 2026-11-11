@@ -15,6 +15,16 @@ public enum PackCompatibility {
         this.confirmation = Component.translatable("pack.incompatible.confirm." + type);
     }
 
+    public static PackCompatibility forVersion(net.minecraft.util.InclusiveRange<net.minecraft.server.packs.metadata.pack.PackFormat> declared, net.minecraft.server.packs.metadata.pack.PackFormat game) {
+        if (declared.minInclusive().major() == Integer.MAX_VALUE) {
+            return UNKNOWN;
+        }
+        if (declared.maxInclusive().compareTo(game) < 0) {
+            return TOO_OLD;
+        }
+        return game.compareTo(declared.minInclusive()) < 0 ? TOO_NEW : COMPATIBLE;
+    }
+
     public boolean isCompatible() {
         return this == COMPATIBLE;
     }

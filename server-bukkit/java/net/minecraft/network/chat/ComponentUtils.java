@@ -37,7 +37,7 @@ public class ComponentUtils {
         return resolve(context, component, 0);
     }
     public static MutableComponent resolve(ResolutionContext context, Component component, int recursionDepth) throws CommandSyntaxException {
-        MutableComponent result = component.getContents().resolve(context, recursionDepth + 1);
+        final MutableComponent result = component.getContents().resolve(context, recursionDepth + 1);
         for (Component sibling : component.getSiblings()) {
             result.append(resolve(context, sibling, recursionDepth + 1));
         }
@@ -73,7 +73,7 @@ public class ComponentUtils {
         if (values.size() == 1) {
             return formatter.apply(values.iterator().next()).copy();
         }
-        MutableComponent result = Component.empty();
+        final MutableComponent result = Component.empty();
         boolean first = true;
         for (T value : values) {
             if (!first) {

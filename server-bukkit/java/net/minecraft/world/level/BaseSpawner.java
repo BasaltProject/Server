@@ -12,7 +12,10 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
 public abstract class BaseSpawner {
-    public static final EntityProcessor SET_DISPLAY_ENTITY_ID = null;
+    public static final EntityProcessor SET_DISPLAY_ENTITY_ID = e -> {
+        e.setId(-1);
+        return e;
+    };
     public static final String SPAWN_DATA_TAG = "SpawnData";
     private static final int kSpinEvent = 1;
     private SpawnData nextSpawnData;

@@ -12,7 +12,7 @@ import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 public class AlternativesEntry extends CompositeEntryBase {
     public static final MapCodec<AlternativesEntry> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.level.storage.loot.entries.AlternativesEntry.class, "MAP_CODEC");
-    public static final ProblemReporter.Problem UNREACHABLE_PROBLEM = null;
+    public static final ProblemReporter.Problem UNREACHABLE_PROBLEM = () -> "Unreachable entry!";
     public AlternativesEntry(List<LootPoolEntryContainer> children, Optional<Holder<LootItemCondition>> condition, Optional<Holder<LootItemFunction>> modifier) {
         super(children, condition, modifier);
     }

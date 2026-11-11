@@ -25,7 +25,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 public class EnderDragon extends Mob implements Enemy {
-    public static final EntityDataAccessor<Integer> DATA_PHASE = null;
+    public static final EntityDataAccessor<Integer> DATA_PHASE = net.minecraft.network.syncher.EntityDataSerializers.INT.createAccessor(16);
     public final DragonFlightHistory flightHistory = null;
     public final EnderDragonPart head = null;
     public float oFlapTime;

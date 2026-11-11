@@ -20,7 +20,7 @@ public abstract class BasePressurePlateBlock extends Block {
     protected BasePressurePlateBlock(int index) {
         super(index);
     }
-    protected static final AABB TOUCH_AABB = null;
+    protected static final AABB TOUCH_AABB = Block.column(14.0, 0.0, 4.0).toAabbs().getFirst();
     protected final BlockSetType type = null;
     protected BasePressurePlateBlock(BlockBehaviour.Properties properties, BlockSetType type) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);

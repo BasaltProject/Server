@@ -193,7 +193,7 @@ public class BuiltInRegistries {
         return registry;
     }
 
-    public static final DataComponentInitializers DATA_COMPONENT_INITIALIZERS = null;
+    public static final DataComponentInitializers DATA_COMPONENT_INITIALIZERS = new DataComponentInitializers();
     public static final DefaultedMappedRegistry<GameEvent> GAME_EVENT = gameEvents();
     public static final Registry<SoundEvent> SOUND_EVENT = sounds();
     public static final Registry<MobEffect> MOB_EFFECT = net.minecraft.world.effect.MobEffects.registry();
@@ -248,9 +248,9 @@ public class BuiltInRegistries {
     public static final Registry<MapCodec<? extends DensityFunction>> DENSITY_FUNCTION_TYPE = new MappedRegistry<>(net.minecraft.core.registries.Registries.DENSITY_FUNCTION_TYPE);
     public static final Registry<MapCodec<? extends StructureProcessor>> STRUCTURE_PROCESSOR = new MappedRegistry<>(net.minecraft.core.registries.Registries.STRUCTURE_PROCESSOR);
     public static final Registry<StructurePoolElementType<?>> STRUCTURE_POOL_ELEMENT = new MappedRegistry<>(net.minecraft.core.registries.Registries.STRUCTURE_POOL_ELEMENT);
-    public static final Registry<MapCodec<? extends PoolAliasBinding>> POOL_ALIAS_BINDING_TYPE = null;
+    public static final Registry<MapCodec<? extends PoolAliasBinding>> POOL_ALIAS_BINDING_TYPE = empty(net.minecraft.core.registries.Registries.POOL_ALIAS_BINDING);
     public static final Registry<CreativeModeTab> CREATIVE_MODE_TAB = new MappedRegistry<>(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB);
-    public static final Registry<CriterionTrigger<?>> TRIGGER_TYPES = null;
+    public static final Registry<CriterionTrigger<?>> TRIGGER_TYPES = empty(net.minecraft.core.registries.Registries.TRIGGER_TYPE);
     public static final Registry<NumberFormatType<?>> NUMBER_FORMAT_TYPE = new MappedRegistry<>(net.minecraft.core.registries.Registries.NUMBER_FORMAT_TYPE);
     public static final Registry<DataComponentType<?>> DATA_COMPONENT_TYPE = net.minecraft.core.component.DataComponents.registry();
     public static final Registry<GameRule<?>> GAME_RULE = new MappedRegistry<>(net.minecraft.core.registries.Registries.GAME_RULE);
@@ -284,7 +284,7 @@ public class BuiltInRegistries {
     public static final Registry<MapCodec<? extends SlotSource>> SLOT_SOURCE_TYPE = new MappedRegistry<>(net.minecraft.core.registries.Registries.SLOT_SOURCE_TYPE);
     public static final Registry<ContextKeySet> CONTEXT_KEY_SET = new MappedRegistry<>(net.minecraft.core.registries.Registries.CONTEXT_KEY_SET);
     public static final Registry<Consumer<GameTestHelper>> TEST_FUNCTION = new MappedRegistry<>(net.minecraft.core.registries.Registries.TEST_FUNCTION);
-    public static final Registry<? extends Registry<?>> REGISTRY = null;
+    public static final Registry<? extends Registry<?>> REGISTRY = empty(net.minecraft.resources.ResourceKey.createRegistryKey(net.minecraft.core.registries.Registries.ROOT_REGISTRY_NAME));
     public static void bootStrap() {
         return;
     }

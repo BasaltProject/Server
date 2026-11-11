@@ -26,7 +26,7 @@ public class GsonHelper {
     protected GsonHelper() {
     }
     public static Object fromJson(Gson gson, String string, Class type) {
-        throw Unsupported.hit("net.minecraft.util.GsonHelper.fromJson");
+        return gson.fromJson(string, type);
     }
     public static boolean isStringValue(JsonObject node, String name) {
         return isValidPrimitive(node, name) && node.getAsJsonPrimitive(name).isString();

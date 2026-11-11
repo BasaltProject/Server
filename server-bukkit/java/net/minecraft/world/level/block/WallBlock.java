@@ -28,7 +28,7 @@ public class WallBlock extends Block implements SimpleWaterloggedBlock {
     public static final EnumProperty<WallSide> NORTH = BlockStateProperties.NORTH_WALL;
     public static final EnumProperty<WallSide> SOUTH = BlockStateProperties.SOUTH_WALL;
     public static final EnumProperty<WallSide> WEST = BlockStateProperties.WEST_WALL;
-    public static final Map<Direction, EnumProperty<WallSide>> PROPERTY_BY_DIRECTION = null;
+    public static final Map<Direction, EnumProperty<WallSide>> PROPERTY_BY_DIRECTION = com.google.common.collect.ImmutableMap.copyOf(new java.util.EnumMap<>(Map.of(Direction.NORTH, NORTH, Direction.EAST, EAST, Direction.SOUTH, SOUTH, Direction.WEST, WEST)));
     public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
     public WallBlock(BlockBehaviour.Properties properties) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);

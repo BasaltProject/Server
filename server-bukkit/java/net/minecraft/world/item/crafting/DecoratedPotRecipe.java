@@ -20,7 +20,7 @@ public class DecoratedPotRecipe extends CustomRecipe {
         Ingredient.CONTENTS_STREAM_CODEC, o -> o.frontPattern,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         DecoratedPotRecipe::new);
-    public static final RecipeSerializer<DecoratedPotRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<DecoratedPotRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient backPattern;
     private final Ingredient leftPattern;
     private final Ingredient rightPattern;

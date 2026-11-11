@@ -18,8 +18,12 @@ public class WorldGenSettings extends SavedData {
     public WorldOptions options() {
         return options;
     }
-    public static final Codec<WorldGenSettings> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.levelgen.WorldGenSettings.class, "CODEC");
-    public static final SavedDataType<WorldGenSettings> TYPE = null;
+    public static final Codec<WorldGenSettings> CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.create(i -> i.group(
+        WorldOptions.CODEC.forGetter(WorldGenSettings::options), WorldDimensions.CODEC.forGetter(WorldGenSettings::dimensions)).apply(i, i.stable(WorldGenSettings::new)));
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static final SavedDataType<WorldGenSettings> TYPE = new SavedDataType<>(net.minecraft.resources.Identifier.withDefaultNamespace("world_gen_settings"),
+        () -> new WorldGenSettings(WorldOptions.defaultWithRandomSeed(), new WorldDimensions(new java.util.HashMap())), CODEC,
+        net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_WORLD_GEN_SETTINGS);
     public static WorldGenSettings of(WorldOptions options, RegistryAccess registryAccess) {
         return new WorldGenSettings(options, new WorldDimensions(registryAccess.lookupOrThrow(net.minecraft.core.registries.Registries.LEVEL_STEM)));
     }

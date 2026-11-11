@@ -75,6 +75,25 @@ public final class EntityPredicate {
         this.parts = parts;
         this.combined = combine(parts);
     }
+    public static net.minecraft.core.Holder<net.minecraft.world.level.storage.loot.predicates.LootItemCondition> wrap(EntityPredicate single) {
+        return net.minecraft.core.Holder.direct(new org.basaltmc.bukkit.facade.EntityPropertiesCondition(single));
+    }
+    public static net.minecraft.core.Holder<net.minecraft.world.level.storage.loot.predicates.LootItemCondition> wrap(Builder single) {
+        return wrap(single.build());
+    }
+    public static java.util.Optional<net.minecraft.core.Holder<net.minecraft.world.level.storage.loot.predicates.LootItemCondition>> wrap(java.util.Optional<EntityPredicate> single) {
+        return single.map(EntityPredicate::wrap);
+    }
+    public static java.util.List<net.minecraft.core.Holder<net.minecraft.world.level.storage.loot.predicates.LootItemCondition>> wrap(Builder... predicates) {
+        return java.util.Arrays.stream(predicates).map(EntityPredicate::wrap).toList();
+    }
+    public static net.minecraft.world.level.storage.loot.LootContext createContext(ServerPlayer player, Entity entity) {
+        var params = new net.minecraft.world.level.storage.loot.LootParams.Builder(player.level())
+            .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.THIS_ENTITY, entity)
+            .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN, player.position())
+            .create(net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.ADVANCEMENT_ENTITY);
+        return new net.minecraft.world.level.storage.loot.LootContext.Builder(params).create(java.util.Optional.empty());
+    }
     public boolean matches(ServerPlayer player, Entity entity) {
         return matches(player.level(), player.position(), entity);
     }

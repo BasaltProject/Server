@@ -11,7 +11,7 @@ import net.minecraft.world.level.Level;
 public class FireworkStarRecipe extends CustomRecipe {
     public static final MapCodec<FireworkStarRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.FireworkStarRecipe.class, "MAP_CODEC");
     public static final StreamCodec<RegistryFriendlyByteBuf, FireworkStarRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.FireworkStarRecipe.class, "STREAM_CODEC");
-    public static final RecipeSerializer<FireworkStarRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<FireworkStarRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Map<FireworkExplosion.Shape, Ingredient> shapes;
     private final Ingredient trail;
     private final Ingredient twinkle;

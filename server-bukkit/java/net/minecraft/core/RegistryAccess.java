@@ -19,8 +19,8 @@ public interface RegistryAccess extends HolderLookup.Provider {
     }
 
     interface Frozen extends RegistryAccess {}
-    Logger LOGGER = null;
-    Frozen EMPTY = null;
+    Logger LOGGER = org.slf4j.LoggerFactory.getLogger(RegistryAccess.class);
+    Frozen EMPTY = new ImmutableRegistryAccess(Map.of()).freeze();
     default Stream<RegistryEntry<?>> registries() {
         return Stream.empty();
     }

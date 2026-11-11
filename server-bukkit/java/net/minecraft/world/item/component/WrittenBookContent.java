@@ -15,7 +15,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 public record WrittenBookContent(Filterable<String> title, String author, int generation, List<Filterable<Component>> pages, boolean resolved) implements BookContent<Component, WrittenBookContent>, TooltipProvider {
-    public static final WrittenBookContent EMPTY = null;
+    public static final WrittenBookContent EMPTY = new WrittenBookContent(net.minecraft.server.network.Filterable.passThrough(""), "", 0, List.of(), true);
     public static final int PAGE_LENGTH = 32767;
     public static final int TITLE_LENGTH = 16;
     public static final int TITLE_MAX_LENGTH = 32;

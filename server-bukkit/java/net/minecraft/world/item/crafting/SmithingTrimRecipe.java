@@ -23,7 +23,7 @@ public class SmithingTrimRecipe extends SimpleSmithingRecipe {
         Ingredient.CONTENTS_STREAM_CODEC, o -> o.addition,
         TrimPattern.STREAM_CODEC, o -> o.pattern,
         SmithingTrimRecipe::new);
-    public static final RecipeSerializer<SmithingTrimRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<SmithingTrimRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient template;
     private final Ingredient base;
     private final Ingredient addition;

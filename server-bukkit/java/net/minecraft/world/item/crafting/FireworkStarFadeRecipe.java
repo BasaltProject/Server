@@ -16,7 +16,7 @@ public class FireworkStarFadeRecipe extends CustomRecipe {
         Ingredient.CONTENTS_STREAM_CODEC, o -> o.dye,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         FireworkStarFadeRecipe::new);
-    public static final RecipeSerializer<FireworkStarFadeRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<FireworkStarFadeRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient target;
     private final Ingredient dye;
     private final ItemStackTemplate result;

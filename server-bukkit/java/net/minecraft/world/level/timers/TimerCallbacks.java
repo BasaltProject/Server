@@ -1,0 +1,24 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.world.level.timers;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.ExtraCodecs;
+import java.util.function.Function;
+public class TimerCallbacks<C> {
+    public static final TimerCallbacks<MinecraftServer> SERVER_CALLBACKS = new TimerCallbacks<MinecraftServer>()
+        .register(Identifier.withDefaultNamespace("function"), FunctionCallback.CODEC)
+        .register(Identifier.withDefaultNamespace("function_tag"), FunctionTagCallback.CODEC);
+    private final ExtraCodecs.LateBoundIdMapper<Identifier, MapCodec<? extends TimerCallback<C>>> idMapper = new ExtraCodecs.LateBoundIdMapper<>();
+    private final Codec<TimerCallback<C>> codec = idMapper.codec(Identifier.CODEC).dispatch(TimerCallback::codec, Function.identity());
+    public TimerCallbacks() {
+    }
+    public TimerCallbacks<C> register(Identifier id, MapCodec<? extends TimerCallback<C>> codec) {
+        idMapper.put(id, codec);
+        return this;
+    }
+    public Codec<TimerCallback<C>> codec() {
+        return codec;
+    }
+}

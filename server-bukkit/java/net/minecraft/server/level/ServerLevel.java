@@ -59,6 +59,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -303,7 +304,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return registryAccess().lookupOrThrow(Registries.DIMENSION_TYPE).get(ResourceKey.create(Registries.DIMENSION_TYPE, Identifier.withDefaultNamespace(type))).orElseThrow();
     }
     public FeatureFlagSet enabledFeatures() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.enabledFeatures");
+        return FeatureFlagSet.of();
     }
     private BiomeManager kBiomeManager;
     public BiomeManager getBiomeManager() {
@@ -363,10 +364,11 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return (CraftServer) org.bukkit.Bukkit.getServer();
     }
     public DifficultyInstance getCurrentDifficultyAt(BlockPos pos) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getCurrentDifficultyAt");
+        org.bukkit.Chunk chunk = world.getChunkAt(pos.getX() >> 4, pos.getZ() >> 4);
+        return new DifficultyInstance(getDifficulty(), getGameTime(), chunk.getInhabitedTime(), getMoonBrightness(pos));
     }
     public SavedDataStorage getDataStorage() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getDataStorage");
+        return MinecraftServer.getServer().getDataStorage();
     }
     public LevelEntityGetter getEntities() {
         return entityManager.getEntityGetter();
@@ -417,7 +419,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return DedicatedServer.instance();
     }
     public StructureTemplateManager getStructureTemplateManager() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getStructureTemplateManager");
+        return MinecraftServer.getServer().getStructureTemplateManager();
     }
     public CraftWorld getWorld() {
         return world;
@@ -438,13 +440,44 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return isOutsideBuildHeight(blockPos.getY());
     }
     public EntityLookup moonrise$getEntityLookup() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.moonrise$getEntityLookup");
+        ServerLevel level = this;
+        return new EntityLookup() {
+            @SuppressWarnings("rawtypes")
+            private LevelEntityGetter<Entity> source() {
+                return (LevelEntityGetter<Entity>) level.getEntities();
+            }
+            public boolean addNewEntity(Entity entity, boolean event) {
+                return level.addFreshEntity(entity);
+            }
+            public net.minecraft.world.level.entity.EntityAccess get(UUID id) {
+                return source().get(id);
+            }
+            public net.minecraft.world.level.entity.EntityAccess get(int id) {
+                return source().get(id);
+            }
+            public Iterable getAll() {
+                return source().getAll();
+            }
+            public void get(net.minecraft.world.level.entity.EntityTypeTest type,
+                net.minecraft.util.AbortableIterationConsumer consumer) {
+                source().get(type, consumer);
+            }
+            public void get(net.minecraft.world.phys.AABB bb, Consumer output) {
+                source().get(bb, output);
+            }
+            public void get(net.minecraft.world.level.entity.EntityTypeTest type, net.minecraft.world.phys.AABB bb,
+                net.minecraft.util.AbortableIterationConsumer consumer) {
+                source().get(type, bb, consumer);
+            }
+        };
     }
     public PalettedContainerFactory palettedContainerFactory() {
         return PalettedContainerFactory.create(registryAccess());
     }
+    private static final WorldConfiguration kPaperConfig = new WorldConfiguration() {
+    };
     public WorldConfiguration paperConfig() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.paperConfig");
+        return kPaperConfig;
     }
     public List players() {
         return getPlayers(player -> true);
@@ -507,10 +540,10 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     public void updatePOIOnBlockStateChange(BlockPos pos, BlockState oldState, BlockState newState) {
         return;
     }
-    public static final BlockPos END_SPAWN_POINT = null;
-    public static final IntProvider RAIN_DELAY = null;
-    public static final IntProvider RAIN_DURATION = null;
-    public static final IntProvider THUNDER_DURATION = null;
+    public static final BlockPos END_SPAWN_POINT = new BlockPos(100, 50, 0);
+    public static final IntProvider RAIN_DELAY = net.minecraft.util.valueproviders.UniformInt.of(12000, 180000);
+    public static final IntProvider RAIN_DURATION = net.minecraft.util.valueproviders.UniformInt.of(12000, 24000);
+    public static final IntProvider THUNDER_DURATION = net.minecraft.util.valueproviders.UniformInt.of(3600, 15600);
     protected final Raids raids = null;
     private net.minecraft.world.level.portal.PortalForcer portalForcer;
     private ServerWaypointManager waypointManager;
@@ -598,8 +631,9 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         }
         return waypointManager;
     }
+    private static final float[] kMoonBrightness = {1.0F, 0.75F, 0.5F, 0.25F, 0.0F, 0.25F, 0.5F, 0.75F};
     public float getMoonBrightness(BlockPos pos) {
-        return world.getMoonPhase().ordinal() == 4 ? 0.0F : 1.0F;
+        return kMoonBrightness[world.getMoonPhase().ordinal()];
     }
     public void resetWeatherCycle() {
         world.setStorm(false);

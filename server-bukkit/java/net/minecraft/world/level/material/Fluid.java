@@ -37,7 +37,7 @@ public abstract class Fluid {
     public int getTickDelay(LevelReader level) {
         return 0;
     }
-    public static final IdMapper<FluidState> FLUID_STATE_REGISTRY = null;
+    public static final IdMapper<FluidState> FLUID_STATE_REGISTRY = new IdMapper<>();
     protected final StateDefinition<Fluid, FluidState> stateDefinition = null;
     protected Fluid() {
 

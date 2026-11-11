@@ -17,7 +17,7 @@ public class EnderDragonFight extends SavedData {
     public static final int ARENA_TICKET_LEVEL = 9;
     public static final int DRAGON_SPAWN_Y = 128;
     public static final Codec<EnderDragonFight> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.dimension.end.EnderDragonFight.class, "CODEC");
-    public static final SavedDataType<EnderDragonFight> TYPE = null;
+    public static final SavedDataType<EnderDragonFight> TYPE = new SavedDataType<>(net.minecraft.resources.Identifier.withDefaultNamespace("ender_dragon_fight"), EnderDragonFight::createDefault, CODEC, net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_ENDER_DRAGON_FIGHT);
     public static EnderDragonFight createDefault() {
         return new EnderDragonFight((org.bukkit.World) null);
     }

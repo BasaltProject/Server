@@ -3,7 +3,7 @@ package net.minecraft.world.level.saveddata;
 import com.mojang.serialization.Codec;
 public final class WeatherData extends SavedData {
     public static final Codec<WeatherData> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.saveddata.WeatherData.class, "CODEC");
-    public static final SavedDataType<WeatherData> TYPE = null;
+    public static final SavedDataType<WeatherData> TYPE = new SavedDataType<>(net.minecraft.resources.Identifier.withDefaultNamespace("weather"), WeatherData::new, CODEC, net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_WEATHER);
     private org.bukkit.World world;
     private int clearTime;
     private int rainTime;

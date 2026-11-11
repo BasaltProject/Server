@@ -38,9 +38,9 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 public class Shulker extends AbstractGolem implements Enemy {
-    protected static final EntityDataAccessor<Direction> DATA_ATTACH_FACE_ID = null;
-    protected static final EntityDataAccessor<Byte> DATA_PEEK_ID = null;
-    protected static final EntityDataAccessor<Byte> DATA_COLOR_ID = null;
+    protected static final EntityDataAccessor<Direction> DATA_ATTACH_FACE_ID = net.minecraft.network.syncher.EntityDataSerializers.DIRECTION.createAccessor(16);
+    protected static final EntityDataAccessor<Byte> DATA_PEEK_ID = net.minecraft.network.syncher.EntityDataSerializers.BYTE.createAccessor(17);
+    protected static final EntityDataAccessor<Byte> DATA_COLOR_ID = net.minecraft.network.syncher.EntityDataSerializers.BYTE.createAccessor(18);
     public static final int MAX_TELEPORT_DISTANCE = 8;
     public Shulker(EntityType<? extends Shulker> type, Level level) {
         super(type, level);

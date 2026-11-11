@@ -10,7 +10,7 @@ import net.minecraft.world.item.crafting.display.SlotDisplay;
 public class StonecutterRecipe extends SingleItemRecipe {
     public static final MapCodec<StonecutterRecipe> MAP_CODEC = SingleItemRecipe.simpleMapCodec(StonecutterRecipe::new);
     public static final StreamCodec<RegistryFriendlyByteBuf, StonecutterRecipe> STREAM_CODEC = SingleItemRecipe.simpleStreamCodec(StonecutterRecipe::new);
-    public static final RecipeSerializer<StonecutterRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<StonecutterRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     public StonecutterRecipe(Recipe.CommonInfo commonInfo, Ingredient ingredient, ItemStackTemplate result) {
         super(commonInfo, ingredient, result);
     }

@@ -17,8 +17,8 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.scores.PlayerTeam;
 public abstract class TamableAnimal extends Animal implements OwnableEntity {
     public static final int TELEPORT_WHEN_DISTANCE_IS_SQ = 144;
-    protected static final EntityDataAccessor<Byte> DATA_FLAGS_ID = null;
-    protected static final EntityDataAccessor<Optional<EntityReference<LivingEntity>>> DATA_OWNERUUID_ID = null;
+    protected static final EntityDataAccessor<Byte> DATA_FLAGS_ID = net.minecraft.network.syncher.EntityDataSerializers.BYTE.createAccessor(18);
+    protected static final EntityDataAccessor<Optional<EntityReference<LivingEntity>>> DATA_OWNERUUID_ID = net.minecraft.network.syncher.EntityDataSerializers.OPTIONAL_LIVING_ENTITY_REFERENCE.createAccessor(19);
     protected TamableAnimal(EntityType<? extends TamableAnimal> type, Level level) {
         super(type, level);
     }

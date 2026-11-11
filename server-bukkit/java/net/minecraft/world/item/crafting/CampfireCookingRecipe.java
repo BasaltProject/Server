@@ -8,7 +8,7 @@ import net.minecraft.world.item.ItemStackTemplate;
 public class CampfireCookingRecipe extends AbstractCookingRecipe {
     public static final MapCodec<CampfireCookingRecipe> MAP_CODEC = AbstractCookingRecipe.cookingMapCodec(CampfireCookingRecipe::new);
     public static final StreamCodec<RegistryFriendlyByteBuf, CampfireCookingRecipe> STREAM_CODEC = AbstractCookingRecipe.cookingStreamCodec(CampfireCookingRecipe::new);
-    public static final RecipeSerializer<CampfireCookingRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<CampfireCookingRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     public CampfireCookingRecipe(Recipe.CommonInfo commonInfo, AbstractCookingRecipe.CookingBookInfo bookInfo, Ingredient ingredient, ItemStackTemplate result, float experience, int cookingTime) {
         super(commonInfo, bookInfo, ingredient, result, experience, cookingTime);
     }

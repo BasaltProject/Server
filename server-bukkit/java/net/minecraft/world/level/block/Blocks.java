@@ -920,8 +920,8 @@ public class Blocks {
     public static final Block RAW_IRON_BLOCK = named("minecraft:raw_iron_block");
     public static final Block RAW_COPPER_BLOCK = named("minecraft:raw_copper_block");
     public static final Block RAW_GOLD_BLOCK = named("minecraft:raw_gold_block");
-    public static final Block POTTED_AZALEA = named("minecraft:potted_azalea");
-    public static final Block POTTED_FLOWERING_AZALEA = named("minecraft:potted_flowering_azalea");
+    public static final Block POTTED_AZALEA = named("minecraft:potted_azalea_bush");
+    public static final Block POTTED_FLOWERING_AZALEA = named("minecraft:potted_flowering_azalea_bush");
     public static final Block OCHRE_FROGLIGHT = named("minecraft:ochre_froglight");
     public static final Block VERDANT_FROGLIGHT = named("minecraft:verdant_froglight");
     public static final Block PEARLESCENT_FROGLIGHT = named("minecraft:pearlescent_froglight");

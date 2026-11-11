@@ -16,7 +16,9 @@ public class NotificationManager implements NotificationService {
     private DedicatedServer server;
 
     public void registerService(NotificationService notificationService) {
-        services.add(notificationService);
+        if (notificationService != this) {
+            services.add(notificationService);
+        }
     }
 
     public void setServer(DedicatedServer server) {

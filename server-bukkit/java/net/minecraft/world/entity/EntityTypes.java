@@ -301,5 +301,5 @@ public class EntityTypes {
     public static final EntityType<ZombifiedPiglin> ZOMBIFIED_PIGLIN = lookup(EntityTypeIds.ZOMBIFIED_PIGLIN);
     public static final EntityType<Player> PLAYER = lookup(EntityTypeIds.PLAYER);
     public static final EntityType<FishingHook> FISHING_BOBBER = lookup(EntityTypeIds.FISHING_BOBBER);
-    static final Set<EntityType<?>> OP_ONLY_CUSTOM_DATA = null;
+    static final Set<EntityType<?>> OP_ONLY_CUSTOM_DATA = Set.of(FALLING_BLOCK, COMMAND_BLOCK_MINECART, SPAWNER_MINECART);
 }

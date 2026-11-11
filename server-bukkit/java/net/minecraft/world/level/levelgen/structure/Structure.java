@@ -123,7 +123,12 @@ public abstract class Structure {
     }
     public abstract StructureType<?> type();
     public static record StructureSettings(HolderSet<Biome> biomes, Map<MobCategory, StructureSpawnOverride> spawnOverrides, GenerationStep.Decoration step, TerrainAdjustment terrainAdaptation) {
-        public static final MapCodec<StructureSettings> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.level.levelgen.structure.Structure.StructureSettings.class, "CODEC");
+        public static final MapCodec<StructureSettings> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+            org.basaltmc.bukkit.facade.ReflectiveCodecs.holderSet(net.minecraft.core.registries.Registries.BIOME).fieldOf("biomes").forGetter(StructureSettings::biomes),
+            Codec.simpleMap(MobCategory.CODEC, StructureSpawnOverride.CODEC, net.minecraft.util.StringRepresentable.keys(MobCategory.values())).fieldOf("spawn_overrides")
+                .forGetter(StructureSettings::spawnOverrides),
+            GenerationStep.Decoration.CODEC.fieldOf("step").forGetter(StructureSettings::step),
+            TerrainAdjustment.CODEC.optionalFieldOf("terrain_adaptation", TerrainAdjustment.NONE).forGetter(StructureSettings::terrainAdaptation)).apply(i, StructureSettings::new));
         public StructureSettings(HolderSet<Biome> biomes) {
             this(biomes, Map.of(), GenerationStep.Decoration.SURFACE_STRUCTURES, TerrainAdjustment.NONE);
         }

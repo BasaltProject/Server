@@ -22,17 +22,27 @@ public interface AttributeModifier<Subject, Argument> {
         Map.entry(OperationId.ADD, FloatModifier.ADD), Map.entry(OperationId.SUBTRACT, FloatModifier.SUBTRACT),
         Map.entry(OperationId.MULTIPLY, FloatModifier.MULTIPLY), Map.entry(OperationId.MINIMUM, FloatModifier.MINIMUM),
         Map.entry(OperationId.MAXIMUM, FloatModifier.MAXIMUM));
-    Map<OperationId, AttributeModifier<Vector3fc, ?>> RGB_COLOR_LIBRARY = Map.of(OperationId.OVERRIDE, override());
-    Map<OperationId, AttributeModifier<Vector4fc, ?>> ARGB_COLOR_LIBRARY = Map.of(OperationId.OVERRIDE, override());
-    Map<OperationId, AttributeModifier<Integer, ?>> INTEGER_LIBRARY = Map.of(OperationId.OVERRIDE, override());
-    Map<OperationId, AttributeModifier<MobSpawnSettings, ?>> MOB_SPAWN_SETTINGS_LIBRARY = Map.of(OperationId.OVERRIDE, override());
+    Map<OperationId, AttributeModifier<Vector3fc, ?>> RGB_COLOR_LIBRARY = Map.of(OperationId.OVERRIDE, override(),
+        OperationId.ALPHA_BLEND, ColorModifier.ALPHA_BLEND_RGB, OperationId.ADD, ColorModifier.ADD_RGB,
+        OperationId.SUBTRACT, ColorModifier.SUBTRACT_RGB, OperationId.MULTIPLY, ColorModifier.MULTIPLY_RGB,
+        OperationId.BLEND_TO_GRAY, ColorModifier.BLEND_TO_GRAY_RGB);
+    Map<OperationId, AttributeModifier<Vector4fc, ?>> ARGB_COLOR_LIBRARY = Map.of(OperationId.OVERRIDE, override(),
+        OperationId.ALPHA_BLEND, ColorModifier.ALPHA_BLEND_ARGB, OperationId.ADD, ColorModifier.ADD_ARGB,
+        OperationId.SUBTRACT, ColorModifier.SUBTRACT_ARGB, OperationId.MULTIPLY, ColorModifier.MULTIPLY_ARGB,
+        OperationId.BLEND_TO_GRAY, ColorModifier.BLEND_TO_GRAY_ARGB);
+    Map<OperationId, AttributeModifier<Integer, ?>> INTEGER_LIBRARY = Map.of(OperationId.OVERRIDE, override(),
+        OperationId.ADD, IntegerModifier.ADD, OperationId.SUBTRACT, IntegerModifier.SUBTRACT,
+        OperationId.MULTIPLY, IntegerModifier.MULTIPLY, OperationId.MINIMUM, IntegerModifier.MINIMUM,
+        OperationId.MAXIMUM, IntegerModifier.MAXIMUM);
+    Map<OperationId, AttributeModifier<MobSpawnSettings, ?>> MOB_SPAWN_SETTINGS_LIBRARY = Map.of(OperationId.OVERRIDE, override(),
+        OperationId.OVERLAY, MobSpawnSettingsModifier.overlay());
 
     static <Value> AttributeModifier<Value, Value> override() {
         return new OverrideModifier<>();
     }
 
     static <Element> Map<OperationId, AttributeModifier<List<Element>, ?>> listLibrary() {
-        return Map.of(OperationId.OVERRIDE, override());
+        return Map.of(OperationId.OVERRIDE, override(), OperationId.APPEND, ListModifier.append());
     }
 
     Subject apply(Subject subject, Argument argument);

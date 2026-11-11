@@ -28,7 +28,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 public class Vex extends Monster implements TraceableEntity, OwnableEntity {
     public static final float FLAP_DEGREES_PER_TICK = 45.836624F;
     public static final int TICKS_PER_FLAP = 0;
-    protected static final EntityDataAccessor<Byte> DATA_FLAGS_ID = null;
+    protected static final EntityDataAccessor<Byte> DATA_FLAGS_ID = net.minecraft.network.syncher.EntityDataSerializers.BYTE.createAccessor(16);
     public Vex(EntityType<? extends Vex> type, Level level) {
         super(type, level);
         this.moveControl = new VexMoveControl<>(this);

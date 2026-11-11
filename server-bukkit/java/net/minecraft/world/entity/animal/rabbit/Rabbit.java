@@ -156,7 +156,7 @@ public class Rabbit extends Animal {
     }
     public static enum Variant implements StringRepresentable {
         BROWN, WHITE, BLACK, WHITE_SPLOTCHED, GOLD, SALT, EVIL;
-        public static final Variant DEFAULT = null;
+        public static final Variant DEFAULT = BROWN;
         public static final Codec<Variant> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.animal.rabbit.Rabbit.Variant.class, "CODEC");
         public static final Codec<Variant> LEGACY_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.animal.rabbit.Rabbit.Variant.class, "LEGACY_CODEC");
         public static final StreamCodec<ByteBuf, Variant> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.entity.animal.rabbit.Rabbit.Variant.class, "STREAM_CODEC");

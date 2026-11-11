@@ -814,10 +814,10 @@ public abstract class Player extends Avatar implements ContainerUser {
         return damageSources().playerAttack(this);
     }
     public static record BedSleepingProblem(Component message) {
-        public static final BedSleepingProblem TOO_FAR_AWAY = null;
-        public static final BedSleepingProblem OBSTRUCTED = null;
-        public static final BedSleepingProblem OTHER_PROBLEM = null;
-        public static final BedSleepingProblem NOT_SAFE = null;
+        public static final BedSleepingProblem TOO_FAR_AWAY = new BedSleepingProblem(net.minecraft.network.chat.Component.translatable("block.minecraft.bed.too_far_away"));
+        public static final BedSleepingProblem OBSTRUCTED = new BedSleepingProblem(net.minecraft.network.chat.Component.translatable("block.minecraft.bed.obstructed"));
+        public static final BedSleepingProblem OTHER_PROBLEM = new BedSleepingProblem((Component) null);
+        public static final BedSleepingProblem NOT_SAFE = new BedSleepingProblem(net.minecraft.network.chat.Component.translatable("block.minecraft.bed.not_safe"));
     }
 
     private Abilities abilitiesView;

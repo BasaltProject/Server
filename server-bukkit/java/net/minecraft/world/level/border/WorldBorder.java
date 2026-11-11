@@ -17,7 +17,7 @@ public class WorldBorder extends SavedData {
     public static final double MAX_SIZE = 5.999997E7;
     public static final double MAX_CENTER_COORDINATE = 2.9999984E7;
     public static final Codec<WorldBorder> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.border.WorldBorder.class, "CODEC");
-    public static final SavedDataType<WorldBorder> TYPE = null;
+    public static final SavedDataType<WorldBorder> TYPE = new SavedDataType<>(net.minecraft.resources.Identifier.withDefaultNamespace("world_border"), WorldBorder::new, CODEC, net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_WORLD_BORDER);
     private final List<BorderChangeListener> listeners = new ArrayList<>();
     private org.bukkit.WorldBorder backing;
     private double centerX;

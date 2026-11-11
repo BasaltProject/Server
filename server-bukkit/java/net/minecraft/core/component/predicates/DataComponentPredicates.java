@@ -49,7 +49,11 @@ public class DataComponentPredicates {
     }
 
     static synchronized Identifier idOf(DataComponentPredicate.Type<?> type) {
-        return kIds.get(type);
+        Identifier id = kIds.get(type);
+        if (id == null && type instanceof DataComponentPredicate.AnyValueType any) {
+            id = org.basaltmc.bukkit.facade.ComponentTypes.idOf(any.componentType());
+        }
+        return id;
     }
 
     public static DataComponentPredicate.Type<?> bootstrap(Registry<DataComponentPredicate.Type<?>> registry) {

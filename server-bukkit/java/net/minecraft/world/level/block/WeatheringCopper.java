@@ -11,8 +11,15 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.level.block.state.BlockState;
 public interface WeatheringCopper extends ChangeOverTimeBlock<WeatheringCopper.WeatherState> {
-    Supplier<BiMap<Block, Block>> NEXT_BY_BLOCK = null;
-    Supplier<BiMap<Block, Block>> PREVIOUS_BY_BLOCK = null;
+    Supplier<BiMap<Block, Block>> NEXT_BY_BLOCK = com.google.common.base.Suppliers.memoize(() -> {
+        com.google.common.collect.ImmutableBiMap.Builder<Block, Block> builder = com.google.common.collect.ImmutableBiMap.builder();
+        java.util.stream.Stream.of(Blocks.COPPER_BLOCK, Blocks.CUT_COPPER, Blocks.CHISELED_COPPER, Blocks.CUT_COPPER_SLAB,
+            Blocks.CUT_COPPER_STAIRS, Blocks.COPPER_DOOR, Blocks.COPPER_TRAPDOOR, Blocks.COPPER_BARS, Blocks.COPPER_GRATE,
+            Blocks.COPPER_BULB, Blocks.COPPER_LANTERN, Blocks.COPPER_CHEST, Blocks.COPPER_GOLEM_STATUE, Blocks.LIGHTNING_ROD,
+            Blocks.COPPER_CHAIN).forEach(collection -> collection.weathering().progressMapping(builder::put));
+        return builder.build();
+    });
+    Supplier<BiMap<Block, Block>> PREVIOUS_BY_BLOCK = com.google.common.base.Suppliers.memoize(() -> NEXT_BY_BLOCK.get().inverse());
     private static Optional<Block> shift(Block block, int step) {
         String path = block.blockKey().getPath();
         if (path.startsWith("waxed_")) {
@@ -40,6 +47,11 @@ public interface WeatheringCopper extends ChangeOverTimeBlock<WeatheringCopper.W
             + (base.equals("copper_block") ? "copper" : base);
         return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getOptional(
             net.minecraft.resources.Identifier.withDefaultNamespace(name));
+    }
+    static WeatherState ageOf(Block block) {
+        String path = block.blockKey().getPath();
+        return path.startsWith("exposed_") ? WeatherState.EXPOSED : path.startsWith("weathered_") ? WeatherState.WEATHERED
+            : path.startsWith("oxidized_") ? WeatherState.OXIDIZED : WeatherState.UNAFFECTED;
     }
     static Optional<Block> getPrevious(Block block) {
         return shift(block, -1);

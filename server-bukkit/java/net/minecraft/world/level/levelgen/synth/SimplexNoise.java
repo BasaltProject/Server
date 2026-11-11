@@ -6,7 +6,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 public class SimplexNoise extends GradientNoise {
-    public static final Interval RANGE = null;
+    public static final Interval RANGE = Interval.ofSymmetric(2.0F);
     public static final double STANDARD_DEVIATION = 0.42544;
     private static final double kSkew2 = 0.5 * (Math.sqrt(3.0) - 1.0);
     private static final double kUnskew2 = (3.0 - Math.sqrt(3.0)) / 6.0;

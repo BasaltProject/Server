@@ -31,5 +31,8 @@ public abstract class SimpleCriterionTrigger<T extends SimpleCriterionTrigger.Si
     }
     public interface SimpleInstance extends CriterionTriggerInstance {
         Optional<Holder<LootItemCondition>> player();
+        default void validate(net.minecraft.world.level.storage.loot.ValidationContextSource validator) {
+            org.basaltmc.bukkit.facade.TriggerKit.check(validator, "player", player());
+        }
     }
 }

@@ -16,7 +16,7 @@ public class ShieldDecorationRecipe extends CustomRecipe {
         Ingredient.CONTENTS_STREAM_CODEC, o -> o.target,
         ItemStackTemplate.STREAM_CODEC, o -> o.result,
         ShieldDecorationRecipe::new);
-    public static final RecipeSerializer<ShieldDecorationRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<ShieldDecorationRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final Ingredient banner;
     private final Ingredient target;
     private final ItemStackTemplate result;

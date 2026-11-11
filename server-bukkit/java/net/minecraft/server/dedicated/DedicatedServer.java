@@ -33,6 +33,7 @@ import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.storage.LevelStorageSource;
 
 public class DedicatedServer extends MinecraftServer implements ServerInterface {
+    private static final int kCommandWaitSeconds = 10;
     private static final DedicatedServer kInstance = new DedicatedServer();
 
     private DedicatedServer() {}
@@ -150,7 +151,25 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface 
         return java.util.Arrays.stream(org.bukkit.Bukkit.getServer().getPluginManager().getPlugins()).map(org.bukkit.plugin.Plugin::getName).collect(java.util.stream.Collectors.joining(", "));
     }
     public String runCommand(String command) {
-        org.bukkit.Bukkit.getServer().dispatchCommand(org.bukkit.Bukkit.getServer().getConsoleSender(), command);
+        Runnable dispatch = () -> org.bukkit.Bukkit.getServer().dispatchCommand(org.bukkit.Bukkit.getServer().getConsoleSender(), command);
+        if (isSameThread()) {
+            dispatch.run();
+            return "";
+        }
+        java.util.concurrent.CompletableFuture<Void> done = new java.util.concurrent.CompletableFuture<>();
+        execute(() -> {
+            try {
+                dispatch.run();
+                done.complete(null);
+            } catch (Throwable failure) {
+                done.completeExceptionally(failure);
+            }
+        });
+        try {
+            done.get(kCommandWaitSeconds, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception failure) {
+            throw new IllegalStateException("Command did not run on the server thread", failure);
+        }
         return "";
     }
     public int entityBroadcastRangePercentage() {

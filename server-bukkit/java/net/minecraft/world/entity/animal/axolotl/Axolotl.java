@@ -205,7 +205,7 @@ public class Axolotl extends Animal implements Bucketable {
     }
     public static enum Variant implements StringRepresentable {
         LUCY, WILD, GOLD, CYAN, BLUE;
-        public static final Variant DEFAULT = null;
+        public static final Variant DEFAULT = LUCY;
         public static final StreamCodec<ByteBuf, Variant> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.entity.animal.axolotl.Axolotl.Variant.class, "STREAM_CODEC");
         public static final Codec<Variant> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.animal.axolotl.Axolotl.Variant.class, "CODEC");
         public static final Codec<Variant> LEGACY_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.animal.axolotl.Axolotl.Variant.class, "LEGACY_CODEC");

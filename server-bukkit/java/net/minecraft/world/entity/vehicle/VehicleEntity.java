@@ -14,9 +14,9 @@ public abstract class VehicleEntity extends Entity {
     private int hurtDir = 1;
     private float damage;
 
-    protected static final EntityDataAccessor<Integer> DATA_ID_HURT = null;
-    protected static final EntityDataAccessor<Integer> DATA_ID_HURTDIR = null;
-    protected static final EntityDataAccessor<Float> DATA_ID_DAMAGE = null;
+    protected static final EntityDataAccessor<Integer> DATA_ID_HURT = net.minecraft.network.syncher.EntityDataSerializers.INT.createAccessor(8);
+    protected static final EntityDataAccessor<Integer> DATA_ID_HURTDIR = net.minecraft.network.syncher.EntityDataSerializers.INT.createAccessor(9);
+    protected static final EntityDataAccessor<Float> DATA_ID_DAMAGE = net.minecraft.network.syncher.EntityDataSerializers.FLOAT.createAccessor(10);
     public VehicleEntity(EntityType<?> type, Level level) {
         super(type, level);
     }

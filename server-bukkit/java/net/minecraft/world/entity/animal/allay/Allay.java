@@ -39,7 +39,7 @@ public class Allay extends PathfinderMob implements InventoryCarrier, VibrationS
     private final VibrationSystem.User vibrationUser = new VibrationUser();
 
     public static final int MAX_NOTEBLOCK_DISTANCE = 1024;
-    public static final ImmutableList<Float> THROW_SOUND_PITCHES = null;
+    public static final ImmutableList<Float> THROW_SOUND_PITCHES = ImmutableList.of(0.5625F, 0.625F, 0.75F, 0.9375F, 1.0F, 1.0F, 1.125F, 1.25F, 1.5F, 1.875F, 2.0F, 2.25F, 2.5F, 3.0F, 3.75F, 4.0F);
     public Allay(EntityType<? extends Allay> type, Level level) {
         super(type, level);
     }

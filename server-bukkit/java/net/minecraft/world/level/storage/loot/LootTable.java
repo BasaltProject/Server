@@ -77,7 +77,7 @@ public class LootTable implements Validatable, LootJson.Node {
     public static final Codec<LootTable> DIRECT_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.storage.loot.LootTable.class, "DIRECT_CODEC");
     public static final Codec<Holder<LootTable>> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.storage.loot.LootTable.class, "CODEC");
     public static final Codec<HolderSet<LootTable>> LIST_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.storage.loot.LootTable.class, "LIST_CODEC");
-    public static final LootTable EMPTY = null;
+    public static final LootTable EMPTY = new LootTable(net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.EMPTY, Optional.empty(), List.of(), Optional.empty());
     private LootTable(ContextKeySet paramSet, Optional<Identifier> randomSequence, List<LootPool> pools, Optional<Holder<LootItemFunction>> modifier) {
         this.pools = pools;
         this.modifier = modifier;

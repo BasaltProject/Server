@@ -24,16 +24,21 @@ public class ServerCommonPacketListenerImpl implements ServerCommonPacketListene
     protected final Connection connection;
 
     public ServerCommonPacketListenerImpl(Connection connection) {
+        this.server = MinecraftServer.getServer();
+        this.cookie = null;
         this.connection = connection;
     }
     public void send(Packet<?> packet) {
         connection.send(packet);
     }
     public static final int LATENCY_CHECK_INTERVAL = 15000;
-    static final Component DISCONNECT_UNEXPECTED_QUERY = null;
-    protected final MinecraftServer server = null;
+    static final Component DISCONNECT_UNEXPECTED_QUERY = Component.translatable("multiplayer.disconnect.unexpected_query_response");
+    protected final MinecraftServer server;
+    protected final CommonListenerCookie cookie;
     public ServerCommonPacketListenerImpl(MinecraftServer server, Connection connection, CommonListenerCookie cookie) {
+        this.server = server;
         this.connection = connection;
+        this.cookie = cookie;
     }
     public void onDisconnect(DisconnectionDetails details) {
     }
@@ -89,7 +94,11 @@ public class ServerCommonPacketListenerImpl implements ServerCommonPacketListene
     public int latency() {
         return 0;
     }
+
+    public MinecraftServer server() {
+        return server;
+    }
     protected CommonListenerCookie createCookie(ClientInformation clientInformation) {
-        return null;
+        return new CommonListenerCookie(playerProfile(), latency(), clientInformation, cookie != null && cookie.transferred());
     }
 }

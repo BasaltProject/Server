@@ -8,7 +8,7 @@ import net.minecraft.world.item.ItemStackTemplate;
 public class BlastingRecipe extends AbstractCookingRecipe {
     public static final MapCodec<BlastingRecipe> MAP_CODEC = AbstractCookingRecipe.cookingMapCodec(BlastingRecipe::new);
     public static final StreamCodec<RegistryFriendlyByteBuf, BlastingRecipe> STREAM_CODEC = AbstractCookingRecipe.cookingStreamCodec(BlastingRecipe::new);
-    public static final RecipeSerializer<BlastingRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<BlastingRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     public BlastingRecipe(Recipe.CommonInfo commonInfo, AbstractCookingRecipe.CookingBookInfo bookInfo, Ingredient ingredient, ItemStackTemplate result, float experience, int cookingTime) {
         super(commonInfo, bookInfo, ingredient, result, experience, cookingTime);
     }

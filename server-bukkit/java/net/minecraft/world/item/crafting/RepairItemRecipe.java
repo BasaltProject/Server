@@ -9,7 +9,7 @@ public class RepairItemRecipe extends CustomRecipe {
     public static final RepairItemRecipe INSTANCE = new RepairItemRecipe();
     public static final MapCodec<RepairItemRecipe> MAP_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.mapCodec(net.minecraft.world.item.crafting.RepairItemRecipe.class, "MAP_CODEC");
     public static final StreamCodec<RegistryFriendlyByteBuf, RepairItemRecipe> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.crafting.RepairItemRecipe.class, "STREAM_CODEC");
-    public static final RecipeSerializer<RepairItemRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<RepairItemRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     public boolean matches(CraftingInput input, Level level) {
         return findPair(input) != null;
     }

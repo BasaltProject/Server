@@ -33,7 +33,7 @@ public class LiquidBlock extends Block implements BucketPickup {
     }
     public static final IntegerProperty LEVEL = BlockStateProperties.LEVEL;
     protected final FlowingFluid fluid = null;
-    public static final ImmutableList<Direction> POSSIBLE_FLOW_DIRECTIONS = null;
+    public static final ImmutableList<Direction> POSSIBLE_FLOW_DIRECTIONS = ImmutableList.of(Direction.DOWN, Direction.SOUTH, Direction.NORTH, Direction.EAST, Direction.WEST);
     protected LiquidBlock(FlowingFluid fluid, BlockBehaviour.Properties properties) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
     }

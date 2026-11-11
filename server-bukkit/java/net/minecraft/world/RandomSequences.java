@@ -14,7 +14,7 @@ import org.basaltmc.bukkit.facade.NativeSequenceRandom;
 /** The random sequences of the main world; the streams and their defaults live in the native world. */
 public class RandomSequences extends SavedData {
     public static final Codec<RandomSequences> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.RandomSequences.class, "CODEC");
-    public static final SavedDataType<RandomSequences> TYPE = null;
+    public static final SavedDataType<RandomSequences> TYPE = new SavedDataType<RandomSequences>(Identifier.withDefaultNamespace("random_sequences"), RandomSequences::new, CODEC, net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_RANDOM_SEQUENCES);
 
     public RandomSequences() {
     }

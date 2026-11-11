@@ -15,7 +15,7 @@ public class MapExtendingRecipe extends CustomRecipe {
         Ingredient.CONTENTS_STREAM_CODEC, o -> o.material,
         TransmuteResult.STREAM_CODEC, o -> o.result,
         MapExtendingRecipe::new);
-    public static final RecipeSerializer<MapExtendingRecipe> SERIALIZER = null;
+    public static final RecipeSerializer<MapExtendingRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
     private final ShapedRecipePattern pattern;
     private final Ingredient map;
     private final Ingredient material;

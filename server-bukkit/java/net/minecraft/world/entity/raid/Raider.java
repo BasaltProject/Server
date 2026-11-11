@@ -21,7 +21,7 @@ import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 public abstract class Raider extends PatrollingMonster {
-    protected static final EntityDataAccessor<Boolean> IS_CELEBRATING = null;
+    protected static final EntityDataAccessor<Boolean> IS_CELEBRATING = net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN.createAccessor(16);
     protected Raid raid;
     protected Raider(EntityType<? extends Raider> type, Level level) {
         super(type, level);

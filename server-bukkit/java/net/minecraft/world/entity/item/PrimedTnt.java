@@ -19,7 +19,11 @@ public class PrimedTnt extends Entity implements TraceableEntity {
     public static final short DEFAULT_FUSE_TIME = (short) 80;
     public static final int NO_FUSE = -1;
     public static final String TAG_FUSE = "fuse";
-    public static final ExplosionDamageCalculator USED_PORTAL_DAMAGE_CALCULATOR = null;
+    public static final ExplosionDamageCalculator USED_PORTAL_DAMAGE_CALCULATOR = new ExplosionDamageCalculator() {
+        public boolean shouldBlockExplode(net.minecraft.world.level.Explosion explosion, net.minecraft.world.level.BlockGetter level, net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state, float power) {
+            return !state.is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL) && super.shouldBlockExplode(explosion, level, pos, state, power);
+        }
+    };
     public PrimedTnt(EntityType<? extends PrimedTnt> type, Level level) {
         super(type, level);
     }

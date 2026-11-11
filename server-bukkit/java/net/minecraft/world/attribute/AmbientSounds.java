@@ -9,6 +9,6 @@ import net.minecraft.sounds.SoundEvent;
 
 public record AmbientSounds(Optional<Holder<SoundEvent>> loop, Optional<AmbientMoodSettings> mood, List<AmbientAdditionsSettings> additions) {
     public static final AmbientSounds EMPTY = new AmbientSounds(Optional.empty(), Optional.empty(), List.of());
-    public static final AmbientSounds LEGACY_CAVE_SETTINGS = EMPTY;
+    public static final AmbientSounds LEGACY_CAVE_SETTINGS = new AmbientSounds(Optional.empty(), Optional.of(AmbientMoodSettings.LEGACY_CAVE_SETTINGS), List.of());
     public static final Codec<AmbientSounds> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(AmbientSounds.class, "CODEC");
 }

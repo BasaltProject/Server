@@ -1,0 +1,36 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.world;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Optional;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.RandomSupport;
+import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
+public class RandomSequence {
+    public static final Codec<RandomSequence> CODEC = RecordCodecBuilder.create(i -> i.group(
+            XoroshiroRandomSource.CODEC.fieldOf("source").forGetter(r -> r.source)).apply(i, RandomSequence::new));
+    private final XoroshiroRandomSource source;
+    public RandomSequence(XoroshiroRandomSource source) {
+        this.source = source;
+    }
+    public RandomSequence(long seed, Identifier key) {
+        this(seed, Optional.of(key));
+    }
+    public RandomSequence(long seed, Optional<Identifier> key) {
+        this(build(seed, key));
+    }
+    private static XoroshiroRandomSource build(long seed, Optional<Identifier> key) {
+        RandomSupport.Seed128bit base = RandomSupport.upgradeSeedTo128bitUnmixed(seed);
+        if (key.isPresent()) {
+            base = base.xor(seedForKey(key.get()));
+        }
+        return new XoroshiroRandomSource(base.mixed());
+    }
+    public static RandomSupport.Seed128bit seedForKey(Identifier key) {
+        return RandomSupport.seedFromHashOf(key.toString());
+    }
+    public RandomSource random() {
+        return source;
+    }
+}

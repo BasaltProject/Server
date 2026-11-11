@@ -61,6 +61,7 @@ public class Item implements ItemLike, FeatureElement {
 
     public Item(Identifier key) {
         this.key = key;
+        this.descriptionId = "item." + key.getNamespace() + "." + key.getPath().replace('/', '.');
     }
 
     public Identifier itemKey() {
@@ -68,7 +69,7 @@ public class Item implements ItemLike, FeatureElement {
     }
 
     public String getDescriptionId() {
-        return "item." + key.getNamespace() + "." + key.getPath().replace('/', '.');
+        return descriptionId;
     }
 
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
@@ -82,14 +83,14 @@ public class Item implements ItemLike, FeatureElement {
     public static final Codec<Holder<Item>> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.item.Item.class, "CODEC");
     public static final StreamCodec<RegistryFriendlyByteBuf, Holder<Item>> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.item.Item.class, "STREAM_CODEC");
     public static final Codec<Holder<Item>> CODEC_WITH_BOUND_COMPONENTS = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.item.Item.class, "CODEC_WITH_BOUND_COMPONENTS");
-    public static final Map<Block, Item> BY_BLOCK = null;
+    public static final Map<Block, Item> BY_BLOCK = new java.util.HashMap<>();
     public static final Identifier BASE_ATTACK_DAMAGE_ID = Identifier.withDefaultNamespace("base_attack_damage");
     public static final Identifier BASE_ATTACK_SPEED_ID = Identifier.withDefaultNamespace("base_attack_speed");
     public static final int DEFAULT_MAX_STACK_SIZE = 64;
     public static final int ABSOLUTE_MAX_STACK_SIZE = 99;
     public static final int MAX_BAR_WIDTH = 13;
     protected static final int APPROXIMATELY_INFINITE_USE_DURATION = 72000;
-    protected final String descriptionId = null;
+    protected final String descriptionId;
     public static int getId(Item item) {
         return BuiltInRegistries.ITEM.getId(item);
     }
@@ -425,13 +426,26 @@ public class Item implements ItemLike, FeatureElement {
         }
     }
     public interface TooltipContext {
-        TooltipContext EMPTY = null;
+        TooltipContext EMPTY = new TooltipContext() {
+            public HolderLookup.Provider registries() {
+                return null;
+            }
+            public float tickRate() {
+                return 20.0F;
+            }
+            public MapItemSavedData mapData(MapId id) {
+                return null;
+            }
+            public boolean isPeaceful() {
+                return false;
+            }
+        };
         HolderLookup. Provider registries();
         float tickRate();
         MapItemSavedData mapData(MapId id);
         boolean isPeaceful();
         static TooltipContext of(Level level) {
-            return new TooltipContext() {
+            return level == null ? EMPTY : new TooltipContext() {
             public HolderLookup.Provider registries() {
                 return level.registryAccess();
             }

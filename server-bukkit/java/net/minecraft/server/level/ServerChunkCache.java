@@ -216,7 +216,7 @@ public class ServerChunkCache extends ChunkSource {
     public void close(boolean flag) {}
 
     public SavedDataStorage getDataStorage() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerChunkCache.getDataStorage");
+        return level.getDataStorage();
     }
 
     public ChunkGenerator getGenerator() {

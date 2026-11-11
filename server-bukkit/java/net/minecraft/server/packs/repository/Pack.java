@@ -1,5 +1,9 @@
 // Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.server.packs.repository;
+import net.minecraft.SharedConstants;
+import net.minecraft.server.packs.*;
+import net.minecraft.server.packs.metadata.pack.*;
+import net.minecraft.server.packs.FeatureFlagsMetadataSection;
 
 import java.util.List;
 import java.util.function.Function;
@@ -23,6 +27,31 @@ public class Pack {
         this.resources = resources;
         this.metadata = metadata;
         this.selectionConfig = selectionConfig;
+    }
+
+    public static Pack readMetaAndCreate(PackLocationInfo location, ResourcesSupplier resources, PackType packType, PackSelectionConfig selectionConfig) {
+        Metadata meta = readPackMetadata(location, resources, SharedConstants.getCurrentVersion().packVersion(packType), packType);
+        return meta == null ? null : new Pack(location, resources, meta, selectionConfig);
+    }
+
+    public static Metadata readPackMetadata(PackLocationInfo location, ResourcesSupplier resources, PackFormat currentPackVersion, PackType type) {
+        try (PackMetadataResources pack = resources.openMetadata(location)) {
+            PackMetadataSection section;
+            try {
+                section = pack.getMetadataSection(PackMetadataSection.forPackType(type));
+            } catch (com.google.gson.JsonParseException malformed) {
+                section = pack.getMetadataSection(PackMetadataSection.FALLBACK_TYPE);
+            }
+            if (section == null) {
+                return null;
+            }
+            FeatureFlagsMetadataSection flags = pack.getMetadataSection(FeatureFlagsMetadataSection.TYPE);
+            OverlayMetadataSection overlays = pack.getMetadataSection(OverlayMetadataSection.forPackType(type));
+            return new Metadata(section.description(), PackCompatibility.forVersion(section.supportedFormats(), currentPackVersion),
+                flags != null ? flags.flags() : FeatureFlagSet.of(), overlays != null ? overlays.overlaysForVersion(currentPackVersion) : List.of());
+        } catch (Exception unreadable) {
+            return null;
+        }
     }
 
     public PackLocationInfo location() {

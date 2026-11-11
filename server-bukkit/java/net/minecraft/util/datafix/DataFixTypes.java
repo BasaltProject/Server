@@ -23,16 +23,39 @@ public enum DataFixTypes {
         return codec;
     }
 
-    private String nativeType() {
+    /** The name the native fixer gives the data of this type. */
+    public String nativeType() {
         return switch (this) {
-            case CHUNK -> "chunk";
+            case LEVEL, LEVEL_SUMMARY -> "level";
             case PLAYER -> "player";
+            case CHUNK -> "chunk";
+            case HOTBAR -> "hotbar";
+            case OPTIONS -> "options";
+            case STRUCTURE -> "structure";
+            case STATS -> "stats";
+            case ADVANCEMENTS -> "advancements";
+            case POI_CHUNK -> "poi_chunk";
+            case WORLD_GEN_SETTINGS -> "world_gen_settings";
             case ENTITY_CHUNK -> "entity_chunk";
-            case SAVED_DATA_RANDOM_SEQUENCES -> "random_sequences";
-            case SAVED_DATA_RAIDS -> "raids";
+            case DEBUG_PROFILE -> "debug_profile";
+            case SAVED_DATA_COMMAND_STORAGE -> "saved_data:command_storage";
+            case SAVED_DATA_CUSTOM_BOSS_EVENTS -> "custom_boss_events";
+            case SAVED_DATA_ENDER_DRAGON_FIGHT -> "saved_data:ender_dragon_fight";
+            case SAVED_DATA_GAME_RULES -> "saved_data:game_rules";
+            case SAVED_DATA_FORCED_CHUNKS -> "tickets";
             case SAVED_DATA_MAP_DATA -> "map";
+            case SAVED_DATA_MAP_INDEX -> "map_index";
+            case SAVED_DATA_RAIDS -> "raids";
+            case SAVED_DATA_RANDOM_SEQUENCES -> "random_sequences";
+            case SAVED_DATA_SCHEDULED_EVENTS -> "saved_data:scheduled_events";
             case SAVED_DATA_SCOREBOARD -> "scoreboard";
-            default -> null;
+            case SAVED_DATA_STOPWATCHES -> "saved_data:stopwatches";
+            case SAVED_DATA_STRUCTURE_FEATURE_INDICES -> "structure_feature_indices";
+            case SAVED_DATA_WANDERING_TRADER -> "saved_data:wandering_trader";
+            case SAVED_DATA_WEATHER -> "saved_data:weather";
+            case SAVED_DATA_WORLD_BORDER -> "world_border";
+            case SAVED_DATA_WORLD_CLOCKS -> "saved_data:world_clocks";
+            case SAVED_DATA_WORLD_GEN_SETTINGS -> "saved_data:world_gen_settings";
         };
     }
 
@@ -41,14 +64,13 @@ public enum DataFixTypes {
             return input;
         }
         String type = nativeType();
-        if (type == null) {
-            throw new UnsupportedOperationException("The native data fixer has no " + name() + " fixes from " + fromVersion);
-        }
         Tag tag = input.convert(NbtOps.INSTANCE).getValue();
         byte[] fixed = org.basaltmc.bukkit.LeftoverNatives.datafix(type,
             org.basaltmc.bukkit.facade.NbtCodec.toAnonymous((CompoundTag) tag), fromVersion, toVersion);
         if (fixed == null) {
-            throw new IllegalStateException("The native data fixer rejected " + name() + " data from " + fromVersion);
+            String gap = org.basaltmc.bukkit.LeftoverNatives.datafixMissing(type, fromVersion, toVersion);
+            throw new IllegalStateException("The native data fixer cannot bring " + name() + " data from " + fromVersion
+                + (gap == null ? "" : ": no fix for " + gap));
         }
         return new Dynamic<Tag>(NbtOps.INSTANCE, org.basaltmc.bukkit.facade.NbtCodec.fromAnonymous(fixed)).convert(input.getOps());
     }

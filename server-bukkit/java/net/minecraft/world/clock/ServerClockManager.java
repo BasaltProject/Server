@@ -8,7 +8,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 public class ServerClockManager extends SavedData implements ClockManager {
-    public static final SavedDataType<ServerClockManager> TYPE = null;
+    public static final SavedDataType<ServerClockManager> TYPE = new SavedDataType<>(net.minecraft.resources.Identifier.withDefaultNamespace("world_clocks"), ServerClockManager::new, com.mojang.serialization.MapCodec.unitCodec(ServerClockManager::new), net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_WORLD_CLOCKS);
     private ServerClockManager(PackedClockStates packedClockStates) {
     }
 

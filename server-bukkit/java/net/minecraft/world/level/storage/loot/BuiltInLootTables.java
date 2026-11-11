@@ -92,7 +92,7 @@ public class BuiltInLootTables {
     public static final ResourceKey<LootTable> EQUIPMENT_TRIAL_CHAMBER = table("EQUIPMENT_TRIAL_CHAMBER");
     public static final ResourceKey<LootTable> EQUIPMENT_TRIAL_CHAMBER_RANGED = table("EQUIPMENT_TRIAL_CHAMBER_RANGED");
     public static final ResourceKey<LootTable> EQUIPMENT_TRIAL_CHAMBER_MELEE = table("EQUIPMENT_TRIAL_CHAMBER_MELEE");
-    public static final ColorCollection<ResourceKey<LootTable>> SHEEP = null;
+    public static final ColorCollection<ResourceKey<LootTable>> SHEEP = ColorCollection.NAMES.map(color -> table("entities/sheep/" + color));
     public static final ResourceKey<LootTable> FISHING = table("FISHING");
     public static final ResourceKey<LootTable> FISHING_JUNK = table("FISHING_JUNK");
     public static final ResourceKey<LootTable> FISHING_TREASURE = table("FISHING_TREASURE");
@@ -136,7 +136,7 @@ public class BuiltInLootTables {
     public static final ResourceKey<LootTable> SHEAR_BROWN_MOOSHROOM = table("SHEAR_BROWN_MOOSHROOM");
     public static final ResourceKey<LootTable> SHEAR_SNOW_GOLEM = table("SHEAR_SNOW_GOLEM");
     public static final ResourceKey<LootTable> SHEAR_SHEEP = table("SHEAR_SHEEP");
-    public static final ColorCollection<ResourceKey<LootTable>> SHEAR_DYED_SHEEP = null;
+    public static final ColorCollection<ResourceKey<LootTable>> SHEAR_DYED_SHEEP = ColorCollection.NAMES.map(color -> table("shearing/sheep/" + color));
     public static final ResourceKey<LootTable> CHARGED_CREEPER = table("CHARGED_CREEPER");
     public static final ResourceKey<LootTable> CHARGED_CREEPER_PIGLIN = table("CHARGED_CREEPER_PIGLIN");
     public static final ResourceKey<LootTable> CHARGED_CREEPER_CREEPER = table("CHARGED_CREEPER_CREEPER");

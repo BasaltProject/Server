@@ -11,7 +11,7 @@ import org.basaltmc.bukkit.LeftoverNatives;
 
 /** The stopwatches of the server, kept by the native `/stopwatch` command. */
 public class Stopwatches extends SavedData {
-    public static final SavedDataType<Stopwatches> TYPE = null;
+    public static final SavedDataType<Stopwatches> TYPE = new SavedDataType<>(net.minecraft.resources.Identifier.withDefaultNamespace("stopwatches"), Stopwatches::new, com.mojang.serialization.MapCodec.unitCodec(Stopwatches::new), net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_STOPWATCHES);
 
     public Stopwatches() {
     }

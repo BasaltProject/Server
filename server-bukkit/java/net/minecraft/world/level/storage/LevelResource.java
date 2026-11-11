@@ -1,7 +1,7 @@
 // Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
 package net.minecraft.world.level.storage;
 public record LevelResource(String id) {
-    public static LevelResource DATA;
+    public static final LevelResource DATA = new LevelResource("data");
     public static final LevelResource PLAYER_ADVANCEMENTS_DIR = new LevelResource("players/advancements");
     public static final LevelResource PLAYER_STATS_DIR = new LevelResource("players/stats");
     public static final LevelResource PLAYER_DATA_DIR = new LevelResource("players/data");

@@ -1,0 +1,23 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.world.level.levelgen.blockpredicates;
+import com.mojang.serialization.MapCodec;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.LevelAccessor;
+public class AllOfPredicate extends CombiningPredicate {
+    public static final MapCodec<AllOfPredicate> CODEC = CombiningPredicate.codec(AllOfPredicate::new);
+    public AllOfPredicate(List<BlockPredicate> predicates) {
+        super(predicates);
+    }
+    public boolean test(LevelAccessor level, BlockPos origin) {
+        for (BlockPredicate predicate : predicates) {
+            if (!predicate.test(level, origin)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    public BlockPredicateType<?> type() {
+        return BlockPredicateType.ALL_OF;
+    }
+}

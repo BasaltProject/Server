@@ -46,25 +46,25 @@ public class ArmorStand extends LivingEntity {
     }
 
     public static final int WOBBLE_TIME = 5;
-    public static final Rotations DEFAULT_HEAD_POSE = null;
-    public static final Rotations DEFAULT_BODY_POSE = null;
-    public static final Rotations DEFAULT_LEFT_ARM_POSE = null;
-    public static final Rotations DEFAULT_RIGHT_ARM_POSE = null;
-    public static final Rotations DEFAULT_LEFT_LEG_POSE = null;
-    public static final Rotations DEFAULT_RIGHT_LEG_POSE = null;
+    public static final Rotations DEFAULT_HEAD_POSE = new Rotations(0.0F, 0.0F, 0.0F);
+    public static final Rotations DEFAULT_BODY_POSE = new Rotations(0.0F, 0.0F, 0.0F);
+    public static final Rotations DEFAULT_LEFT_ARM_POSE = new Rotations(-10.0F, 0.0F, -10.0F);
+    public static final Rotations DEFAULT_RIGHT_ARM_POSE = new Rotations(-15.0F, 0.0F, 10.0F);
+    public static final Rotations DEFAULT_LEFT_LEG_POSE = new Rotations(-1.0F, 0.0F, -1.0F);
+    public static final Rotations DEFAULT_RIGHT_LEG_POSE = new Rotations(1.0F, 0.0F, 1.0F);
     public static final int DISABLE_TAKING_OFFSET = 8;
     public static final int DISABLE_PUTTING_OFFSET = 16;
     public static final int CLIENT_FLAG_SMALL = 1;
     public static final int CLIENT_FLAG_SHOW_ARMS = 4;
     public static final int CLIENT_FLAG_NO_BASEPLATE = 8;
     public static final int CLIENT_FLAG_MARKER = 16;
-    public static final EntityDataAccessor<Byte> DATA_CLIENT_FLAGS = null;
-    public static final EntityDataAccessor<Rotations> DATA_HEAD_POSE = null;
-    public static final EntityDataAccessor<Rotations> DATA_BODY_POSE = null;
-    public static final EntityDataAccessor<Rotations> DATA_LEFT_ARM_POSE = null;
-    public static final EntityDataAccessor<Rotations> DATA_RIGHT_ARM_POSE = null;
-    public static final EntityDataAccessor<Rotations> DATA_LEFT_LEG_POSE = null;
-    public static final EntityDataAccessor<Rotations> DATA_RIGHT_LEG_POSE = null;
+    public static final EntityDataAccessor<Byte> DATA_CLIENT_FLAGS = net.minecraft.network.syncher.EntityDataSerializers.BYTE.createAccessor(15);
+    public static final EntityDataAccessor<Rotations> DATA_HEAD_POSE = net.minecraft.network.syncher.EntityDataSerializers.ROTATIONS.createAccessor(16);
+    public static final EntityDataAccessor<Rotations> DATA_BODY_POSE = net.minecraft.network.syncher.EntityDataSerializers.ROTATIONS.createAccessor(17);
+    public static final EntityDataAccessor<Rotations> DATA_LEFT_ARM_POSE = net.minecraft.network.syncher.EntityDataSerializers.ROTATIONS.createAccessor(18);
+    public static final EntityDataAccessor<Rotations> DATA_RIGHT_ARM_POSE = net.minecraft.network.syncher.EntityDataSerializers.ROTATIONS.createAccessor(19);
+    public static final EntityDataAccessor<Rotations> DATA_LEFT_LEG_POSE = net.minecraft.network.syncher.EntityDataSerializers.ROTATIONS.createAccessor(20);
+    public static final EntityDataAccessor<Rotations> DATA_RIGHT_LEG_POSE = net.minecraft.network.syncher.EntityDataSerializers.ROTATIONS.createAccessor(21);
     public long lastHit;
     public ArmorStand(EntityType<? extends ArmorStand> type, Level level) {
         super(type, level);

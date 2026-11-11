@@ -119,6 +119,83 @@ public class Inventory implements Container, Nameable {
     public Component getDisplayName() {
         return getName();
     }
+
+    public net.minecraft.core.NonNullList<ItemStack> getNonEquipmentItems() {
+        net.minecraft.core.NonNullList<ItemStack> items = net.minecraft.core.NonNullList.withSize(INVENTORY_SIZE, ItemStack.EMPTY);
+        for (int slot = 0; slot < INVENTORY_SIZE; slot++) {
+            items.set(slot, getItem(slot));
+        }
+        return items;
+    }
+
+    public int getFreeSlot() {
+        for (int slot = 0; slot < INVENTORY_SIZE; slot++) {
+            if (getItem(slot).isEmpty()) {
+                return slot;
+            }
+        }
+        return NOT_FOUND_INDEX;
+    }
+
+    private boolean hasRoomFor(ItemStack held, ItemStack incoming) {
+        return !held.isEmpty() && ItemStack.isSameItemSameComponents(held, incoming) && held.isStackable() && held.getCount() < held.getMaxStackSize();
+    }
+
+    public int getSlotWithRemainingSpace(ItemStack incoming) {
+        for (int slot : new int[] {getSelectedSlot(), SLOT_OFFHAND}) {
+            if (hasRoomFor(getItem(slot), incoming)) {
+                return slot;
+            }
+        }
+        for (int slot = 0; slot < INVENTORY_SIZE; slot++) {
+            if (hasRoomFor(getItem(slot), incoming)) {
+                return slot;
+            }
+        }
+        return NOT_FOUND_INDEX;
+    }
+
+    public int findSlotMatchingCraftingIngredient(net.minecraft.core.Holder<net.minecraft.world.item.Item> item, ItemStack existing) {
+        for (int slot = 0; slot < INVENTORY_SIZE; slot++) {
+            ItemStack held = getItem(slot);
+            if (!held.isEmpty() && held.is(item) && isUsableForCrafting(held) && (existing.isEmpty() || ItemStack.isSameItemSameComponents(existing, held))) {
+                return slot;
+            }
+        }
+        return NOT_FOUND_INDEX;
+    }
+
+    public void placeItemBackInInventory(ItemStack stack, net.minecraft.util.Prediction prediction) {
+        placeItemBackInInventory(stack, true, prediction);
+    }
+
+    public void placeItemBackInInventory(ItemStack stack, boolean sendSlotUpdate, net.minecraft.util.Prediction prediction) {
+        while (!stack.isEmpty()) {
+            int slot = getSlotWithRemainingSpace(stack);
+            if (slot == NOT_FOUND_INDEX) {
+                slot = getFreeSlot();
+            }
+            if (slot == NOT_FOUND_INDEX) {
+                player.drop(stack, false, prediction);
+                return;
+            }
+            ItemStack held = getItem(slot);
+            int room = stack.getMaxStackSize() - held.getCount();
+            ItemStack moved = stack.split(room);
+            if (held.isEmpty()) {
+                setItem(slot, moved);
+            } else {
+                held.grow(moved.getCount());
+                setItem(slot, held);
+            }
+        }
+    }
+
+    public void fillStackedContents(StackedItemContents contents) {
+        for (int slot = 0; slot < INVENTORY_SIZE; slot++) {
+            contents.accountSimpleStack(getItem(slot));
+        }
+    }
     public static boolean isUsableForCrafting(ItemStack itemStack) {
         return !itemStack.isDamaged() && !itemStack.isEnchanted() && !itemStack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME);
     }

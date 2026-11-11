@@ -176,7 +176,7 @@ public class Llama extends AbstractChestedHorse implements RangedAttackMob {
     }
     public static enum Variant implements StringRepresentable {
         CREAMY, WHITE, BROWN, GRAY;
-        public static final Variant DEFAULT = null;
+        public static final Variant DEFAULT = CREAMY;
         public static final Codec<Variant> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.animal.equine.Llama.Variant.class, "CODEC");
         public static final Codec<Variant> LEGACY_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.entity.animal.equine.Llama.Variant.class, "LEGACY_CODEC");
         public static final StreamCodec<ByteBuf, Variant> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.entity.animal.equine.Llama.Variant.class, "STREAM_CODEC");

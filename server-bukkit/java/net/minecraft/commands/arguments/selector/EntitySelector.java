@@ -41,7 +41,8 @@ public class EntitySelector {
     private EntitySelector() {}
 
     public static final int INFINITE = 2147483647;
-    public static final BiConsumer<Vec3, List<? extends Entity>> ORDER_ARBITRARY = null;
+    public static final BiConsumer<Vec3, List<? extends Entity>> ORDER_ARBITRARY = (p, c) -> {
+    };
     public static final Codec<CompilableString<EntitySelector>> COMPILABLE_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.commands.arguments.selector.EntitySelector.class, "COMPILABLE_CODEC");
     public EntitySelector(int maxResults, boolean includesEntities, boolean worldLimited, List<Predicate<Entity>> contextFreePredicates, MinMaxBounds. Doubles range, Function<Vec3, Vec3> position, AABB aabb, BiConsumer<Vec3, List<? extends Entity>> order, boolean currentEntity, String playerName, UUID entityUUID, EntityType<?> type, boolean usesSelector) {
         

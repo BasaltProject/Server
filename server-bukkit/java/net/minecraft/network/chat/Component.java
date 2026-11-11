@@ -34,7 +34,7 @@ public interface Component extends FormattedText, Message {
 
     @Override
     default String getString() {
-        StringBuilder builder = new StringBuilder();
+        final StringBuilder builder = new StringBuilder();
         visit(content -> {
             builder.append(content);
             return Optional.empty();
@@ -43,7 +43,7 @@ public interface Component extends FormattedText, Message {
     }
 
     default String getString(int limit) {
-        StringBuilder builder = new StringBuilder();
+        final StringBuilder builder = new StringBuilder();
         visit(content -> {
             int remaining = limit - builder.length();
             if (remaining <= 0) {

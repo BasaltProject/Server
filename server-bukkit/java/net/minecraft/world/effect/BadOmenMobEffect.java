@@ -1,0 +1,36 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.world.effect;
+
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.raid.Raid;
+
+class BadOmenMobEffect extends MobEffect {
+    protected BadOmenMobEffect(MobEffectCategory category, int color) {
+        super(category, color);
+    }
+
+    @Override
+    public boolean shouldApplyEffectTickThisTick(int remainingDuration, int amplification) {
+        return true;
+    }
+
+    @Override
+    public boolean applyEffectTick(ServerLevel level, LivingEntity mob, int amplification) {
+        if (!(mob instanceof ServerPlayer player) || player.isSpectator() || level.getDifficulty() == Difficulty.PEACEFUL) {
+            return true;
+        }
+        if (!level.isVillage(player.blockPosition())) {
+            return true;
+        }
+        Raid raid = level.getRaidAt(player.blockPosition());
+        if (raid != null && raid.getRaidOmenLevel() >= raid.getMaxRaidOmenLevel()) {
+            return true;
+        }
+        player.addEffect(new MobEffectInstance(MobEffects.RAID_OMEN, 600, amplification));
+        player.setRaidOmenPosition(player.blockPosition());
+        return false;
+    }
+}

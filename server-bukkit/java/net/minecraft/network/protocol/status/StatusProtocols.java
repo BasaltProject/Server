@@ -1,0 +1,29 @@
+// Independent reimplementation, not Mojang code. See server-bukkit/NOTICE.md
+package net.minecraft.network.protocol.status;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.ProtocolInfo;
+import net.minecraft.network.protocol.ProtocolInfoBuilder;
+import net.minecraft.network.protocol.SimpleUnboundProtocol;
+import net.minecraft.network.protocol.ping.ClientboundPongResponsePacket;
+import net.minecraft.network.protocol.ping.PingPacketTypes;
+import net.minecraft.network.protocol.ping.ServerboundPingRequestPacket;
+public class StatusProtocols {
+    public static final SimpleUnboundProtocol<ServerStatusPacketListener, ByteBuf> SERVERBOUND_TEMPLATE;
+    public static final ProtocolInfo<ServerStatusPacketListener> SERVERBOUND;
+    public static final SimpleUnboundProtocol<ClientStatusPacketListener, FriendlyByteBuf> CLIENTBOUND_TEMPLATE;
+    public static final ProtocolInfo<ClientStatusPacketListener> CLIENTBOUND;
+    static {
+        SERVERBOUND_TEMPLATE = ProtocolInfoBuilder.<ServerStatusPacketListener, ByteBuf>serverboundProtocol(ConnectionProtocol.STATUS, builder -> {
+            builder.addPacket(StatusPacketTypes.SERVERBOUND_STATUS_REQUEST, ServerboundStatusRequestPacket.STREAM_CODEC);
+            builder.addPacket(PingPacketTypes.SERVERBOUND_PING_REQUEST, ServerboundPingRequestPacket.STREAM_CODEC);
+        });
+        SERVERBOUND = SERVERBOUND_TEMPLATE.bind((e) -> e);
+        CLIENTBOUND_TEMPLATE = ProtocolInfoBuilder.<ClientStatusPacketListener, FriendlyByteBuf>clientboundProtocol(ConnectionProtocol.STATUS, builder -> {
+            builder.addPacket(StatusPacketTypes.CLIENTBOUND_STATUS_RESPONSE, ClientboundStatusResponsePacket.STREAM_CODEC);
+            builder.addPacket(PingPacketTypes.CLIENTBOUND_PONG_RESPONSE, ClientboundPongResponsePacket.STREAM_CODEC);
+        });
+        CLIENTBOUND = CLIENTBOUND_TEMPLATE.bind(FriendlyByteBuf::new);
+    }
+}

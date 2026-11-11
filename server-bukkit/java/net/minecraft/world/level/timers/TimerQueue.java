@@ -13,7 +13,7 @@ import net.minecraft.world.level.saveddata.SavedDataType;
 
 public class TimerQueue<T> extends SavedData {
     public static final Codec<TimerQueue<MinecraftServer>> CODEC = org.basaltmc.bukkit.facade.LazyCodecs.codec(net.minecraft.world.level.timers.TimerQueue.class, "CODEC");
-    public static final SavedDataType<TimerQueue<MinecraftServer>> TYPE = null;
+    public static final SavedDataType<TimerQueue<MinecraftServer>> TYPE = new SavedDataType<>(net.minecraft.resources.Identifier.withDefaultNamespace("scheduled_events"), TimerQueue::new, CODEC, net.minecraft.util.datafix.DataFixTypes.SAVED_DATA_SCHEDULED_EVENTS);
     private final PriorityQueue<Event<T>> queue = new PriorityQueue<>((a, b) -> {
         int byTime = Long.compare(a.triggerTime(), b.triggerTime());
         return byTime != 0 ? byTime : a.sequentialId().compareTo(b.sequentialId());

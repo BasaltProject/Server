@@ -67,7 +67,7 @@ public class NewMinecartBehavior extends MinecartBehavior {
     }
     public static record MinecartStep(Vec3 position, Vec3 movement, float yRot, float xRot, float weight) {
         public static final StreamCodec<ByteBuf, MinecartStep> STREAM_CODEC = org.basaltmc.bukkit.facade.LazyCodecs.streamCodec(net.minecraft.world.entity.vehicle.minecart.NewMinecartBehavior.MinecartStep.class, "STREAM_CODEC");
-        public static final MinecartStep ZERO = null;
+        public static final MinecartStep ZERO = new MinecartStep(Vec3.ZERO, Vec3.ZERO, 0.0F, 0.0F, 0.0F);
     }
     static class TrackIteration {
         public double movementLeft;

@@ -35,7 +35,7 @@ public class LastSeenMessagesValidator {
             throw new ValidationException("Last seen update contained " + update.acknowledged().length() + " messages, but maximum window size is " + lastSeenCount);
         }
         for (int i = 0; i < lastSeenCount; i++) {
-            boolean acknowledged = update.acknowledged().get(i);
+            final boolean acknowledged = update.acknowledged().get(i);
             LastSeenTrackedEntry message = trackedMessages.get(i);
             if (acknowledged) {
                 if (message == null) {

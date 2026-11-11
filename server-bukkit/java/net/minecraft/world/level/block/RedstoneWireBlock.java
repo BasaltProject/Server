@@ -33,7 +33,7 @@ public class RedstoneWireBlock extends Block {
     public static final EnumProperty<RedstoneSide> SOUTH = BlockStateProperties.SOUTH_REDSTONE;
     public static final EnumProperty<RedstoneSide> WEST = BlockStateProperties.WEST_REDSTONE;
     public static final IntegerProperty POWER = BlockStateProperties.POWER;
-    public static final Map<Direction, EnumProperty<RedstoneSide>> PROPERTY_BY_DIRECTION = null;
+    public static final Map<Direction, EnumProperty<RedstoneSide>> PROPERTY_BY_DIRECTION = com.google.common.collect.ImmutableMap.copyOf(new java.util.EnumMap<>(Map.of(Direction.NORTH, NORTH, Direction.EAST, EAST, Direction.SOUTH, SOUTH, Direction.WEST, WEST)));
     public RedstoneWireBlock(BlockBehaviour.Properties properties) {
         super((net.minecraft.world.level.block.state.BlockBehaviour.Properties) null);
     }
