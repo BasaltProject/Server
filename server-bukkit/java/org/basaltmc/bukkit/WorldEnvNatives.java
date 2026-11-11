@@ -137,4 +137,6 @@ public final class WorldEnvNatives {
 
     /** Whether the tool is right for the block's drops, then how fast it mines it. */
     public static native double[] toolFacts(String item, int state);
+    public static native long[] overworldBiomePoints();
+    public static native String[] overworldBiomeNames();
 }

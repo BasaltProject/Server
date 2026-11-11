@@ -73,13 +73,11 @@ public interface EndermanOps extends Enderman, Cored {
     }
 
     default boolean isScreaming() {
-        return core().integer("target") >= 0;
+        return core().flag("enderman_creepy");
     }
 
     default void setScreaming(boolean screaming) {
-        if (screaming != isScreaming()) {
-            throw org.basaltmc.bukkit.Unsupported.hit("Enderman#setScreaming without a target");
-        }
+        core().set("enderman_creepy", screaming);
     }
 
     default boolean hasBeenStaredAt() {

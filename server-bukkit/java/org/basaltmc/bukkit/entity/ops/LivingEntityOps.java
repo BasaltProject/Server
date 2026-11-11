@@ -117,6 +117,10 @@ public interface LivingEntityOps extends LivingEntity, EntityOps, LivingExtraOps
         return core().equipment(this);
     }
 
+    default io.papermc.paper.world.damagesource.CombatTracker getCombatTracker() {
+        return org.basaltmc.bukkit.player.BasaltCombatTracker.of(this);
+    }
+
     default double getLastDamage() {
         return core().real("last_damage");
     }

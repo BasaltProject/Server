@@ -194,6 +194,11 @@ std::expected<void, std::string> BukkitBridge::boot() {
     } else {
         env->ExceptionClear();
     }
+    if (jclass fileNatives = env->FindClass("org/basaltmc/bukkit/FileNatives"); fileNatives != nullptr) {
+        registerFileNatives(env, fileNatives);
+    } else {
+        env->ExceptionClear();
+    }
     if (jclass mechanicsNatives = env->FindClass("org/basaltmc/bukkit/MechanicsNatives"); mechanicsNatives != nullptr) {
         registerMechanicsNatives(env, mechanicsNatives);
     } else {

@@ -89,10 +89,55 @@ public interface AreaEffectCloudOps extends AreaEffectCloud, Cored {
     }
 
     default <T> void setParticle(Particle particle, T data) {
-        if (data != null) {
-            throw org.basaltmc.bukkit.Unsupported.hit("AreaEffectCloud#setParticle with particle data");
+        if (data == null) {
+            setParticle(particle);
+            return;
         }
-        setParticle(particle);
+        java.util.Map<String, Object> options = new java.util.LinkedHashMap<>();
+        options.put("type", particle.getKey().toString());
+        if (data instanceof Particle.DustTransition transition) {
+            options.put("from_color", transition.getColor().asRGB());
+            options.put("to_color", transition.getToColor().asRGB());
+            options.put("scale", transition.getSize());
+        } else if (data instanceof Particle.DustOptions dust) {
+            options.put("color", dust.getColor().asRGB());
+            options.put("scale", dust.getSize());
+        } else if (data instanceof Particle.Spell spell) {
+            options.put("color", spell.getColor().asRGB());
+            options.put("power", spell.getPower());
+        } else if (data instanceof org.bukkit.Color color) {
+            options.put("color", color.asARGB());
+        } else if (data instanceof org.bukkit.block.data.BlockData block) {
+            options.put("block_state", stateNbt(block.getAsString()));
+        } else if (data instanceof org.bukkit.inventory.ItemStack stack) {
+            options.put("item", java.util.Map.of("id", stack.getType().getKey().toString(), "count", Math.max(1, stack.getAmount())));
+        } else if (data instanceof Float number) {
+            options.put(particle == Particle.SCULK_CHARGE ? "roll" : "power", number);
+        } else if (data instanceof Integer delay) {
+            options.put("delay", delay);
+        } else if (data instanceof Particle.Trail trail) {
+            options.put("target", EntityNbt.floats((float) trail.getTarget().getX(), (float) trail.getTarget().getY(), (float) trail.getTarget().getZ()));
+            options.put("color", trail.getColor().asRGB());
+            options.put("duration", trail.getDuration());
+        } else {
+            throw new IllegalArgumentException("Cannot store particle data " + data);
+        }
+        EntityNbt.put(core(), "custom_particle", options);
+    }
+
+    private static java.util.Map<String, Object> stateNbt(String text) {
+        java.util.Map<String, Object> state = new java.util.LinkedHashMap<>();
+        int open = text.indexOf('[');
+        state.put("Name", open < 0 ? text : text.substring(0, open));
+        if (open >= 0) {
+            java.util.Map<String, Object> properties = new java.util.LinkedHashMap<>();
+            for (String pair : text.substring(open + 1, text.length() - 1).split(",")) {
+                int split = pair.indexOf('=');
+                properties.put(pair.substring(0, split), pair.substring(split + 1));
+            }
+            state.put("Properties", properties);
+        }
+        return state;
     }
 
     default void setBasePotionData(PotionData data) {

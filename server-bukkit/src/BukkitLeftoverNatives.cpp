@@ -173,11 +173,31 @@ jobjectArray JNICALL nativeTemplateScan(JNIEnv* env, jclass, jbyteArray nbt, jin
 }
 
 jbyteArray JNICALL nativeDatafix(JNIEnv* env, jclass, jstring type, jbyteArray nbt, jint from, jint to) {
-    return jni::byteArrayOf(env, plugins::datafix::upgrade(toStd(env, type), jni::bytesOf(env, nbt), from, to));
+    return jni::byteArrayOf(env, plugins::datafix::upgrade(toStd(env, type), jni::bytesOf(env, nbt), from, to).nbt);
+}
+
+jbyteArray JNICALL nativeDatafixStep(JNIEnv* env, jclass, jstring type, jstring step, jint versionKey, jbyteArray nbt) {
+    return jni::byteArrayOf(
+        env, plugins::datafix::applyStep(toStd(env, type), toStd(env, step), versionKey, jni::bytesOf(env, nbt)).nbt);
+}
+
+jstring JNICALL nativeDatafixMissing(JNIEnv* env, jclass, jstring type, jint from, jint to) {
+    const std::string gap = plugins::datafix::missing(toStd(env, type), from, to);
+    return gap.empty() ? nullptr : env->NewStringUTF(gap.c_str());
 }
 
 jboolean JNICALL nativeDatafixSupports(JNIEnv* env, jclass, jstring type) {
     return flag(plugins::datafix::supports(toStd(env, type)));
+}
+
+jobjectArray JNICALL nativeDatafixLegacyState(JNIEnv* env, jclass, jint id) {
+    const metamorph::datafix::LegacyBlockState state = plugins::datafix::legacyState(id);
+    std::vector<std::string> flat{state.name};
+    for (const auto& [key, value] : state.properties) {
+        flat.push_back(key);
+        flat.push_back(value);
+    }
+    return jni::stringArrayOf(env, flat);
 }
 
 jintArray JNICALL nativeTerrainShape(JNIEnv* env, jclass, jstring settings) {
@@ -208,6 +228,19 @@ jdouble JNICALL nativeTerrainDensity(JNIEnv* env, jclass, jstring settings, jlon
             .services()
             .worldgen()
             .density(name, seed, router, x, y, z)
+            .value_or(std::nan(""));
+    });
+}
+
+jdouble JNICALL nativeTerrainDensityTree(JNIEnv* env, jclass, jstring settings, jlong seed, jstring json, jint x,
+                                         jint y, jint z) {
+    const std::string name = toStd(env, settings);
+    const std::string tree = toStd(env, json);
+    return jni::onServer<jdouble>(std::nan(""), [&] {
+        return BukkitBridge::current()
+            .services()
+            .worldgen()
+            .densityTree(name, seed, tree, x, y, z)
             .value_or(std::nan(""));
     });
 }
@@ -279,10 +312,10 @@ jdoubleArray JNICALL nativeNoiseHandleRange(JNIEnv* env, jclass, jlong handle) {
 }
 
 void JNICALL nativeNoiseRelease(JNIEnv*, jclass, jlong handle) {
-    (void)jni::onServer<bool>(false, [&] {
+    static_cast<void>(jni::onServer<bool>(false, [&] {
         BukkitBridge::current().services().worldgen().releaseNoise(handle);
         return true;
-    });
+    }));
 }
 
 jint JNICALL nativeTerrainHeight(JNIEnv* env, jclass, jstring settings, jlong seed, jint x, jint z, jboolean floor) {
@@ -342,6 +375,24 @@ jdouble JNICALL nativeHumidity(JNIEnv* env, jclass, jstring world, jint x, jint 
         plugins::PluginWorldEnv* target = found == nullptr ? nullptr : found->env();
         return target == nullptr ? 0.4 : target->humidity(x, y, z);
     });
+}
+
+jdoubleArray JNICALL nativePortalExit(JNIEnv* env, jclass, jstring from, jstring to, jdouble x, jdouble y, jdouble z,
+                                      jboolean alongX) {
+    const std::string source = toStd(env, from);
+    const std::string target = toStd(env, to);
+    const auto exit = jni::onServer<std::optional<std::array<double, 3>>>(std::nullopt, [&] {
+        return BukkitBridge::current().services().worlds().netherPortalExit(source, target, x, y, z,
+                                                                            alongX == JNI_TRUE);
+    });
+    if (!exit.has_value()) {
+        return nullptr;
+    }
+    jdoubleArray out = env->NewDoubleArray(3);
+    if (out != nullptr) {
+        env->SetDoubleArrayRegion(out, 0, 3, exit->data());
+    }
+    return out;
 }
 
 jlongArray JNICALL nativeClimate(JNIEnv* env, jclass, jstring world, jint quartX, jint quartY, jint quartZ) {
@@ -407,6 +458,23 @@ jobjectArray JNICALL nativeEnchantItem(JNIEnv* env, jclass, jobjectArray stack, 
     }
     return jni::stringArrayOf(env, {made->item, std::to_string(made->count), made->components});
 }
+
+jobjectArray JNICALL nativeApplyLoot(JNIEnv* env, jclass, jobjectArray stack, jstring world, jstring functions,
+                                     jdouble x, jdouble y, jdouble z, jlong seed) {
+    const std::vector<std::string> given = jni::stringsOf(env, stack);
+    if (given.size() < 3) {
+        return nullptr;
+    }
+    const plugins::PluginLootItem item{.item = given[0], .count = std::atoi(given[1].c_str()), .components = given[2]};
+    const plugins::PluginLootApply how{.world = toStd(env, world), .x = x, .y = y, .z = z, .seed = seed};
+    const std::string json = toStd(env, functions);
+    const auto made = jni::onServer<std::optional<plugins::PluginLootItem>>(
+        std::nullopt, [&] { return BukkitBridge::current().services().loot().apply(json, item, how); });
+    if (!made.has_value()) {
+        return nullptr;
+    }
+    return jni::stringArrayOf(env, {made->item, std::to_string(made->count), made->components});
+}
 } // namespace
 
 void registerLeftoverNatives(JNIEnv* env, jclass natives) {
@@ -433,10 +501,17 @@ void registerLeftoverNatives(JNIEnv* env, jclass natives) {
         method("templateScan", "([BIIIIIIILjava/lang/String;Z)[Ljava/lang/Object;",
                reinterpret_cast<void*>(&nativeTemplateScan)),
         method("datafix", "(Ljava/lang/String;[BII)[B", reinterpret_cast<void*>(&nativeDatafix)),
+        method("datafixStep", "(Ljava/lang/String;Ljava/lang/String;I[B)[B",
+               reinterpret_cast<void*>(&nativeDatafixStep)),
+        method("datafixMissing", "(Ljava/lang/String;II)Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeDatafixMissing)),
         method("datafixSupports", "(Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeDatafixSupports)),
+        method("datafixLegacyState", "(I)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeDatafixLegacyState)),
         method("terrainShape", "(Ljava/lang/String;)[I", reinterpret_cast<void*>(&nativeTerrainShape)),
         method("terrainDensity", "(Ljava/lang/String;JLjava/lang/String;III)D",
                reinterpret_cast<void*>(&nativeTerrainDensity)),
+        method("terrainDensityTree", "(Ljava/lang/String;JLjava/lang/String;III)D",
+               reinterpret_cast<void*>(&nativeTerrainDensityTree)),
         method("terrainNoise", "(Ljava/lang/String;JLjava/lang/String;DDD)D",
                reinterpret_cast<void*>(&nativeTerrainNoise)),
         method("terrainNoiseRange", "(Ljava/lang/String;JLjava/lang/String;)[D",
@@ -453,12 +528,16 @@ void registerLeftoverNatives(JNIEnv* env, jclass natives) {
         method("entityDefaults", "(Ljava/lang/String;)[Ljava/lang/String;",
                reinterpret_cast<void*>(&nativeEntityDefaults)),
         method("humidity", "(Ljava/lang/String;III)D", reinterpret_cast<void*>(&nativeHumidity)),
+        method("portalExit", "(Ljava/lang/String;Ljava/lang/String;DDDZ)[D",
+               reinterpret_cast<void*>(&nativePortalExit)),
         method("climate", "(Ljava/lang/String;III)[J", reinterpret_cast<void*>(&nativeClimate)),
         method("dragonBar", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Z",
                reinterpret_cast<void*>(&nativeDragonBar)),
         method("dragonAction", "(Ljava/lang/String;Ljava/lang/String;I)Z",
                reinterpret_cast<void*>(&nativeDragonAction)),
         method("windowProperty", "(Ljava/lang/String;II)Z", reinterpret_cast<void*>(&nativeWindowProperty)),
+        method("applyLoot", "([Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;DDDJ)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeApplyLoot)),
         method("enchantItem", "([Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJ)[Ljava/lang/String;",
                reinterpret_cast<void*>(&nativeEnchantItem)),
         method("explorerMap", "(Ljava/lang/String;DDD[Ljava/lang/String;Ljava/lang/String;IIZ)[B",

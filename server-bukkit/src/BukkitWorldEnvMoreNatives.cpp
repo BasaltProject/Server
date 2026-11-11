@@ -1,6 +1,7 @@
 #include "BukkitWorldEnvShared.hpp"
 
 #include <basalt/server/plugins/PluginWorldEnv.hpp>
+#include <basalt/server/world/climate/OverworldBiomes.hpp>
 
 #include <algorithm>
 
@@ -492,6 +493,34 @@ jdoubleArray JNICALL nativeToolFacts(JNIEnv* env, jclass, jstring item, jint sta
     env->SetDoubleArrayRegion(array, 0, static_cast<jsize>(facts.size()), facts.data());
     return array;
 }
+
+jlongArray JNICALL nativeOverworldBiomePoints(JNIEnv* env, jclass) {
+    const auto points = world::climate::overworldBiomes::build();
+    std::vector<jlong> flat;
+    flat.reserve(points.size() * 13);
+    for (const auto& [point, name] : points) {
+        for (const auto* axis : {&point.temperature, &point.humidity, &point.continentalness, &point.erosion,
+                                 &point.depth, &point.weirdness}) {
+            flat.push_back(axis->min);
+            flat.push_back(axis->max);
+        }
+        flat.push_back(point.offset);
+    }
+    jlongArray array = env->NewLongArray(static_cast<jsize>(flat.size()));
+    env->SetLongArrayRegion(array, 0, static_cast<jsize>(flat.size()), flat.data());
+    return array;
+}
+
+jobjectArray JNICALL nativeOverworldBiomeNames(JNIEnv* env, jclass) {
+    const auto points = world::climate::overworldBiomes::build();
+    jobjectArray names =
+        env->NewObjectArray(static_cast<jsize>(points.size()), env->FindClass("java/lang/String"), nullptr);
+    for (std::size_t at = 0; at < points.size(); ++at) {
+        const std::string name{points[at].second};
+        env->SetObjectArrayElement(names, static_cast<jsize>(at), env->NewStringUTF(name.c_str()));
+    }
+    return names;
+}
 } // namespace
 
 void registerWorldEnvMoreNatives(JNIEnv* env, jclass natives) {
@@ -536,6 +565,8 @@ void registerWorldEnvMoreNatives(JNIEnv* env, jclass natives) {
         method("useGenerator", "(Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeUseGenerator)),
         method("transformState", "(III)I", reinterpret_cast<void*>(&nativeTransformState)),
         method("toolFacts", "(Ljava/lang/String;I)[D", reinterpret_cast<void*>(&nativeToolFacts)),
+        method("overworldBiomePoints", "()[J", reinterpret_cast<void*>(&nativeOverworldBiomePoints)),
+        method("overworldBiomeNames", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeOverworldBiomeNames)),
     };
     if (env->RegisterNatives(natives, methods.data(), static_cast<jint>(methods.size())) != 0) {
         BukkitBridge::current().log().error(

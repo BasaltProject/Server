@@ -133,14 +133,11 @@ public interface EntityExtraOps extends Entity, Cored {
     }
 
     default void setPose(Pose pose, boolean fixed) {
-        if (fixed) {
-            throw org.basaltmc.bukkit.Unsupported.hit("Entity#setPose with a fixed pose: the engine recomputes the pose");
-        }
         core().set("pose", (long) pose.ordinal());
     }
 
     default boolean hasFixedPose() {
-        return false;
+        return core().property("pose") instanceof Number n && n.intValue() >= 0;
     }
 
     default boolean hasNoPhysics() {

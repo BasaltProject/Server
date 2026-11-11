@@ -16,6 +16,7 @@ basalt_module(server-bukkit
         src/BukkitBridge.cpp
         src/BukkitEmbedded.cpp
         src/BukkitEntityNatives.cpp
+        src/BukkitFileNatives.cpp
         src/BukkitHost.cpp
         src/BukkitItemNatives.cpp
         src/BukkitLeftoverNatives.cpp

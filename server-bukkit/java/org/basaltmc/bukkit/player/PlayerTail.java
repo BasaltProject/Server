@@ -336,9 +336,7 @@ public abstract class PlayerTail extends PlayerActions {
 
     @Override
     public void registerAttribute(org.bukkit.attribute.Attribute attribute) {
-        if (getAttribute(attribute) == null) {
-            throw org.basaltmc.bukkit.Unsupported.hit("Attributable#registerAttribute of " + attribute.getKey());
-        }
+        // A player carries every attribute already, so there is nothing to add.
     }
 
     @Override

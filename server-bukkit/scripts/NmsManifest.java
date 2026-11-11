@@ -654,6 +654,46 @@ public final class NmsManifest {
 
     private final Map<String, ClassInfo> index = new HashMap<>();
     private boolean forceConcrete;
+    private final Set<String> blockHooks = new HashSet<>();
+
+    private void loadBlockHooks(Path root) throws IOException {
+        Pattern method = Pattern.compile("^    (?:protected|public)(?: final)? (?!static)([\\w<>\\[\\], .?]+?) (\\w+)\\((.*)\\) (?:throws [\\w, ]+)?\\{$");
+        for (String file : List.of("net/minecraft/world/level/block/state/BlockBehaviour.java", "net/minecraft/world/level/block/Block.java")) {
+            Path path = root.resolve(file);
+            if (!Files.exists(path)) {
+                continue;
+            }
+            for (String line : Files.readAllLines(path)) {
+                Matcher m = method.matcher(line);
+                if (m.matches()) {
+                    blockHooks.add(m.group(2) + "/" + paramTypes(m.group(3)) + "/" + m.group(1).trim());
+                }
+            }
+        }
+    }
+
+    private static String paramTypes(String params) {
+        List<String> types = new ArrayList<>();
+        int depth = 0;
+        StringBuilder current = new StringBuilder();
+        for (char c : (params + ",").toCharArray()) {
+            if (c == '<') {
+                depth++;
+            } else if (c == '>') {
+                depth--;
+            }
+            if (c == ',' && depth == 0) {
+                String p = current.toString().trim().replaceAll("\\bfinal ", "");
+                if (!p.isEmpty()) {
+                    types.add(p.substring(0, p.lastIndexOf(' ') < 0 ? p.length() : p.lastIndexOf(' ')).trim());
+                }
+                current.setLength(0);
+            } else {
+                current.append(c);
+            }
+        }
+        return String.join(",", types);
+    }
 
     private void runStubs(Path manifestDir, Path out, List<Path> skips) throws IOException {
         Set<String> skipTop = new HashSet<>();
@@ -661,6 +701,7 @@ public final class NmsManifest {
             if (!Files.isDirectory(root)) {
                 continue;
             }
+            loadBlockHooks(root);
             Path registriesFile = root.resolve("net/minecraft/core/registries/Registries.java");
             if (Files.exists(registriesFile)) {
                 Matcher keys = Pattern.compile("ResourceKey<Registry<(.+?)>> (\\w+) =\\s*ResourceKey\\.createRegistryKey")
@@ -1329,6 +1370,57 @@ public final class NmsManifest {
                 .append("    return new net.minecraft.world.entity.ai.behavior.InertBehavior<>();\n").append(in).append("}\n");
             return;
         }
+        if (!ctor && !isInterface && !isEnum && !isRecord && !has(mt.getModifiers(), Modifier.STATIC)
+            && fqn.matches("net\\.minecraft\\.world\\.level\\.block\\.[A-Z]\\w*(\\.\\w+)*")) {
+            String ret = text(mt.getReturnType());
+            List<String> types = new ArrayList<>();
+            List<String> names = new ArrayList<>();
+            for (VariableTree p : mt.getParameters()) {
+                types.add(text(p.getType()));
+                names.add(p.getName().toString());
+            }
+            if (blockHooks.contains(name + "/" + String.join(",", types) + "/" + ret)) {
+                inertNote("block-hook-super", fqn, name);
+                sb.append(in).append(header).append(" {\n").append(in).append("    ").append(ret.equals("void") ? "" : "return ")
+                    .append("super.").append(name).append("(").append(String.join(", ", names)).append(");\n").append(in).append("}\n");
+                return;
+            }
+        }
+        if (!ctor && name.equals("codec") && mt.getParameters().isEmpty() && !has(mt.getModifiers(), Modifier.STATIC)
+            && text(mt.getReturnType()).startsWith("MapCodec<")) {
+            for (Tree member : owner.getMembers()) {
+                if (member instanceof VariableTree v && has(v.getModifiers(), Modifier.STATIC)
+                    && (v.getName().contentEquals("MAP_CODEC") || v.getName().contentEquals("CODEC"))
+                    && text(v.getType()).equals(text(mt.getReturnType()))) {
+                    inertNote("codec-field", fqn, name);
+                    sb.append(in).append(header).append(" {\n").append(in).append("    return ").append(v.getName()).append(";\n")
+                        .append(in).append("}\n");
+                    return;
+                }
+            }
+        }
+        if (!ctor && name.equals("validate") && mt.getParameters().size() == 1
+            && text(mt.getParameters().get(0).getType()).equals("ValidationContext") && text(mt.getReturnType()).equals("void")
+            && fqn.startsWith("net.minecraft.world.level.storage.loot.")) {
+            inertNote("loot-validate-noop", fqn, name);
+            sb.append(in).append(header).append(" {\n").append(in).append("}\n");
+            return;
+        }
+        if (!ctor && name.equals("performBonemeal") && fqn.startsWith("net.minecraft.world.level.block.") && mt.getParameters().size() == 5
+            && text(mt.getParameters().get(0).getType()).equals("ServerLevel") && text(mt.getParameters().get(2).getType()).equals("BlockPos")) {
+            String level = mt.getParameters().get(0).getName().toString();
+            String pos = mt.getParameters().get(2).getName().toString();
+            inertNote("bonemeal-native", fqn, name);
+            sb.append(in).append(header).append(" {\n").append(in).append("    org.basaltmc.bukkit.WorldEnvNatives.boneMeal(").append(level)
+                .append(".getWorld().getName(), ").append(pos).append(".getX(), ").append(pos).append(".getY(), ").append(pos)
+                .append(".getZ());\n").append(in).append("}\n");
+            return;
+        }
+        if (!ctor && name.equals("getReferencedContextParams") && mt.getParameters().isEmpty() && !has(mt.getModifiers(), Modifier.STATIC)
+            && fqn.startsWith("net.minecraft.world.level.storage.loot.")) {
+            sb.append(in).append(header).append(" {\n").append(in).append("    return java.util.Set.of();\n").append(in).append("}\n");
+            return;
+        }
         if (!ctor) {
             sb.append(in).append(header).append(" {\n").append(in)
                 .append("    throw org.basaltmc.bukkit.facade.NmsStub.unsupported(\"").append(where).append("\");\n")
@@ -1362,6 +1454,18 @@ public final class NmsManifest {
         sb.append(in).append(header).append(" {\n").append(in).append("    ").append(call).append("throw ")
             .append("org.basaltmc.bukkit.facade.NmsStub.unsupported(\"").append(where).append("\");\n")
             .append(in).append("}\n");
+    }
+
+    private String codecConstant(ClassTree owner, String returnType) {
+        boolean map = returnType.startsWith("MapCodec");
+        for (Tree member : owner.getMembers()) {
+            if (member instanceof VariableTree v && has(v.getModifiers(), Modifier.STATIC)
+                && (v.getName().contentEquals("CODEC") || v.getName().contentEquals("MAP_CODEC"))
+                && text(v.getType()).startsWith("MapCodec") == map && text(v.getType()).contains("Codec")) {
+                return v.getName().toString();
+            }
+        }
+        return null;
     }
 
     private String topOf(ClassInfo c) {

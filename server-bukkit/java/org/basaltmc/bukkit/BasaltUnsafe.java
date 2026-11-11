@@ -7,6 +7,8 @@ public final class BasaltUnsafe extends UnsafeValuesBase {
     static final BasaltUnsafe INSTANCE = new BasaltUnsafe();
 
     private static final int kDataVersion = 5023;
+    private static final int kFirstNumericVersion = 99;
+    private static final int kFirstItemOnlyId = 256;
 
     @Override
     public int getDataVersion() {
@@ -38,20 +40,59 @@ public final class BasaltUnsafe extends UnsafeValuesBase {
         return material;
     }
 
+    private static org.bukkit.block.data.BlockData blockOf(org.bukkit.Material material, byte data) {
+        if (!material.isLegacy()) {
+            return org.bukkit.Bukkit.createBlockData(material);
+        }
+        String[] state = LeftoverNatives.datafixLegacyState(material.getId() << 4 | (data & 15));
+        StringBuilder text = new StringBuilder(state[0]);
+        for (int at = 1; at + 1 < state.length; at += 2) {
+            text.append(at == 1 ? '[' : ',').append(state[at]).append('=').append(state[at + 1]);
+        }
+        return org.bukkit.Bukkit.createBlockData(state.length > 1 ? text.append(']').toString() : text.toString());
+    }
+
     private static org.bukkit.Material modernOf(org.bukkit.Material material, byte data) {
         if (!material.isLegacy()) {
             return material;
         }
+        if (material.getId() < kFirstItemOnlyId) {
+            return blockOf(material, data).getMaterial();
+        }
         org.bukkit.Material modern = org.bukkit.Material.getMaterial(material.name().substring("LEGACY_".length()));
-        if (modern == null || data != 0) {
+        if (modern != null && data == 0) {
+            return modern;
+        }
+        org.bukkit.Material flattened = flattenedItem(material, data);
+        if (flattened == null) {
             throw Unsupported.hit("UnsafeValues#fromLegacy of " + material + " with data " + data);
         }
-        return modern;
+        return flattened;
+    }
+
+    private static org.bukkit.Material flattenedItem(org.bukkit.Material legacy, byte data) {
+        net.minecraft.nbt.CompoundTag stack = new net.minecraft.nbt.CompoundTag();
+        stack.putShort("id", (short) legacy.getId());
+        stack.putByte("Count", (byte) 1);
+        stack.putShort("Damage", (short) (data & 0xFF));
+        net.minecraft.nbt.ListTag inventory = new net.minecraft.nbt.ListTag();
+        inventory.add(stack);
+        net.minecraft.nbt.CompoundTag player = new net.minecraft.nbt.CompoundTag();
+        player.put("Inventory", inventory);
+        byte[] fixed = LeftoverNatives.datafix("player", org.basaltmc.bukkit.facade.NbtCodec.toAnonymous(player), kFirstNumericVersion, kDataVersion);
+        if (fixed == null) {
+            return null;
+        }
+        net.minecraft.nbt.ListTag items = org.basaltmc.bukkit.facade.NbtCodec.fromAnonymous(fixed).getListOrEmpty("Inventory");
+        if (items.isEmpty() || !(items.get(0) instanceof net.minecraft.nbt.CompoundTag item)) {
+            return null;
+        }
+        return item.getString("id").map(org.bukkit.Material::matchMaterial).orElse(null);
     }
 
     @Override
     public org.bukkit.block.data.BlockData fromLegacy(org.bukkit.Material material, byte data) {
-        return org.bukkit.Bukkit.createBlockData(modernOf(material, data));
+        return blockOf(material, data);
     }
 
     @Override

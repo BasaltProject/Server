@@ -14,31 +14,44 @@ import org.bukkit.damage.DamageType;
 import org.bukkit.damage.DeathMessageType;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
 
 public final class BasaltCombatTracker implements CombatTracker {
     private static final int kStride = 8;
     private static final int kResetDamageTicks = 100;
     private static final int kResetCombatTicks = 300;
 
-    private final Player player;
+    private final LivingEntity player;
     private boolean inCombat;
     private int combatStart;
     private int combatEnd;
 
-    public BasaltCombatTracker(Player player) {
+    private static final java.util.Map<LivingEntity, BasaltCombatTracker> kTrackers =
+        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    public static BasaltCombatTracker of(LivingEntity entity) {
+        return kTrackers.computeIfAbsent(entity, BasaltCombatTracker::new);
+    }
+
+    public BasaltCombatTracker(LivingEntity player) {
         this.player = player;
     }
 
     private record Row(String type, String messageId, int direct, int cause, float damage, float fall,
             String location, long tick) {}
 
+    private Object call(String operation, Object... arguments) {
+        if (player instanceof org.bukkit.entity.Player human) {
+            return PlayerCalls.call(human.getUniqueId(), operation, arguments);
+        }
+        return ((org.basaltmc.bukkit.entity.ops.EntityOps) player).core().call(operation, arguments);
+    }
+
     private int now() {
         return (int) player.getWorld().getGameTime();
     }
 
     private List<Row> rows() {
-        Object flat = PlayerCalls.call(player.getUniqueId(), "combat");
+        Object flat = call("combat");
         List<Row> out = new ArrayList<>();
         if (flat instanceof String[] values) {
             for (int at = 0; at + kStride <= values.length; at += kStride) {
@@ -108,7 +121,7 @@ public final class BasaltCombatTracker implements CombatTracker {
         if (!player.isValid() || now() - last > reset) {
             inCombat = false;
             combatEnd = now();
-            PlayerCalls.call(player.getUniqueId(), "combat_clear");
+            call("combat_clear");
             return;
         }
         if (!inCombat) {
@@ -140,7 +153,7 @@ public final class BasaltCombatTracker implements CombatTracker {
 
     @Override
     public void setCombatEntries(List<CombatEntry> entries) {
-        PlayerCalls.call(player.getUniqueId(), "combat_clear");
+        call("combat_clear");
         for (CombatEntry entry : entries) {
             addCombatEntry(entry);
         }
@@ -152,7 +165,7 @@ public final class BasaltCombatTracker implements CombatTracker {
         String type = source.getDamageType().getKey().toString();
         String message = source.getDamageType().getTranslationKey();
         FallLocationType location = entry.getFallLocationType();
-        PlayerCalls.call(player.getUniqueId(), "combat_push", type,
+        call("combat_push", type,
             message.startsWith("death.attack.") ? message.substring("death.attack.".length()) : message,
             (long) (source.getDirectEntity() == null ? -1 : source.getDirectEntity().getEntityId()),
             (long) (source.getCausingEntity() == null ? -1 : source.getCausingEntity().getEntityId()),
@@ -219,7 +232,7 @@ public final class BasaltCombatTracker implements CombatTracker {
     public void resetCombatState() {
         inCombat = false;
         combatEnd = now();
-        PlayerCalls.call(player.getUniqueId(), "combat_clear");
+        call("combat_clear");
     }
 
     @Override

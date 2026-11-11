@@ -90,6 +90,10 @@ public final class WorldNatives {
     public static native boolean loadChunk(String world, int chunkX, int chunkZ, boolean generate);
     public static native boolean unloadChunk(String world, int chunkX, int chunkZ);
     public static native int[] loadedChunks(String world);
+    public static native byte[] storedChunk(String world, int chunkX, int chunkZ);
+    public static native boolean hasStoredChunk(String world, int chunkX, int chunkZ);
+    public static native boolean storeChunk(String world, int chunkX, int chunkZ, byte[] nbt);
+    public static native int[] storedChunks(String world, int regionX, int regionZ);
 
     public static native int[] entityIds(String world, int chunkX, int chunkZ, boolean all);
     public static native String[] entityStrings(String world, int id);

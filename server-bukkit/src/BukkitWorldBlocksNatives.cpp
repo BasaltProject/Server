@@ -160,6 +160,35 @@ jintArray JNICALL nativeLoadedChunks(JNIEnv* env, jclass, jstring name) {
     const auto world = worldOf(env, name);
     return intArray(env, world == nullptr ? std::vector<std::int32_t>{} : world->loadedChunks());
 }
+
+jbyteArray JNICALL nativeStoredChunk(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return nullptr;
+    }
+    return byteArray(env, guarded<std::optional<std::vector<std::uint8_t>>>(
+                              std::nullopt, [&] { return world->storedChunkNbt(chunkX, chunkZ); }));
+}
+
+jboolean JNICALL nativeHasStoredChunk(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
+    const auto world = worldOf(env, name);
+    return world != nullptr && guarded<bool>(false, [&] { return world->hasStoredChunk(chunkX, chunkZ); }) ? JNI_TRUE
+                                                                                                           : JNI_FALSE;
+}
+
+jboolean JNICALL nativeStoreChunk(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jbyteArray nbt) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr || nbt == nullptr) {
+        return JNI_FALSE;
+    }
+    const std::vector<std::uint8_t> payload = bytes(env, nbt);
+    return guarded<bool>(false, [&] { return world->storeChunkNbt(chunkX, chunkZ, payload); }) ? JNI_TRUE : JNI_FALSE;
+}
+
+jintArray JNICALL nativeStoredChunks(JNIEnv* env, jclass, jstring name, jint regionX, jint regionZ) {
+    const auto world = worldOf(env, name);
+    return intArray(env, world == nullptr ? std::vector<std::int32_t>{} : world->storedChunksIn(regionX, regionZ));
+}
 } // namespace
 
 void registerWorldNativesBlocks(JNIEnv* env, jclass natives) {
@@ -180,6 +209,10 @@ void registerWorldNativesBlocks(JNIEnv* env, jclass natives) {
         nativeMethod("loadChunk", "(Ljava/lang/String;IIZ)Z", reinterpret_cast<void*>(&nativeLoadChunk)),
         nativeMethod("unloadChunk", "(Ljava/lang/String;II)Z", reinterpret_cast<void*>(&nativeUnloadChunk)),
         nativeMethod("loadedChunks", "(Ljava/lang/String;)[I", reinterpret_cast<void*>(&nativeLoadedChunks)),
+        nativeMethod("storedChunk", "(Ljava/lang/String;II)[B", reinterpret_cast<void*>(&nativeStoredChunk)),
+        nativeMethod("hasStoredChunk", "(Ljava/lang/String;II)Z", reinterpret_cast<void*>(&nativeHasStoredChunk)),
+        nativeMethod("storeChunk", "(Ljava/lang/String;II[B)Z", reinterpret_cast<void*>(&nativeStoreChunk)),
+        nativeMethod("storedChunks", "(Ljava/lang/String;II)[I", reinterpret_cast<void*>(&nativeStoredChunks)),
     };
     registerMethods(env, natives, methods.data(), static_cast<jint>(methods.size()));
 }

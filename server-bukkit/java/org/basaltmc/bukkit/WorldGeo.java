@@ -394,7 +394,14 @@ public abstract class WorldGeo extends WorldExtras {
             case CHERRY -> "cherry";
             case PALE_OAK -> "pale_oak";
             case PALE_OAK_CREAKING -> "pale_oak_creaking";
-            default -> throw Unsupported.hit("World#generateTree " + type);
+            case RED_MUSHROOM -> "red_mushroom";
+            case BROWN_MUSHROOM -> "brown_mushroom";
+            case CHORUS_PLANT -> "chorus_plant";
+            case CRIMSON_FUNGUS -> "crimson_fungus";
+            case WARPED_FUNGUS -> "warped_fungus";
+            case RED_POPLAR -> "red_poplar";
+            case ORANGE_POPLAR -> "orange_poplar";
+            case YELLOW_POPLAR -> "yellow_poplar";
         };
     }
 

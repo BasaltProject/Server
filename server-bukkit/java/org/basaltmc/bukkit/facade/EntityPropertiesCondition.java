@@ -16,9 +16,7 @@ public record EntityPropertiesCondition(EntityPredicate predicate) implements Lo
     @Override
     public boolean test(LootContext context) {
         net.minecraft.world.entity.Entity entity = context.getOptional(LootContextParams.THIS_ENTITY);
-        if (!(entity instanceof net.minecraft.server.level.ServerPlayer player)) {
-            return false;
-        }
-        return predicate.matches(player, entity);
+        net.minecraft.world.phys.Vec3 origin = context.getOptional(LootContextParams.ORIGIN);
+        return entity != null && predicate.matches(context.getLevel(), origin == null ? entity.position() : origin, entity);
     }
 }

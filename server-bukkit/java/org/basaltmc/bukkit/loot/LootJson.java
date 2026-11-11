@@ -81,4 +81,27 @@ public final class LootJson {
             context == null ? 0L : context.getRandom().nextLong());
         return Double.isNaN(value) ? 0.0 : value;
     }
+
+    public static void holderSet(StringBuilder out, net.minecraft.core.HolderSet<?> set) {
+        if (set.unwrapKey().isPresent()) {
+            string(out, "#" + set.unwrapKey().get().location());
+            return;
+        }
+        out.append('[');
+        boolean first = true;
+        for (Holder<?> each : set) {
+            if (!first) {
+                out.append(',');
+            }
+            first = false;
+            string(out, each.getRegisteredName());
+        }
+        out.append(']');
+    }
+
+    public static void itemFilter(StringBuilder out, net.minecraft.advancements.predicates.ItemPredicate predicate) {
+        var encoded = net.minecraft.advancements.predicates.ItemPredicate.CODEC
+            .encodeStart(com.mojang.serialization.JsonOps.INSTANCE, predicate);
+        out.append(encoded.getOrThrow(message -> new IllegalStateException("Cannot write item filter: " + message)));
+    }
 }

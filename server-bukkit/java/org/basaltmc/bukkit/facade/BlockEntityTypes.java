@@ -131,6 +131,22 @@ public final class BlockEntityTypes {
                 return new net.minecraft.world.level.block.entity.DecoratedPotBlockEntity(level, pos, tag);
             case "ender_chest":
                 return new net.minecraft.world.level.block.entity.EnderChestBlockEntity(level, pos, tag);
+            case "chiseled_bookshelf":
+                return new net.minecraft.world.level.block.entity.ChiseledBookShelfBlockEntity(level, pos, tag);
+            case "shelf":
+                return new net.minecraft.world.level.block.entity.ShelfBlockEntity(level, pos, tag);
+            case "end_gateway":
+                return new net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity(level, pos, tag);
+            case "test_block":
+                return new net.minecraft.world.level.block.entity.TestBlockEntity(level, pos, tag);
+            case "test_instance_block":
+                return new net.minecraft.world.level.block.entity.TestInstanceBlockEntity(level, pos, tag);
+            case "potent_sulfur":
+                return new net.minecraft.world.level.block.entity.PotentSulfurBlockEntity(level, pos, tag);
+            case "calibrated_sculk_sensor":
+                return new net.minecraft.world.level.block.entity.CalibratedSculkSensorBlockEntity(level, pos, tag);
+            case "piston":
+                return new net.minecraft.world.level.block.piston.PistonMovingBlockEntity(level, pos, tag);
             default:
                 return new BlockEntity(level, pos, tag);
         }
