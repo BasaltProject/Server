@@ -515,7 +515,7 @@ void ClientSession::enterPlay() {
         logger_.info([&session] { return "Loaded " + session->name() + " from players.db."; });
     }
     // parity: `ServerPlayer.calculateGameModeForNewPlayer`, which a dedicated server applies to operators too.
-    if (options_.tuning.forceGamemode) {
+    if (options_.tuning.live->forceGamemode.load(std::memory_order_relaxed)) {
         session->gamemode = options_.defaultGamemode;
         session->flying = session->gamemode == play::Gamemode::Spectator;
     }

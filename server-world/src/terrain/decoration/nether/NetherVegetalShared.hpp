@@ -82,7 +82,7 @@ void placeWeepingColumn(Chunk& chunk, random::RandomSource& random, std::int32_t
 
 void placeHugeFungi(Chunk& chunk, random::RandomSource& random, const NetherBiomeLookup& biomeSource,
                     const HugeFungus& config);
-void placeHugeFungus(Chunk& chunk, random::RandomSource& random, const Pos& origin, const HugeFungus& config);
+bool placeHugeFungus(Chunk& chunk, random::RandomSource& random, const Pos& origin, const HugeFungus& config);
 
 } // namespace shared
 

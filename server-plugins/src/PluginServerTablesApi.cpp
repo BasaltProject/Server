@@ -402,6 +402,36 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
         return 1;
     });
     lua.setField("number");
+    wire::lua::pushHostFunction(lua, "loot.apply", [server](LuaArgs& args) {
+        if (!args.isTable(1)) {
+            args.raise("loot.apply({ functions = ..., item = ..., world = ... }) takes a table");
+        }
+        PluginLootItem given;
+        given.item = stringField(args, 1, "item").value_or(std::string{});
+        given.count = static_cast<std::int32_t>(numberField(args, 1, "count").value_or(1.0));
+        given.components = stringField(args, 1, "components").value_or(std::string{});
+        PluginLootApply how;
+        how.world = stringField(args, 1, "world").value_or(std::string{});
+        how.x = numberField(args, 1, "x").value_or(0.0);
+        how.y = numberField(args, 1, "y").value_or(0.0);
+        how.z = numberField(args, 1, "z").value_or(0.0);
+        how.seed = static_cast<std::int64_t>(numberField(args, 1, "seed").value_or(0.0));
+        const std::optional<PluginLootItem> made =
+            server->services().loot().apply(stringField(args, 1, "functions").value_or(std::string{}), given, how);
+        if (!made.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        args.pushString(made->item);
+        args.setField("item");
+        args.pushInteger(made->count);
+        args.setField("count");
+        args.pushString(made->components);
+        args.setField("components");
+        return 1;
+    });
+    lua.setField("apply");
     wire::lua::pushHostFunction(lua, "loot.enchant", [server](LuaArgs& args) {
         if (!args.isTable(1)) {
             args.raise("loot.enchant({ item = ..., levels = ..., world = ... }) takes a table");
@@ -723,6 +753,15 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
         return 1;
     });
     lua.setField("density");
+    wire::lua::pushHostFunction(lua, "worldgen.density_tree", [server](LuaArgs& args) {
+        const std::optional<double> value = server->services().worldgen().densityTree(
+            args.checkString(1), args.checkInteger(2), args.checkString(3),
+            static_cast<std::int32_t>(args.checkInteger(4)), static_cast<std::int32_t>(args.checkInteger(5)),
+            static_cast<std::int32_t>(args.checkInteger(6)));
+        value.has_value() ? args.pushNumber(*value) : args.pushNil();
+        return 1;
+    });
+    lua.setField("density_tree");
     wire::lua::pushHostFunction(lua, "worldgen.noise", [server](LuaArgs& args) {
         const std::optional<double> value =
             server->services().worldgen().noise(args.checkString(1), args.checkInteger(2), args.checkString(3),
@@ -801,18 +840,91 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
     lua.pushTable();
     wire::lua::pushHostFunction(lua, "datafix.upgrade", [](LuaArgs& args) {
         const std::optional<std::vector<std::uint8_t>> bytes = snbtBytes(args, 2);
-        const std::string type = args.checkString(1);
+        if (!bytes.has_value()) {
+            args.pushNil();
+            args.pushString("the data is not a compound");
+            return 2;
+        }
         const auto from = static_cast<std::int32_t>(args.checkInteger(3));
         const auto to = static_cast<std::int32_t>(args.integerOr(4, metamorph::datafix::kCurrentVersion));
-        pushSnbt(args, bytes.has_value() ? datafix::upgrade(type, *bytes, from, to) : std::nullopt);
-        return 1;
+        const datafix::Outcome outcome = datafix::upgrade(args.checkString(1), *bytes, from, to);
+        pushSnbt(args, outcome.nbt);
+        if (outcome.nbt.has_value()) {
+            return 1;
+        }
+        args.pushString(outcome.error);
+        return 2;
     });
     lua.setField("upgrade");
+    wire::lua::pushHostFunction(lua, "datafix.step", [](LuaArgs& args) {
+        const std::optional<std::vector<std::uint8_t>> bytes = snbtBytes(args, 3);
+        if (!bytes.has_value()) {
+            args.pushNil();
+            args.pushString("the data is not a compound");
+            return 2;
+        }
+        const datafix::Outcome outcome = datafix::applyStep(args.checkString(1), args.checkString(2),
+                                                            static_cast<std::int32_t>(args.checkInteger(4)), *bytes);
+        pushSnbt(args, outcome.nbt);
+        if (outcome.nbt.has_value()) {
+            return 1;
+        }
+        args.pushString(outcome.error);
+        return 2;
+    });
+    lua.setField("step");
+    wire::lua::pushHostFunction(lua, "datafix.missing", [](LuaArgs& args) {
+        const auto from = static_cast<std::int32_t>(args.checkInteger(2));
+        const auto to = static_cast<std::int32_t>(args.integerOr(3, metamorph::datafix::kCurrentVersion));
+        const std::string gap = datafix::missing(args.checkString(1), from, to);
+        if (gap.empty()) {
+            args.pushNil();
+        } else {
+            args.pushString(gap);
+        }
+        return 1;
+    });
+    lua.setField("missing");
+    wire::lua::pushHostFunction(lua, "datafix.steps", [](LuaArgs& args) {
+        const std::vector<datafix::Step> steps = datafix::steps(args.checkString(1));
+        args.pushTable();
+        for (std::size_t index = 0; index < steps.size(); ++index) {
+            args.pushTable();
+            args.pushInteger(steps[index].version);
+            args.setField("version");
+            args.pushInteger(steps[index].subVersion);
+            args.setField("sub_version");
+            args.pushString(steps[index].name);
+            args.setField("name");
+            args.setIndex(static_cast<std::int64_t>(index) + 1);
+        }
+        return 1;
+    });
+    lua.setField("steps");
+    wire::lua::pushHostFunction(lua, "datafix.types", [](LuaArgs& args) {
+        pushNames(args, datafix::types());
+        return 1;
+    });
+    lua.setField("types");
     wire::lua::pushHostFunction(lua, "datafix.supports", [](LuaArgs& args) {
         args.pushBoolean(datafix::supports(args.checkString(1)));
         return 1;
     });
     lua.setField("supports");
+    wire::lua::pushHostFunction(lua, "datafix.legacy_state", [](LuaArgs& args) {
+        const metamorph::datafix::LegacyBlockState state =
+            datafix::legacyState(static_cast<std::int32_t>(args.checkInteger(1)));
+        args.pushString(state.name);
+        args.pushTable();
+        for (const auto& [key, value] : state.properties) {
+            args.pushString(value);
+            args.setField(key);
+        }
+        return 2;
+    });
+    lua.setField("legacy_state");
+    lua.pushInteger(metamorph::datafix::kCurrentVersion);
+    lua.setField("current_version");
     lua.setGlobal("datafix");
 }
 } // namespace basalt::server::plugins::pluginApi::misc

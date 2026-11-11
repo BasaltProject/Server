@@ -1,161 +1,37 @@
-#include "Transport.hpp"
+#include "RemoteServiceImpl.hpp"
 
-#include <basalt/server/remote/AttemptTracker.hpp>
-#include <basalt/server/remote/Http.hpp>
+#include <basalt/server/remote/ManagementRpc.hpp>
 #include <basalt/server/remote/RconCodec.hpp>
-#include <basalt/server/remote/RemoteService.hpp>
 #include <basalt/server/remote/WebSocketCodec.hpp>
-#include <basalt/wire/common/json/Json.hpp>
-#include <basalt/wire/io/EventLoop.hpp>
-#include <basalt/wire/io/TcpSocket.hpp>
 
-#include <atomic>
-#include <deque>
-#include <map>
-#include <mutex>
-#include <thread>
 #include <unordered_map>
 
 namespace basalt::server::remote {
 namespace {
 
-using Clock = std::chrono::steady_clock;
+using detail::Clock;
+using detail::kApiToken;
+using detail::Kind;
+using detail::kManagementToken;
+using detail::kMaxCommandChars;
+using detail::kMaxOutBytes;
+using detail::kMaxQueuedLogLines;
+using detail::kMaxRconConnections;
+using detail::kMaxWsMessage;
+using detail::kRconIdleSeconds;
+using detail::kRconToken;
+using remoteJson::constantTimeEquals;
+using remoteJson::errorJson;
+using remoteJson::jsonText;
+using remoteJson::resultJson;
 using wire::common::JsonObject;
 using wire::common::JsonValue;
 
-constexpr std::uint64_t kRconToken = 1;
-constexpr std::uint64_t kApiToken = 2;
-constexpr std::uint64_t kFirstConnection = 16;
-constexpr std::size_t kMaxRconConnections = 16;
-constexpr std::int32_t kRconIdleSeconds = 30;
-constexpr std::size_t kMaxQueuedLogLines = 4096;
-constexpr std::size_t kMaxWsMessage = 65536;
-constexpr std::size_t kMaxOutBytes = 4 * 1024 * 1024;
-constexpr std::size_t kMaxCommandChars = 32767;
-
-enum class Kind : std::uint8_t { Rcon, Http, WebSocket };
-
-struct Connection {
-    std::uint64_t id = 0;
-    Kind kind = Kind::Http;
-    std::unique_ptr<Transport> transport;
-    std::string peer;
-    std::string in;
-    std::string out;
-    std::string fragments;
-    bool authed = false;
-    bool busy = false;
-    bool closeAfterFlush = false;
-    bool writeInterest = false;
-    Clock::time_point lastReceived;
-    Clock::time_point lastPing;
-};
-
-struct Completion {
-    std::uint64_t connection = 0;
-    std::string bytes;
-    bool endBusy = false;
-    bool close = false;
-};
-
-[[nodiscard]] bool constantTimeEquals(std::string_view a, std::string_view b) {
-    unsigned char diff = a.size() == b.size() ? 0 : 1;
-    const std::size_t length = std::max(a.size(), b.size());
-    for (std::size_t i = 0; i < length; ++i) {
-        const auto left = static_cast<unsigned char>(i < a.size() ? a[i] : 0);
-        const auto right = static_cast<unsigned char>(i < b.size() ? b[i] : 0);
-        diff = static_cast<unsigned char>(diff | (left ^ right));
-    }
-    return diff == 0;
-}
-
-[[nodiscard]] std::string jsonText(const JsonObject& object) {
-    return wire::common::writeJson(JsonValue::ofObject(object));
-}
-
-[[nodiscard]] std::string errorJson(std::string_view message) {
-    JsonObject object;
-    object.set("error", JsonValue::of(std::string{message}));
-    return jsonText(object);
-}
-
-[[nodiscard]] std::string resultJson(const CommandResult& result, const JsonValue* id) {
-    JsonObject object;
-    if (id != nullptr) {
-        object.set("type", JsonValue::of(std::string{"result"}));
-        object.set("id", *id);
-    }
-    object.set("cancelled", JsonValue::of(result.cancelled));
-    object.set("output", JsonValue::of(result.output));
-    return jsonText(object);
-}
-
 } // namespace
 
-struct RemoteService::Impl : std::enable_shared_from_this<Impl> {
-    RemoteSettings settings;
-    RemoteHost& host;
-    wire::common::Logger logger;
-    wire::io::EventLoop loop;
-    std::optional<wire::io::TcpListener> rconListener;
-    std::optional<wire::io::TcpListener> apiListener;
-    std::unique_ptr<TlsContext> tls;
-    AttemptTracker rconTracker;
-    AttemptTracker apiTracker;
-    std::map<std::uint64_t, Connection> connections;
-    std::uint64_t nextId = kFirstConnection;
-    std::jthread thread;
-    std::atomic<bool> running{false};
-    std::atomic<std::int32_t> subscribers{0};
-    std::mutex mailbox;
-    std::deque<Completion> completions;
-    std::deque<std::string> logLines;
-    Clock::time_point lastSweep = Clock::now();
-
-    Impl(RemoteSettings s, RemoteHost& h, wire::common::Logger l)
-        : settings(std::move(s)), host(h), logger(std::move(l)),
-          rconTracker(settings.rcon.maxFailures, settings.rcon.lockoutSeconds),
-          apiTracker(settings.api.maxFailures, settings.api.lockoutSeconds) {}
-
-    void post(Completion completion) {
-        {
-            const std::lock_guard lock{mailbox};
-            completions.push_back(std::move(completion));
-        }
-        static_cast<void>(loop.wake());
-    }
-
-    [[nodiscard]] std::size_t countOf(Kind a, Kind b, const std::string* peer = nullptr) const {
-        std::size_t count = 0;
-        for (const auto& [id, connection] : connections) {
-            count += (connection.kind == a || connection.kind == b) && (peer == nullptr || connection.peer == *peer);
-        }
-        return count;
-    }
-
-    void dispatch(std::uint64_t id, bool endBusy, std::string failure, std::function<std::string(RemoteHost&)> work);
-    void run(std::stop_token stop);
-    void accept(wire::io::TcpListener& listener, bool api);
-    void close(std::uint64_t id);
-    void refreshInterest(Connection& connection);
-    void flush(Connection& connection);
-    void service(Connection& connection, bool readable, bool writable);
-    void drainMailbox();
-    void sweep();
-    void process(Connection& connection);
-    void processRcon(Connection& connection);
-    void processHttp(Connection& connection);
-    void processWebSocket(Connection& connection);
-    void handleRequest(Connection& connection, http::Request& request);
-    void upgrade(Connection& connection, const http::Request& request);
-    void handleWsMessage(Connection& connection, const std::string& text);
-    void reply(Connection& connection, int status, std::string_view body, std::string_view extra = {});
-    void runCommand(Connection& connection, Origin origin, std::string command,
-                    std::function<std::string(CommandResult)> render);
-    [[nodiscard]] bool authorised(const http::Request& request, std::string& chosenProtocol) const;
-};
-
-void RemoteService::Impl::accept(wire::io::TcpListener& listener, bool api) {
+void RemoteService::Impl::accept(wire::io::TcpListener& listener, const std::uint64_t token) {
+    const bool managed = token == kManagementToken;
+    const bool api = token != kRconToken;
     while (true) {
         std::expected<wire::io::TcpConnection, wire::io::SocketError> accepted = listener.accept();
         if (!accepted.has_value()) {
@@ -163,23 +39,28 @@ void RemoteService::Impl::accept(wire::io::TcpListener& listener, bool api) {
         }
         static_cast<void>(accepted->setNonBlocking());
         const std::string peer = accepted->remoteAddress();
-        AttemptTracker& tracker = api ? apiTracker : rconTracker;
-        const std::size_t limit = api ? static_cast<std::size_t>(settings.api.maxConnections) : kMaxRconConnections;
-        const std::size_t open = api ? countOf(Kind::Http, Kind::WebSocket) : countOf(Kind::Rcon, Kind::Rcon);
-        const std::size_t perAddress = static_cast<std::size_t>(api ? settings.api.maxConnectionsPerAddress
-                                                                    : settings.rcon.maxConnectionsPerAddress);
+        const std::size_t limit = managed ? static_cast<std::size_t>(settings.management.maxConnections)
+                                  : api   ? static_cast<std::size_t>(settings.api.maxConnections)
+                                          : kMaxRconConnections;
+        const std::size_t perAddress = static_cast<std::size_t>(managed ? settings.management.maxConnectionsPerAddress
+                                                                : api   ? settings.api.maxConnectionsPerAddress
+                                                                        : settings.rcon.maxConnectionsPerAddress);
+        const std::size_t open =
+            api ? countOf(Kind::Http, Kind::WebSocket, nullptr, managed) : countOf(Kind::Rcon, Kind::Rcon);
         const std::size_t sameAddress =
-            api ? countOf(Kind::Http, Kind::WebSocket, &peer) : countOf(Kind::Rcon, Kind::Rcon, &peer);
-        if (open >= limit || sameAddress >= perAddress || (!api && tracker.lockedFor(peer, Clock::now()) > 0)) {
+            api ? countOf(Kind::Http, Kind::WebSocket, &peer, managed) : countOf(Kind::Rcon, Kind::Rcon, &peer);
+        if (open >= limit || sameAddress >= perAddress || (!api && rconTracker.lockedFor(peer, Clock::now()) > 0)) {
             continue;
         }
         Connection connection;
         connection.id = nextId++;
         connection.kind = api ? Kind::Http : Kind::Rcon;
+        connection.management = managed;
         connection.peer = peer;
         connection.lastReceived = Clock::now();
         connection.lastPing = connection.lastReceived;
-        connection.transport = std::make_unique<Transport>(std::move(*accepted), api ? tls.get() : nullptr);
+        TlsContext* context = managed ? managementTls.get() : api ? tls.get() : nullptr;
+        connection.transport = std::make_unique<Transport>(std::move(*accepted), context);
         const std::int64_t handle = connection.transport->socket().nativeHandle();
         if (handle < 0 || !loop.watch(handle, {true, false}, connection.id).has_value()) {
             continue;
@@ -195,8 +76,11 @@ void RemoteService::Impl::close(std::uint64_t id) {
     if (found == connections.end()) {
         return;
     }
-    if (found->second.kind == Kind::WebSocket) {
+    if (found->second.kind == Kind::WebSocket && !found->second.management) {
         subscribers.fetch_sub(1);
+    }
+    if (found->second.notified) {
+        notified.fetch_sub(1);
     }
     loop.unwatch(found->second.transport->socket().nativeHandle());
     connections.erase(found);
@@ -278,8 +162,8 @@ void RemoteService::Impl::dispatch(std::uint64_t id, bool endBusy, std::string f
                                    std::function<std::string(RemoteHost&)> work) {
     struct Pending {
         std::weak_ptr<Impl> service;
-        std::uint64_t id;
-        bool endBusy;
+        std::uint64_t id = 0;
+        bool endBusy = false;
         std::string failure;
         bool ran = false;
 
@@ -292,7 +176,11 @@ void RemoteService::Impl::dispatch(std::uint64_t id, bool endBusy, std::string f
         }
     };
 
-    auto pending = std::make_shared<Pending>(Pending{weak_from_this(), id, endBusy, std::move(failure)});
+    auto pending = std::make_shared<Pending>();
+    pending->service = weak_from_this();
+    pending->id = id;
+    pending->endBusy = endBusy;
+    pending->failure = std::move(failure);
     host.runOnServerThread([pending, work = std::move(work)] {
         pending->ran = true;
         if (const std::shared_ptr<Impl> alive = pending->service.lock()) {
@@ -355,7 +243,8 @@ void RemoteService::Impl::upgrade(Connection& connection, const http::Request& r
         return;
     }
     std::string protocol;
-    static_cast<void>(authorised(request, protocol));
+    static_cast<void>(connection.management ? managementCheck(request, protocol).empty()
+                                            : authorised(request, protocol));
     std::string head = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n";
     head += "Sec-WebSocket-Accept: " + websocket::acceptKey(*key) + "\r\n";
     if (!protocol.empty()) {
@@ -364,10 +253,18 @@ void RemoteService::Impl::upgrade(Connection& connection, const http::Request& r
     connection.out += head + "\r\n";
     connection.kind = Kind::WebSocket;
     connection.lastPing = Clock::now();
-    subscribers.fetch_add(1);
+    if (connection.management) {
+        markNotified(connection);
+    } else {
+        subscribers.fetch_add(1);
+    }
 }
 
 void RemoteService::Impl::handleRequest(Connection& connection, http::Request& request) {
+    if (connection.management) {
+        handleManagementRequest(connection, request);
+        return;
+    }
     const Clock::time_point now = Clock::now();
     if (const std::int32_t locked = apiTracker.lockedFor(connection.peer, now); locked > 0) {
         connection.closeAfterFlush = true;
@@ -472,8 +369,16 @@ void RemoteService::Impl::handleWsMessage(Connection& connection, const std::str
     JsonValue id;
     std::string command = text;
     bool hasId = false;
-    if (!text.empty() && text.front() == '{') {
+    if (connection.management || (!text.empty() && (text.front() == '{' || text.front() == '['))) {
         const auto parsed = wire::common::parseJson(text);
+        if (connection.management && !parsed.has_value()) {
+            websocket::encode(connection.out, websocket::opcode::kText, managementRpc::parseErrorFrame("Invalid JSON"));
+            return;
+        }
+        if (connection.management || (parsed.has_value() && managementRpc::isRpc(*parsed))) {
+            handleRpc(connection, *parsed);
+            return;
+        }
         const JsonObject* object = parsed.has_value() ? parsed->get<JsonObject>() : nullptr;
         const JsonValue* written = object == nullptr ? nullptr : object->find("command");
         const std::string* value = written == nullptr ? nullptr : written->get<std::string>();
@@ -598,10 +503,12 @@ void RemoteService::Impl::service(Connection& connection, bool readable, bool wr
 void RemoteService::Impl::drainMailbox() {
     std::deque<Completion> done;
     std::deque<std::string> lines;
+    std::deque<std::string> frames;
     {
         const std::lock_guard lock{mailbox};
         done.swap(completions);
         lines.swap(logLines);
+        frames.swap(notifications);
     }
     for (Completion& completion : done) {
         const auto found = connections.find(completion.connection);
@@ -616,12 +523,13 @@ void RemoteService::Impl::drainMailbox() {
         }
         service(connection, false, true);
     }
+    deliverNotifications(frames);
     if (subscribers.load() == 0) {
         return;
     }
     std::vector<std::uint64_t> targets;
     for (const auto& [id, connection] : connections) {
-        if (connection.kind == Kind::WebSocket) {
+        if (connection.kind == Kind::WebSocket && !connection.management) {
             targets.push_back(id);
         }
     }
@@ -651,6 +559,7 @@ void RemoteService::Impl::sweep() {
     for (auto& [id, connection] : connections) {
         const std::int32_t idle = connection.kind == Kind::Rcon && !connection.authed ? kRconIdleSeconds
                                   : connection.kind == Kind::Rcon                     ? settings.api.idleSeconds * 10
+                                  : connection.management                             ? settings.management.idleSeconds
                                                                                       : settings.api.idleSeconds;
         const auto quiet = std::chrono::duration_cast<std::chrono::seconds>(now - connection.lastReceived).count();
         if (quiet > idle && !connection.busy) {
@@ -689,9 +598,11 @@ void RemoteService::Impl::run(std::stop_token stop) {
             const std::vector<wire::io::IoReady> events{ready->begin(), ready->end()};
             for (const wire::io::IoReady& event : events) {
                 if (event.token == kRconToken && rconListener.has_value()) {
-                    accept(*rconListener, false);
+                    accept(*rconListener, kRconToken);
                 } else if (event.token == kApiToken && apiListener.has_value()) {
-                    accept(*apiListener, true);
+                    accept(*apiListener, kApiToken);
+                } else if (event.token == kManagementToken && managementListener.has_value()) {
+                    accept(*managementListener, kManagementToken);
                 } else if (const auto found = connections.find(event.token); found != connections.end()) {
                     if (event.closed && !event.readable) {
                         close(found->first);
@@ -704,6 +615,7 @@ void RemoteService::Impl::run(std::stop_token stop) {
         drainMailbox();
         if (!connections.empty()) {
             sweep();
+            beat();
         }
     }
     connections.clear();
@@ -752,7 +664,21 @@ std::expected<void, std::string> RemoteService::start() {
             return std::unexpected("API: " + bound.error());
         }
     }
-    if (!impl.rconListener.has_value() && !impl.apiListener.has_value()) {
+    if (impl.settings.management.enabled) {
+        if (impl.settings.management.tls) {
+            auto context = TlsContext::create(impl.settings.management.certPath, impl.settings.management.keyPath);
+            if (!context.has_value()) {
+                return std::unexpected("management: " + context.error());
+            }
+            impl.managementTls = std::move(*context);
+        }
+        if (auto bound = bind(impl.settings.management.bind, impl.settings.management.port, kManagementToken,
+                              impl.managementListener);
+            !bound.has_value()) {
+            return std::unexpected("management: " + bound.error());
+        }
+    }
+    if (!impl.rconListener.has_value() && !impl.apiListener.has_value() && !impl.managementListener.has_value()) {
         return {};
     }
     impl.running = true;
@@ -770,6 +696,7 @@ void RemoteService::stop() {
     impl.thread.join();
     impl.rconListener.reset();
     impl.apiListener.reset();
+    impl.managementListener.reset();
 }
 
 void RemoteService::publishLog(std::string_view line) {

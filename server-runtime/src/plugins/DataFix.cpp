@@ -48,18 +48,24 @@ std::optional<NbtCompound> fixDocument(std::string_view kind, NbtCompound docume
         return document;
     }
     if (kind == "chunk") {
-        datafix::upgrade(datafix::Domain::Chunk, document, fromVersion);
+        if (!datafix::upgrade(datafix::Domain::Chunk, document, fromVersion).empty()) {
+            return std::nullopt;
+        }
         return document;
     }
     NbtCompound root;
     if (kind == "entity") {
         root.set("Entities", listOf(std::move(document)));
-        datafix::upgrade(datafix::Domain::Entities, root, fromVersion);
+        if (!datafix::upgrade(datafix::Domain::Entities, root, fromVersion).empty()) {
+            return std::nullopt;
+        }
         return firstOf(root, "Entities");
     }
     if (kind == "item") {
         root.set("Items", listOf(std::move(document)));
-        datafix::upgrade(datafix::Domain::Entities, root, fromVersion);
+        if (!datafix::upgrade(datafix::Domain::Entities, root, fromVersion).empty()) {
+            return std::nullopt;
+        }
         return firstOf(root, "Items");
     }
     if (kind == "block_entity") {
@@ -70,7 +76,9 @@ std::optional<NbtCompound> fixDocument(std::string_view kind, NbtCompound docume
             level.set("TileEntities", listOf(std::move(document)));
             root.set("Level", NbtTag::ofCompound(std::move(level)));
         }
-        datafix::upgrade(datafix::Domain::Chunk, root, fromVersion);
+        if (!datafix::upgrade(datafix::Domain::Chunk, root, fromVersion).empty()) {
+            return std::nullopt;
+        }
         if (std::optional<NbtCompound> found = firstOf(root, "block_entities"); found.has_value()) {
             return found;
         }
@@ -131,7 +139,9 @@ namespace {
     section.set("block_states", NbtTag::ofCompound(std::move(states)));
     NbtCompound root;
     root.set("sections", listOf(std::move(section)));
-    datafix::upgrade(datafix::Domain::Chunk, root, fromVersion);
+    if (!datafix::upgrade(datafix::Domain::Chunk, root, fromVersion).empty()) {
+        return std::nullopt;
+    }
     const std::optional<NbtCompound> fixed = firstOf(root, "sections");
     const NbtCompound* held = fixed.has_value() ? compoundIn(*fixed, "block_states") : nullptr;
     return held == nullptr ? std::nullopt : firstOf(*held, "palette");
@@ -169,7 +179,9 @@ std::optional<std::string> fixName(std::string_view kind, std::string_view text,
         section.set("biomes", NbtTag::ofCompound(std::move(biomes)));
         NbtCompound root;
         root.set("sections", listOf(std::move(section)));
-        datafix::upgrade(datafix::Domain::Chunk, root, fromVersion);
+        if (!datafix::upgrade(datafix::Domain::Chunk, root, fromVersion).empty()) {
+            return std::nullopt;
+        }
         const std::optional<NbtCompound> fixed = firstOf(root, "sections");
         const NbtCompound* held = fixed.has_value() ? compoundIn(*fixed, "biomes") : nullptr;
         const NbtTag* palette = held == nullptr ? nullptr : held->find("palette");

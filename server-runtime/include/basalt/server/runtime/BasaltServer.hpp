@@ -2,6 +2,7 @@
 
 #include <basalt/server/plugins/PluginApi.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
+#include <basalt/server/remote/ManagementNotifier.hpp>
 #include <basalt/server/remote/RemoteHost.hpp>
 #include <basalt/server/remote/RemoteService.hpp>
 #include <basalt/server/runtime/AreaEffectCloudSystem.hpp>
@@ -135,6 +136,7 @@ private:
 
     void startRemote(std::chrono::steady_clock::time_point startedAt);
     void stopRemote();
+    void saveEverything();
 
     void startBukkit();
     void enableBukkit();
@@ -375,6 +377,10 @@ private:
     std::unique_ptr<bedrock::BedrockListener> bedrockListener_;
     std::unique_ptr<server::remote::RemoteHost> remoteHost_;
     std::shared_ptr<server::remote::RemoteService> remote_;
+    std::unique_ptr<server::remote::ManagementBackend> management_;
+    std::shared_ptr<server::remote::ManagementNotifier> managementNotifier_ =
+        std::make_shared<server::remote::ManagementNotifier>();
+    std::atomic<std::int32_t> heartbeatSeconds_{0};
     std::unique_ptr<BlockTests> blockTests_;
     std::atomic<bool> accepting_{true};
     std::atomic<bool> shuttingDown_{false};

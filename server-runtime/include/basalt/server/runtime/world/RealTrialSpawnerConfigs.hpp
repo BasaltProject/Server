@@ -30,6 +30,8 @@ public:
 
     [[nodiscard]] std::size_t size() const noexcept { return entries_.size(); }
 
+    [[nodiscard]] const auto& entries() const noexcept { return entries_; }
+
     [[nodiscard]] const wire::nbt::NbtCompound* definitionOf(const wire::common::Identifier& id) const;
 
 private:

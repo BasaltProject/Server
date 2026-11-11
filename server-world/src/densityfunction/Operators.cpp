@@ -395,9 +395,10 @@ Interval Unary::range() const {
     return input;
 }
 
-Sampler Unary::compile(CompileContext& context) const {
-    Sampler input = input_->compile(context);
-    switch (type_) {
+Sampler Unary::compile(CompileContext& context) const { return unarySampler(type_, input_->compile(context)); }
+
+Sampler unarySampler(UnaryType type, Sampler input) {
+    switch (type) {
     case UnaryType::Abs:
         return mapped(std::move(input), [](float x) { return std::fabs(x); });
     case UnaryType::Square:

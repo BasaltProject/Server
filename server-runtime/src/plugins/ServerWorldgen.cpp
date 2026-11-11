@@ -5,6 +5,7 @@
 #include <basalt/server/world/noise/NormalNoise.hpp>
 #include <basalt/server/world/terrain/NoiseColumnHeights.hpp>
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 
 #include <cmath>
 
@@ -70,6 +71,25 @@ std::optional<double> ServerWorldgen::density(std::string_view settings, std::in
     }
     const server::world::densityfunction::Sampler sampler = found->state->sampler(*chosen);
     return static_cast<double>(server::world::densityfunction::sampleUncached(*sampler, x, y, z));
+}
+
+std::optional<double> ServerWorldgen::densityTree(std::string_view settings, std::int64_t seed, std::string_view json,
+                                                  std::int32_t x, std::int32_t y, std::int32_t z) {
+    const auto found = router(settings, seed);
+    const auto root = wire::common::parseJson(json);
+    if (found == nullptr || !root.has_value()) {
+        return std::nullopt;
+    }
+    try {
+        const auto parsed = found->state->loader().parse(*root);
+        if (!parsed.has_value()) {
+            return std::nullopt;
+        }
+        const server::world::densityfunction::Sampler sampler = found->state->sampler(*parsed);
+        return static_cast<double>(server::world::densityfunction::sampleUncached(*sampler, x, y, z));
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
 }
 
 std::optional<double> ServerWorldgen::noise(std::string_view settings, std::int64_t seed, std::string_view id, double x,

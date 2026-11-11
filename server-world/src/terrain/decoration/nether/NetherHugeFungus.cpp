@@ -1,6 +1,7 @@
 #include "NetherVegetalShared.hpp"
 
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/terrain/decoration/nether/HugeFungusFeature.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -251,21 +252,22 @@ const HugeFungus& warpedFungus() {
     return config;
 }
 
-void placeHugeFungus(Chunk& chunk, random::RandomSource& random, const Pos& origin, const HugeFungus& config) {
+bool placeHugeFungus(Chunk& chunk, random::RandomSource& random, const Pos& origin, const HugeFungus& config) {
     if (blockPathAt(chunk, origin.x, origin.y - 1, origin.z) != config.validBase) {
-        return;
+        return false;
     }
     std::int32_t totalHeight = 4 + random.nextInt(10);
     if (random.nextInt(12) == 0) {
         totalHeight *= 2;
     }
     if (origin.y + totalHeight + 1 >= kNetherGenerationDepth) {
-        return;
+        return false;
     }
     const bool isHuge = random.nextFloat() < kHugeFungusProbability;
     setBlock(chunk, origin.x, origin.y, origin.z, registry::blocks::air().stateId);
     placeStem(chunk, random, origin, totalHeight, isHuge, config);
     placeHat(chunk, random, origin, totalHeight, isHuge, config);
+    return true;
 }
 
 void placeHugeFungi(Chunk& chunk, random::RandomSource& random, const NetherBiomeLookup& biomeSource,
@@ -278,3 +280,13 @@ void placeHugeFungi(Chunk& chunk, random::RandomSource& random, const NetherBiom
 }
 
 } // namespace basalt::server::world::terrain::decoration::nether::shared
+
+namespace basalt::server::world::terrain::decoration::nether {
+
+bool hugeFungusFeature::place(Chunk& chunk, random::RandomSource& random, const std::int32_t x, const std::int32_t y,
+                              const std::int32_t z, const bool warped) {
+    const shared::Pos origin{.x = x, .y = y, .z = z};
+    return shared::placeHugeFungus(chunk, random, origin, warped ? shared::warpedFungus() : shared::crimsonFungus());
+}
+
+} // namespace basalt::server::world::terrain::decoration::nether

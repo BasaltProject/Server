@@ -36,6 +36,15 @@ struct PluginLootEnchant {
     std::int64_t seed = 0;
 };
 
+struct PluginLootApply {
+    std::string world;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    /// Zero applies without a fixed seed.
+    std::int64_t seed = 0;
+};
+
 struct PluginTradeOffer {
     PluginLootItem costA;
     std::optional<PluginLootItem> costB;
@@ -81,6 +90,16 @@ public:
     /// The stack with enchantments rolled as `enchant_with_levels` does; nothing when the world is unknown.
     [[nodiscard]] virtual std::optional<PluginLootItem> enchant(const PluginLootItem& stack,
                                                                 const PluginLootEnchant& how) {
+        static_cast<void>(stack);
+        static_cast<void>(how);
+        return std::nullopt;
+    }
+
+    /// The stack after the loot functions given as JSON (one, or a list); nothing when the JSON or the world is
+    /// unknown.
+    [[nodiscard]] virtual std::optional<PluginLootItem> apply(std::string_view functions, const PluginLootItem& stack,
+                                                              const PluginLootApply& how) {
+        static_cast<void>(functions);
         static_cast<void>(stack);
         static_cast<void>(how);
         return std::nullopt;

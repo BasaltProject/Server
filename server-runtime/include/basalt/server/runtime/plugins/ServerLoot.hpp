@@ -36,6 +36,9 @@ public:
     [[nodiscard]] std::optional<double> number(std::string_view json, bool asFloat, std::int64_t seed) override;
     [[nodiscard]] std::optional<server::plugins::PluginLootItem>
     enchant(const server::plugins::PluginLootItem& stack, const server::plugins::PluginLootEnchant& how) override;
+    [[nodiscard]] std::optional<server::plugins::PluginLootItem>
+    apply(std::string_view functions, const server::plugins::PluginLootItem& stack,
+          const server::plugins::PluginLootApply& how) override;
 
 private:
     [[nodiscard]] std::optional<std::vector<server::plugins::PluginLootItem>>

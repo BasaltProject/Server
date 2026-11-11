@@ -68,7 +68,12 @@ std::optional<NbtCompound> read(const std::string_view worldRoot, const std::str
     NbtCompound data = *held;
     if (imported) {
         const std::int32_t version = root->getInt("DataVersion", 0);
-        metamorph::datafix::upgradeSavedData(name, data, version);
+        if (const std::string refusal = metamorph::datafix::upgradeSavedData(name, data, version); !refusal.empty()) {
+            wire::common::Logger{"world"}.warn([&name, &refusal] {
+                return "The saved " + std::string{name} + " cannot be imported: " + refusal + ".";
+            });
+            return std::nullopt;
+        }
         if (version > metamorph::datafix::kCurrentVersion) {
             wire::common::Logger{"world"}.warn([&name, version] {
                 return "Imported " + std::string{name} + " from data version " + std::to_string(version) +

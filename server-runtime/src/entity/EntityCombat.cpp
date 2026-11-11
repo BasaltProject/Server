@@ -202,6 +202,17 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         entity.shulker->struckBy = blamed.directType.has_value() ? blamed.directType->path() : std::string{};
     }
     entity.health -= static_cast<double>(reduced);
+    if (entity.combatRecords.size() >= ServerEntity::kMaxCombatRecords) {
+        entity.combatRecords.erase(entity.combatRecords.begin());
+    }
+    entity.combatRecords.push_back(ServerEntity::CombatRecord{.damageType = cause.find(':') == std::string_view::npos
+                                                                                ? "minecraft:" + std::string{cause}
+                                                                                : std::string{cause},
+                                                              .messageId = std::string{cause},
+                                                              .directId = blamed.directId.value_or(-1),
+                                                              .causeId = blamed.causingId.value_or(-1),
+                                                              .damage = reduced,
+                                                              .tick = entity.tickCount});
     bool died = entity.health <= 0.0;
     if (died) {
         entity.health = 0.0;

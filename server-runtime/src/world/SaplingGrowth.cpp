@@ -2,6 +2,9 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 #include <basalt/server/runtime/world/SaplingGrowth.hpp>
+#include <basalt/server/world/terrain/decoration/HugeMushroomFeature.hpp>
+#include <basalt/server/world/terrain/decoration/end/EndDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/nether/HugeFungusFeature.hpp>
 #include <basalt/server/world/terrain/decoration/tree/FallenTreeFeature.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeConfigs.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeature.hpp>
@@ -279,6 +282,9 @@ std::optional<std::vector<PlannedBlock>> planTree(WorldState& world, std::int32_
         {"mangrove", &configs::mangrove()},
         {"tall_mangrove", &configs::tallMangrove()},
         {"cherry", &configs::cherry()},
+        {"red_poplar", &configs::redPoplar()},
+        {"orange_poplar", &configs::orangePoplar()},
+        {"yellow_poplar", &configs::yellowPoplar()},
     };
     static const std::map<std::string, const trees::FallenTreeConfiguration*, std::less<>> fallenByName{
         {"fallen_oak", &trees::fallenTreeConfigs::oak()},
@@ -288,6 +294,26 @@ std::optional<std::vector<PlannedBlock>> planTree(WorldState& world, std::int32_
         {"fallen_jungle", &trees::fallenTreeConfigs::jungle()},
         {"fallen_poplar", &trees::fallenTreeConfigs::poplar()},
     };
+    namespace decoration = server::world::terrain::decoration;
+    const auto standalone = [&](const Placer& placer) { return planConfig(world, x, y, z, placer, random, 0); };
+    if (tree == "brown_mushroom" || tree == "red_mushroom") {
+        const auto kind = tree == "red_mushroom" ? decoration::hugeMushroomFeature::Kind::Red
+                                                 : decoration::hugeMushroomFeature::Kind::Brown;
+        return standalone([kind, y](server::world::Chunk& scratch, random::RandomSource& worldgen) {
+            return decoration::hugeMushroomFeature::place(scratch, worldgen, kCentre, y, kCentre, kind);
+        });
+    }
+    if (tree == "crimson_fungus" || tree == "warped_fungus") {
+        const bool warped = tree == "warped_fungus";
+        return standalone([warped, y](server::world::Chunk& scratch, random::RandomSource& worldgen) {
+            return decoration::nether::hugeFungusFeature::place(scratch, worldgen, kCentre, y, kCentre, warped);
+        });
+    }
+    if (tree == "chorus_plant") {
+        return standalone([y](server::world::Chunk& scratch, random::RandomSource& worldgen) {
+            return decoration::end::endVegetalDecoration::placeStandalone(scratch, worldgen, kCentre, y, kCentre);
+        });
+    }
     if (const auto fallen = fallenByName.find(tree); fallen != fallenByName.end()) {
         const trees::FallenTreeConfiguration& config = *fallen->second;
         return planConfig(

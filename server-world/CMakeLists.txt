@@ -21,6 +21,7 @@ basalt_module(server-world
         src/densityfunction/DensityFunctionJson.cpp
         src/densityfunction/Generators.cpp
         src/densityfunction/Operators.cpp
+        src/densityfunction/PowerAndRound.cpp
         src/densityfunction/RandomState.cpp
         src/densityfunction/SamplerContext.cpp
         src/densityfunction/Structural.cpp
@@ -237,6 +238,12 @@ basalt_module(server-world
         src/noise/NormalNoise.cpp
     DEPENDS basalt::metamorph-datafix basalt::metamorph-region basalt::server-random basalt::server-registry basalt::wire-common
             basalt::wire-io basalt::wire-protocol basalt::wire-text
+)
+
+basalt_test(server-world-density-function-test
+    SOURCES
+        test/DensityFunctionTest.cpp
+    DEPENDS basalt::server-world
 )
 
 basalt_test(server-world-light-test

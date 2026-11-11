@@ -182,4 +182,41 @@ std::optional<server::plugins::PluginLootItem> ServerLoot::enchant(const server:
                           : wire::nbt::snbt::stringify(wire::nbt::NbtTag::ofCompound(made.components))};
 }
 
+std::optional<server::plugins::PluginLootItem> ServerLoot::apply(std::string_view functions,
+                                                                 const server::plugins::PluginLootItem& stack,
+                                                                 const server::plugins::PluginLootApply& how) {
+    world::LoadedWorld* world = hooks_.worldFor ? hooks_.worldFor(how.world) : nullptr;
+    const auto item = wire::common::Identifier::parse(stack.item);
+    const auto json = wire::common::parseJson(functions);
+    if (world == nullptr || hooks_.tables == nullptr || !item.has_value() || !json.has_value()) {
+        return std::nullopt;
+    }
+    const auto parsed = server::world::loot::lootTableJson::parseModifier(*json, &hooks_.tables->references());
+    if (!parsed.has_value()) {
+        return std::nullopt;
+    }
+    server::world::loot::LootContext context;
+    hooks_.tables->prepareAt(context, *world, how.x, how.y, how.z);
+    server::world::loot::ItemStack given{.item = *item, .count = stack.count};
+    if (!stack.components.empty()) {
+        const auto components = wire::nbt::snbt::parse(stack.components);
+        const wire::nbt::NbtCompound* compound =
+            components.has_value() ? components->get<wire::nbt::NbtCompound>() : nullptr;
+        if (compound != nullptr) {
+            given.components = *compound;
+        }
+    }
+    random::RandomSource random =
+        random::RandomSource::legacy(how.seed != 0 ? how.seed : static_cast<std::int64_t>(std::random_device{}()));
+    for (const server::world::loot::LootFunction& function : *parsed) {
+        given = function.apply(std::move(given), random, std::nullopt, context);
+    }
+    return server::plugins::PluginLootItem{
+        .item = given.item.toString(),
+        .count = given.count,
+        .components = given.components.empty()
+                          ? std::string{}
+                          : wire::nbt::snbt::stringify(wire::nbt::NbtTag::ofCompound(given.components))};
+}
+
 } // namespace basalt::server::runtime::plugins

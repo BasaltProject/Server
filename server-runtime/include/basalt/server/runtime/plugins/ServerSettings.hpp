@@ -11,6 +11,7 @@
 
 namespace basalt::server::runtime::config {
 struct BasaltConfig;
+struct LiveTuning;
 class ServerListConfig;
 } // namespace basalt::server::runtime::config
 
@@ -31,6 +32,12 @@ public:
         std::function<void(std::int32_t)> setIdleTimeout;
         std::function<bool()> autoSave;
         std::function<void(bool)> setAutoSave;
+        std::function<config::LiveTuning*()> live;
+        std::function<bool()> whitelistOn;
+        std::function<void(bool)> setWhitelistOn;
+        std::function<void()> kickUnlisted;
+        std::function<std::int32_t()> heartbeatSeconds;
+        std::function<void(std::int32_t)> setHeartbeatSeconds;
     };
 
     void use(Hooks hooks) { hooks_ = std::move(hooks); }
@@ -56,7 +63,12 @@ public:
 
     [[nodiscard]] std::int32_t spawnProtection() const;
 
+    /// Set when an operator hides the player count from the server list at run time, unset to follow the profile.
+    [[nodiscard]] std::optional<bool> hidePlayersOverride() const;
+
 private:
+    bool setNumber(std::string_view key, std::int32_t number);
+
     Hooks hooks_;
     mutable std::mutex mutex_;
     std::optional<std::string> motd_;
@@ -64,6 +76,7 @@ private:
     std::atomic<std::int32_t> pauseWhenEmpty_{-1};
     std::atomic<std::int32_t> spawnProtection_{-1};
     std::atomic<bool> pauseAllowed_{true};
+    std::atomic<std::int8_t> hidePlayers_{-1};
     std::optional<std::string> respawnWorld_;
 };
 

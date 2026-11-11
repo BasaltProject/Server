@@ -591,7 +591,10 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.type().path() == "enderman") {
         // parity: `setTarget` raises `DATA_CREEPY` with a target and lowers both without one.
-        live.endermanCreepy = entity.targetId.has_value();
+        live.endermanCreepy = entity.neutral != nullptr && entity.neutral->creepy.has_value() &&
+                                      entity.neutral->creepyTarget == entity.targetId
+                                  ? *entity.neutral->creepy
+                                  : entity.targetId.has_value();
         live.endermanStaredAt = entity.neutral != nullptr && entity.neutral->staredAt;
     }
     if (entity.firework != nullptr) {

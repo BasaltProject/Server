@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace basalt::server::remote {
 
@@ -32,9 +33,28 @@ struct ApiSettings {
     std::int32_t idleSeconds = 60;
 };
 
+struct ManagementSettings {
+    bool enabled = false;
+    std::string bind = "127.0.0.1";
+    std::int32_t port = 25585;
+    std::string secret;
+    bool tls = false;
+    std::string certPath;
+    std::string keyPath;
+    std::vector<std::string> allowedOrigins;
+    std::int32_t heartbeatSeconds = 0;
+    std::int32_t maxFailures = 5;
+    std::int32_t lockoutSeconds = 30;
+    std::int32_t requestsPerMinute = 600;
+    std::int32_t maxConnections = 16;
+    std::int32_t maxConnectionsPerAddress = 8;
+    std::int32_t idleSeconds = 60;
+};
+
 struct RemoteSettings {
     RconSettings rcon;
     ApiSettings api;
+    ManagementSettings management;
 };
 
 } // namespace basalt::server::remote

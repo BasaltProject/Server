@@ -1,5 +1,7 @@
 #pragma once
 
+#include <basalt/server/remote/ManagementBackend.hpp>
+
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -31,6 +33,9 @@ public:
     [[nodiscard]] virtual std::string statusJson() = 0;
     [[nodiscard]] virtual std::string playersJson() = 0;
     [[nodiscard]] virtual std::string pluginsJson() = 0;
+
+    /// The management protocol backend, or null when this host has none; touch it only on the server thread.
+    [[nodiscard]] virtual ManagementBackend* management() { return nullptr; }
 };
 
 } // namespace basalt::server::remote

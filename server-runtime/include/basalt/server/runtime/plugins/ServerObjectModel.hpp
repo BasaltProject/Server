@@ -45,6 +45,7 @@ class LoadedWorld;
 class PlayerProgress;
 class RealRecipes;
 class RealLootTables;
+class RealTrialSpawnerConfigs;
 } // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
@@ -73,6 +74,7 @@ struct ModelHooks {
     std::function<BlockChangeBroadcaster*()> blocks;
     NpcRegistry* npcs = nullptr;
     world::RealLootTables* lootTables = nullptr;
+    const world::RealTrialSpawnerConfigs* trialSpawners = nullptr;
     const world::realBlockTags::TagMembers* blockTags = nullptr;
     const world::realBlockTags::TagMembers* itemTags = nullptr;
     std::function<bool(world::LoadedWorld& world, std::string_view action, std::int32_t value)> endFight;
@@ -185,6 +187,8 @@ public:
     [[nodiscard]] std::vector<std::string> itemIds() const override;
     [[nodiscard]] std::vector<std::string> tags(std::string_view registry) const override;
     [[nodiscard]] std::vector<std::string> entityTypeIds() const override;
+    [[nodiscard]] std::optional<std::array<double, 3>>
+    netherPortalExit(std::string_view from, std::string_view to, double x, double y, double z, bool alongX) override;
     [[nodiscard]] std::vector<std::string> registryIds(std::string_view registry) const override;
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> registryData(std::string_view registry,
                                                                         std::string_view id) const override;

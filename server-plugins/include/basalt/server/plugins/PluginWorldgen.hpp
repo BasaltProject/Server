@@ -66,6 +66,19 @@ public:
         return std::nullopt;
     }
 
+    /// A density function given as game data JSON, evaluated with the random state of the settings and seed.
+    [[nodiscard]] virtual std::optional<double> densityTree(std::string_view settings, std::int64_t seed,
+                                                            std::string_view json, std::int32_t x, std::int32_t y,
+                                                            std::int32_t z) {
+        static_cast<void>(settings);
+        static_cast<void>(seed);
+        static_cast<void>(json);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return std::nullopt;
+    }
+
     /// A named noise (`minecraft:jagged`) seeded as the settings seed their random state.
     [[nodiscard]] virtual std::optional<double> noise(std::string_view settings, std::int64_t seed, std::string_view id,
                                                       double x, double y, double z) {

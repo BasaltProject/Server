@@ -100,6 +100,8 @@ enum class Kind : std::uint8_t {
     Slice,
     FindTopSurface,
     BlendedNoise,
+    Pow,
+    Round,
 };
 
 /// parity: `DensityFunction`.
@@ -131,6 +133,9 @@ protected:
 
 /// parity: `SimpleDensityFunction`.
 enum class SimpleType : std::uint8_t { BlendAlpha, BlendOffset, Beardifier };
+
+/// parity: `RoundFunction.Type`.
+enum class RoundType : std::uint8_t { Floor, Round, Ceil, Truncate };
 
 /// parity: `UnaryFunction.Type`.
 enum class UnaryType : std::uint8_t {
@@ -187,6 +192,8 @@ namespace functions {
 [[nodiscard]] Function shift(ShiftType type, std::string noiseId, std::shared_ptr<const noise::NormalNoise> parameters);
 [[nodiscard]] Function unary(UnaryType type, Function input);
 [[nodiscard]] Function binary(BinaryType type, Function left, Function right);
+[[nodiscard]] Function pow(Function base, Function exponent);
+[[nodiscard]] Function round(RoundType type, Function input, Function multiple);
 [[nodiscard]] Function spline(std::shared_ptr<const Spline> spline);
 [[nodiscard]] Function lerp(Function alpha, Function first, Function second);
 [[nodiscard]] Function clamp(Function input, float min, float max);

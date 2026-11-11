@@ -314,6 +314,48 @@ private:
     std::shared_ptr<const Spline> spline_;
 };
 
+class Pow final : public DensityFunction {
+public:
+    Pow(Function base, Function exponent) : base_(std::move(base)), exponent_(std::move(exponent)) {}
+
+    [[nodiscard]] Kind kind() const noexcept override { return Kind::Pow; }
+
+    [[nodiscard]] Interval range() const override { return Interval::pow(base_->range(), exponent_->range()); }
+
+    [[nodiscard]] std::int32_t domainAxes() const override { return base_->domainAxes() | exponent_->domainAxes(); }
+
+    [[nodiscard]] Sampler compile(CompileContext& context) const override;
+    [[nodiscard]] Function rewriteChildren(const Function& self, const RewriteRule& rule) const override;
+    [[nodiscard]] bool equals(const DensityFunction& other) const override;
+    [[nodiscard]] std::size_t hash() const override;
+
+private:
+    Function base_;
+    Function exponent_;
+};
+
+class Round final : public DensityFunction {
+public:
+    Round(RoundType type, Function input, Function multiple)
+        : type_(type), input_(std::move(input)), multiple_(std::move(multiple)) {}
+
+    [[nodiscard]] Kind kind() const noexcept override { return Kind::Round; }
+
+    [[nodiscard]] Interval range() const override;
+
+    [[nodiscard]] std::int32_t domainAxes() const override { return input_->domainAxes() | multiple_->domainAxes(); }
+
+    [[nodiscard]] Sampler compile(CompileContext& context) const override;
+    [[nodiscard]] Function rewriteChildren(const Function& self, const RewriteRule& rule) const override;
+    [[nodiscard]] bool equals(const DensityFunction& other) const override;
+    [[nodiscard]] std::size_t hash() const override;
+
+private:
+    RoundType type_;
+    Function input_;
+    Function multiple_;
+};
+
 class Lerp final : public DensityFunction {
 public:
     Lerp(Function alpha, Function first, Function second)
@@ -558,6 +600,8 @@ private:
 [[nodiscard]] Sampler noiseSampler(std::shared_ptr<const noise::Noise> noise, double xzScale, double yScale);
 [[nodiscard]] Sampler constAddSampler(Sampler input, float value);
 [[nodiscard]] Sampler constMulSampler(Sampler input, float value);
+[[nodiscard]] Sampler unarySampler(UnaryType type, Sampler input);
+[[nodiscard]] float roundToInteger(float input, RoundType type) noexcept;
 [[nodiscard]] Sampler clampSampler(Sampler input, float min, float max);
 [[nodiscard]] Sampler lerpSampler(Sampler alpha, Sampler first, Sampler second);
 [[nodiscard]] Sampler ySliceSampler(Sampler input, std::int32_t y);

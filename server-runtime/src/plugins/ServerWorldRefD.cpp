@@ -51,6 +51,7 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -99,6 +100,25 @@ std::int32_t LoadedWorldRef::highest(std::int32_t x, std::int32_t z, std::string
 
 bool LoadedWorldRef::chunkLoaded(std::int32_t chunkX, std::int32_t chunkZ) const {
     return world_->state().isLoaded(chunkX, chunkZ);
+}
+
+std::optional<std::vector<std::uint8_t>> LoadedWorldRef::storedChunkNbt(std::int32_t chunkX,
+                                                                        std::int32_t chunkZ) const {
+    return world_->regions().rawChunk(chunkX, chunkZ);
+}
+
+bool LoadedWorldRef::hasStoredChunk(std::int32_t chunkX, std::int32_t chunkZ) const {
+    return world_->regions().hasChunk(chunkX, chunkZ);
+}
+
+bool LoadedWorldRef::storeChunkNbt(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::uint8_t> nbt) {
+    const auto seconds =
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch());
+    return world_->regions().writeRawChunk(chunkX, chunkZ, nbt, static_cast<std::int32_t>(seconds.count()));
+}
+
+std::vector<std::int32_t> LoadedWorldRef::storedChunksIn(std::int32_t regionX, std::int32_t regionZ) const {
+    return world_->regions().storedChunks(regionX, regionZ);
 }
 
 bool LoadedWorldRef::loadChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate) {

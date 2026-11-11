@@ -23,9 +23,11 @@ basalt_module(server-plugins
         src/PluginObject.cpp
         src/PluginObjects.cpp
         src/PluginDatafix.cpp
+        src/PluginFiles.cpp
         src/PluginRecipeApi.cpp
         src/PluginEntityObject.cpp
         src/PluginPlayerObject.cpp
+        src/PluginWorldBlockEntities.cpp
         src/PluginWorldBulk.cpp
         src/PluginWorldEnvObjects.cpp
         src/PluginWorldObjects.cpp

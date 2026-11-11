@@ -65,7 +65,8 @@ bool ClientSession::noBlocksAround(const player::PlayerSession& session) {
 // parity: `handlePlayerPositionChange` clientIsFloating; the block under the feet stands for verticalCollisionBelow.
 void ClientSession::noteFloating(double dy) {
     const player::PlayerSession* session = playerSession_.get();
-    clientFloating_ = session != nullptr && dy >= kFloatingDrop && !options_.tuning.allowFlight &&
+    clientFloating_ = session != nullptr && dy >= kFloatingDrop &&
+                      !options_.tuning.live->allowFlight.load(std::memory_order_relaxed) &&
                       session->gamemode != wire::protocol::play::Gamemode::Spectator && !session->mayFly() &&
                       !session->effects.contains(wire::common::Identifier::vanilla("levitation")) &&
                       !session->fallFlying && session->autoSpinTicks <= 0 && noBlocksAround(*session);

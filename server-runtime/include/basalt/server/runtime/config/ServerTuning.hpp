@@ -2,15 +2,29 @@
 
 #include <basalt/wire/common/toml/Toml.hpp>
 
+#include <atomic>
 #include <cstdint>
 #include <expected>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::config {
 
+/// The few options an operator may change while the server runs; every connection reads them from here.
+struct LiveTuning {
+    std::atomic<bool> forceGamemode{false};
+    std::atomic<bool> enforceWhitelist{false};
+    std::atomic<bool> acceptsTransfers{false};
+    std::atomic<bool> allowFlight{false};
+    std::atomic<bool> statusReplies{true};
+    std::atomic<std::int32_t> entityBroadcastRangePercentage{100};
+};
+
 struct ServerTuning {
+    std::shared_ptr<LiveTuning> live = std::make_shared<LiveTuning>();
+
     std::string brand;
     std::vector<std::string> startupCommands;
     bool forceGamemode = false;

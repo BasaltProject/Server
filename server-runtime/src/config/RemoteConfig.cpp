@@ -1,3 +1,4 @@
+#include <basalt/server/remote/ApiToken.hpp>
 #include <basalt/server/runtime/config/RemoteConfig.hpp>
 
 #include <algorithm>
@@ -91,6 +92,50 @@ std::expected<remote::RemoteSettings, std::string> fromToml(const TomlTable& roo
         BASALT_TRY_NUMBER(out.maxConnectionsPerAddress, *api, "max-connections-per-address", 1, 4096, "api")
         if (out.enabled && out.tls && (out.certPath.empty() || out.keyPath.empty())) {
             return std::unexpected(std::string{path} + ": tls = true in [network.api] needs tls-cert and tls-key");
+        }
+    }
+    if (const TomlTable* management = network == nullptr ? nullptr : network->table("management");
+        management != nullptr) {
+        if (auto known =
+                onlyKnown(*management, "management",
+                          {"enabled", "bind", "port", "secret", "tls", "tls-cert", "tls-key", "allowed-origins",
+                           "status-heartbeat-interval", "max-failures", "lockout-seconds", "requests-per-minute",
+                           "max-connections", "max-connections-per-address", "idle-seconds"},
+                          path);
+            !known.has_value()) {
+            return std::unexpected(known.error());
+        }
+        remote::ManagementSettings& out = settings.management;
+        out.enabled = management->boolean("enabled").value_or(out.enabled);
+        out.bind = std::string{management->string("bind").value_or(out.bind)};
+        out.secret = std::string{management->string("secret").value_or("")};
+        out.tls = management->boolean("tls").value_or(out.tls);
+        out.certPath = std::string{management->string("tls-cert").value_or("")};
+        out.keyPath = std::string{management->string("tls-key").value_or("")};
+        out.allowedOrigins = management->stringList("allowed-origins");
+        BASALT_TRY_NUMBER(out.port, *management, "port", 1, 65535, "management")
+        BASALT_TRY_NUMBER(out.heartbeatSeconds, *management, "status-heartbeat-interval", 0, 86400, "management")
+        BASALT_TRY_NUMBER(out.maxFailures, *management, "max-failures", 1, 1000, "management")
+        BASALT_TRY_NUMBER(out.lockoutSeconds, *management, "lockout-seconds", 1, 86400, "management")
+        BASALT_TRY_NUMBER(out.requestsPerMinute, *management, "requests-per-minute", 1, 1000000, "management")
+        BASALT_TRY_NUMBER(out.maxConnections, *management, "max-connections", 1, 4096, "management")
+        BASALT_TRY_NUMBER(out.maxConnectionsPerAddress, *management, "max-connections-per-address", 1, 4096,
+                          "management")
+        BASALT_TRY_NUMBER(out.idleSeconds, *management, "idle-seconds", 1, 86400, "management")
+        if (!out.secret.empty() && !remote::isValidManagementSecret(out.secret)) {
+            return std::unexpected(std::string{path} +
+                                   ": secret in [network.management] must be 40 letters and digits, or empty to "
+                                   "generate one");
+        }
+        if (out.enabled && out.tls && (out.certPath.empty() || out.keyPath.empty())) {
+            return std::unexpected(std::string{path} +
+                                   ": tls = true in [network.management] needs tls-cert and tls-key");
+        }
+        if (out.enabled &&
+            ((settings.api.enabled && out.port == settings.api.port && out.bind == settings.api.bind) ||
+             (settings.rcon.enabled && out.port == settings.rcon.port && out.bind == settings.rcon.bind))) {
+            return std::unexpected(std::string{path} +
+                                   ": [network.management] cannot share a port with [network.api] or [network.rcon]");
         }
     }
     if (settings.rcon.enabled && settings.rcon.port == settings.api.port && settings.api.enabled &&

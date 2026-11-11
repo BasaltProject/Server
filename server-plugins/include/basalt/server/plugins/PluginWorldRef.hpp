@@ -669,6 +669,34 @@ public:
         return 0;
     }
 
+    /// Raw NBT of a chunk as stored on disk, or empty when the world has none.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> storedChunkNbt(std::int32_t chunkX,
+                                                                                  std::int32_t chunkZ) const {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        return std::nullopt;
+    }
+
+    [[nodiscard]] virtual bool hasStoredChunk(std::int32_t chunkX, std::int32_t chunkZ) const {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        return false;
+    }
+
+    virtual bool storeChunkNbt(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::uint8_t> nbt) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        static_cast<void>(nbt);
+        return false;
+    }
+
+    /// Chunk coordinates as x, z pairs of the chunks stored in one region file.
+    [[nodiscard]] virtual std::vector<std::int32_t> storedChunksIn(std::int32_t regionX, std::int32_t regionZ) const {
+        static_cast<void>(regionX);
+        static_cast<void>(regionZ);
+        return {};
+    }
+
     [[nodiscard]] virtual bool chunkLoaded(std::int32_t chunkX, std::int32_t chunkZ) const {
         static_cast<void>(chunkX);
         static_cast<void>(chunkZ);

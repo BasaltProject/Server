@@ -201,9 +201,10 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             continue;
         }
         if (!visibleTo(*entity, me) || session->extras.hiddenEntities.contains(entity->entityId()) ||
-            !inTrackingRange(*entity, session->x, session->z, viewDistance,
-                             owner_->options().tuning.entityBroadcastRangePercentage,
-                             owner_->currentWorld()->mobSettings())) {
+            !inTrackingRange(
+                *entity, session->x, session->z, viewDistance,
+                owner_->options().tuning.live->entityBroadcastRangePercentage.load(std::memory_order_relaxed),
+                owner_->currentWorld()->mobSettings())) {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
                 lastRuntimeEntityMetadata_.erase(entity->entityId());

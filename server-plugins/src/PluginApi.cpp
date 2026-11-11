@@ -1,9 +1,12 @@
 #include "PluginApiShared.hpp"
 #include "PluginFilePath.hpp"
 
+#include <basalt/server/plugins/PluginFiles.hpp>
+
 namespace basalt::server::plugins::pluginApi {
 namespace {
 using namespace internal;
+namespace fileService = plugins::fileService;
 
 void installIdentity(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, std::int32_t lanes) {
     lua.pushTable();
@@ -102,6 +105,47 @@ void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
         return 1;
     });
     lua.setField("write");
+    wire::lua::pushHostFunction(lua, "files.stat", [target](LuaArgs& args) {
+        const std::string live = insideFolder(args, 1, target->folder);
+        const std::optional<fileService::Stat> found = fileService::stat(live);
+        if (!found.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        args.pushString(found->kind == fileService::Kind::File        ? "file"
+                        : found->kind == fileService::Kind::Directory ? "directory"
+                                                                      : "other");
+        args.setField("kind");
+        args.pushInteger(found->size);
+        args.setField("size");
+        args.pushInteger(found->modifiedMillis);
+        args.setField("modified");
+        return 1;
+    });
+    lua.setField("stat");
+    wire::lua::pushHostFunction(lua, "files.walk", [target](LuaArgs& args) {
+        const std::string live = insideFolder(args, 1, target->folder);
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const std::string& entry : fileService::walk(live)) {
+            args.pushString(entry.substr(2) + (entry.front() == 'd' ? "/" : ""));
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("walk");
+    wire::lua::pushHostFunction(lua, "files.capabilities", [target](LuaArgs& args) {
+        const std::string live = insideFolder(args, 1, target->folder);
+        const fileService::Capabilities found = fileService::capabilities(live);
+        args.pushTable();
+        args.pushBoolean(found.atomicMove);
+        args.setField("atomic_move");
+        args.pushBoolean(found.hardLinks);
+        args.setField("hard_links");
+        return 1;
+    });
+    lua.setField("capabilities");
     lua.setGlobal("files");
 }
 

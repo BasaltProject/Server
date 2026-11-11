@@ -157,7 +157,11 @@ std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std:
     if (const std::int32_t version = upgraded.getInt("DataVersion"); version > metamorph::datafix::kCurrentVersion) {
         return std::unexpected(StorageFormatError{std::string{uuid} + ".dat was saved by a newer version of the game"});
     } else if (version < metamorph::datafix::kCurrentVersion) {
-        metamorph::datafix::upgrade(metamorph::datafix::Domain::Player, upgraded, version);
+        if (const std::string refusal =
+                metamorph::datafix::upgrade(metamorph::datafix::Domain::Player, upgraded, version);
+            !refusal.empty()) {
+            return std::unexpected(StorageFormatError{std::string{uuid} + ".dat cannot be upgraded: " + refusal});
+        }
     }
     const NbtCompound* root = &upgraded;
 

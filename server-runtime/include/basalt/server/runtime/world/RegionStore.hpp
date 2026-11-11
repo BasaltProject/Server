@@ -50,6 +50,18 @@ public:
 
     [[nodiscard]] std::optional<server::world::Chunk> loadChunk(std::int32_t chunkX, std::int32_t chunkZ);
 
+    /// The chunk's stored NBT bytes as they sit in the region, without decoding them.
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> rawChunk(std::int32_t chunkX, std::int32_t chunkZ);
+
+    [[nodiscard]] bool hasChunk(std::int32_t chunkX, std::int32_t chunkZ);
+
+    /// Stores NBT bytes (empty clears the chunk) and writes its region; refused for chunks that cannot be read.
+    bool writeRawChunk(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::uint8_t> nbt,
+                       std::int32_t timestamp);
+
+    /// Chunk coordinates (x, z pairs) stored in one region.
+    [[nodiscard]] std::vector<std::int32_t> storedChunks(std::int32_t regionX, std::int32_t regionZ);
+
     enum class Age : std::uint8_t { Absent, Current, MaybeOld };
 
     [[nodiscard]] Age ageOf(std::int32_t chunkX, std::int32_t chunkZ);

@@ -21,8 +21,8 @@ struct Fixed {
 const std::vector<Fixed>& fixedSections() {
     static const std::vector<Fixed> table{
         {"server.toml",
-         {"server", "network.java", "network.bedrock", "network.query", "network.rcon", "network.api", "performance",
-          "logging", "datapacks"}},
+         {"server", "network.java", "network.bedrock", "network.query", "network.rcon", "network.api",
+          "network.management", "performance", "logging", "datapacks"}},
         {"limits.toml", {"packets", "spam", "items"}},
         {"messages.toml", {"kick"}},
         {"worlds.toml", {"defaults"}},

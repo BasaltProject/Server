@@ -1,5 +1,7 @@
+#include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/config/BasaltConfig.hpp>
 #include <basalt/server/runtime/config/ServerListConfig.hpp>
+#include <basalt/server/runtime/config/ServerTuning.hpp>
 #include <basalt/server/runtime/plugins/ServerSettings.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
@@ -10,7 +12,7 @@
 namespace basalt::server::runtime::plugins {
 namespace {
 
-constexpr std::array<std::string_view, 27> kKeys{"motd",
+constexpr std::array<std::string_view, 40> kKeys{"motd",
                                                  "max_players",
                                                  "port",
                                                  "bind",
@@ -36,7 +38,20 @@ constexpr std::array<std::string_view, 27> kKeys{"motd",
                                                  "rcon_enabled",
                                                  "rcon_port",
                                                  "api_enabled",
-                                                 "api_port"};
+                                                 "api_port",
+                                                 "management_enabled",
+                                                 "management_host",
+                                                 "management_port",
+                                                 "management_tls",
+                                                 "difficulty",
+                                                 "enforce_allowlist",
+                                                 "allow_flight",
+                                                 "force_game_mode",
+                                                 "accept_transfers",
+                                                 "status_replies",
+                                                 "entity_broadcast_range",
+                                                 "status_heartbeat_interval",
+                                                 "operator_user_permission_level"};
 
 [[nodiscard]] std::string joined(const std::vector<std::string>& values) {
     std::string out;
@@ -78,6 +93,11 @@ std::int32_t ServerSettings::pauseWhenEmptySeconds() const {
     return held >= 0 ? held : hooks_.config ? hooks_.config().pauseWhenEmptySeconds : 0;
 }
 
+std::optional<bool> ServerSettings::hidePlayersOverride() const {
+    const std::int8_t held = hidePlayers_.load(std::memory_order_relaxed);
+    return held < 0 ? std::nullopt : std::optional{held != 0};
+}
+
 std::int32_t ServerSettings::spawnProtection() const {
     const std::int32_t held = spawnProtection_.load(std::memory_order_relaxed);
     return held >= 0 ? held : hooks_.config ? hooks_.config().spawnProtection : 0;
@@ -106,6 +126,37 @@ std::optional<std::string> ServerSettings::get(const std::string_view key) const
     }
     if (key == "pause_when_empty_seconds") {
         return std::to_string(pauseWhenEmptySeconds());
+    }
+    if (config::LiveTuning* live = hooks_.live ? hooks_.live() : nullptr; live != nullptr) {
+        if (key == "enforce_allowlist") {
+            return boolText(live->enforceWhitelist.load(std::memory_order_relaxed));
+        }
+        if (key == "allow_flight") {
+            return boolText(live->allowFlight.load(std::memory_order_relaxed));
+        }
+        if (key == "force_game_mode") {
+            return boolText(live->forceGamemode.load(std::memory_order_relaxed));
+        }
+        if (key == "accept_transfers") {
+            return boolText(live->acceptsTransfers.load(std::memory_order_relaxed));
+        }
+        if (key == "status_replies") {
+            return boolText(live->statusReplies.load(std::memory_order_relaxed));
+        }
+        if (key == "entity_broadcast_range") {
+            return std::to_string(live->entityBroadcastRangePercentage.load(std::memory_order_relaxed));
+        }
+    }
+    if (key == "status_heartbeat_interval") {
+        return std::to_string(hooks_.heartbeatSeconds ? hooks_.heartbeatSeconds() : 0);
+    }
+    if (key == "operator_user_permission_level") {
+        return std::to_string(command::permissionLevel::operatorLevel());
+    }
+    if (key == "difficulty") {
+        const std::vector<world::LoadedWorld*> worlds =
+            hooks_.worlds ? hooks_.worlds() : std::vector<world::LoadedWorld*>{};
+        return worlds.empty() ? std::string{"normal"} : worlds.front()->difficulty();
     }
     if (key == "spawn_protection") {
         return std::to_string(spawnProtection());
@@ -139,6 +190,18 @@ std::optional<std::string> ServerSettings::get(const std::string_view key) const
     if (key == "api_port") {
         return std::to_string(config.remote.api.port);
     }
+    if (key == "management_enabled") {
+        return boolText(config.remote.management.enabled);
+    }
+    if (key == "management_host") {
+        return config.remote.management.bind;
+    }
+    if (key == "management_port") {
+        return std::to_string(config.remote.management.port);
+    }
+    if (key == "management_tls") {
+        return boolText(config.remote.management.tls);
+    }
     if (key == "bedrock_port") {
         return std::to_string(config.bedrockPort);
     }
@@ -152,7 +215,7 @@ std::optional<std::string> ServerSettings::get(const std::string_view key) const
         return boolText(config.enforceSecureProfile);
     }
     if (key == "whitelist") {
-        return boolText(config.whitelist);
+        return boolText(hooks_.whitelistOn ? hooks_.whitelistOn() : config.whitelist);
     }
     if (key == "gamemode") {
         const std::vector<world::LoadedWorld*> worlds =
@@ -177,6 +240,9 @@ std::optional<std::string> ServerSettings::get(const std::string_view key) const
                                   : first.tunables().simulationDistance.value_or(first.settings().simulationDistance));
     }
     if (key == "hide_online_players") {
+        if (const auto held = hidePlayersOverride(); held.has_value()) {
+            return boolText(*held);
+        }
         return boolText(hooks_.serverList && hooks_.serverList().defaultProfile().hidePlayerCount.value_or(false));
     }
     if (key == "level_type") {
@@ -259,6 +325,52 @@ bool ServerSettings::set(const std::string_view key, const std::string_view valu
         hooks_.setIdleTimeout(*number);
         return true;
     }
+    if (const bool flag = value == "true"; value == "true" || value == "false") {
+        config::LiveTuning* live = hooks_.live ? hooks_.live() : nullptr;
+        if (key == "whitelist" && hooks_.setWhitelistOn) {
+            hooks_.setWhitelistOn(flag);
+            if (hooks_.kickUnlisted) {
+                hooks_.kickUnlisted();
+            }
+            return true;
+        }
+        if (key == "hide_online_players") {
+            hidePlayers_.store(flag ? 1 : 0, std::memory_order_relaxed);
+            return true;
+        }
+        if (live != nullptr) {
+            std::atomic<bool>* target = key == "enforce_allowlist"  ? &live->enforceWhitelist
+                                        : key == "allow_flight"     ? &live->allowFlight
+                                        : key == "force_game_mode"  ? &live->forceGamemode
+                                        : key == "accept_transfers" ? &live->acceptsTransfers
+                                        : key == "status_replies"   ? &live->statusReplies
+                                                                    : nullptr;
+            if (target != nullptr) {
+                target->store(flag, std::memory_order_relaxed);
+                if (key == "enforce_allowlist" && hooks_.kickUnlisted) {
+                    hooks_.kickUnlisted();
+                }
+                return true;
+            }
+        }
+    }
+    if (key == "difficulty") {
+        if (value != "peaceful" && value != "easy" && value != "normal" && value != "hard") {
+            return false;
+        }
+        for (world::LoadedWorld* world : hooks_.worlds ? hooks_.worlds() : std::vector<world::LoadedWorld*>{}) {
+            world->setDifficulty(std::string{value});
+        }
+        return true;
+    }
+    if (key == "entity_broadcast_range" || key == "status_heartbeat_interval" ||
+        key == "operator_user_permission_level" || key == "view_distance" || key == "simulation_distance") {
+        const std::optional<std::int32_t> number = numberOf(value);
+        if (!number.has_value()) {
+            return false;
+        }
+        return setNumber(key, *number);
+    }
     if (key == "gamemode") {
         if (value != "survival" && value != "creative" && value != "adventure" && value != "spectator") {
             return false;
@@ -269,6 +381,43 @@ bool ServerSettings::set(const std::string_view key, const std::string_view valu
         return true;
     }
     return false;
+}
+
+bool ServerSettings::setNumber(const std::string_view key, const std::int32_t number) {
+    const std::vector<world::LoadedWorld*> worlds =
+        hooks_.worlds ? hooks_.worlds() : std::vector<world::LoadedWorld*>{};
+    if (key == "entity_broadcast_range") {
+        config::LiveTuning* live = hooks_.live ? hooks_.live() : nullptr;
+        if (live == nullptr || number < 10 || number > 1000) {
+            return false;
+        }
+        live->entityBroadcastRangePercentage.store(number, std::memory_order_relaxed);
+        return true;
+    }
+    if (key == "status_heartbeat_interval") {
+        if (number < 0 || !hooks_.setHeartbeatSeconds) {
+            return false;
+        }
+        hooks_.setHeartbeatSeconds(number);
+        return true;
+    }
+    if (key == "operator_user_permission_level") {
+        if (number < 1 || number > 4) {
+            return false;
+        }
+        command::permissionLevel::setOperatorLevel(number);
+        return true;
+    }
+    if (key == "view_distance") {
+        for (world::LoadedWorld* world : worlds) {
+            world->setViewDistance(std::clamp(number, 2, 32));
+        }
+        return !worlds.empty();
+    }
+    for (world::LoadedWorld* world : worlds) {
+        world->tunables().simulationDistance = std::clamp(number, 2, 32);
+    }
+    return !worlds.empty();
 }
 
 } // namespace basalt::server::runtime::plugins

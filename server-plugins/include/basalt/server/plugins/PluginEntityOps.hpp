@@ -101,6 +101,9 @@ struct EntityOperationSpec {
 inline constexpr std::array kEntityOperations{
     EntityOperationSpec{"damage", ""},
     EntityOperationSpec{"kill", ""},
+    EntityOperationSpec{"combat", ""},
+    EntityOperationSpec{"combat_clear", ""},
+    EntityOperationSpec{"combat_push", ""},
     EntityOperationSpec{"add_effect", ""},
     EntityOperationSpec{"remove_effect", ""},
     EntityOperationSpec{"clear_effects", ""},

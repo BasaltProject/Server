@@ -578,6 +578,18 @@ public:
     float hurtDirection = 0.0F;
     bool collidable = true;
     std::int8_t forcedPose = -1;
+
+    struct CombatRecord {
+        std::string damageType;
+        std::string messageId;
+        std::int32_t directId = -1;
+        std::int32_t causeId = -1;
+        float damage = 0.0F;
+        std::int64_t tick = 0;
+    };
+
+    static constexpr std::size_t kMaxCombatRecords = 256;
+    std::vector<CombatRecord> combatRecords;
     std::int8_t visualFire = -1;
     bool freezeLocked = false;
     bool jumping = false;

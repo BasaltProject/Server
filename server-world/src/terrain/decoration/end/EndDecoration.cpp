@@ -80,7 +80,7 @@ const std::set<std::string, std::less<>>& chorusDownConnections() {
 
 class ChorusWorld {
 public:
-    ChorusWorld(Chunk& chunk, const NoiseRouter& router) : chunk_(&chunk), router_(&router) {}
+    ChorusWorld(Chunk& chunk, const NoiseRouter* router) : chunk_(&chunk), router_(router) {}
 
     [[nodiscard]] bool isEmpty(const EndPos& position) { return registry::blocks::isAir(stateAt(position)); }
 
@@ -135,7 +135,7 @@ private:
         if ((position.x >> 4) == chunk_->chunkX() && (position.z >> 4) == chunk_->chunkZ()) {
             return chunk_->blockStateId(position.x & 15, position.y, position.z & 15);
         }
-        if (position.y < 0 || position.y >= kEndGenerationDepth) {
+        if (router_ == nullptr || position.y < 0 || position.y >= kEndGenerationDepth) {
             return registry::blocks::air().stateId;
         }
         const std::int32_t sampleChunkX = position.x >> 4;
@@ -270,7 +270,18 @@ void endTopLayerDecoration::decorate(Chunk& chunk, const TheEndBiomeSource& biom
 
 bool endVegetalDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const NoiseRouter& router,
                                    const std::int32_t x, const std::int32_t y, const std::int32_t z) {
-    ChorusWorld world{chunk, router};
+    ChorusWorld world{chunk, &router};
+    const EndPos origin{.x = x, .y = y, .z = z};
+    if (!world.isEmpty(origin) || world.pathAt(below(origin)) != "end_stone") {
+        return false;
+    }
+    generatePlant(world, origin, random);
+    return true;
+}
+
+bool endVegetalDecoration::placeStandalone(Chunk& chunk, random::RandomSource& random, const std::int32_t x,
+                                           const std::int32_t y, const std::int32_t z) {
+    ChorusWorld world{chunk, nullptr};
     const EndPos origin{.x = x, .y = y, .z = z};
     if (!world.isEmpty(origin) || world.pathAt(below(origin)) != "end_stone") {
         return false;
@@ -285,7 +296,7 @@ void endVegetalDecoration::decorate(Chunk& chunk, const std::int64_t seed, const
     const std::int64_t decorationSeed =
         random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
     random::setFeatureSeed(random, decorationSeed, kChorusPlantIndex, kVegetalDecorationStep);
-    ChorusWorld world{chunk, router};
+    ChorusWorld world{chunk, &router};
     const std::int32_t count = random.nextInt(5);
     for (std::int32_t attempt = 0; attempt < count; ++attempt) {
         const std::int32_t x = chunk.chunkX() * 16 + random.nextInt(16);

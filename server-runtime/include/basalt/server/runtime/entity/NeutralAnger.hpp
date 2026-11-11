@@ -27,6 +27,9 @@ struct Anger {
     bool hadTarget = false;
     /// parity: `Enderman.DATA_STARED_AT`, until the target is dropped.
     bool staredAt = false;
+    /// A plugin's `DATA_CREEPY` write, kept while the target it was made against stays.
+    std::optional<bool> creepy;
+    std::optional<std::int32_t> creepyTarget;
 };
 
 [[nodiscard]] Anger& stateOf(ServerEntity& mob);

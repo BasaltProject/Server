@@ -216,6 +216,11 @@ public:
     bool setBiomeAt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view biome) override;
     [[nodiscard]] std::int32_t highest(std::int32_t x, std::int32_t z, std::string_view kind, bool load) override;
     [[nodiscard]] bool chunkLoaded(std::int32_t chunkX, std::int32_t chunkZ) const override;
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> storedChunkNbt(std::int32_t chunkX,
+                                                                          std::int32_t chunkZ) const override;
+    [[nodiscard]] bool hasStoredChunk(std::int32_t chunkX, std::int32_t chunkZ) const override;
+    bool storeChunkNbt(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::uint8_t> nbt) override;
+    [[nodiscard]] std::vector<std::int32_t> storedChunksIn(std::int32_t regionX, std::int32_t regionZ) const override;
     bool loadChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate) override;
     bool unloadChunk(std::int32_t chunkX, std::int32_t chunkZ) override;
     [[nodiscard]] std::vector<std::int32_t> loadedChunks() const override;

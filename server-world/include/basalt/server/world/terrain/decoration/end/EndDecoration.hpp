@@ -33,6 +33,9 @@ void decorate(Chunk& chunk, std::int64_t seed, const NoiseRouter& router, const 
 bool placeAt(Chunk& chunk, random::RandomSource& random, const NoiseRouter& router, std::int32_t x, std::int32_t y,
              std::int32_t z);
 
+/// The same plant with nothing outside the chunk, for a scratch copy.
+bool placeStandalone(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z);
+
 } // namespace endVegetalDecoration
 
 /// parity: the End's surface structures step, the return gateways and the ten obsidian spikes.

@@ -131,6 +131,37 @@ void addEntityState(Table& table, Operations& operations) {
                      return entity.activeSlot >= 0;
                  }};
 
+    operations["combat"] = [](const Environment&, ServerEntity& entity, const Arguments&) -> std::optional<Value> {
+        std::vector<std::string> flat;
+        for (const ServerEntity::CombatRecord& record : entity.combatRecords) {
+            flat.insert(flat.end(), {record.damageType, record.messageId, std::to_string(record.directId),
+                                     std::to_string(record.causeId), std::to_string(record.damage), "0", "",
+                                     std::to_string(record.tick)});
+        }
+        return flat;
+    };
+    operations["combat_clear"] = [](const Environment&, ServerEntity& entity,
+                                    const Arguments&) -> std::optional<Value> {
+        entity.combatRecords.clear();
+        return true;
+    };
+    operations["combat_push"] = [](const Environment&, ServerEntity& entity,
+                                   const Arguments& arguments) -> std::optional<Value> {
+        if (arguments.size() < 8) {
+            return false;
+        }
+        if (entity.combatRecords.size() >= ServerEntity::kMaxCombatRecords) {
+            entity.combatRecords.erase(entity.combatRecords.begin());
+        }
+        entity.combatRecords.push_back(
+            ServerEntity::CombatRecord{.damageType = asText(at(arguments, 0)).value_or(""),
+                                       .messageId = asText(at(arguments, 1)).value_or(""),
+                                       .directId = static_cast<std::int32_t>(asInt(at(arguments, 2), -1)),
+                                       .causeId = static_cast<std::int32_t>(asInt(at(arguments, 3), -1)),
+                                       .damage = static_cast<float>(asReal(at(arguments, 4))),
+                                       .tick = asInt(at(arguments, 7))});
+        return true;
+    };
     operations["start_using"] = [](const Environment&, ServerEntity& entity,
                                    const Arguments& arguments) -> std::optional<Value> {
         entity.activeSlot = asInt(at(arguments, 0)) == 1 ? 1 : 0;

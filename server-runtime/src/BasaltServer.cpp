@@ -309,7 +309,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         .onSaveInterval =
             [this] {
                 if (saveControl_ != nullptr && saveControl_->enabled()) {
-                    persistence_->persistEverything();
+                    saveEverything();
                 }
             },
         .playerSaveIntervalSeconds = config.tuning.playerAutosaveSeconds,
@@ -402,7 +402,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     persistence_ = std::make_unique<PersistenceCoordinator>(std::move(persistenceHooks), playerRegistry_, *playerStore_,
                                                             commandStorage_, metrics_, logger_);
-    saveControl_ = std::make_unique<command::commands::SaveControl>([this] { persistence_->persistEverything(); });
+    saveControl_ = std::make_unique<command::commands::SaveControl>([this] { saveEverything(); });
 
     timings::ReportSources sources;
     sources.versionName = std::string{buildInfo::kMinecraftVersion};
@@ -764,6 +764,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     model.npcs = &npcs_;
     model.lootTables = &vanillaData_.lootTables;
+    model.trialSpawners = &vanillaData_.trialSpawnerConfigs;
     model.blockTags = &vanillaData_.blockTags;
     model.itemTags = &vanillaData_.itemTags;
     model.nextEntityId = [this] { return playerRegistry_.allocateEntityId(); };
@@ -884,6 +885,18 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             [this](bool on) {
                 if (saveControl_ != nullptr) {
                     static_cast<void>(saveControl_->setEnabled(on));
+                }
+            },
+        .live = [this] { return config_->tuning.live.get(); },
+        .whitelistOn = [this] { return whitelistEnforced_; },
+        .setWhitelistOn = [this](bool value) { whitelistEnforced_ = value; },
+        .kickUnlisted = [this] { kickUnlistedPlayers(); },
+        .heartbeatSeconds = [this] { return heartbeatSeconds_.load(); },
+        .setHeartbeatSeconds =
+            [this](std::int32_t seconds) {
+                heartbeatSeconds_ = seconds;
+                if (remote_) {
+                    remote_->setHeartbeatSeconds(seconds);
                 }
             }});
     miscServices_.control = std::make_unique<plugins::ServerControl>(plugins::ServerControl::Hooks{

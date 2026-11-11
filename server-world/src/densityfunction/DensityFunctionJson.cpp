@@ -69,6 +69,19 @@ using wire::common::JsonValue;
     return std::nullopt;
 }
 
+[[nodiscard]] std::optional<RoundType> roundNamed(std::string_view name) {
+    static constexpr std::pair<std::string_view, RoundType> kTypes[] = {{"floor", RoundType::Floor},
+                                                                        {"round", RoundType::Round},
+                                                                        {"ceil", RoundType::Ceil},
+                                                                        {"truncate", RoundType::Truncate}};
+    for (const auto& [id, type] : kTypes) {
+        if (id == name) {
+            return type;
+        }
+    }
+    return std::nullopt;
+}
+
 [[nodiscard]] std::optional<BinaryType> binaryNamed(std::string_view name) {
     static constexpr std::pair<std::string_view, BinaryType> kTypes[] = {
         {"add", BinaryType::Add}, {"sub", BinaryType::Sub}, {"mul", BinaryType::Mul},
@@ -250,6 +263,11 @@ std::expected<Function, std::string> DensityFunctionLoader::parseObject(const Js
         const JsonValue* value = object->find(field);
         return value == nullptr ? std::expected<Function, std::string>{functions::zero()} : parse(*value);
     };
+    const auto optionalConstant = [this, object](std::string_view field,
+                                                 float fallback) -> std::expected<Function, std::string> {
+        const JsonValue* value = object->find(field);
+        return value == nullptr ? std::expected<Function, std::string>{functions::constant(fallback)} : parse(*value);
+    };
     const auto noiseId = [object]() -> std::optional<std::string> {
         const JsonValue* value = object->find("noise");
         const auto* id = value == nullptr ? nullptr : value->get<std::string>();
@@ -355,6 +373,16 @@ std::expected<Function, std::string> DensityFunctionLoader::parseObject(const Js
         BASALT_TRY(left, child("left"));
         BASALT_TRY(right, child("right"));
         return functions::binary(*binary, *left, *right);
+    }
+    if (type == "pow") {
+        BASALT_TRY(base, child("base"));
+        BASALT_TRY(exponent, child("exponent"));
+        return functions::pow(*base, *exponent);
+    }
+    if (const std::optional<RoundType> round = roundNamed(type); round.has_value()) {
+        BASALT_TRY(input, child("input"));
+        BASALT_TRY(multiple, optionalConstant("multiple", 1.0F));
+        return functions::round(*round, *input, *multiple);
     }
     if (type == "spline") {
         const JsonValue* field = object->find("spline");

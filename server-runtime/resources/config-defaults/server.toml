@@ -277,6 +277,36 @@ max-connections-per-address = 8
 max-body-bytes = 65536
 idle-seconds = 60
 
+[network.management]
+# The server management protocol of vanilla's dedicated server (management-server-enabled, -host and -port),
+# JSON-RPC 2.0 over a WebSocket at "/" of this port: allowlist, bans, operators, players, server state and
+# settings and game rules, plus notifications. Off by default. Connect with "Authorization: Bearer <secret>", or
+# with the subprotocol "minecraft-v1,<secret>" from a browser whose Origin is listed in allowed-origins.
+enabled = false
+bind = "127.0.0.1"
+port = 25585
+# Exactly 40 letters and digits, as management-server-secret. Empty generates one on the first run and keeps it in
+# .basalt/management-secret (state, readable only by its owner); it is never written to the log.
+secret = ""
+# Serve WSS (management-server-tls-enabled). Needs PEM files; off loopback the secret crosses the network in the
+# clear without it.
+tls = false
+tls-cert = ""
+tls-key = ""
+# Browser origins allowed to authenticate with the subprotocol, as management-server-allowed-origins.
+allowed-origins = []
+# Seconds between server/status notifications, 0 for none, as status-heartbeat-interval. Changeable at runtime.
+status-heartbeat-interval = 0
+# Bad secrets from one address before it is locked out, and the first lockout (it doubles each time).
+max-failures = 5
+lockout-seconds = 30
+# Requests an address may make per minute, open connections at once, from one address, and seconds of silence
+# before a connection is dropped.
+requests-per-minute = 600
+max-connections = 16
+max-connections-per-address = 8
+idle-seconds = 60
+
 [network.query]
 # Answer GameSpy 4 status queries over UDP, as vanilla's enable-query does: server list sites and monitoring tools
 # ask it for the player names and counts. IPv4 only.

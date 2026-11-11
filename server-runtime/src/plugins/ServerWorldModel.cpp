@@ -35,6 +35,8 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/NetherPortals.hpp>
+#include <basalt/server/runtime/world/RealTrialSpawnerConfigs.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/runtime/world/maps/MapDecorationTypes.hpp>
@@ -421,6 +423,13 @@ std::vector<std::string> LoadedWorlds::registryIds(std::string_view registry) co
         return {"minecraft:desert", "minecraft:jungle", "minecraft:plains", "minecraft:savanna",
                 "minecraft:snow",   "minecraft:swamp",  "minecraft:taiga"};
     }
+    if (registry == "trial_spawner" && hooks_->trialSpawners != nullptr) {
+        std::vector<std::string> ids;
+        for (const auto& [id, definition] : hooks_->trialSpawners->entries()) {
+            ids.push_back(id.toString());
+        }
+        return ids;
+    }
     static const std::vector<wire::protocol::configuration::RegistryDataPacket> synced =
         registry::vanillaConfigurationRegistries::packets();
     for (const wire::protocol::configuration::RegistryDataPacket& packet : synced) {
@@ -437,6 +446,14 @@ std::vector<std::string> LoadedWorlds::registryIds(std::string_view registry) co
 
 std::optional<std::vector<std::uint8_t>> LoadedWorlds::registryData(std::string_view registry,
                                                                     std::string_view id) const {
+    if (registry == "trial_spawner" && hooks_->trialSpawners != nullptr) {
+        const auto parsed = wire::common::Identifier::parse(id);
+        const wire::nbt::NbtCompound* found =
+            parsed.has_value() ? hooks_->trialSpawners->definitionOf(*parsed) : nullptr;
+        return found == nullptr
+                   ? std::nullopt
+                   : std::optional{wire::nbt::nbtIO::writeAnonymous(wire::nbt::NbtTag::ofCompound(*found))};
+    }
     static const std::vector<wire::protocol::configuration::RegistryDataPacket> synced =
         registry::vanillaConfigurationRegistries::packets();
     for (const wire::protocol::configuration::RegistryDataPacket& packet : synced) {
@@ -470,6 +487,21 @@ std::vector<std::string> LoadedWorlds::entityTypeIds() const {
         ids.push_back(entry.id.toString());
     }
     return ids;
+}
+
+std::optional<std::array<double, 3>> LoadedWorlds::netherPortalExit(std::string_view from, std::string_view to,
+                                                                    double x, double y, double z, bool alongX) {
+    world::LoadedWorld* source = hooks_->worldFor ? hooks_->worldFor(std::string{from}) : nullptr;
+    world::LoadedWorld* target = hooks_->worldFor ? hooks_->worldFor(std::string{to}) : nullptr;
+    if (source == nullptr || target == nullptr) {
+        return std::nullopt;
+    }
+    const auto axis = alongX ? server::world::portal::PortalAxis::X : server::world::portal::PortalAxis::Z;
+    const std::optional<world::PortalExit> exit = world::netherPortals::exitFor(*source, *target, x, y, z, axis);
+    if (!exit.has_value()) {
+        return std::nullopt;
+    }
+    return std::array<double, 3>{exit->x, exit->y, exit->z};
 }
 
 server::plugins::PluginHandle RegistryPlaceholders::registerPlaceholder(std::string_view pluginId,

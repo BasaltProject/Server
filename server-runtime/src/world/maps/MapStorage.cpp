@@ -42,7 +42,9 @@ using wire::nbt::NbtTag;
         return std::nullopt;
     }
     NbtCompound data = *held;
-    metamorph::datafix::upgradeSavedData("map", data, root->getInt("DataVersion"));
+    if (!metamorph::datafix::upgradeSavedData("map", data, root->getInt("DataVersion")).empty()) {
+        return std::nullopt;
+    }
     return data;
 }
 

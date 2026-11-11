@@ -89,16 +89,26 @@ void AccessRepository::ban(const BanRecord& record) {
     statement.bind(6, record.createdAtEpochSeconds);
     statement.bind(7, record.expiresAtEpochSeconds);
     statement.execute();
+    if (observer_) {
+        observer_(
+            AccessChange{AccessChange::Type::Banned, record.kind, record.subject, record.name.value_or(""), record});
+    }
 }
 
 bool AccessRepository::pardon(std::string_view subject, BanKind kind) {
-    if (!banOf(subject, kind).has_value()) {
+    const std::optional<BanRecord> held = banOf(subject, kind);
+    if (!held.has_value()) {
         return false;
     }
     wire::sql::Statement statement = database_->prepare("DELETE FROM ban WHERE subject = ? AND kind = ?");
     statement.bind(1, subject);
     statement.bind(2, storedNameOf(kind));
-    return statement.execute();
+    const bool removed = statement.execute();
+    if (removed && observer_) {
+        observer_(AccessChange{AccessChange::Type::Pardoned, kind, std::string{subject}, held->name.value_or(""),
+                               std::nullopt});
+    }
+    return removed;
 }
 
 std::vector<WhitelistEntry> AccessRepository::whitelist() {
@@ -134,14 +144,29 @@ void AccessRepository::addToWhitelist(const WhitelistEntry& entry) {
     statement.bind(2, entry.name);
     statement.bind(3, entry.addedAtEpochSeconds);
     statement.execute();
+    if (observer_) {
+        observer_(
+            AccessChange{AccessChange::Type::WhitelistAdded, BanKind::Player, entry.uuid, entry.name, std::nullopt});
+    }
 }
 
 bool AccessRepository::removeFromWhitelist(std::string_view uuid) {
+    std::string name;
+    for (const WhitelistEntry& entry : observer_ ? whitelist() : std::vector<WhitelistEntry>{}) {
+        if (entry.uuid == uuid) {
+            name = entry.name;
+        }
+    }
     if (!isWhitelisted(uuid)) {
         return false;
     }
     wire::sql::Statement statement = database_->prepare("DELETE FROM whitelist WHERE uuid = ?");
     statement.bind(1, uuid);
-    return statement.execute();
+    const bool removed = statement.execute();
+    if (removed && observer_) {
+        observer_(
+            AccessChange{AccessChange::Type::WhitelistRemoved, BanKind::Player, std::string{uuid}, name, std::nullopt});
+    }
+    return removed;
 }
 } // namespace basalt::server::storage

@@ -242,6 +242,86 @@ RegionStore::Age RegionStore::ageOf(std::int32_t chunkX, std::int32_t chunkZ) {
     return peekDataVersion(blob) < metamorph::datafix::kCurrentVersion ? Age::MaybeOld : Age::Current;
 }
 
+std::optional<std::vector<std::uint8_t>> RegionStore::rawChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::int32_t regionX = chunkX >> 5;
+    const std::int32_t regionZ = chunkZ >> 5;
+    if (!ensureLoaded(regionX, regionZ)) {
+        return std::nullopt;
+    }
+    const std::lock_guard<std::mutex> lock{mutex_};
+    const LinearRegion* held = touch(key(regionX, regionZ));
+    if (held == nullptr) {
+        return std::nullopt;
+    }
+    const std::span<const std::uint8_t> blob = held->chunkAt(chunkX & 31, chunkZ & 31);
+    if (blob.empty()) {
+        return std::nullopt;
+    }
+    return std::vector<std::uint8_t>(blob.begin(), blob.end());
+}
+
+bool RegionStore::hasChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::int32_t regionX = chunkX >> 5;
+    const std::int32_t regionZ = chunkZ >> 5;
+    if (!ensureLoaded(regionX, regionZ)) {
+        return false;
+    }
+    const std::lock_guard<std::mutex> lock{mutex_};
+    const LinearRegion* held = touch(key(regionX, regionZ));
+    return held != nullptr && held->hasChunkAt(chunkX & 31, chunkZ & 31);
+}
+
+bool RegionStore::writeRawChunk(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::uint8_t> nbt,
+                                std::int32_t timestamp) {
+    {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        if (unreadableChunks_.contains(key(chunkX, chunkZ)) ||
+            unreadableRegions_.contains(key(chunkX >> 5, chunkZ >> 5))) {
+            return false;
+        }
+    }
+    const std::lock_guard<std::mutex> writeLock{writeMutex_};
+    if (closed_) {
+        return false;
+    }
+    const std::int64_t regionKey = key(chunkX >> 5, chunkZ >> 5);
+    {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        LinearRegion* target = region(chunkX >> 5, chunkZ >> 5);
+        if (target == nullptr) {
+            target = &store(regionKey, LinearRegion{});
+        }
+        if (nbt.empty()) {
+            target->clearChunk(chunkX & 31, chunkZ & 31);
+        } else {
+            target->setChunk(chunkX & 31, chunkZ & 31, std::vector<std::uint8_t>(nbt.begin(), nbt.end()), timestamp);
+        }
+        dirtyRegions_.insert(regionKey);
+    }
+    return flushDirty() > 0;
+}
+
+std::vector<std::int32_t> RegionStore::storedChunks(std::int32_t regionX, std::int32_t regionZ) {
+    std::vector<std::int32_t> found;
+    if (!ensureLoaded(regionX, regionZ)) {
+        return found;
+    }
+    const std::lock_guard<std::mutex> lock{mutex_};
+    const LinearRegion* held = touch(key(regionX, regionZ));
+    if (held == nullptr) {
+        return found;
+    }
+    for (std::int32_t localZ = 0; localZ < 32; ++localZ) {
+        for (std::int32_t localX = 0; localX < 32; ++localX) {
+            if (held->hasChunkAt(localX, localZ)) {
+                found.push_back((regionX << 5) + localX);
+                found.push_back((regionZ << 5) + localZ);
+            }
+        }
+    }
+    return found;
+}
+
 std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     const std::int32_t regionX = chunkX >> 5;
     const std::int32_t regionZ = chunkZ >> 5;

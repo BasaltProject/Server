@@ -809,6 +809,14 @@ Function binary(BinaryType type, Function left, Function right) {
     return std::make_shared<const nodes::Binary>(type, std::move(left), std::move(right));
 }
 
+Function pow(Function base, Function exponent) {
+    return std::make_shared<const nodes::Pow>(std::move(base), std::move(exponent));
+}
+
+Function round(RoundType type, Function input, Function multiple) {
+    return std::make_shared<const nodes::Round>(type, std::move(input), std::move(multiple));
+}
+
 Function spline(std::shared_ptr<const Spline> spline) {
     return std::make_shared<const nodes::SplineNode>(std::move(spline));
 }

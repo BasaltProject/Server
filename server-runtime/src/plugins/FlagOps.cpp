@@ -144,6 +144,22 @@ void addFlags(Table& table) {
             entity::neutralAnger::stateOf(entity).staredAt = asBool(value);
             return true;
         }};
+    table["enderman_creepy"] =
+        Accessor{[](const ServerEntity& entity) -> Value {
+                     const auto* anger = entity.neutral.get();
+                     return anger != nullptr && anger->creepy.has_value() && anger->creepyTarget == entity.targetId
+                                ? *anger->creepy
+                                : entity.targetId.has_value();
+                 },
+                 [](ServerEntity& entity, const Value& value) {
+                     if (entity.type().path() != "enderman") {
+                         return false;
+                     }
+                     entity::neutralAnger::Anger& anger = entity::neutralAnger::stateOf(entity);
+                     anger.creepy = asBool(value);
+                     anger.creepyTarget = entity.targetId;
+                     return true;
+                 }};
     table["piglin_cannot_hunt"] =
         viaState(&ServerEntity::piglin, &entity::piglins::PiglinState::cannotHunt, true, ensurePiglin);
     table["piglin_dancing"] =

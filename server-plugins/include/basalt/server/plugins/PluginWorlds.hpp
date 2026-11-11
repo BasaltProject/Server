@@ -200,6 +200,18 @@ public:
     }
 
     [[nodiscard]] virtual std::vector<std::string> entityTypeIds() const { return {}; }
+
+    /// Finds or builds the nether portal an entity at x,y,z of `from` lands in within `to`; returns its feet position.
+    [[nodiscard]] virtual std::optional<std::array<double, 3>>
+    netherPortalExit(std::string_view from, std::string_view to, double x, double y, double z, bool alongX) {
+        static_cast<void>(from);
+        static_cast<void>(to);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(alongX);
+        return std::nullopt;
+    }
 };
 
 class PluginPlaceholders {

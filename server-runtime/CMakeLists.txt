@@ -37,6 +37,7 @@ basalt_module(server-runtime-core
         src/config/ForwardingConfig.cpp
         src/config/RemoteConfig.cpp
         src/remote/BasaltServerRemote.cpp
+        src/remote/ManagementBackendImpl.cpp
         src/remote/RemoteHostImpl.cpp
         src/config/MobsConfig.cpp
         src/config/GameplayRules.cpp

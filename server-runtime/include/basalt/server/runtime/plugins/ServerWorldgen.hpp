@@ -31,6 +31,8 @@ public:
     [[nodiscard]] std::optional<server::plugins::PluginTerrainShape> shape(std::string_view settings) override;
     [[nodiscard]] std::optional<double> density(std::string_view settings, std::int64_t seed, std::string_view function,
                                                 std::int32_t x, std::int32_t y, std::int32_t z) override;
+    [[nodiscard]] std::optional<double> densityTree(std::string_view settings, std::int64_t seed, std::string_view json,
+                                                    std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::optional<double> noise(std::string_view settings, std::int64_t seed, std::string_view id,
                                               double x, double y, double z) override;
     [[nodiscard]] std::optional<std::int64_t> createNoise(std::string_view id,

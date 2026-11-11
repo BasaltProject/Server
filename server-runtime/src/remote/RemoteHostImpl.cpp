@@ -61,6 +61,8 @@ class Host final : public server::remote::RemoteHost {
 public:
     explicit Host(Sources sources) : s_(sources) {}
 
+    [[nodiscard]] server::remote::ManagementBackend* management() override { return s_.management; }
+
     void runOnServerThread(std::function<void()> work) override {
         const command::CommandEnvironment& environment = s_.dispatcher->environment();
         const auto named = environment.options().worlds.find(environment.options().defaultWorldName);

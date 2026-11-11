@@ -102,7 +102,7 @@ void ClientSession::handleHandshake(std::int32_t packetId, wire::io::ByteBuffer&
     switch (packet->intent) {
     case wire::protocol::handshake::ClientIntent::Status:
         // parity: `ServerHandshakePacketListenerImpl` drops a status request when `enable-status` is off.
-        if (!options_.tuning.statusReplies) {
+        if (!options_.tuning.live->statusReplies.load(std::memory_order_relaxed)) {
             connection_.close();
             return;
         }
@@ -113,7 +113,7 @@ void ClientSession::handleHandshake(std::int32_t packetId, wire::io::ByteBuffer&
         break;
     case wire::protocol::handshake::ClientIntent::Transfer:
         // parity: `ServerHandshakePacketListenerImpl.handleIntention`, TRANSFER without `accepts-transfers`.
-        if (!options_.tuning.acceptsTransfers) {
+        if (!options_.tuning.live->acceptsTransfers.load(std::memory_order_relaxed)) {
             state_ = wire::protocol::ProtocolState::Login;
             refuseLogin(messageFor("transfers-disabled",
                                    wire::text::Component::translatable("multiplayer.disconnect.transfers_disabled")));

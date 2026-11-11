@@ -4,6 +4,7 @@
 #include <basalt/server/remote/RemoteSettings.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
+#include <cstdint>
 #include <expected>
 #include <memory>
 #include <string>
@@ -25,6 +26,11 @@ public:
 
     /// Callable from any thread; a no-op while nobody listens to the console stream.
     void publishLog(std::string_view line);
+
+    /// Callable from any thread; a no-op while no client takes notifications.
+    void publishNotification(std::string frame);
+
+    void setHeartbeatSeconds(std::int32_t seconds);
 
 private:
     struct Impl;

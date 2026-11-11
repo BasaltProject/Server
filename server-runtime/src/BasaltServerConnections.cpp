@@ -117,8 +117,8 @@ void fillPlayer(server::plugins::PluginEvent& event, const player::PlayerSession
 
 // parity: `MinecraftServer.kickUnlistedPlayers`.
 void BasaltServer::kickUnlistedPlayers() {
-    if (!config_->tuning.enforceWhitelist || !whitelistEnforced_ || playerStore_ == nullptr ||
-        !playerStore_->isOpen()) {
+    if (!config_->tuning.live->enforceWhitelist.load(std::memory_order_relaxed) || !whitelistEnforced_ ||
+        playerStore_ == nullptr || !playerStore_->isOpen()) {
         return;
     }
     const std::shared_ptr<const config::ConfigSnapshot> snapshot = live_->current();

@@ -165,6 +165,12 @@ std::expected<ServerTuning, std::string> ServerTuning::fromToml(const TomlTable&
         }
         tuning.logIps = logging->boolean("log-ips").value_or(tuning.logIps);
     }
+    tuning.live->forceGamemode = tuning.forceGamemode;
+    tuning.live->enforceWhitelist = tuning.enforceWhitelist;
+    tuning.live->acceptsTransfers = tuning.acceptsTransfers;
+    tuning.live->allowFlight = tuning.allowFlight;
+    tuning.live->statusReplies = tuning.statusReplies;
+    tuning.live->entityBroadcastRangePercentage = tuning.entityBroadcastRangePercentage;
     return tuning;
 }
 
