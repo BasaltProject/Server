@@ -521,7 +521,8 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         const play::LevelEventPacket effect{
             .event = play::LevelEventPacket::kParticlesDestroyBlock, .pos = pos, .data = *broken};
         for (const PlayerSession* other : watchers) {
-            if (other->entityId() == session->entityId()) {
+            // A Java client plays its own break effect; a Bedrock one is only told.
+            if (other->entityId() == session->entityId() && !other->connection().playSound) {
                 continue;
             }
             if (other->connection().sendLevelEvent) {

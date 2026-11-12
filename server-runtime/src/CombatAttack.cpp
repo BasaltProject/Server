@@ -298,6 +298,11 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     if (result.died) {
         killEntity(*target);
     } else {
+        for (player::PlayerSession* watcher : owner_->playersInSameWorld()) {
+            if (watcher->connection().playSound && watcher->connection().showDamage) {
+                watcher->connection().showDamage(target->entityId(), -1, session->entityId());
+            }
+        }
         owner_->broadcastSound(entity::entityCombat::hurtSound(*target), target->x, target->y, target->z,
                                SoundSource::Hostile);
     }

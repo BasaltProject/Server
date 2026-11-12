@@ -20,6 +20,7 @@ basalt_module(server-runtime-core
         src/bedrock/BedrockListener.cpp
         src/bedrock/BedrockMaps.cpp
         src/bedrock/BedrockPlayer.cpp
+        src/bedrock/BedrockJavaSkin.cpp
         src/bedrock/BedrockSeen.cpp
         src/bedrock/BedrockShield.cpp
         src/bedrock/BedrockPlayerConnection.cpp

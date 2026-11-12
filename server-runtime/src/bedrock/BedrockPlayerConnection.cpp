@@ -669,13 +669,24 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             return;
         }
         // A sound with no name is a numbered event there, which is how the hits of a fight reach that client.
-        const std::int32_t event = wire::bedrock::bedrockSoundEvent(sound, protocol);
-        if (event < 0) {
+        const std::string_view event = wire::bedrock::bedrockSoundEventName(sound);
+        if (event.empty()) {
             return;
         }
         wire::io::ByteBuffer body;
         wire::bedrock::writeLevelSoundEvent(body, event, static_cast<float>(x), static_cast<float>(y),
                                             static_cast<float>(z), protocol);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelSoundEvent), body.toVector());
+    };
+
+    // The material a block sounds like comes from the block named in the event, so the state travels with it.
+    connection.placedBlockSound = [mailbox = joining.mailbox,
+                                   protocol = joining.protocol](const std::int32_t x, const std::int32_t y,
+                                                                const std::int32_t z, const std::int32_t stateId) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeLevelSoundEvent(
+            body, "place", static_cast<float>(x) + 0.5F, static_cast<float>(y) + 0.5F, static_cast<float>(z) + 0.5F,
+            protocol, static_cast<std::int32_t>(wire::bedrock::bedrockBlockId(stateId, protocol)));
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelSoundEvent), body.toVector());
     };
 
@@ -864,16 +875,19 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Transfer), body.toVector(), true);
     };
 
-    connection.sendSwing = [mailbox = joining.mailbox](const std::int32_t entityId, bool) {
-        // One arm on Bedrock: there is no packet for the other hand, and the wrong arm is worse than the expected one.
+    connection.sendSwing = [mailbox = joining.mailbox, protocol = joining.protocol](const std::int32_t entityId,
+                                                                                    const bool offhand) {
+        // Before 26.60 there is one arm on Bedrock, and the wrong arm is worse than the expected one.
         wire::io::ByteBuffer body;
-        wire::bedrock::writeAnimate(body, runtimeIdFor(entityId), wire::bedrock::BedrockAnimation::SwingArm);
+        wire::bedrock::writeAnimate(body, runtimeIdFor(entityId), wire::bedrock::BedrockAnimation::SwingArm, protocol,
+                                    offhand);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Animate), body.toVector());
     };
 
-    connection.showCriticalHit = [mailbox = joining.mailbox](const std::int32_t entityId) {
+    connection.showCriticalHit = [mailbox = joining.mailbox, protocol = joining.protocol](const std::int32_t entityId) {
         wire::io::ByteBuffer body;
-        wire::bedrock::writeAnimate(body, runtimeIdFor(entityId), wire::bedrock::BedrockAnimation::CriticalHit);
+        wire::bedrock::writeAnimate(body, runtimeIdFor(entityId), wire::bedrock::BedrockAnimation::CriticalHit,
+                                    protocol);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Animate), body.toVector());
     };
 
@@ -914,48 +928,10 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (session_ == nullptr || !context_.commandList) {
             return;
         }
-        // TEMPORARY: the one packet the join burst never contained, and the only thing `/op` sends.
-        if (const char* const drop = std::getenv("BASALT_BEDROCK_DROP");
-            drop != nullptr && std::string_view{drop}.find("commandtree") != std::string_view::npos) {
-            context_.logger.warn([] { return "Leaving out of the Bedrock join: commandtree"; });
-            return;
-        }
-        // TEMPORARY: operator command names carry hyphens and Bedrock has no native command that does.
-        const char* const drop = std::getenv("BASALT_BEDROCK_DROP");
-        const bool withoutHyphens = drop != nullptr && std::string_view{drop}.find("hyphens") != std::string_view::npos;
         std::vector<wire::bedrock::CommandInfo> commands;
         for (auto& [name, usage] : context_.commandList(*session_)) {
-            if (withoutHyphens && name.find('-') != std::string::npos) {
-                continue;
-            }
             commands.push_back(wire::bedrock::CommandInfo{std::move(name), fitsInACommandTip(usage)});
         }
-        if (withoutHyphens) {
-            context_.logger.warn([] { return "Leaving out of the Bedrock command tree: hyphenated names"; });
-        }
-        // TEMPORARY: `BASALT_BEDROCK_COMMANDS=n` offers only the first n, to find the entry a client refuses.
-        if (const char* const most = std::getenv("BASALT_BEDROCK_COMMANDS"); most != nullptr) {
-            const auto kept = static_cast<std::size_t>(std::atoll(most));
-            if (commands.size() > kept) {
-                commands.resize(kept);
-            }
-            context_.logger.warn([&commands] {
-                std::string names;
-                for (std::size_t at = commands.size() >= 8 ? commands.size() - 8 : 0; at < commands.size(); ++at) {
-                    names += (names.empty() ? "" : ", ") + commands[at].name;
-                }
-                return "Offering only " + std::to_string(commands.size()) +
-                       " Bedrock command(s), the last of them: " + names;
-            });
-        }
-        // TEMPORARY: the whole list in order, which is how to name the one a client will not take.
-        context_.logger.debug([&commands] {
-            std::string named;
-            for (std::size_t at = 0; at < commands.size(); ++at) {
-                named += (named.empty() ? "" : " ") + std::to_string(at) + ":" + commands[at].name;
-            }
-            return "Bedrock commands offered: " + named;
-        });
         wire::io::ByteBuffer body;
         wire::bedrock::writeAvailableCommands(body, commands);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AvailableCommands), body.toVector());

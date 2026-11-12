@@ -407,8 +407,11 @@ void CombatSystem::announceEntityHit(const std::vector<PlayerSession*>& watchers
         entity.ambientSoundTime = -entity::mobSounds::ambientInterval(entity);
     }
     for (PlayerSession* watcher : watchers) {
-        // A client on the other edition hears only the hit: flinch and knockback come from entity sync metadata.
+        // A client on the other edition is told the flash and the hit; knockback comes from entity sync metadata.
         if (watcher->connection().playSound) {
+            if (!died && watcher->connection().showDamage) {
+                watcher->connection().showDamage(entity.entityId(), registryId, causeEntityId);
+            }
             watcher->connection().playSound(sound, entity.x, entity.y, entity.z, volume, pitch);
             continue;
         }

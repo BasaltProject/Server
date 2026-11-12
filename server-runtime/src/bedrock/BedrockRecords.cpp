@@ -45,7 +45,7 @@ void BedrockRecords::stopped(const std::int32_t x, const std::int32_t y, const s
     const Position at{x, y, z};
     wire::io::ByteBuffer body;
     if (const auto handle = handles_.find(at); handle != handles_.end()) {
-        wire::bedrock::writeStopSoundHandle(body, handle->second);
+        wire::bedrock::writeStopSoundHandle(body, handle->second, protocol_);
         handles_.erase(handle);
         post_(wire::bedrock::BedrockPacket::ClientboundUpdateSoundData, body.toVector());
     } else if (const auto name = names_.find(at); name != names_.end()) {

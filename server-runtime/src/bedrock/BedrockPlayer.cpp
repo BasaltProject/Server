@@ -19,6 +19,8 @@
 #include <basalt/wire/bedrock/BedrockParticles.hpp>
 #include <basalt/wire/bedrock/BedrockSounds.hpp>
 #include <basalt/wire/common/json/Json.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
+#include <basalt/wire/protocol/play/PlayPackets.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
@@ -228,6 +230,16 @@ BedrockPlayer::~BedrockPlayer() {
     announceAndSay(Component::translatable("multiplayer.player.left", {Component::text(session_->name())})
                        .color(wire::text::kYellow));
     if (context_.registry != nullptr) {
+        // A Java client keeps the tab entry of whoever never says they left, and a Bedrock player never could.
+        for (const player::PlayerSession* other : context_.registry->snapshot()) {
+            if (other->uuid() == session_->uuid() || !other->connection().sendPlayPacket) {
+                continue;
+            }
+            other->connection().sendPlayPacket(
+                wire::protocol::play::PlayerInfoRemovePacket::kId, [this](wire::io::ByteBuffer& buffer) {
+                    wire::protocol::play::PlayerInfoRemovePacket{.players = {session_->uuid()}}.write(buffer);
+                });
+        }
         context_.registry->remove(session_->uuid());
         // Retired rather than deleted: this runs on the listener thread and the tick loop may still hold this player.
         context_.registry->retire(std::move(session_));
@@ -354,6 +366,13 @@ void BedrockPlayer::blockAction(const std::int32_t action, const std::int32_t x,
         return;
     }
     context_.breakBlock(*session_, x, y, z);
+    // The crack stays on the spot after the block is gone, and shows again on whatever is put there next.
+    diggingAt_.reset();
+    diggingTicks_ = 0;
+    wire::io::ByteBuffer body;
+    wire::bedrock::writeLevelEvent(body, wire::bedrock::LevelEventType::BlockStopBreak, static_cast<float>(x),
+                                   static_cast<float>(y), static_cast<float>(z), 0);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
 }
 
 void BedrockPlayer::useItemOn(const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t face,
@@ -792,6 +811,35 @@ void BedrockPlayer::move(const double x, const double y, const double z, const f
     session_->z = z;
     session_->yaw = yaw;
     session_->pitch = pitch;
+
+    // A Java client is told where a player is by that player's own connection, so a Bedrock one has to say it here.
+    const std::array<double, 5> now{x, y, z, static_cast<double>(yaw), static_cast<double>(pitch)};
+    if (toldOthers_ && now == lastTold_) {
+        return;
+    }
+    toldOthers_ = true;
+    lastTold_ = now;
+    if (context_.registry == nullptr) {
+        return;
+    }
+    const wire::protocol::play::EntityTeleportPacket moved{.entityId = session_->entityId(),
+                                                           .x = x,
+                                                           .y = y,
+                                                           .z = z,
+                                                           .yaw = yaw,
+                                                           .pitch = pitch,
+                                                           .onGround = session_->onGround};
+    const wire::protocol::play::RotateHeadPacket head{.entityId = session_->entityId(), .headYaw = yaw};
+    for (const player::PlayerSession* other : context_.registry->snapshot()) {
+        if (other->uuid() == session_->uuid() || other->worldName != session_->worldName ||
+            !other->connection().sendPlayPacket) {
+            continue;
+        }
+        other->connection().sendPlayPacket(wire::protocol::play::EntityTeleportPacket::kId,
+                                           [&moved](wire::io::ByteBuffer& buffer) { moved.write(buffer); });
+        other->connection().sendPlayPacket(wire::protocol::play::RotateHeadPacket::kId,
+                                           [&head](wire::io::ByteBuffer& buffer) { head.write(buffer); });
+    }
 }
 
 void BedrockPlayer::showMenu(const std::string& title, const std::map<std::int32_t, server::plugins::PluginItem>& items,
@@ -1113,6 +1161,21 @@ void BedrockPlayer::tick() {
     if (session_ != nullptr && context_.pickupItems) {
         context_.pickupItems(*session_);
     }
+    if (session_ != nullptr && session_->connection().sendInventoryAll) {
+        // Whatever changed the inventory off this thread, the client hears of it within a sync.
+        std::size_t mark = 0;
+        for (std::int32_t slot = 0; slot < player::PlayerInventory::kMenuSlots; ++slot) {
+            const std::optional<storage::StoredItemStack> held = session_->inventory.at(slot);
+            if (held.has_value()) {
+                mark = (mark * 1000003U) ^ (std::hash<std::string>{}(held->id) + static_cast<std::size_t>(held->count) +
+                                            (static_cast<std::size_t>(slot) << 8U));
+            }
+        }
+        if (mark != inventoryMark_) {
+            inventoryMark_ = mark;
+            session_->connection().sendInventoryAll();
+        }
+    }
     if (ui_ != nullptr && session_ != nullptr) {
         const wire::common::placeholder::PlaceholderContext context =
             wire::common::placeholder::PlaceholderContext{}.with(runtime::placeholder::playerSlot(), session_.get());
@@ -1331,6 +1394,11 @@ void BedrockPlayer::syncSurroundings() {
         if (before.look != seen.look) {
             drawLook(id, seen);
         }
+        if (before.flags != seen.flags) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeEntityFlags(body, runtimeIdFor(id), seen.flags, protocol_);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
+        }
         present.emplace(id, std::move(seen));
     }
 
@@ -1381,10 +1449,14 @@ void BedrockPlayer::drawSidebar(const std::string& title, const std::vector<std:
 
     // Only what changed: these boards carry coordinates and a spinner, so some line differs every tick.
     std::vector<wire::bedrock::BedrockScoreLine> changed;
+    std::vector<std::int64_t> replaced;
     for (std::size_t at = 0; at < lines.size(); ++at) {
         std::string text = wire::text::toLegacyText(wire::text::miniMessage::parse(lines[at]));
         if (at < sidebarShown_.size() && sidebarShown_[at] == text) {
             continue;
+        }
+        if (at < sidebarShown_.size()) {
+            replaced.push_back(static_cast<std::int64_t>(at) + 1);
         }
         changed.push_back(wire::bedrock::BedrockScoreLine{.lineId = static_cast<std::int64_t>(at) + 1,
                                                           .name = std::move(text),
@@ -1396,6 +1468,8 @@ void BedrockPlayer::drawSidebar(const std::string& title, const std::vector<std:
     for (std::size_t at = lines.size(); at < sidebarShown_.size(); ++at) {
         gone.push_back(static_cast<std::int64_t>(at) + 1);
     }
+    // A client keeps the first name an id was given, so a row whose text changed is taken away and put back.
+    gone.insert(gone.end(), replaced.begin(), replaced.end());
     if (!gone.empty()) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeRemoveScores(body, kSidebarObjective, gone, protocol_);
@@ -1462,12 +1536,6 @@ void BedrockPlayer::sendColumn(const std::int32_t chunkX, const std::int32_t chu
 
 bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {
     if (session_ == nullptr || !context_.sendChunks) {
-        return false;
-    }
-    // TEMPORARY: a join with no world at all, to tell whether the columns are what a client refuses.
-    if (const char* const drop = std::getenv("BASALT_BEDROCK_DROP");
-        drop != nullptr && std::string_view{drop}.find("chunks") != std::string_view::npos) {
-        context_.logger.warn([] { return "Leaving out of the Bedrock join: chunks"; });
         return false;
     }
     const std::int32_t centreX = static_cast<std::int32_t>(std::floor(session_->x)) >> 4;
@@ -1590,6 +1658,12 @@ void BedrockPlayer::syncOthers() {
 
         const auto known = others_.find(other->uuid());
         if (known == others_.end()) {
+            // A Java account's own skin takes a moment to arrive, and the list entry cannot be changed cheaply after.
+            if (skins_ != nullptr && !skins_->of(other->uuid()).has_value() && !other->profileProperties.empty() &&
+                BedrockListener::Skins::fetchJava(skins_, other->uuid(), other->profileProperties)) {
+                present.erase(other->uuid());
+                continue;
+            }
             wire::bedrock::PlayerListEntry entry;
             entry.uuidHigh = other->uuid().high();
             entry.uuidLow = other->uuid().low();

@@ -216,6 +216,27 @@ enabled = true
 # is the one every Bedrock client tries first.
 port = 19132
 
+# How Bedrock clients reach the server. NetherNet is Mojang's replacement for
+# RakNet and is the only one Bedrock 26.60 and newer still use; RakNet stays for
+# the older clients that have not updated yet, and will be removed from Basalt
+# once none are left.
+#   "both"       NetherNet and RakNet (recommended)
+#   "nethernet"  NetherNet only
+#   "raknet"     RakNet only (clients on 26.60 and newer cannot join)
+# NetherNet asks for TCP and UDP on the same machine: the TCP port is `port`
+# above, and the UDP one is `nethernet-port`.
+transport = "both"
+
+# The UDP port of NetherNet's game traffic. 0 picks `port` when RakNet is off
+# and `port` + 1 when it is on, since RakNet already holds `port` over UDP.
+nethernet-port = 0
+
+# The address NetherNet tells clients to send their game traffic to. Leave it
+# empty and it is the address the client reached the server on, which is right
+# unless the server sits behind NAT or a proxy that changes the address: then
+# write the public one here.
+advertise-address = ""
+
 # What goes in front of a Bedrock player's name inside the server, so a Steve
 # from each edition is two people and not one. Set it to "" on a server where
 # only Bedrock players join, and then two accounts with the same name are two

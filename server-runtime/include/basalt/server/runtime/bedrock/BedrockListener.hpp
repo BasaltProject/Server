@@ -5,9 +5,11 @@
 #include <basalt/wire/bedrock/BedrockConnection.hpp>
 #include <basalt/wire/bedrock/BedrockGate.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
+#include <basalt/wire/bedrock/NetherNetServer.hpp>
 #include <basalt/wire/bedrock/RakServer.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
+#include <basalt/wire/protocol/login/LoginPackets.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -24,13 +26,18 @@
 
 namespace basalt::server::runtime::bedrock {
 
-inline constexpr std::string_view kBedrockGameVersion = "1.26.50";
+inline constexpr std::string_view kBedrockGameVersion = "1.26.60";
 
 struct BedrockOptions {
     bool enabled = true;
     std::uint16_t port = 19132;
 
     std::string prefix = ".";
+
+    bool raknet = true;
+    bool nethernet = true;
+    std::uint16_t netherNetPort = 0;
+    std::string advertiseAddress;
 
     wire::bedrock::BedrockGate gate;
 };
@@ -71,9 +78,14 @@ public:
 
         [[nodiscard]] std::optional<wire::bedrock::SkinInfo> of(const wire::common::Uuid& who) const;
 
+        /// Starts fetching a Java account's skin once; true while it is still on its way.
+        static bool fetchJava(const std::shared_ptr<Skins>& self, const wire::common::Uuid& who,
+                              std::vector<wire::protocol::login::GameProfileProperty> properties);
+
     private:
         mutable std::mutex lock_;
         std::unordered_map<wire::common::Uuid, wire::bedrock::SkinInfo> skins_;
+        std::unordered_map<wire::common::Uuid, bool> fetching_;
     };
 
     struct Joining {
@@ -220,6 +232,12 @@ private:
     struct Session;
 
     void run();
+    void adopt(const wire::io::UdpEndpoint& key, std::unique_ptr<Session> owned);
+    void startNetherNet();
+    void refreshNetherNetStatus();
+    void onNetherNetMessage(const std::shared_ptr<wire::bedrock::NetherNetLink>& link,
+                            std::span<const std::uint8_t> payload);
+    void onNetherNetDisconnect(const std::shared_ptr<wire::bedrock::NetherNetLink>& link);
     void onConnect(wire::bedrock::RakSession& session);
     void onMessage(wire::bedrock::RakSession& session, std::span<const std::uint8_t> payload);
     void onDisconnect(wire::bedrock::RakSession& session);
@@ -236,6 +254,10 @@ private:
 
     std::shared_ptr<const wire::bedrock::EcKeyPair> keys_;
     std::unique_ptr<wire::bedrock::RakServer> server_;
+    std::unique_ptr<wire::bedrock::NetherNetServer> nether_;
+    std::mutex netherStatusLock_;
+    wire::bedrock::NetherNetStatus netherStatus_;
+    std::uint64_t netherStatusAtMs_ = 0;
     std::unordered_map<wire::io::UdpEndpoint, std::unique_ptr<Session>> sessions_;
     std::mutex carriedLock_;
     std::vector<std::shared_ptr<Session>> carried_;

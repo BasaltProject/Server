@@ -371,6 +371,9 @@ private:
     double fallDistance_ = 0.0;
     std::set<std::int64_t> shownBars_;
     std::vector<std::string> sidebarShown_;
+    std::size_t inventoryMark_ = 0;
+    std::array<double, 5> lastTold_{};
+    bool toldOthers_ = false;
     std::optional<std::string> sidebarTitle_;
 
     std::optional<std::chrono::steady_clock::time_point> drawingSince_;

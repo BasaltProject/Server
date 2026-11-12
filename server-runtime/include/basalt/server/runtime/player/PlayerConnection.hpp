@@ -75,6 +75,8 @@ struct PlayerConnection {
     std::function<void(std::int32_t type, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t data)>
         sendLevelEvent;
 
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> placedBlockSound;
+
     std::function<void(const wire::common::Uuid& id, const wire::text::Component& title, float progress, bool show)>
         showBossBar;
 

@@ -385,6 +385,11 @@ bool CombatHandler::stab(PlayerSession& session, world::LoadedWorld& world, std:
     if (died) {
         killEntity(*mob);
     } else if (hurt) {
+        for (player::PlayerSession* watcher : owner_->playersInSameWorld()) {
+            if (watcher->connection().playSound && watcher->connection().showDamage) {
+                watcher->connection().showDamage(mob->entityId(), -1, session.entityId());
+            }
+        }
         owner_->broadcastSound(entity::entityCombat::hurtSound(*mob), mob->x, mob->y, mob->z, SoundSource::Hostile);
     }
     return true;

@@ -622,6 +622,10 @@ void BasaltServer::startBedrockListener() {
     options.enabled = true;
     options.port = static_cast<std::uint16_t>(config_->bedrockPort);
     options.prefix = config_->bedrockPrefix;
+    options.raknet = config_->bedrockTransport != "nethernet";
+    options.nethernet = config_->bedrockTransport != "raknet";
+    options.netherNetPort = static_cast<std::uint16_t>(config_->bedrockNetherNetPort);
+    options.advertiseAddress = config_->bedrockAdvertiseAddress;
 
     // A list naming a protocol this build has no codec for is reported rather than accepted.
     std::set<std::int32_t> speakable = wire::bedrock::BedrockGate::buildSupport();
@@ -1005,6 +1009,9 @@ void BasaltServer::startBedrockListener() {
                 for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
                     if (watcher->worldName != session->worldName) {
                         continue;
+                    }
+                    if (!result.died && watcher->connection().playSound && watcher->connection().showDamage) {
+                        watcher->connection().showDamage(target->entityId(), -1, session->entityId());
                     }
                     player::playSoundFor(*watcher,
                                          result.died ? entity::entityCombat::deathSound(*target)

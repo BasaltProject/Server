@@ -345,6 +345,20 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
             }
             config.bedrockPort = static_cast<std::int32_t>(port.value_or(defaults.bedrockPort));
             config.bedrockPrefix = std::string{bedrock->string("prefix").value_or(defaults.bedrockPrefix)};
+            config.bedrockTransport = std::string{bedrock->string("transport").value_or(defaults.bedrockTransport)};
+            if (config.bedrockTransport != "both" && config.bedrockTransport != "raknet" &&
+                config.bedrockTransport != "nethernet") {
+                return std::unexpected(std::string{path} +
+                                       ": the bedrock transport must be \"both\", \"raknet\" or \"nethernet\"");
+            }
+            const std::optional<std::int64_t> netherNetPort = bedrock->integer("nethernet-port");
+            if (netherNetPort.has_value() && (*netherNetPort < 0 || *netherNetPort > 65535)) {
+                return std::unexpected(std::string{path} + ": the bedrock nethernet-port must be between 0 and 65535");
+            }
+            config.bedrockNetherNetPort =
+                static_cast<std::int32_t>(netherNetPort.value_or(defaults.bedrockNetherNetPort));
+            config.bedrockAdvertiseAddress =
+                std::string{bedrock->string("advertise-address").value_or(defaults.bedrockAdvertiseAddress)};
         }
     }
     if (!config.javaEnabled && !config.bedrockEnabled) {

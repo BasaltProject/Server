@@ -33,6 +33,12 @@ struct BasaltConfig {
     bool bedrockEnabled = true;
     std::int32_t bedrockPort = 19132;
     std::string bedrockPrefix = ".";
+    /// "both", "raknet" or "nethernet": which transports Bedrock clients may connect over.
+    std::string bedrockTransport = "both";
+    /// UDP port of NetherNet's WebRTC traffic; 0 picks one that does not clash with RakNet's.
+    std::int32_t bedrockNetherNetPort = 0;
+    /// The address NetherNet tells clients to send to; empty uses the one they reached the server on.
+    std::string bedrockAdvertiseAddress;
     std::int32_t maxPlayers = 80;
     bool onlineMode = true;
     /// parity: `enforce-secure-profile`, which only matters in online mode.

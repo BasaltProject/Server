@@ -1,11 +1,16 @@
+#include <basalt/server/runtime/bedrock/BedrockJavaSkin.hpp>
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
 #include <basalt/wire/bedrock/BedrockMaps.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/bedrock/BedrockTypes.hpp>
 #include <basalt/wire/common/timings/NativeSampler.hpp>
+#include <basalt/wire/io/Platform.hpp>
 
 #include <chrono>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <set>
 #include <utility>
 
@@ -73,6 +78,8 @@ using wire::bedrock::RakSession;
 // Twenty milliseconds: short enough that an acknowledgement is never late, long enough not to spin when idle.
 constexpr int kPollTimeoutMillis = 20;
 
+constexpr std::uint64_t kNetherNetStatusRefreshMillis = 1000;
+
 constexpr std::int32_t kInitialRadius = 4;
 
 // A join glued every column into one batch of over a megabyte; sending a turn's worth at a time keeps pieces readable.
@@ -135,7 +142,8 @@ private:
 } // namespace
 
 struct BedrockListener::Session {
-    RakSession* transport = nullptr;
+    wire::bedrock::BedrockTransport* transport = nullptr;
+    std::shared_ptr<wire::bedrock::NetherNetLink> nether;
     std::optional<BedrockConnection> rak;
     std::unique_ptr<Channel> link;
     std::string address;
@@ -160,6 +168,16 @@ struct BedrockListener::Session {
         link = std::make_unique<RakChannel>(*rak);
     }
 
+    Session(std::shared_ptr<wire::bedrock::NetherNetLink> carrier, std::shared_ptr<const wire::bedrock::EcKeyPair> keys,
+            std::string gameVersion, wire::bedrock::BedrockGate gate)
+        : transport(carrier.get()), nether(carrier), address(carrier->peer().toString()) {
+        rak.emplace(*carrier, std::move(keys), std::move(gameVersion), std::move(gate));
+        if (!carrier->identityKey().empty()) {
+            rak->expectIdentity(carrier->identityKey());
+        }
+        link = std::make_unique<RakChannel>(*rak);
+    }
+
     Session(std::unique_ptr<Channel> channel, std::string from) : link(std::move(channel)), address(std::move(from)) {}
 };
 
@@ -171,6 +189,29 @@ void BedrockListener::Skins::remember(const wire::common::Uuid& who, wire::bedro
 void BedrockListener::Skins::forget(const wire::common::Uuid& who) {
     const std::lock_guard<std::mutex> guard{lock_};
     skins_.erase(who);
+}
+
+bool BedrockListener::Skins::fetchJava(const std::shared_ptr<Skins>& self, const wire::common::Uuid& who,
+                                       std::vector<wire::protocol::login::GameProfileProperty> properties) {
+    {
+        const std::lock_guard<std::mutex> guard{self->lock_};
+        if (self->skins_.contains(who)) {
+            return false;
+        }
+        if (const auto known = self->fetching_.find(who); known != self->fetching_.end()) {
+            return known->second;
+        }
+        self->fetching_.emplace(who, true);
+    }
+    std::thread{[self, who, properties = std::move(properties)] {
+        std::optional<wire::bedrock::SkinInfo> skin = javaSkinOf(properties);
+        const std::lock_guard<std::mutex> guard{self->lock_};
+        if (skin.has_value()) {
+            self->skins_.insert_or_assign(who, std::move(*skin));
+        }
+        self->fetching_.insert_or_assign(who, false);
+    }}.detach();
+    return true;
 }
 
 std::optional<wire::bedrock::SkinInfo> BedrockListener::Skins::of(const wire::common::Uuid& who) const {
@@ -265,29 +306,142 @@ bool BedrockListener::start() {
     }
     keys_ = std::make_shared<const wire::bedrock::EcKeyPair>(std::move(*keys));
 
-    wire::bedrock::RakServerConfig config;
-    config.port = options_.port;
-    server_ = std::make_unique<wire::bedrock::RakServer>(config);
-    if (const auto started = server_->start(); !started) {
-        logger_.warn([this] {
-            return "Could not bind UDP port " + std::to_string(options_.port) +
-                   " for Bedrock. Something else is on it, which is usually the last run of this "
-                   "server still letting go of it: try again, or change `port` under "
-                   "[network.bedrock] in config/server.toml.";
-        });
-        server_.reset();
+    if (options_.raknet) {
+        wire::bedrock::RakServerConfig config;
+        config.port = options_.port;
+        server_ = std::make_unique<wire::bedrock::RakServer>(config);
+        if (const auto started = server_->start(); !started) {
+            logger_.warn([this] {
+                return "Could not bind UDP port " + std::to_string(options_.port) +
+                       " for Bedrock. Something else is on it, which is usually the last run of this "
+                       "server still letting go of it: try again, or change `port` under "
+                       "[network.bedrock] in config/server.toml.";
+            });
+            server_.reset();
+        } else {
+            server_->onAdvertise([this] { return advertisement(); });
+            server_->onConnect([this](RakSession& session) { onConnect(session); });
+            server_->onMessage(
+                [this](RakSession& session, std::span<const std::uint8_t> payload) { onMessage(session, payload); });
+            server_->onDisconnect([this](RakSession& session) { onDisconnect(session); });
+        }
+    }
+    if (options_.nethernet) {
+        startNetherNet();
+    }
+    if (server_ == nullptr && nether_ == nullptr) {
         return false;
     }
-
-    server_->onAdvertise([this] { return advertisement(); });
-    server_->onConnect([this](RakSession& session) { onConnect(session); });
-    server_->onMessage(
-        [this](RakSession& session, std::span<const std::uint8_t> payload) { onMessage(session, payload); });
-    server_->onDisconnect([this](RakSession& session) { onDisconnect(session); });
 
     running_.store(true);
     thread_ = std::jthread{[this] { run(); }};
     return true;
+}
+
+namespace {
+
+constexpr std::string_view kNetherNetIdentityFile = ".basalt/nethernet-identity.der";
+
+/// The key a client pins on first use, so it has to survive a restart or every player is asked again.
+std::shared_ptr<const wire::bedrock::EcKeyPair> loadOrCreateNetherNetIdentity(const wire::common::Logger& logger) {
+    const std::filesystem::path path{kNetherNetIdentityFile};
+    if (std::ifstream in{path, std::ios::binary}; in) {
+        const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+        if (auto key = wire::bedrock::EcKeyPair::fromPrivateDer(bytes)) {
+            return std::make_shared<const wire::bedrock::EcKeyPair>(std::move(*key));
+        }
+        logger.warn([] { return "The saved NetherNet identity is unreadable, so a new one is made."; });
+    }
+    auto key = wire::bedrock::EcKeyPair::generate();
+    if (!key) {
+        return nullptr;
+    }
+    if (const auto der = key->privateKeyDer(); der) {
+        std::error_code ignored;
+        std::filesystem::create_directories(path.parent_path(), ignored);
+        std::ofstream out{path, std::ios::binary | std::ios::trunc};
+        out.write(reinterpret_cast<const char*>(der->data()), static_cast<std::streamsize>(der->size()));
+        if (!out) {
+            logger.warn(
+                [] { return "Could not save the NetherNet identity: players will be asked to trust it again."; });
+        }
+    }
+    return std::make_shared<const wire::bedrock::EcKeyPair>(std::move(*key));
+}
+
+} // namespace
+
+void BedrockListener::startNetherNet() {
+    wire::bedrock::NetherNetConfig config;
+    config.signalingPort = options_.port;
+    if (options_.netherNetPort != 0) {
+        config.icePort = options_.netherNetPort;
+    } else if (options_.raknet) {
+        config.icePort = options_.port == 65535 ? static_cast<std::uint16_t>(options_.port - 1)
+                                                : static_cast<std::uint16_t>(options_.port + 1);
+    }
+    config.advertiseHost = options_.advertiseAddress;
+    config.identityKey = loadOrCreateNetherNetIdentity(logger_);
+
+    nether_ = std::make_unique<wire::bedrock::NetherNetServer>(std::move(config));
+    nether_->onStatus([this] {
+        const std::lock_guard<std::mutex> guard{netherStatusLock_};
+        return netherStatus_;
+    });
+    nether_->onConnect([this](const std::shared_ptr<wire::bedrock::NetherNetLink>& link) {
+        // Shutting down: letting one in means a player who joins mid-save and is never saved.
+        if (!accepting_.load()) {
+            link->close();
+            return;
+        }
+        adopt(link->peer(), std::make_unique<Session>(link, keys_, gameVersion_, options_.gate));
+    });
+    nether_->onMessage([this](const std::shared_ptr<wire::bedrock::NetherNetLink>& link,
+                              std::span<const std::uint8_t> payload) { onNetherNetMessage(link, payload); });
+    nether_->onDisconnect(
+        [this](const std::shared_ptr<wire::bedrock::NetherNetLink>& link) { onNetherNetDisconnect(link); });
+    refreshNetherNetStatus();
+
+    if (const auto started = nether_->start(); !started) {
+        logger_.warn([this, &started] {
+            return "Could not start NetherNet for Bedrock: " + started.error() + ". NetherNet needs TCP port " +
+                   std::to_string(options_.port) +
+                   " and a UDP port of its own: change `port` or `nethernet-port` under [network.bedrock] in "
+                   "config/server.toml.";
+        });
+        nether_.reset();
+    }
+}
+
+void BedrockListener::refreshNetherNetStatus() {
+    const Status status = hooks_.status ? hooks_.status() : Status{"Basalt", 0, 20};
+    const auto [motd, subMotd] = splitMotd(status.motd);
+    wire::bedrock::NetherNetStatus snapshot;
+    snapshot.name = motd;
+    snapshot.version = gameVersion_;
+    snapshot.level = subMotd.empty() ? "Basalt" : subMotd;
+    snapshot.protocol = static_cast<std::uint32_t>(wire::bedrock::kNativeBedrockProtocol);
+    snapshot.players = static_cast<std::uint32_t>(status.online);
+    snapshot.maxPlayers = static_cast<std::uint32_t>(status.max);
+    const std::lock_guard<std::mutex> guard{netherStatusLock_};
+    netherStatus_ = std::move(snapshot);
+}
+
+void BedrockListener::onNetherNetMessage(const std::shared_ptr<wire::bedrock::NetherNetLink>& link,
+                                         std::span<const std::uint8_t> payload) {
+    const auto found = sessions_.find(link->peer());
+    if (found == sessions_.end()) {
+        return;
+    }
+    found->second->rak->receive(payload);
+}
+
+void BedrockListener::onNetherNetDisconnect(const std::shared_ptr<wire::bedrock::NetherNetLink>& link) {
+    if (const auto found = sessions_.find(link->peer()); found != sessions_.end()) {
+        skins_->forget(
+            uuidOf(found->second->login.xuid.empty() ? found->second->login.name : found->second->login.xuid));
+        sessions_.erase(found);
+    }
 }
 
 std::string BedrockListener::welcome() const {
@@ -298,7 +452,15 @@ std::string BedrockListener::welcome() const {
         }
         protocols += std::to_string(protocol);
     }
-    return "Bedrock on UDP port " + std::to_string(port()) + " (" + gameVersion_ + ", protocol " + protocols + ")";
+    std::string transports;
+    if (server_ != nullptr) {
+        transports = "RakNet on UDP port " + std::to_string(server_->port());
+    }
+    if (nether_ != nullptr) {
+        transports += std::string{transports.empty() ? "" : ", "} + "NetherNet on TCP port " +
+                      std::to_string(nether_->signalingPort()) + " and UDP port " + std::to_string(nether_->icePort());
+    }
+    return "Bedrock over " + transports + " (" + gameVersion_ + ", protocol " + protocols + ")";
 }
 
 void BedrockListener::closeDoor() { accepting_.store(false); }
@@ -318,17 +480,40 @@ void BedrockListener::stop() {
     if (server_ != nullptr) {
         server_->poll(nowMillis(), 0);
     }
+    if (nether_ != nullptr) {
+        for (const auto& [peer, session] : sessions_) {
+            if (session->nether != nullptr) {
+                session->nether->close();
+            }
+        }
+        // NetherNet sends from a thread of its own: give it a moment to put the goodbyes on the wire.
+        wire::io::sleepFor(std::chrono::milliseconds{500});
+        nether_->stop();
+        nether_.reset();
+    }
     sessions_.clear();
     server_.reset();
 }
 
-std::uint16_t BedrockListener::port() const noexcept { return server_ ? server_->port() : options_.port; }
+std::uint16_t BedrockListener::port() const noexcept {
+    if (server_ != nullptr) {
+        return server_->port();
+    }
+    return nether_ != nullptr ? nether_->signalingPort() : options_.port;
+}
 
 std::size_t BedrockListener::sessionCount() const { return sessions_.size(); }
 
 void BedrockListener::run() {
     wire::common::nameCurrentThread("Bedrock listener");
     while (running_.load()) {
+        if (nether_ != nullptr) {
+            nether_->drain();
+            if (const std::uint64_t now = nowMillis(); now - netherStatusAtMs_ >= kNetherNetStatusRefreshMillis) {
+                netherStatusAtMs_ = now;
+                refreshNetherNetStatus();
+            }
+        }
         // Before the poll: it flushes what is queued now, so another thread's line goes out this turn.
         const bool open = accepting_.load();
         for (const auto& [peer, session] : sessions_) {
@@ -339,7 +524,11 @@ void BedrockListener::run() {
             deliverMail(*session);
         }
         serveCarried();
-        server_->poll(nowMillis(), kPollTimeoutMillis);
+        if (server_ != nullptr) {
+            server_->poll(nowMillis(), kPollTimeoutMillis);
+        } else {
+            wire::io::sleepFor(std::chrono::milliseconds{kPollTimeoutMillis});
+        }
     }
 }
 
@@ -434,14 +623,18 @@ void BedrockListener::onConnect(RakSession& session) {
     if (!accepting_.load()) {
         return;
     }
-    auto owned = std::make_unique<Session>(session, keys_, gameVersion_, options_.gate);
+    adopt(session.peer(), std::make_unique<Session>(session, keys_, gameVersion_, options_.gate));
+}
+
+void BedrockListener::adopt(const wire::io::UdpEndpoint& key, std::unique_ptr<Session> owned) {
     Session& entry = *owned;
-    sessions_.emplace(session.peer(), std::move(owned));
+    sessions_.emplace(key, std::move(owned));
 
     entry.rak->onLogin([this, &entry](const wire::bedrock::LoginRequest& login) {
         entry.login = login;
-        logger_.info([this, &login] {
-            return prefixedName(login.name) + " is joining from Bedrock" +
+        logger_.info([this, &login, &entry] {
+            return prefixedName(login.name) + " is joining from Bedrock (protocol " +
+                   std::to_string(entry.rak->protocolVersion()) + ")" +
                    (login.authenticated ? "" : " (unauthenticated)") + ".";
         });
     });
@@ -537,12 +730,34 @@ void BedrockListener::onGamePacket(Session& entry, BedrockPacket packet, wire::i
 
         const wire::bedrock::BedrockTransaction transaction =
             wire::bedrock::readTransaction(body, entry.link->protocolVersion());
+        logger_.debug([&transaction] {
+            return "inventory transaction kind " + std::to_string(transaction.kind) +
+                   (transaction.itemUse.has_value()
+                        ? " use " + std::to_string(transaction.itemUse->action) + " at " +
+                              std::to_string(transaction.itemUse->x) + "," + std::to_string(transaction.itemUse->y) +
+                              "," + std::to_string(transaction.itemUse->z) + " face " +
+                              std::to_string(transaction.itemUse->face) + " slot " +
+                              std::to_string(transaction.itemUse->hotbarSlot)
+                        : " unread");
+        });
         // A finished mouthful arrives like a hit: the client eats on its own clock and this is the only word of it.
         if (transaction.itemRelease.has_value()) {
             if (transaction.itemRelease->action == kConsume) {
                 entry.player->finishEating(transaction.itemRelease->hotbarSlot);
             } else {
                 entry.player->releaseItem(transaction.itemRelease->hotbarSlot);
+            }
+            return;
+        }
+        // A click on a block comes here as well as inside the input packet, and a client may use either.
+        if (transaction.itemUse.has_value()) {
+            if (transaction.itemUse->action == 0) {
+                entry.player->useItemOn(transaction.itemUse->x, transaction.itemUse->y, transaction.itemUse->z,
+                                        transaction.itemUse->face, transaction.itemUse->clickX,
+                                        transaction.itemUse->clickY, transaction.itemUse->clickZ,
+                                        transaction.itemUse->hotbarSlot);
+            } else if (transaction.itemUse->action == 1) {
+                entry.player->useItemInAir(transaction.itemUse->hotbarSlot);
             }
             return;
         }
@@ -788,14 +1003,6 @@ void BedrockListener::onReady(Session& session) {
     }
     session.started = true;
 
-    // TEMPORARY: `BASALT_BEDROCK_DROP=items` leaves one packet out of the burst to find the one a client refuses.
-    const char* const dropped = std::getenv("BASALT_BEDROCK_DROP");
-    const std::string drop = dropped == nullptr ? std::string{} : std::string{dropped};
-    const auto dropping = [&drop](const std::string_view what) { return drop.find(what) != std::string::npos; };
-    if (!drop.empty()) {
-        logger_.warn([&drop] { return "Leaving out of the Bedrock join: " + drop; });
-    }
-
     // Piece sizes tell whether a client that never answers chokes on one packet's contents or on the size.
     const auto note = [this](const std::string_view what, const std::size_t bytes) {
         logger_.debug([what, bytes] {
@@ -820,42 +1027,37 @@ void BedrockListener::onReady(Session& session) {
     info.worldId = "basalt";
 
     wire::io::ByteBuffer body;
+    wire::bedrock::writeJigsawStructureData(body);
+    session.link->sendPacket(BedrockPacket::JigsawStructureData, body.readable());
+    body.clear();
+    wire::bedrock::writeVoxelShapes(body);
+    session.link->sendPacket(BedrockPacket::VoxelShapes, body.readable());
+    body.clear();
     wire::bedrock::writeStartGame(body, info, session.link->protocolVersion());
     session.link->sendPacket(BedrockPacket::StartGame, body.readable());
     note("start_game", body.readableBytes());
 
     // A real client reads start_game, finds it knows nothing of what lives here, and leaves without a word.
     body.clear();
-    if (!dropping("biomes")) {
-        wire::bedrock::writeBiomeDefinitionList(body);
-        session.link->sendPacket(BedrockPacket::BiomeDefinitionList, body.readable());
-        note("biomes", body.readableBytes());
-    }
+    wire::bedrock::writeBiomeDefinitionList(body);
+    session.link->sendPacket(BedrockPacket::BiomeDefinitionList, body.readable());
+    note("biomes", body.readableBytes());
 
     // Item numbers are said by the server and go before anything that could carry an item.
     body.clear();
-    if (!dropping("items")) {
-        wire::bedrock::writeItemComponent(body, session.link->protocolVersion());
-        session.link->sendPacket(BedrockPacket::ItemComponent, body.readable());
-        note("items", body.readableBytes());
-    }
+    wire::bedrock::writeItemComponent(body, session.link->protocolVersion());
+    session.link->sendPacket(BedrockPacket::ItemComponent, body.readable());
+    note("items", body.readableBytes());
 
     body.clear();
-    if (!dropping("entities")) {
-        wire::bedrock::writeAvailableEntityIdentifiers(body);
-        session.link->sendPacket(BedrockPacket::AvailableEntityIdentifiers, body.readable());
-        note("entities", body.readableBytes());
-    }
+    wire::bedrock::writeAvailableEntityIdentifiers(body);
+    session.link->sendPacket(BedrockPacket::AvailableEntityIdentifiers, body.readable());
+    note("entities", body.readableBytes());
 
     body.clear();
-    if (!dropping("creative")) {
-        // TEMPORARY: `BASALT_BEDROCK_CREATIVE=n` offers only the first n items, to find the entry a client refuses.
-        const char* const most = std::getenv("BASALT_BEDROCK_CREATIVE");
-        const std::size_t offered = most == nullptr ? SIZE_MAX : static_cast<std::size_t>(std::atoll(most));
-        wire::bedrock::writeCreativeContent(body, session.link->protocolVersion(), offered);
-        session.link->sendPacket(BedrockPacket::CreativeContent, body.readable());
-        note("creative", body.readableBytes());
-    }
+    wire::bedrock::writeCreativeContent(body, session.link->protocolVersion());
+    session.link->sendPacket(BedrockPacket::CreativeContent, body.readable());
+    note("creative", body.readableBytes());
 
     body.clear();
     wire::bedrock::writeGameRulesChanged(body, session.link->protocolVersion());
@@ -863,10 +1065,21 @@ void BedrockListener::onReady(Session& session) {
     note("gamerules", body.readableBytes());
 
     // A value for a property the client was never declared draws nothing, so each kind that has one is named once.
-    for (const std::string_view farmAnimal : {"minecraft:pig", "minecraft:cow", "minecraft:chicken"}) {
-        static constexpr std::array<std::string_view, 3> kClimates{"temperate", "warm", "cold"};
+    static constexpr std::array<std::string_view, 3> kClimates{"temperate", "warm", "cold"};
+    static constexpr std::array<std::string_view, 2> kChickenSounds{"default", "picky"};
+    static constexpr std::array<std::string_view, 3> kPigSounds{"default", "big", "mini"};
+    static constexpr std::array<std::string_view, 2> kCowSounds{"default", "moody"};
+    static constexpr std::array<std::string_view, 2> kCatSounds{"default", "royal"};
+    using wire::bedrock::EntityEnumProperty;
+    const std::array<std::pair<std::string_view, std::vector<EntityEnumProperty>>, 4> kDeclared{{
+        {"minecraft:pig", {{"minecraft:climate_variant", kClimates}, {"minecraft:sound_variant", kPigSounds}}},
+        {"minecraft:cow", {{"minecraft:climate_variant", kClimates}, {"minecraft:sound_variant", kCowSounds}}},
+        {"minecraft:chicken", {{"minecraft:climate_variant", kClimates}, {"minecraft:sound_variant", kChickenSounds}}},
+        {"minecraft:cat", {{"minecraft:sound_variant", kCatSounds}}},
+    }};
+    for (const auto& [entityType, properties] : kDeclared) {
         body.clear();
-        wire::bedrock::writeSyncEntityProperty(body, farmAnimal, "minecraft:climate_variant", kClimates);
+        wire::bedrock::writeSyncEntityProperties(body, entityType, properties);
         session.link->sendPacket(BedrockPacket::SyncEntityProperty, body.readable());
     }
     note("entity properties", body.readableBytes());
@@ -886,11 +1099,9 @@ void BedrockListener::onReady(Session& session) {
     note("recipes", body.readableBytes());
 
     body.clear();
-    if (!dropping("commands")) {
-        wire::bedrock::writeSetCommandsEnabled(body, true);
-        session.link->sendPacket(BedrockPacket::SetCommandsEnabled, body.readable());
-        note("commands", body.readableBytes());
-    }
+    wire::bedrock::writeSetCommandsEnabled(body, true);
+    session.link->sendPacket(BedrockPacket::SetCommandsEnabled, body.readable());
+    note("commands", body.readableBytes());
 
     body.clear();
     wire::bedrock::writeChunkRadiusUpdated(body, kInitialRadius);

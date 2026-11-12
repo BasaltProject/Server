@@ -325,7 +325,11 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     const reg::BlockSoundTypeEntry& soundType = reg::blockSounds::of(settledStateId);
     const std::int64_t placeSeed = seedOf(context.blocks);
     for (const PlayerSession* other : playersIn(context.blocks, world.name())) {
-        if (other->entityId() == session->entityId()) {
+        if (other->entityId() == session->entityId() && !other->connection().playSound) {
+            continue;
+        }
+        if (other->connection().placedBlockSound) {
+            other->connection().placedBlockSound(placeAt.x, placeAt.y, placeAt.z, settledStateId);
             continue;
         }
         playSoundFor(*other, soundType.placeSound, play::SoundSource::Blocks, placeAt.x + 0.5, placeAt.y + 0.5,
