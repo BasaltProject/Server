@@ -503,8 +503,7 @@ void sweep(PlayerSession& attacker, world::LoadedWorld& world, const Context& co
     const std::array<double, 2> towards = facing(attacker);
     const std::int32_t weaponSlot = PlayerInventory::kHotbarStart + attacker.inventory.heldSlot();
     for (ServerEntity* nearby : world.state().entities()) {
-        if (nearby->entityId() == targetId || nearby->removed || nearby->dying ||
-            !server::registry::entityAttributes::isLiving(nearby->type()) ||
+        if (nearby->entityId() == targetId || nearby->removed || nearby->dying || !nearby->livingType() ||
             !entity::Aabb::of(nearby->x, nearby->y, nearby->z, nearby->width(), nearby->height()).intersects(reach) ||
             allied(context, attacker, nearby->uuid().toString(), nearby->entityId()) ||
             (nearby->type().path() == "armor_stand" && nearby->sourceNbt.has_value() &&

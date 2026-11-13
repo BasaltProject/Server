@@ -26,6 +26,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -534,6 +535,7 @@ private:
     std::function<void(std::int32_t, std::int32_t, bool)> onNeighbourhoodComplete_;
 
     std::map<std::int64_t, std::unique_ptr<server::world::Chunk>> chunksByPos_;
+    std::unordered_map<std::int64_t, server::world::Chunk*> chunkIndex_;
     /// parity: the counter behind `ScheduledTick.subTickOrder`.
     std::int64_t nextTickOrder_ = 0;
     std::atomic<std::int64_t> chunkVersion_{0};

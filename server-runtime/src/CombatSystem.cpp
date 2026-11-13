@@ -268,8 +268,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         if (target.has_value() && target->mob != nullptr &&
             (world::detectorRails::isMinecart(target->mob->type()) || entity::boats::isBoat(target->mob->type()))) {
             const ServerEntity* owner = entity.ownerId.has_value() ? world.state().entity(*entity.ownerId) : nullptr;
-            const bool ownedByLiving =
-                owner != nullptr && !owner->removed && server::registry::entityAttributes::isLiving(owner->type());
+            const bool ownedByLiving = owner != nullptr && !owner->removed && owner->livingType();
             static_cast<void>(hitVehicle(world, target->mob, ownedByLiving ? 8.0F : 5.0F,
                                          ownedByLiving ? world::damageTypes::kWitherSkull : world::damageTypes::kMagic,
                                          entity));
@@ -511,7 +510,7 @@ void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<Pla
     std::vector<Splashed> splashed;
     // parity: `applySplash` reaches every living thing in range, mobs as much as players.
     for (ServerEntity* mob : living) {
-        if (mob->removed || mob->dying || !server::registry::entityAttributes::isLiving(mob->type())) {
+        if (mob->removed || mob->dying || !mob->livingType()) {
             continue;
         }
         const double dx = mob->x - bottle.x;

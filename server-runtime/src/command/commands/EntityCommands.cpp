@@ -193,7 +193,7 @@ void DamageCommand::build(const CommandNodeBuilder& root) const {
             if (what->health <= 0.0) {
                 what->killed = true;
                 // parity: only a `LivingEntity` has a `tickDeath` to play out.
-                (reg::entityAttributes::isLiving(what->type()) ? what->dying : what->removed) = true;
+                (what->livingType() ? what->dying : what->removed) = true;
             }
         }
         // parity: an item entity takes damage from fire and explosions, neither of which this reaches.

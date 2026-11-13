@@ -657,8 +657,7 @@ void ClientSession::enterPlay() {
     }
 
     joinTicket = {};
-    // Looked up again at each use: a join can outlast the grace a departed session is kept for, and a stale pointer
-    // would dangle.
+    // Looked up at each use: a join can outlast the grace a departed session is kept for.
     const auto stillHere = [registry, &earlierPlayers, &player] {
         std::vector<PlayerSession*> found;
         for (const wire::common::Uuid& earlier : earlierPlayers) {

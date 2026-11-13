@@ -93,8 +93,8 @@ void MobActionSystem::tickPufferfish(world::LoadedWorld& world, const std::vecto
         const Aabb reach = boxOf(fish).inflate(kScareInflate);
         bool frightened = false;
         for (const ServerEntity* other : living) {
-            if (other == &fish || other->removed || !server::registry::entityAttributes::isLiving(other->type()) ||
-                !scary(*other, options_.entityTags) || !reach.intersects(boxOf(*other))) {
+            if (other == &fish || other->removed || !other->livingType() || !scary(*other, options_.entityTags) ||
+                !reach.intersects(boxOf(*other))) {
                 continue;
             }
             frightened = true;

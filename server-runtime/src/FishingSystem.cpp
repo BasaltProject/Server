@@ -553,7 +553,7 @@ void FishingSystem::hookFirstHit(world::LoadedWorld& world, const std::vector<Pl
         }
     };
     for (const ServerEntity* mob : living) {
-        if (!mob->removed && !mob->dying && registry::entityAttributes::isLiving(mob->type())) {
+        if (!mob->removed && !mob->dying && mob->livingType()) {
             consider(mob->entityId(), mob->x, mob->y, mob->z, mob->width(), mob->height());
         }
     }

@@ -112,6 +112,7 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     chunk.share();
 
     Chunk& installed = *chunksByPos_.emplace(chunkKey, std::make_unique<Chunk>(std::move(chunk))).first->second;
+    chunkIndex_.emplace(chunkKey, &installed);
     blockVersion_.fetch_add(1, std::memory_order_release);
     const PendingChunkDecorations::ChunkAt chunkAt = [this](std::int64_t otherKey) { return chunkAtLocked(otherKey); };
     const std::vector<server::world::ChunkGeneratedBlockWrite> spilledWrites = installed.takeGeneratedBlockWrites();

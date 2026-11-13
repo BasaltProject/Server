@@ -36,8 +36,7 @@ constexpr double kTorsionalElasticity = 10.0;
 
 bool isLeashable(const ServerEntity& entity) {
     const std::string_view path = entity.type().path();
-    return boats::isBoat(entity.type()) ||
-           (registry::entityAttributes::isLiving(entity.type()) && path != "armor_stand" && path != "player");
+    return boats::isBoat(entity.type()) || (entity.livingType() && path != "armor_stand" && path != "player");
 }
 
 bool canBeLeashed(const ServerEntity& entity, bool monster) {

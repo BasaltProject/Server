@@ -48,9 +48,9 @@ struct Nearest {
         return best;
     }
     for (const ServerEntity* other : mob.entities) {
-        if (other == &mob.mob || other->removed || other->dying ||
-            !registry::entityAttributes::isLiving(other->type()) || wardens::isWarden(other->type()) ||
-            other->type().path() == "armor_stand" || !inBox(other->x, other->y, other->z)) {
+        if (other == &mob.mob || other->removed || other->dying || !other->livingType() ||
+            wardens::isWarden(other->type()) || other->type().path() == "armor_stand" ||
+            !inBox(other->x, other->y, other->z)) {
             continue;
         }
         const double distance = mob.distanceSquaredTo(other->x, other->y, other->z);

@@ -147,7 +147,7 @@ void AreaEffectCloudSystem::tick(world::LoadedWorld& world, const std::vector<Pl
             }
         }
         for (ServerEntity* mob : living) {
-            if (!mob->removed && !mob->dying && registry::entityAttributes::isLiving(mob->type()) &&
+            if (!mob->removed && !mob->dying && mob->livingType() &&
                 intersects(box, mob->x, mob->y, mob->z, mob->width(), mob->height())) {
                 touch(mob->entityId(), nullptr, mob, mob->x, mob->z);
             }
@@ -269,7 +269,7 @@ void AreaEffectCloudSystem::fireballLanded(world::LoadedWorld& world, const std:
         }
     }
     for (const ServerEntity* mob : living) {
-        if (!placed && !mob->removed && registry::entityAttributes::isLiving(mob->type()) &&
+        if (!placed && !mob->removed && mob->livingType() &&
             intersects(reach, mob->x, mob->y, mob->z, mob->width(), mob->height()) && near(mob->x, mob->y, mob->z)) {
             x = mob->x;
             y = mob->y;

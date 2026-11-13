@@ -179,7 +179,7 @@ void MobActionSystem::wardenHears(world::LoadedWorld& world, const std::vector<P
         }
         for (const ServerEntity* mob : world.state().entities()) {
             if (mob->uuid() == *uuid && !mob->removed) {
-                const bool living = server::registry::entityAttributes::isLiving(mob->type());
+                const bool living = mob->livingType();
                 return Somebody{.id = mob->entityId(),
                                 .x = mob->x,
                                 .y = mob->y,

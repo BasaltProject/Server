@@ -78,8 +78,7 @@ void MobActionSystem::tickRavager(world::LoadedWorld& world, const std::vector<P
         entity::mobOverrides::griefing(ravager, world.gameRules().get(world::gameRules::kMobGriefing));
     for (ServerEntity* other : world.state().entities()) {
         if (other == &ravager || other->removed || other->dying || other->type().path() == "ravager" ||
-            !server::registry::entityAttributes::isLiving(other->type()) ||
-            (!griefing && other->type().path() == "armor_stand") ||
+            !other->livingType() || (!griefing && other->type().path() == "armor_stand") ||
             !inRoar(ravager, other->x, other->y, other->z, other->width(), other->height())) {
             continue;
         }

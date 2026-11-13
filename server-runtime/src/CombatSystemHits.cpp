@@ -55,9 +55,11 @@ bool CombatSystem::deflected(const std::vector<PlayerSession*>& watchers, const 
     }
     const std::set<Identifier>& deflectors =
         world::realEntityTypeTags::membersOf(*options_.entityTags, Identifier::vanilla("deflects_projectiles"));
-    if (deflectors.empty() || std::ranges::none_of(living, [&deflectors](const ServerEntity* mob) {
-            return deflectors.contains(mob->type());
-        })) {
+    const auto deflects = [&deflectors](const Identifier& type) {
+        return std::ranges::any_of(deflectors, [&type](const Identifier& member) { return member == type; });
+    };
+    if (deflectors.empty() ||
+        std::ranges::none_of(living, [&deflects](const ServerEntity* mob) { return deflects(mob->type()); })) {
         return false;
     }
     const std::optional<Target> target = targetAlong(watchers, living, projectile, fromX, fromY, fromZ);
@@ -169,9 +171,8 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
             continue;
         }
         // parity: `Projectile.canHitEntity`.
-        if (!server::registry::entityAttributes::isLiving(candidate->type()) &&
-            !world::endCrystals::isCrystal(candidate->type()) && !world::detectorRails::isMinecart(candidate->type()) &&
-            !entity::boats::isBoat(candidate->type())) {
+        if (!candidate->livingType() && !world::endCrystals::isCrystal(candidate->type()) &&
+            !world::detectorRails::isMinecart(candidate->type()) && !entity::boats::isBoat(candidate->type())) {
             continue;
         }
         // parity: `EnderDragon.isPickable` is false; what a projectile meets is one of its parts.
@@ -262,7 +263,7 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
         const float exposure = world::explosions::exposureOf(entity->entityId());
         // parity: `Entity.pushFromExplosion`, from the eyes out, or from where primed TNT stands.
         if (!world.settings().rules.environment.disableExplosionKnockback) {
-            const bool living = server::registry::entityAttributes::isLiving(entity->type());
+            const bool living = entity->livingType();
             const double eyeY =
                 entity->type().path() == "tnt"
                     ? entity->y
@@ -295,7 +296,7 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
             const ServerEntity* source = world.state().entity(sourceEntityId);
             const ServerEntity* behind =
                 source != nullptr && source->ownerId.has_value() ? world.state().entity(*source->ownerId) : source;
-            const bool mobSource = behind != nullptr && server::registry::entityAttributes::isLiving(behind->type());
+            const bool mobSource = behind != nullptr && behind->livingType();
             const float damage = world::explosions::damageAt(distance, static_cast<float>(reach), exposure);
             if (options_.hurtVehicle && !VehicleSystem::ignoresExplosion(world, mobSource) && damage > 0.0F) {
                 static_cast<void>(options_.hurtVehicle(
@@ -308,7 +309,7 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
             }
             continue;
         }
-        if (!server::registry::entityAttributes::isLiving(entity->type())) {
+        if (!entity->livingType()) {
             continue;
         }
         const float damage = world::explosions::damageAt(distance, static_cast<float>(reach), exposure);
@@ -319,9 +320,8 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
         // parity: `Explosion.getIndirectSourceEntity`.
         if (const ServerEntity* source = world.state().entity(sourceEntityId); source != nullptr) {
             const std::optional<std::int32_t> causing = source->ownerId.has_value() ? source->ownerId
-                                                        : server::registry::entityAttributes::isLiving(source->type())
-                                                            ? std::optional{source->entityId()}
-                                                            : std::nullopt;
+                                                        : source->livingType()      ? std::optional{source->entityId()}
+                                                                                    : std::nullopt;
             entity::entityCombat::blame(*entity, causing, source->entityId(), source->type());
         }
         const entity::entityCombat::Result result =

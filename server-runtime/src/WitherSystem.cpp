@@ -311,8 +311,7 @@ void WitherSystem::tickHeads(world::LoadedWorld& world, const std::vector<Server
         std::vector<std::int32_t> found;
         for (const ServerEntity* candidate : living) {
             if (candidate == &wither || candidate->removed || candidate->dying || candidate->health <= 0.0 ||
-                !server::registry::entityAttributes::isLiving(candidate->type()) ||
-                boss::isFriend(candidate->type().path()) ||
+                !candidate->livingType() || boss::isFriend(candidate->type().path()) ||
                 !inBox(candidate->x, candidate->y, candidate->z, candidate->height())) {
                 continue;
             }
@@ -528,8 +527,7 @@ void WitherSystem::levelEvent(const std::vector<PlayerSession*>& watchers, std::
 void WitherSystem::skullLanded(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                ServerEntity& skull, ServerEntity* mob, PlayerSession* player) {
     ServerEntity* owner = skull.ownerId.has_value() ? world.state().entity(*skull.ownerId) : nullptr;
-    const bool ownedByLiving =
-        owner != nullptr && !owner->removed && server::registry::entityAttributes::isLiving(owner->type());
+    const bool ownedByLiving = owner != nullptr && !owner->removed && owner->livingType();
     const float damage = ownedByLiving ? kSkullDamage : kUnownedSkullDamage;
     std::int32_t witherSeconds = 0;
     if (world.difficulty() == "normal") {

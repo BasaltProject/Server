@@ -71,8 +71,7 @@ struct Targets {
     for (const CommandTarget& target : *matched) {
         if (player::PlayerSession* session = target.player(); session != nullptr) {
             targets.players.push_back(session);
-        } else if (entity::ServerEntity* mob = target.entity();
-                   mob != nullptr && server::registry::entityAttributes::isLiving(mob->type())) {
+        } else if (entity::ServerEntity* mob = target.entity(); mob != nullptr && mob->livingType()) {
             targets.mobs.push_back(mob);
             targets.mobWorlds.push_back(target.worldName());
         } else {

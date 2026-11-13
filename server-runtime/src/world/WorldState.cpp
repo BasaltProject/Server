@@ -58,7 +58,8 @@ WorldState::WorldState(std::vector<Chunk> initialChunks, LoadOrGenerate loadOrGe
       itemPhysics_(mutex_, lockedBlockAccessor()) {
     for (Chunk& chunk : initialChunks) {
         const std::int64_t chunkKey = key(chunk.chunkX(), chunk.chunkZ());
-        chunksByPos_.emplace(chunkKey, std::make_unique<Chunk>(std::move(chunk)));
+        chunkIndex_.emplace(
+            chunkKey, chunksByPos_.emplace(chunkKey, std::make_unique<Chunk>(std::move(chunk))).first->second.get());
     }
     const PendingChunkDecorations::ChunkAt chunkAt = [this](std::int64_t chunkKey) { return chunkAtLocked(chunkKey); };
     for (const auto& [chunkKey, chunk] : chunksByPos_) {
@@ -84,8 +85,8 @@ void WorldState::mine(std::string_view what) const {
 }
 
 Chunk* WorldState::chunkAtLocked(std::int64_t chunkKey) const {
-    const auto found = chunksByPos_.find(chunkKey);
-    return found == chunksByPos_.end() ? nullptr : found->second.get();
+    const auto found = chunkIndex_.find(chunkKey);
+    return found == chunkIndex_.end() ? nullptr : found->second;
 }
 
 std::vector<Chunk*> WorldState::snapshot() const {
@@ -229,6 +230,7 @@ std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks, std::vecto
             const std::int32_t chunkX = chunk->chunkX();
             const std::int32_t chunkZ = chunk->chunkZ();
             if (auto node = chunksByPos_.extract(chunkKey); !node.empty()) {
+                chunkIndex_.erase(chunkKey);
                 if (lightBusy_.load() > 0) {
                     const std::lock_guard<std::mutex> graveyard{graveyardMutex_};
                     graveyard_.push_back(std::move(node.mapped()));

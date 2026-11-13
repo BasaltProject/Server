@@ -60,8 +60,7 @@ public:
         ConnectionGate* gate_ = nullptr;
     };
 
-    /// Holds the caller until fewer than `limit` joins are in flight, so plugin work for joins cannot pile up in a
-    /// tick.
+    /// Holds the caller until fewer than `limit` joins are in flight.
     [[nodiscard]] JoinTicket awaitJoinInFlight(std::int32_t limit);
 
 private:

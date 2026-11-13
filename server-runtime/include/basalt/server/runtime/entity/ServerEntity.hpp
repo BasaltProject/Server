@@ -199,6 +199,8 @@ public:
     /// Type predicates settled once at construction; see `typeTraits`.
     [[nodiscard]] std::uint32_t typeTraits() const noexcept { return typeTraits_; }
 
+    [[nodiscard]] bool livingType() const noexcept { return (typeTraits_ & traits::kLiving) != 0; }
+
     [[nodiscard]] const server::registry::entityTypeShapes::Shape* shape() const noexcept { return shape_; }
 
     /// The type's builder box, looked up once: it is read several times a tick by every mob.
@@ -662,6 +664,7 @@ private:
     wire::common::Identifier type_;
     std::uint32_t typeTraits_ = 0;
     const server::registry::entityTypeShapes::Shape* shape_ = nullptr;
+    const std::map<std::string, double, std::less<>>* baseAttributes_ = nullptr;
     float baseWidth_ = 1.0F;
     float baseHeight_ = 1.0F;
     std::int32_t protocolType_ = 0;

@@ -83,8 +83,7 @@ void shockWave(const pvp::Context& context, world::LoadedWorld& world, PlayerSes
         return std::array<double, 3>{dx / distance * power, kKnockbackLift, dz / distance * power};
     };
     for (ServerEntity* nearby : world.state().entities()) {
-        if (nearby->entityId() == struck.entityId || nearby->removed || nearby->dying ||
-            !server::registry::entityAttributes::isLiving(nearby->type()) ||
+        if (nearby->entityId() == struck.entityId || nearby->removed || nearby->dying || !nearby->livingType() ||
             allied(context, attacker, nearby->uuid().toString(), nearby->entityId()) ||
             (nearby->type().path() == "armor_stand" && nearby->sourceNbt.has_value() &&
              nearby->sourceNbt->getBoolean("Marker"))) {

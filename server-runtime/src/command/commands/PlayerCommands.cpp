@@ -128,7 +128,7 @@ void KillCommand::build(const CommandNodeBuilder& root) const {
                 // parity: `/kill` kills, so what it kills drops what it would have dropped.
                 entity->health = 0.0;
                 entity->killed = true;
-                if (reg::entityAttributes::isLiving(entity->type())) {
+                if (entity->livingType()) {
                     entity->dying = true;
                 } else {
                     entity->removed = true;

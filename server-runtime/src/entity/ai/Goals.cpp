@@ -367,11 +367,11 @@ bool AvoidEntityGoal::canUse(MobContext& mob) {
     threat_ = nullptr;
     double bestDistance = distance_ * distance_;
     for (ServerEntity* candidate : mob.entities) {
-        if (candidate == nullptr || candidate->removed || !avoided_.contains(candidate->type().path())) {
+        if (candidate == nullptr || candidate->removed) {
             continue;
         }
         const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);
-        if (distance > bestDistance) {
+        if (distance > bestDistance || !avoided_.contains(candidate->type().path())) {
             continue;
         }
         bestDistance = distance;

@@ -191,7 +191,7 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
                                                 .victimFacts = world::triggerFacts::ofEntity(world, *dead),
                                                 .killingBlow = killingBlowOf(world, *dead)});
         }
-        const bool living = registry::entityAttributes::isLiving(dead->type());
+        const bool living = dead->livingType();
         const bool experienceTaken = living && drinkBySculk(world, *dead);
         // parity: `Entity.die` drops the entity's own loot table where it stood.
         const bool mobDrops = world.gameRules().get(world::gameRules::kMobDrops);

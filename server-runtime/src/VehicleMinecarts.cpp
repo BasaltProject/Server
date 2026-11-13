@@ -260,7 +260,7 @@ bool VehicleSystem::pushAndPickup(world::LoadedWorld& world, ServerEntity& cart,
                 if (!collides(other)) {
                     continue;
                 }
-                if (takes(other) && registry::entityAttributes::isLiving(other.mob->type())) {
+                if (takes(other) && other.mob->livingType()) {
                     static_cast<void>(board(world, cart, *other.mob));
                 } else {
                     pushes_->push(world, other, self);
@@ -281,8 +281,7 @@ bool VehicleSystem::pushAndPickup(world::LoadedWorld& world, ServerEntity& cart,
     bool pickedUp = false;
     if (rideable && cart.passengerIds.empty()) {
         for (const EntityPushSystem::Body& other : pushes_->pushablesIn(world, self, reach)) {
-            if (takes(other) && registry::entityAttributes::isLiving(other.mob->type()) && collides(other) &&
-                board(world, cart, *other.mob)) {
+            if (takes(other) && other.mob->livingType() && collides(other) && board(world, cart, *other.mob)) {
                 pickedUp = true;
                 break;
             }

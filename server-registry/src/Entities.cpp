@@ -22,9 +22,9 @@ using wire::common::Identifier;
 
 namespace entityAttributes {
 namespace {
-[[nodiscard]] const std::unordered_map<Identifier, std::map<std::string, double>>& table() {
-    static const std::unordered_map<Identifier, std::map<std::string, double>> built = [] {
-        std::unordered_map<Identifier, std::map<std::string, double>> table;
+[[nodiscard]] const std::unordered_map<Identifier, std::map<std::string, double, std::less<>>>& table() {
+    static const std::unordered_map<Identifier, std::map<std::string, double, std::less<>>> built = [] {
+        std::unordered_map<Identifier, std::map<std::string, double, std::less<>>> table;
         for (const EntityAttributeEntry& entry : entityAttributesTable()) {
             table[vanilla(entry.entity)].emplace(std::string{entry.attribute}, entry.value);
         }
@@ -39,12 +39,12 @@ std::optional<double> baseValue(const Identifier& type, std::string_view attribu
     if (entity == table().end()) {
         return std::nullopt;
     }
-    const auto found = entity->second.find(std::string{unqualified(attribute)});
+    const auto found = entity->second.find(unqualified(attribute));
     return found == entity->second.end() ? std::nullopt : std::optional{found->second};
 }
 
-const std::map<std::string, double>& of(const Identifier& type) {
-    static const std::map<std::string, double> none;
+const std::map<std::string, double, std::less<>>& of(const Identifier& type) {
+    static const std::map<std::string, double, std::less<>> none;
     const auto found = table().find(type);
     return found == table().end() ? none : found->second;
 }

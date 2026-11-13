@@ -453,8 +453,7 @@ std::int32_t ChunkStreamer::flushReadyChunks(std::int32_t limit) {
         if (pendingChunks_.empty()) {
             return 0;
         }
-        // Asking the generator again for every pending square on every turn drowns it in locks; once a second is
-        // enough.
+        // Asking the generator for every pending square each turn drowns it in locks.
         const bool askGenerator = retryCountdown_-- <= 0;
         if (askGenerator) {
             retryCountdown_ = 19;

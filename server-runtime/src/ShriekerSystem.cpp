@@ -301,7 +301,7 @@ bool ShriekerSystem::trySummonWarden(world::LoadedWorld& world, std::int32_t x, 
                                                   server::registry::entityTypeShapes::heightOf(warden));
         bool obstructed = false;
         for (const entity::ServerEntity* other : world.state().entities()) {
-            if (other->removed || !server::registry::entityAttributes::isLiving(other->type())) {
+            if (other->removed || !other->livingType()) {
                 continue;
             }
             const entity::Aabb theirs = entity::Aabb::of(other->x, other->y, other->z, other->width(), other->height());

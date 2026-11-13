@@ -83,7 +83,7 @@ std::vector<spear::Candidate> CombatHandler::spearTargets(const PlayerSession& s
     };
     for (ServerEntity* candidate : world.state().entities()) {
         if (candidate->removed || candidate->health <= 0.0 || candidate->dragon != nullptr ||
-            !server::registry::entityAttributes::isLiving(candidate->type()) || sameVehicle(candidate->vehicleId) ||
+            !candidate->livingType() || sameVehicle(candidate->vehicleId) ||
             (session.vehicleId == candidate->entityId())) {
             continue;
         }

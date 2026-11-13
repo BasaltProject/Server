@@ -145,8 +145,7 @@ void CombatSystem::gust(world::LoadedWorld& world, const std::vector<PlayerSessi
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
     // parity: `hurtEntities` runs before the blocks.
     for (ServerEntity* mob : living) {
-        if (mob->entityId() == blast.sourceId || mob->removed || mob->dying ||
-            !server::registry::entityAttributes::isLiving(mob->type())) {
+        if (mob->entityId() == blast.sourceId || mob->removed || mob->dying || !mob->livingType()) {
             continue;
         }
         const double eyes = mob->y + entity::mobBreathing::eyeHeightOf(*mob);

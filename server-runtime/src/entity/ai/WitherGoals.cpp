@@ -24,8 +24,7 @@ constexpr double kFollowRange = 40.0;
     }
     for (const ServerEntity* candidate : mob.entities) {
         if (candidate == nullptr || candidate == &mob.mob || candidate->removed || candidate->dying ||
-            candidate->health <= 0.0 || !server::registry::entityAttributes::isLiving(candidate->type()) ||
-            witherBoss::isFriend(candidate->type().path())) {
+            candidate->health <= 0.0 || !candidate->livingType() || witherBoss::isFriend(candidate->type().path())) {
             continue;
         }
         const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);

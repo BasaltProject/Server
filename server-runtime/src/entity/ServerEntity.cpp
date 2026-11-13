@@ -148,6 +148,7 @@ ServerEntity::ServerEntity(std::int32_t entityId, wire::common::Uuid uuid, wire:
       protocolType_(protocolType) {
     typeTraits_ = computeTypeTraits(type_);
     shape_ = registry::entityTypeShapes::of(type_);
+    baseAttributes_ = &registry::entityAttributes::of(type_);
     baseWidth_ = static_cast<float>(registry::entityTypeShapes::widthOf(type_));
     baseHeight_ = static_cast<float>(registry::entityTypeShapes::heightOf(type_));
     const bool dolphin = type_.path() == "dolphin";
@@ -164,8 +165,9 @@ double ServerEntity::attribute(std::string_view id) const {
     if (set != attributeValues.end()) {
         return set->second;
     }
-    if (const std::optional<double> born = registry::entityAttributes::baseValue(type_, id); born.has_value()) {
-        return *born;
+    const std::string_view bare = id.substr(id.find(':') == std::string_view::npos ? 0 : id.find(':') + 1);
+    if (const auto born = baseAttributes_->find(bare); born != baseAttributes_->end()) {
+        return born->second;
     }
     return attribute::defaultFor(id).value_or(0.0);
 }

@@ -118,7 +118,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
         soil != nullptr && soil->path() == "farmland" &&
         config::GameplayRules::resolve(world.state().gameplay().blocks.farmlandMobGriefingOverride,
                                        world.gameRules().get(world::gameRules::kMobGriefing)) &&
-        server::registry::entityAttributes::isLiving(mob.type())) {
+        mob.livingType()) {
         random::RandomSource random = freshRandom();
         const world::farmlandTrample::Faller faller{.fallDistance = fallen,
                                                     .width = static_cast<float>(mob.width()),
@@ -134,8 +134,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
     // parity: `TurtleEggBlock.fallOn`, one in three, for any living mob but a turtle, a bat or a zombie.
     if (const wire::common::Identifier* nest = server::registry::blockStateDefinitions::blockOf(onState);
         nest != nullptr && nest->path() == "turtle_egg" && mob.type().path() != "turtle" &&
-        mob.type().path() != "bat" && mob.type().path() != "zombie" &&
-        server::registry::entityAttributes::isLiving(mob.type()) &&
+        mob.type().path() != "bat" && mob.type().path() != "zombie" && mob.livingType() &&
         config::GameplayRules::resolve(world.state().gameplay().blocks.turtleEggMobGriefingOverride,
                                        world.gameRules().get(world::gameRules::kMobGriefing))) {
         random::RandomSource random = freshRandom();

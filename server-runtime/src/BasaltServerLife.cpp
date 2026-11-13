@@ -909,7 +909,7 @@ void BasaltServer::startBedrockListener() {
                         }
                     }
                 }
-                if (target == nullptr || target->removed || !registry::entityAttributes::isLiving(target->type())) {
+                if (target == nullptr || target->removed || !target->livingType()) {
                     return;
                 }
                 const bool reached =

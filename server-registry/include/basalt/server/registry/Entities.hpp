@@ -24,7 +24,7 @@ inline constexpr std::string_view kSafeFallDistance = "safe_fall_distance";
 
 [[nodiscard]] std::optional<double> baseValue(const wire::common::Identifier& type, std::string_view attribute);
 
-[[nodiscard]] const std::map<std::string, double>& of(const wire::common::Identifier& type);
+[[nodiscard]] const std::map<std::string, double, std::less<>>& of(const wire::common::Identifier& type);
 
 [[nodiscard]] bool isLiving(const wire::common::Identifier& type);
 } // namespace entityAttributes

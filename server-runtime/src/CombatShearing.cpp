@@ -92,7 +92,7 @@ bool CombatHandler::shearEquipment(PlayerSession& session, ServerEntity& mob, st
     world::LoadedWorld* world = owner_->currentWorld();
     const std::optional<storage::StoredItemStack> shears = session.inventory.at(handSlot);
     if (world == nullptr || !shears.has_value() || shears->id != "minecraft:shears" || session.sneaking ||
-        !server::registry::entityAttributes::isLiving(mob.type()) || mob.type().path() == "armor_stand") {
+        !mob.livingType() || mob.type().path() == "armor_stand") {
         return false;
     }
     // parity: `canShearEquipment`, nobody riding it, and a wolf only for its owner.

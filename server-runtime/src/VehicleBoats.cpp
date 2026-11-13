@@ -120,8 +120,7 @@ void VehicleSystem::boatPushes(world::LoadedWorld& world, ServerEntity& boat, bo
         const bool boardable =
             mob && !driverIsPlayer &&
             static_cast<std::int32_t>(boat.passengerIds.size()) < entity::boats::maxPassengers(boat.type()) &&
-            !other.mob->vehicleId.has_value() && other.mob->width() < boat.width() &&
-            registry::entityAttributes::isLiving(other.mob->type()) &&
+            !other.mob->vehicleId.has_value() && other.mob->width() < boat.width() && other.mob->livingType() &&
             !(options_.entityTags != nullptr &&
               world::realEntityTypeTags::membersOf(*options_.entityTags,
                                                    wire::common::Identifier::vanilla("cannot_be_pushed_onto_boats"))

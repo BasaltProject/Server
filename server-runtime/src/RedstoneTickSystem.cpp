@@ -429,7 +429,7 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
     for (const entity::ServerEntity* standing : world.state().entities()) {
         // parity: `BasePressurePlateBlock.getEntityCount`.
         if (standing->removed || entity::blockTriggers::ignored(standing->type()) ||
-            (livingOnly && !server::registry::entityAttributes::isLiving(standing->type()))) {
+            (livingOnly && !standing->livingType())) {
             continue;
         }
         const auto [half, height] = halfAndHeightOf(*standing);

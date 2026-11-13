@@ -120,7 +120,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         return;
     }
     // parity: `Mob.checkAndHandleImportantInteractions` runs `NameTagItem.interactLivingEntity` before the leash.
-    if (server::registry::entityAttributes::isLiving(entity->type()) && !entity->dying) {
+    if (entity->livingType() && !entity->dying) {
         const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
         const std::int32_t slot =
             mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot() : PlayerInventory::kOffhandSlot;

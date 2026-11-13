@@ -311,7 +311,7 @@ bool mergeNbt(ServerEntity& entity, const NbtCompound& patch) {
 void markDead(ServerEntity& entity) {
     entity.health = 0.0;
     entity.killed = true;
-    (server::registry::entityAttributes::isLiving(entity.type()) ? entity.dying : entity.removed) = true;
+    (entity.livingType() ? entity.dying : entity.removed) = true;
 }
 
 } // namespace
@@ -438,8 +438,7 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
     }
     if (operation == "has_attribute") {
         const std::string full = attributeKey(asText(at(arguments, 0)).value_or(""));
-        return server::registry::entityAttributes::isLiving(entity.type()) &&
-               server::registry::attributeIds::exists(full.substr(full.find(':') + 1));
+        return entity.livingType() && server::registry::attributeIds::exists(full.substr(full.find(':') + 1));
     }
     if (operation == "set_attribute_base") {
         entity.attributeValues.insert_or_assign(attributeKey(asText(at(arguments, 0)).value_or("")),

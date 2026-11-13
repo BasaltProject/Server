@@ -361,8 +361,7 @@ void EndFightSystem::strike(world::LoadedWorld& world, const std::vector<PlayerS
             }
         }
         for (ServerEntity* mob : living) {
-            if (mob == &dragon || mob->removed || mob->dying ||
-                !server::registry::entityAttributes::isLiving(mob->type()) ||
+            if (mob == &dragon || mob->removed || mob->dying || !mob->livingType() ||
                 !overlaps(area, mob->x, mob->y, mob->z, mob->width(), mob->height())) {
                 continue;
             }
@@ -383,8 +382,7 @@ void EndFightSystem::strike(world::LoadedWorld& world, const std::vector<PlayerS
             }
         }
         for (ServerEntity* mob : living) {
-            if (mob != &dragon && !mob->removed && !mob->dying &&
-                server::registry::entityAttributes::isLiving(mob->type()) &&
+            if (mob != &dragon && !mob->removed && !mob->dying && mob->livingType() &&
                 overlaps(area, mob->x, mob->y, mob->z, mob->width(), mob->height())) {
                 hurtMob(*mob, kHeadDamage);
             }

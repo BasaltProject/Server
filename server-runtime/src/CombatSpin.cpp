@@ -34,8 +34,7 @@ void CombatHandler::spinAttack(PlayerSession& session, double toX, double toY, d
     const double maxZ = std::max(session.z, toZ) + kHalf;
     for (ServerEntity* candidate : world->state().entities()) {
         const double half = candidate->width() / 2.0;
-        if (candidate->removed || candidate->dying ||
-            !server::registry::entityAttributes::isLiving(candidate->type()) || candidate->x + half <= minX ||
+        if (candidate->removed || candidate->dying || !candidate->livingType() || candidate->x + half <= minX ||
             candidate->x - half >= maxX || candidate->y + candidate->height() <= minY || candidate->y >= maxY ||
             candidate->z + half <= minZ || candidate->z - half >= maxZ) {
             continue;

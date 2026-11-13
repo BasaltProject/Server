@@ -182,7 +182,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         recordInteraction(*target, "attack", *session, world->gameTime());
         return;
     }
-    if (!server::registry::entityAttributes::isLiving(target->type())) {
+    if (!target->livingType()) {
         return;
     }
 

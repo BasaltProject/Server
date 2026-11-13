@@ -181,7 +181,7 @@ bool EntityPushSystem::isPushable(world::LoadedWorld& world, const Body& body) c
     if (world::detectorRails::isMinecart(mob.type()) || entity::boats::isBoat(mob.type())) {
         return true;
     }
-    if (!registry::entityAttributes::isLiving(mob.type())) {
+    if (!mob.livingType()) {
         return false;
     }
     const std::string_view path = mob.type().path();

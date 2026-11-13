@@ -91,7 +91,7 @@ NbtCompound encode(const ServerEntity& entity) {
     // parity: Air is `Entity.saveWithoutId`.
     tag.putShort("Air", static_cast<std::int16_t>(entity.airSupply));
     const std::string_view path = entity.type().path();
-    if (server::registry::entityAttributes::isLiving(entity.type())) {
+    if (entity.livingType()) {
         tag.putFloat("Health", static_cast<float>(entity.health));
         if (entity.lastHurtByPlayer.has_value()) {
             tag.set("last_hurt_by_player", uuidTag(*entity.lastHurtByPlayer));
@@ -154,7 +154,7 @@ NbtCompound encode(const ServerEntity& entity) {
     if (path == "tadpole") {
         tag.putInt("Age", entity.conversionClock);
     }
-    if (server::registry::entityAttributes::isLiving(entity.type())) {
+    if (entity.livingType()) {
         if (entity.effects.empty()) {
             tag.remove("active_effects");
         } else {

@@ -119,6 +119,7 @@ private:
 
     double speedModifier_;
     std::int32_t repathCooldown_ = 0;
+    std::int64_t lastCanUseCheck_ = 0;
 };
 
 /// parity: `WardenAi`'s anger, not a target goal at all in vanilla.

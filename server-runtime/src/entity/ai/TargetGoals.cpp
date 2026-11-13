@@ -133,7 +133,7 @@ namespace {
     std::optional<std::int32_t> found;
     for (const ServerEntity* candidate : mob.entities) {
         if (candidate == nullptr || candidate == &mob.mob || candidate->removed || candidate->health <= 0.0 ||
-            !reg::entityAttributes::isLiving(candidate->type()) || candidate->type().path() == "armor_stand") {
+            !candidate->livingType() || candidate->type().path() == "armor_stand") {
             continue;
         }
         const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);
@@ -261,7 +261,12 @@ bool MeleeAttackGoal::withinReach(const MobContext& mob, const TargetView& targe
 }
 
 bool MeleeAttackGoal::canUse(MobContext& mob) {
-    // parity: `MeleeAttackGoal.canUse`.
+    // parity: `MeleeAttackGoal.canUse`, one check every twenty ticks.
+    constexpr std::int64_t kCanUseCooldown = 20;
+    if (mob.gameTime - lastCanUseCheck_ < kCanUseCooldown) {
+        return false;
+    }
+    lastCanUseCheck_ = mob.gameTime;
     const std::optional<TargetView> target = targetOf(mob);
     if (!target.has_value()) {
         return false;

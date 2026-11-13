@@ -1605,7 +1605,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                             ? !touched.player->dead &&
                                   (touched.player->gamemode == wire::protocol::play::Gamemode::Survival ||
                                    touched.player->gamemode == wire::protocol::play::Gamemode::Adventure)
-                            : registry::entityAttributes::isLiving(touched.mob->type()) && !touched.mob->dying &&
+                            : touched.mob->livingType() && !touched.mob->dying &&
                                   !entity::wardens::isWarden(touched.mob->type()) &&
                                   touched.mob->type().path() != "armor_stand";
                     if (targetable) {
