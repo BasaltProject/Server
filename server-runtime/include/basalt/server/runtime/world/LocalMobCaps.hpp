@@ -4,8 +4,9 @@
 
 #include <array>
 #include <cstdint>
-#include <map>
 #include <optional>
+#include <span>
+#include <unordered_map>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -43,14 +44,16 @@ private:
     static constexpr std::size_t kCategoryCount = static_cast<std::size_t>(entity::MobCategory::Misc) + 1;
 
     /// Worked out once per chunk: a spawn pass asks about the same chunk per category and per mob placed.
-    [[nodiscard]] const std::vector<std::size_t>& nearby(std::int32_t chunkX, std::int32_t chunkZ);
+    [[nodiscard]] std::span<const std::uint32_t> nearby(std::int32_t chunkX, std::int32_t chunkZ);
 
     std::vector<MobCapPlayer> players_;
     std::optional<Limits> limits_;
     std::int32_t rangeChunks_ = kGlobalCapRadius;
     double distanceSquared_ = kSpawningDistanceSquared;
-    std::map<std::int32_t, std::array<std::int32_t, kCategoryCount>> counts_;
-    std::map<std::int64_t, std::vector<std::size_t>> nearbyCache_;
+    std::vector<std::array<std::int32_t, kCategoryCount>> counts_;
+    std::vector<std::pair<std::int32_t, std::int32_t>> playerChunks_;
+    std::unordered_map<std::int64_t, std::pair<std::uint32_t, std::uint32_t>> nearbyCache_;
+    std::vector<std::uint32_t> nearbyPool_;
 };
 
 } // namespace basalt::server::runtime::world

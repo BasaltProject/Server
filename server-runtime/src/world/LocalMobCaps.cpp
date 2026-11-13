@@ -17,8 +17,10 @@ using entity::MobCategory;
 } // namespace
 
 LocalMobCaps::LocalMobCaps(std::vector<MobCapPlayer> players) : players_(std::move(players)) {
+    counts_.assign(players_.size(), std::array<std::int32_t, kCategoryCount>{});
+    playerChunks_.reserve(players_.size());
     for (const MobCapPlayer& player : players_) {
-        counts_.emplace(player.id, std::array<std::int32_t, kCategoryCount>{});
+        playerChunks_.emplace_back(wire::common::mth::floor(player.x) >> 4, wire::common::mth::floor(player.z) >> 4);
     }
 }
 
@@ -29,38 +31,38 @@ LocalMobCaps::LocalMobCaps(std::vector<MobCapPlayer> players, const Limits& limi
     distanceSquared_ = static_cast<double>(rangeChunks) * 16.0 * static_cast<double>(rangeChunks) * 16.0;
 }
 
-const std::vector<std::size_t>& LocalMobCaps::nearby(std::int32_t chunkX, std::int32_t chunkZ) {
+std::span<const std::uint32_t> LocalMobCaps::nearby(std::int32_t chunkX, std::int32_t chunkZ) {
     const std::int64_t key = WorldState::key(chunkX, chunkZ);
     if (const auto found = nearbyCache_.find(key); found != nearbyCache_.end()) {
-        return found->second;
+        return std::span<const std::uint32_t>{nearbyPool_}.subspan(found->second.first, found->second.second);
     }
     const double centreX = static_cast<double>(chunkX << 4) + 8.0;
     const double centreZ = static_cast<double>(chunkZ << 4) + 8.0;
-    std::vector<std::size_t> within;
+    const auto first = static_cast<std::uint32_t>(nearbyPool_.size());
     for (std::size_t at = 0; at < players_.size(); ++at) {
         const double dx = centreX - players_[at].x;
         const double dz = centreZ - players_[at].z;
         if ((dx * dx) + (dz * dz) < distanceSquared_) {
-            within.push_back(at);
+            nearbyPool_.push_back(static_cast<std::uint32_t>(at));
         }
     }
-    return nearbyCache_.emplace(key, std::move(within)).first->second;
+    const auto length = static_cast<std::uint32_t>(nearbyPool_.size()) - first;
+    nearbyCache_.emplace(key, std::pair{first, length});
+    return std::span<const std::uint32_t>{nearbyPool_}.subspan(first, length);
 }
 
 bool LocalMobCaps::canSpawn(MobCategory category, std::int32_t chunkX, std::int32_t chunkZ) {
     const std::int32_t maximum = limits_.has_value() && indexOf(category) < limits_->size()
                                      ? (*limits_)[indexOf(category)]
                                      : entity::mobCategoryFacts(category).maxPerChunk;
-    return std::ranges::any_of(nearby(chunkX, chunkZ), [this, category, maximum](std::size_t at) {
-        return counts_.at(players_[at].id)[indexOf(category)] < maximum;
+    return std::ranges::any_of(nearby(chunkX, chunkZ), [this, category, maximum](std::uint32_t at) {
+        return counts_[at][indexOf(category)] < maximum;
     });
 }
 
 bool LocalMobCaps::isSpawnCandidate(std::int32_t chunkX, std::int32_t chunkZ) const {
-    return std::ranges::any_of(players_, [this, chunkX, chunkZ](const MobCapPlayer& player) {
-        const std::int32_t playerChunkX = wire::common::mth::floor(player.x) >> 4;
-        const std::int32_t playerChunkZ = wire::common::mth::floor(player.z) >> 4;
-        return std::abs(chunkX - playerChunkX) <= rangeChunks_ && std::abs(chunkZ - playerChunkZ) <= rangeChunks_;
+    return std::ranges::any_of(playerChunks_, [this, chunkX, chunkZ](const std::pair<std::int32_t, std::int32_t>& at) {
+        return std::abs(chunkX - at.first) <= rangeChunks_ && std::abs(chunkZ - at.second) <= rangeChunks_;
     });
 }
 
@@ -69,14 +71,18 @@ void LocalMobCaps::add(MobCategory category, std::int32_t chunkX, std::int32_t c
     if (category == MobCategory::Misc) {
         return;
     }
-    for (const std::size_t at : nearby(chunkX, chunkZ)) {
-        ++counts_.at(players_[at].id)[indexOf(category)];
+    for (const std::uint32_t at : nearby(chunkX, chunkZ)) {
+        ++counts_[at][indexOf(category)];
     }
 }
 
 std::int32_t LocalMobCaps::count(std::int32_t playerId, MobCategory category) const {
-    const auto found = counts_.find(playerId);
-    return found == counts_.end() ? 0 : found->second[indexOf(category)];
+    for (std::size_t at = 0; at < players_.size(); ++at) {
+        if (players_[at].id == playerId) {
+            return counts_[at][indexOf(category)];
+        }
+    }
+    return 0;
 }
 
 } // namespace basalt::server::runtime::world

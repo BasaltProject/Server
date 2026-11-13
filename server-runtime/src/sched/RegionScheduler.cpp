@@ -4,6 +4,7 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <utility>
 
@@ -16,6 +17,11 @@ namespace {
 static_assert(regionMap::sectionOf(-1) == -1, "a shift, not a division: chunk -1 is in section -1");
 
 } // namespace
+
+std::uint64_t Region::nextGeneration() noexcept {
+    static std::atomic<std::uint64_t> counter{0};
+    return counter.fetch_add(1, std::memory_order_relaxed) + 1;
+}
 
 bool Region::owns(std::int32_t chunkX, std::int32_t chunkZ) const {
     return sections_.empty() || sections_.contains(regionMap::sectionKeyOfChunk(chunkX, chunkZ));
@@ -66,6 +72,12 @@ Region& RegionScheduler::regionFor(std::string_view worldName, std::int32_t chun
         return *world.regions.front();
     }
     return newRegionLocked(worldName);
+}
+
+Owner* RegionScheduler::primaryOwner(std::string_view worldName) {
+    const std::lock_guard<std::mutex> lock{mutex_};
+    const std::vector<std::unique_ptr<Region>>& regions = worldLocked(worldName).regions;
+    return regions.empty() ? &newRegionLocked(worldName).owner() : &regions.front()->owner();
 }
 
 RegionScheduler::WorldRegions& RegionScheduler::worldLocked(std::string_view worldName) {
@@ -150,6 +162,7 @@ void RegionScheduler::repartition(std::string_view worldName, std::span<const st
             ++merged;
         }
         survivor->sections_ = group;
+        survivor->generation_.store(Region::nextGeneration(), std::memory_order_release);
         std::erase(spare, survivor);
         kept.push_back(survivor);
     }
@@ -166,6 +179,15 @@ void RegionScheduler::repartition(std::string_view worldName, std::span<const st
         const auto at =
             std::ranges::find_if(current, [region](const std::unique_ptr<Region>& one) { return one.get() == region; });
         rebuilt.push_back(std::move(*at));
+    }
+    constexpr std::size_t kGraveyardLimit = 512;
+    for (std::unique_ptr<Region>& dropped : current) {
+        if (dropped != nullptr) {
+            graveyard_.push_back(std::move(dropped));
+        }
+    }
+    while (graveyard_.size() > kGraveyardLimit) {
+        graveyard_.pop_front();
     }
     current = std::move(rebuilt);
     for (std::size_t index = 0; index < current.size(); ++index) {

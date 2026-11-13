@@ -8,7 +8,6 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
-#include <map>
 #include <set>
 #include <string_view>
 #include <unordered_map>
@@ -126,16 +125,27 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return std::nullopt;
 }
 
+struct Neighbours {
+    std::array<Position, 10> items;
+    std::size_t count = 0;
+
+    void add(const Position& position) { items[count++] = position; }
+
+    [[nodiscard]] const Position* begin() const { return items.data(); }
+
+    [[nodiscard]] const Position* end() const { return items.data() + count; }
+};
+
 /// parity: `WalkNodeEvaluator.getNeighbors`.
-[[nodiscard]] std::vector<Position> neighbours(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                               bool doors = false, bool amphibious = false, bool floats = false) {
+[[nodiscard]] Neighbours neighbours(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                    bool doors = false, bool amphibious = false, bool floats = false) {
     const bool waterNodes = amphibious || floats;
-    std::vector<Position> found;
+    Neighbours found;
     for (const registry::BlockFace face : kHorizontal) {
         const std::optional<Position> landed =
             step(world, x + registry::stepX(face), y, z + registry::stepZ(face), doors, waterNodes);
         if (landed.has_value()) {
-            found.push_back(*landed);
+            found.add(*landed);
         }
     }
     // parity: a corner is walkable only when both its sides are, so a mob cannot cut an inside corner.
@@ -146,33 +156,110 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
             }
             const std::optional<Position> landed = step(world, x + dx, y, z + dz, doors, waterNodes);
             if (landed.has_value()) {
-                found.push_back(*landed);
+                found.add(*landed);
             }
         }
     }
     // parity: `AmphibiousNodeEvaluator.getNeighbors`.
     if (amphibious) {
         if (isWater(world, x, y + 1, z)) {
-            found.push_back(Position{x, y + 1, z});
+            found.add(Position{x, y + 1, z});
         }
         if (isWater(world, x, y - 1, z)) {
-            found.push_back(Position{x, y - 1, z});
+            found.add(Position{x, y - 1, z});
         }
     }
     return found;
 }
 
-[[nodiscard]] std::vector<Position> reconstruct(const std::map<std::int64_t, std::int64_t>& cameFrom,
-                                                std::int64_t goal) {
+struct SearchEntry {
+    std::int64_t key = 0;
+    std::int64_t cameFrom = 0;
+    double cost = 0.0;
+    double score = 0.0;
+    std::uint32_t stamp = 0;
+    bool hasParent = false;
+    bool open = false;
+};
+
+/// Open-addressing table reused by every search on the thread; a stamp stands in for clearing it.
+class SearchTable {
+public:
+    void reset() {
+        if (++stamp_ == 0) {
+            std::ranges::fill(slots_, SearchEntry{});
+            stamp_ = 1;
+        }
+        used_ = 0;
+        if (slots_.empty()) {
+            slots_.resize(kInitialSlots);
+        }
+    }
+
+    [[nodiscard]] SearchEntry* find(std::int64_t key) {
+        const std::size_t mask = slots_.size() - 1;
+        for (std::size_t at = hash(key) & mask;; at = (at + 1) & mask) {
+            SearchEntry& slot = slots_[at];
+            if (slot.stamp != stamp_) {
+                return nullptr;
+            }
+            if (slot.key == key) {
+                return &slot;
+            }
+        }
+    }
+
+    [[nodiscard]] SearchEntry& findOrAdd(std::int64_t key) {
+        if ((used_ + 1) * 2 > slots_.size()) {
+            grow();
+        }
+        const std::size_t mask = slots_.size() - 1;
+        for (std::size_t at = hash(key) & mask;; at = (at + 1) & mask) {
+            SearchEntry& slot = slots_[at];
+            if (slot.stamp != stamp_) {
+                slot = SearchEntry{.key = key, .stamp = stamp_};
+                ++used_;
+                return slot;
+            }
+            if (slot.key == key) {
+                return slot;
+            }
+        }
+    }
+
+private:
+    static constexpr std::size_t kInitialSlots = 4096;
+
+    [[nodiscard]] static std::size_t hash(std::int64_t key) {
+        return static_cast<std::size_t>((static_cast<std::uint64_t>(key) * 0x9E3779B97F4A7C15ULL) >> 32);
+    }
+
+    void grow() {
+        std::vector<SearchEntry> old = std::move(slots_);
+        slots_.assign(old.size() * 2, SearchEntry{});
+        used_ = 0;
+        for (const SearchEntry& entry : old) {
+            if (entry.stamp == stamp_) {
+                findOrAdd(entry.key) = entry;
+            }
+        }
+    }
+
+    std::vector<SearchEntry> slots_;
+    std::uint32_t stamp_ = 0;
+    std::size_t used_ = 0;
+};
+
+[[nodiscard]] std::vector<Position> reconstruct(SearchTable& table, std::int64_t goal) {
     std::vector<Position> path;
     std::int64_t current = goal;
     while (true) {
         path.push_back(Position{unpackX(current), unpackY(current), unpackZ(current)});
-        const auto found = cameFrom.find(current);
-        if (found == cameFrom.end()) {
+        const SearchEntry* found = table.find(current);
+        if (found == nullptr || !found->hasParent) {
             break;
         }
-        current = found->second;
+        current = found->cameFrom;
     }
     std::ranges::reverse(path);
     if (!path.empty()) {
@@ -222,6 +309,7 @@ std::array<std::int32_t, 3> startOf(world::WorldState& world, double x, double y
 
 std::optional<Route> findRoute(world::WorldState& world, std::int32_t fromX, std::int32_t fromY, std::int32_t fromZ,
                                std::span<const Position> targets, const RouteOptions& options) {
+    const world::WorldState::BlockReadScope readScope{world};
     // parity: `WalkNodeEvaluator.getStart` takes the start as it comes, standable or not.
     if (targets.empty() || !world.blockState(fromX, fromY, fromZ).has_value()) {
         return std::nullopt;
@@ -378,6 +466,7 @@ std::optional<Route> findRoute(world::WorldState& world, std::int32_t fromX, std
 
 std::optional<std::vector<Position>> find(world::WorldState& world, std::int32_t fromX, std::int32_t fromY,
                                           std::int32_t fromZ, std::int32_t toX, std::int32_t toY, std::int32_t toZ) {
+    const world::WorldState::BlockReadScope readScope{world};
     if (!canStandAt(world, fromX, fromY, fromZ)) {
         return std::nullopt;
     }
@@ -387,32 +476,33 @@ std::optional<std::vector<Position>> find(world::WorldState& world, std::int32_t
         return std::vector<Position>{};
     }
 
-    std::map<std::int64_t, std::int64_t> cameFrom;
-    std::map<std::int64_t, double> cost;
-    std::map<std::int64_t, double> score;
-    std::vector<std::int64_t> open;
-    cost[start] = 0.0;
-    score[start] = distance(fromX, fromY, fromZ, toX, toY, toZ);
+    thread_local SearchTable table;
+    thread_local std::vector<std::int64_t> open;
+    table.reset();
+    open.clear();
+    {
+        SearchEntry& first = table.findOrAdd(start);
+        first.cost = 0.0;
+        first.score = distance(fromX, fromY, fromZ, toX, toY, toZ);
+        first.open = true;
+    }
     open.push_back(start);
 
-    const auto scoreOf = [&score](std::int64_t node) {
-        const auto found = score.find(node);
-        return found == score.end() ? std::numeric_limits<double>::max() : found->second;
-    };
-    const auto costOf = [&cost](std::int64_t node) {
-        const auto found = cost.find(node);
-        return found == cost.end() ? std::numeric_limits<double>::max() : found->second;
+    const auto scoreOf = [](const SearchEntry* entry) {
+        return entry == nullptr ? std::numeric_limits<double>::max() : entry->score;
     };
 
     std::int32_t examined = 0;
     while (!open.empty() && examined++ < kMaxNodes) {
         // A plain scan for the cheapest open node: a path this short never pays for a heap.
-        const auto cheapest = std::ranges::min_element(
-            open, [&scoreOf](std::int64_t one, std::int64_t other) { return scoreOf(one) < scoreOf(other); });
+        const auto cheapest = std::ranges::min_element(open, [&](std::int64_t one, std::int64_t other) {
+            return scoreOf(table.find(one)) < scoreOf(table.find(other));
+        });
         const std::int64_t current = *cheapest;
         open.erase(cheapest);
+        table.find(current)->open = false;
         if (current == goal) {
-            return reconstruct(cameFrom, current);
+            return reconstruct(table, current);
         }
 
         const std::int32_t x = unpackX(current);
@@ -420,16 +510,21 @@ std::optional<std::vector<Position>> find(world::WorldState& world, std::int32_t
         const std::int32_t z = unpackZ(current);
         for (const Position& neighbour : neighbours(world, x, y, z)) {
             const std::int64_t next = pack(neighbour[0], neighbour[1], neighbour[2]);
-            const double stepCost = costOf(current) + distance(x, y, z, neighbour[0], neighbour[1], neighbour[2]) +
+            const double stepCost = table.find(current)->cost +
+                                    distance(x, y, z, neighbour[0], neighbour[1], neighbour[2]) +
                                     malus(world, neighbour[0], neighbour[1], neighbour[2]);
-            if (stepCost >= costOf(next)) {
+            const SearchEntry* known = table.find(next);
+            if (known != nullptr && stepCost >= known->cost) {
                 continue;
             }
-            cameFrom[next] = current;
-            cost[next] = stepCost;
-            score[next] =
+            SearchEntry& entry = table.findOrAdd(next);
+            entry.cameFrom = current;
+            entry.hasParent = true;
+            entry.cost = stepCost;
+            entry.score =
                 stepCost + (distance(neighbour[0], neighbour[1], neighbour[2], toX, toY, toZ) * kHeuristicWeight);
-            if (std::ranges::find(open, next) == open.end()) {
+            if (!entry.open) {
+                entry.open = true;
                 open.push_back(next);
             }
         }

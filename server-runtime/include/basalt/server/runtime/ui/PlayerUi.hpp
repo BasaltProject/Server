@@ -71,8 +71,10 @@ private:
     [[nodiscard]] float progressOf(const std::optional<std::string>& raw,
                                    const wire::common::placeholder::PlaceholderContext& context);
 
-    [[nodiscard]] std::pair<std::string, wire::text::Component>
-    render(const std::vector<std::string>& lines, const wire::common::placeholder::PlaceholderContext& context);
+    [[nodiscard]] std::string renderText(const std::vector<std::string>& lines,
+                                         const wire::common::placeholder::PlaceholderContext& context);
+
+    [[nodiscard]] static wire::text::Component parseLines(bool hasLines, const std::string& text);
 
     [[nodiscard]] std::string substitute(std::string_view text,
                                          const wire::common::placeholder::PlaceholderContext& context);

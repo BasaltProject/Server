@@ -458,6 +458,8 @@ basalt_module(server-runtime-core
         src/net/QueryServer.cpp
         src/net/SocketOptions.cpp
         src/net/SessionOutbox.cpp
+        src/net/FrameCache.cpp
+        src/net/SharedPacket.cpp
         src/registry/VanillaBiomes.cpp
         src/registry/VanillaConfigurationRegistries.cpp
         src/registry/VanillaDimensionTypes.cpp

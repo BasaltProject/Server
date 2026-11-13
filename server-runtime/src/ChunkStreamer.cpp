@@ -282,7 +282,7 @@ void ChunkStreamer::sendChunk(Chunk& chunk) {
     }
     const std::vector<std::uint8_t> chunkData = server::world::chunkDataCodec::encodeSections(chunk, obfuscated);
     const std::vector<std::int64_t> heightmap = server::world::chunkDataCodec::encodeHeightmap(chunk);
-    owner_->sendCompressed(MapChunkPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+    owner_->sendDeduplicated(MapChunkPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         MapChunkPacket{.x = chunk.chunkX(),
                        .z = chunk.chunkZ(),
                        .heightmaps = {wire::protocol::play::Heightmap{
@@ -292,7 +292,7 @@ void ChunkStreamer::sendChunk(Chunk& chunk) {
                        .light = wireLight}
             .write(buffer);
     });
-    owner_->sendCompressed(UpdateLightPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+    owner_->sendDeduplicated(UpdateLightPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         UpdateLightPacket{.chunkX = chunk.chunkX(), .chunkZ = chunk.chunkZ(), .light = wireLight}.write(buffer);
     });
 }

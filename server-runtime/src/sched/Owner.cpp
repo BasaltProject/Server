@@ -176,6 +176,23 @@ void Owner::cancelPending() {
         task.handle.cancel();
 }
 
+void Owner::moveConsoleTo(Owner& other) {
+    std::deque<ScheduledTask> console;
+    {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        console.swap(console_);
+    }
+    if (console.empty()) {
+        return;
+    }
+    const std::lock_guard<std::mutex> lock{other.mutex_};
+    for (ScheduledTask& task : console) {
+        if (!task.handle.isCancelled()) {
+            other.console_.push_back(std::move(task));
+        }
+    }
+}
+
 void Owner::drainInto(Owner& other) {
     // Console input keeps its slot in the surviving owner and runs at the turn's console point.
     std::deque<ScheduledTask> console;

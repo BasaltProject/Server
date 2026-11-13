@@ -23,13 +23,15 @@ void PlayerRegistry::add(PlayerSession* session) {
     }
     const std::lock_guard<std::mutex> guard{lock_};
     const auto found = sessions_.find(session->uuid());
+    auto next = std::make_shared<std::vector<PlayerSession*>>(*order_);
     if (found != sessions_.end()) {
-        std::erase(order_, found->second);
+        std::erase(*next, found->second);
         found->second = session;
     } else {
         sessions_.emplace(session->uuid(), session);
     }
-    order_.push_back(session);
+    next->push_back(session);
+    order_ = std::move(next);
 }
 
 void PlayerRegistry::remove(const wire::common::Uuid& uuid) {
@@ -38,7 +40,9 @@ void PlayerRegistry::remove(const wire::common::Uuid& uuid) {
     if (found == sessions_.end()) {
         return;
     }
-    std::erase(order_, found->second);
+    auto next = std::make_shared<std::vector<PlayerSession*>>(*order_);
+    std::erase(*next, found->second);
+    order_ = std::move(next);
     sessions_.erase(found);
 }
 
@@ -88,10 +92,15 @@ PlayerSession* PlayerRegistry::get(const wire::common::Uuid& uuid) const {
 
 std::size_t PlayerRegistry::count() const {
     const std::lock_guard<std::mutex> guard{lock_};
-    return order_.size();
+    return order_->size();
 }
 
 std::vector<PlayerSession*> PlayerRegistry::snapshot() const {
+    const std::lock_guard<std::mutex> guard{lock_};
+    return *order_;
+}
+
+std::shared_ptr<const std::vector<PlayerSession*>> PlayerRegistry::view() const {
     const std::lock_guard<std::mutex> guard{lock_};
     return order_;
 }

@@ -66,19 +66,35 @@ ProtoChunks::ProtoChunks(Hooks hooks, const std::size_t capacity) : hooks_(std::
 ProtoChunks::~ProtoChunks() = default;
 
 void ProtoChunks::demand(const std::int32_t chunkX, const std::int32_t chunkZ, const std::int32_t priority) {
-    const std::lock_guard lock{mutex_};
-    const std::int64_t at = key(chunkX, chunkZ);
-    const auto [request, inserted] = requests_.try_emplace(at, Request{.priority = priority});
-    if (!inserted && priority >= request->second.priority) {
+    const std::lock_guard lock{inboxMutex_};
+    inbox_.push_back(Demand{key(chunkX, chunkZ), priority});
+    inboxSize_.store(inbox_.size(), std::memory_order_release);
+}
+
+void ProtoChunks::drainInbox() {
+    if (inboxSize_.load(std::memory_order_acquire) == 0) {
         return;
     }
-    request->second.priority = priority;
-    wantsStale_ = true;
+    std::vector<Demand> taken;
+    {
+        const std::lock_guard lock{inboxMutex_};
+        taken.swap(inbox_);
+        inboxSize_.store(0, std::memory_order_release);
+    }
+    for (const Demand& demand : taken) {
+        const auto [request, inserted] = requests_.try_emplace(demand.at, Request{.priority = demand.priority});
+        if (!inserted && demand.priority >= request->second.priority) {
+            continue;
+        }
+        request->second.priority = demand.priority;
+        wantsStale_ = true;
+    }
 }
 
 void ProtoChunks::demandArea(const std::int32_t chunkX, const std::int32_t chunkZ, const std::int32_t fullRadius,
                              const std::int32_t decorateRadius, const std::int32_t priority) {
     const std::lock_guard lock{mutex_};
+    drainInbox();
     areas_.insert_or_assign(key(chunkX, chunkZ),
                             Area{.priority = priority, .fullRadius = fullRadius, .decorateRadius = decorateRadius});
     for (std::int32_t dx = -fullRadius; dx <= fullRadius; ++dx) {
@@ -98,6 +114,7 @@ void ProtoChunks::demandArea(const std::int32_t chunkX, const std::int32_t chunk
 
 void ProtoChunks::releaseArea(const std::int32_t chunkX, const std::int32_t chunkZ) {
     const std::lock_guard lock{mutex_};
+    drainInbox();
     const auto area = areas_.find(key(chunkX, chunkZ));
     if (area == areas_.end()) {
         return;
@@ -116,6 +133,7 @@ void ProtoChunks::releaseArea(const std::int32_t chunkX, const std::int32_t chun
 
 std::size_t ProtoChunks::retainWhere(const std::function<bool(std::int32_t, std::int32_t)>& keep) {
     const std::lock_guard lock{mutex_};
+    drainInbox();
     const std::size_t before = requests_.size();
     std::erase_if(requests_, [&](const auto& entry) {
         return !entry.second.waited && !entry.second.member && !busy_.contains(entry.first) &&
@@ -129,6 +147,7 @@ std::size_t ProtoChunks::retainWhere(const std::function<bool(std::int32_t, std:
 
 void ProtoChunks::clearDemands() {
     const std::lock_guard lock{mutex_};
+    drainInbox();
     std::erase_if(requests_, [this](const auto& entry) { return !busy_.contains(entry.first); });
     areas_.clear();
     wantsStale_ = true;
@@ -143,12 +162,18 @@ std::unordered_set<std::int64_t> ProtoChunks::pendingKeys() const {
     for (const Finished& done : finished_) {
         keys.insert(done.key);
     }
+    const std::lock_guard inboxLock{inboxMutex_};
+    for (const Demand& demand : inbox_) {
+        keys.insert(demand.at);
+    }
     return keys;
 }
 
 std::size_t ProtoChunks::pendingCount() const {
-    const std::lock_guard lock{mutex_};
-    return requests_.size() + finished_.size();
+    if (std::unique_lock lock{mutex_, std::try_to_lock}; lock.owns_lock()) {
+        knownPending_.store(requests_.size() + finished_.size(), std::memory_order_relaxed);
+    }
+    return knownPending_.load(std::memory_order_relaxed) + inboxSize_.load(std::memory_order_acquire);
 }
 
 std::size_t ProtoChunks::protoCount() const {
@@ -424,6 +449,7 @@ bool ProtoChunks::step() {
     std::optional<Task> task;
     {
         const std::lock_guard lock{mutex_};
+        drainInbox();
         task = pick();
     }
     if (!task.has_value()) {
@@ -433,6 +459,7 @@ bool ProtoChunks::step() {
     std::vector<Chunk> leaving;
     {
         const std::lock_guard lock{mutex_};
+        drainInbox();
         busy_.erase(task->key);
         wantsStale_ = true;
         const auto request = requests_.find(task->key);
@@ -608,6 +635,7 @@ std::optional<Chunk> ProtoChunks::generateNow(const std::int32_t chunkX, const s
     const std::int64_t at = key(chunkX, chunkZ);
     {
         const std::lock_guard lock{mutex_};
+        drainInbox();
         if (full_.contains(at) && !requests_.contains(at) &&
             std::ranges::none_of(finished_, [at](const Finished& done) { return done.key == at; })) {
             return std::nullopt;
@@ -625,6 +653,7 @@ std::optional<Chunk> ProtoChunks::generateNow(const std::int32_t chunkX, const s
     while (true) {
         {
             const std::lock_guard lock{mutex_};
+            drainInbox();
             const auto done =
                 std::ranges::find_if(finished_, [at](const Finished& finished) { return finished.key == at; });
             if (done != finished_.end()) {

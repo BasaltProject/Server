@@ -5,6 +5,7 @@
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -79,6 +80,8 @@ private:
     [[nodiscard]] std::optional<std::int64_t> takeNext();
     void runWorker();
 
+    void wakeWorkers();
+
     wire::common::Logger logger_{"ChunkGen"};
     std::int64_t awaitTimeoutMillis_;
     WorldState* world_;
@@ -98,8 +101,13 @@ private:
     std::shared_ptr<Live> live_ = std::make_shared<Live>();
     mutable std::mutex mutex_;
     std::unordered_map<std::int64_t, std::int32_t> queued_;
+    mutable std::mutex progressMutex_;
     std::unordered_map<std::int64_t, std::int32_t> inProgress_;
     std::atomic<bool> running_{true};
+    std::mutex wakeMutex_;
+    std::condition_variable wake_;
+    std::atomic<std::uint64_t> wakeEpoch_{0};
+    std::atomic<std::int32_t> sleepers_{0};
     std::vector<std::jthread> workers_;
 };
 

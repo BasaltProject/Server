@@ -546,7 +546,9 @@ void EntityVisibilityTracker::syncPlayers() {
         return;
     }
     std::vector<PlayerSession*> visible;
-    for (PlayerSession* other : registry->snapshot()) {
+    const std::shared_ptr<const std::vector<PlayerSession*>> everyone = registry->view();
+    visible.reserve(everyone->size());
+    for (PlayerSession* other : *everyone) {
         const bool hidden =
             session->extras.hiddenEntities.contains(other->entityId()) ||
             (other->extras.hiddenByDefault && !session->extras.shownEntities.contains(other->entityId()));
@@ -610,6 +612,10 @@ void EntityVisibilityTracker::syncPlayers() {
         syncEquipmentOf(*other);
     }
 
+    // Every visible player was tracked above, so the same count means nobody left.
+    if (trackedPlayers_.size() == visible.size()) {
+        return;
+    }
     std::set<std::int32_t> stillThere;
     for (const PlayerSession* other : visible) {
         stillThere.insert(other->entityId());
@@ -646,6 +652,20 @@ void EntityVisibilityTracker::syncPlayers() {
 }
 
 void EntityVisibilityTracker::syncEquipmentOf(const PlayerSession& other) {
+    if (const auto known = trackedEquipment_.find(other.entityId());
+        known != trackedEquipment_.end() && known->second.size() == 2 + PlayerInventory::kArmourSlots) {
+        const auto unchanged = [&](const std::size_t at, const std::int32_t slot) {
+            return known->second[at] == other.inventory.at(slot);
+        };
+        bool same = unchanged(0, PlayerInventory::kHotbarStart + other.inventory.heldSlot()) &&
+                    unchanged(1, PlayerInventory::kOffhandSlot);
+        for (std::int32_t index = 0; same && index < PlayerInventory::kArmourSlots; index++) {
+            same = unchanged(static_cast<std::size_t>(2 + index), PlayerInventory::kArmourStart + index);
+        }
+        if (same) {
+            return;
+        }
+    }
     std::vector<std::optional<storage::StoredItemStack>> worn{
         other.inventory.at(PlayerInventory::kHotbarStart + other.inventory.heldSlot()),
         other.inventory.at(PlayerInventory::kOffhandSlot)};

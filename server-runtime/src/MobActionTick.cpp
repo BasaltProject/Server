@@ -351,7 +351,7 @@ entity::ai::MobContext MobActionSystem::mobContext(world::LoadedWorld& world, Se
                                   .entities = living,
                                   .players = views,
                                   .actions = *this,
-                                  .light = lightAt(world, entity::mobCombat::blockPosition(mob)),
+                                  .lightPosition = entity::mobCombat::blockPosition(mob),
                                   .night = world::beds::isNight(world.clock().totalTicks()),
                                   .dayTime = world.clock().totalTicks(),
                                   .gameTime = world.gameTime(),
@@ -511,14 +511,6 @@ void MobActionSystem::blazeRises(ServerEntity& blaze, std::optional<double> targ
 void MobActionSystem::activateSkeletonTrap(world::LoadedWorld& world, ServerEntity& horse,
                                            random::RandomSource& random) {
     static_cast<void>(spawning_->activateSkeletonTrap(world, horse, random));
-}
-
-std::int32_t MobActionSystem::lightAt(world::LoadedWorld& world, const std::array<std::int32_t, 3>& position) {
-    const std::int32_t block = world::worldLight::blockLight(world.state(), position[0], position[1], position[2]);
-    const std::int32_t sky = world::worldLight::skyLight(world.state(), position[0], position[1], position[2]);
-    // parity: `Entity.getLightLevelDependentMagicValue`.
-    const std::int32_t daylight = world::beds::isNight(world.clock().totalTicks()) ? 0 : sky;
-    return std::max(block, daylight);
 }
 
 void MobActionSystem::eatGrassUnder(world::LoadedWorld& world, const ServerEntity& mob) {

@@ -78,8 +78,8 @@ void WorldState::mine(std::string_view what) const {
     if (regionCount_ && regionCount_() > 1) {
         return;
     }
-    if (owner_ != nullptr) {
-        owner_->check(what);
+    if (sched::Owner* current = owner(); current != nullptr) {
+        current->check(what);
     }
 }
 
@@ -295,7 +295,7 @@ Chunk& WorldState::getOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) 
     }
     Chunk* arrived = chunkIfLoaded(chunkX, chunkZ);
     while (arrived == nullptr) {
-        sched::Owner* target = installOwner_ != nullptr ? installOwner_ : owner_;
+        sched::Owner* target = installOwner_ != nullptr ? installOwner_ : owner();
         if (target != nullptr && target->isCurrent()) {
             static_cast<void>(target->runPending());
         }

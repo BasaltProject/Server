@@ -259,7 +259,7 @@ Chunk& WorldState::install(Chunk chunk) {
 }
 
 void WorldState::installLater(Chunk chunk, std::function<void()> installed) {
-    sched::Owner* target = installOwner_ != nullptr ? installOwner_ : owner_;
+    sched::Owner* target = installOwner_ != nullptr ? installOwner_ : owner();
     if (target == nullptr) {
         Chunk& placed = install(std::move(chunk));
         if (const std::function<void(Chunk&)> handler = chunkInstalledHandler()) {
@@ -316,7 +316,29 @@ void WorldState::installPass(sched::Owner* target) {
     target->submit([this, target] { installPass(target); });
 }
 
+namespace {
+thread_local const WorldState* tlReadScope = nullptr;
+}
+
+WorldState::BlockReadScope::BlockReadScope(const WorldState& world) {
+    if (tlReadScope == &world) {
+        return;
+    }
+    lock_ = WorldReadLock{world.mutex_};
+    previous_ = tlReadScope;
+    tlReadScope = &world;
+}
+
+WorldState::BlockReadScope::~BlockReadScope() {
+    if (lock_.owns_lock()) {
+        tlReadScope = previous_;
+    }
+}
+
 std::optional<std::int32_t> WorldState::blockState(std::int32_t x, std::int32_t y, std::int32_t z) const {
+    if (tlReadScope == this) {
+        return blockStateLocked(x, y, z);
+    }
     const WorldReadLock lock{mutex_};
     return blockStateLocked(x, y, z);
 }

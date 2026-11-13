@@ -87,6 +87,9 @@ public:
 
     void drainInto(Owner& other);
 
+    /// Hands queued console input to `other`, so the region that runs the console point sees all of it.
+    void moveConsoleTo(Owner& other);
+
     /// Throws when the caller is not the owner and strict mode is on. See `ownership`.
     void check(std::string_view what) const;
 

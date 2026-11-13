@@ -1,9 +1,23 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
+#include <basalt/server/runtime/world/WorldLight.hpp>
 
+#include <algorithm>
 #include <cstdint>
 
 namespace basalt::server::runtime::entity::ai {
+
+std::int32_t MobContext::lightLevel() const {
+    if (lightCache < 0) {
+        const std::int32_t block =
+            world::worldLight::blockLight(world, lightPosition[0], lightPosition[1], lightPosition[2]);
+        const std::int32_t sky =
+            world::worldLight::skyLight(world, lightPosition[0], lightPosition[1], lightPosition[2]);
+        // parity: `Entity.getLightLevelDependentMagicValue`.
+        lightCache = std::max(block, night ? 0 : sky);
+    }
+    return lightCache;
+}
 
 const PlayerView* MobContext::nearestPlayer(double range) const {
     const PlayerView* best = nullptr;

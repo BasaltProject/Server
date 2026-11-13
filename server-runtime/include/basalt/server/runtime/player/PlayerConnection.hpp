@@ -27,6 +27,10 @@
 #include <utility>
 #include <vector>
 
+namespace basalt::server::runtime::net {
+class SharedPacket;
+} // namespace basalt::server::runtime::net
+
 namespace basalt::server::runtime::world {
 class LoadedWorld;
 } // namespace basalt::server::runtime::world
@@ -60,6 +64,9 @@ struct PlayerConnection {
     std::function<void(const chat::PlayerChatMessage& message, const chat::BoundChatType& chatType)> sendChatMessage;
 
     std::function<void(std::int32_t packetId, const std::function<void(wire::io::ByteBuffer&)>& write)> sendPlayPacket;
+
+    /// Like `sendPlayPacket`, for a packet written once and sent to many players.
+    std::function<void(const net::SharedPacket& packet)> sendSharedPacket;
 
     /// The Java connection for raw packet access; unset for Bedrock players.
     std::function<std::shared_ptr<server::plugins::PacketEndpoint>()> packetEndpoint;

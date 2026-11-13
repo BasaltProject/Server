@@ -1,8 +1,11 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <mutex>
+#include <span>
 #include <vector>
 
 namespace basalt::server::runtime::net {
@@ -10,6 +13,17 @@ namespace basalt::server::runtime::net {
 class SessionOutbox {
 public:
     using Frame = std::vector<std::uint8_t>;
+    using SharedFrame = std::shared_ptr<const Frame>;
+
+    /// Either bytes of its own or a frame built once for many connections.
+    struct Entry {
+        Frame own;
+        SharedFrame shared;
+
+        [[nodiscard]] std::span<const std::uint8_t> bytes() const {
+            return shared != nullptr ? std::span<const std::uint8_t>{*shared} : std::span<const std::uint8_t>{own};
+        }
+    };
 
     /// Eight megabytes of unsent frames is a client that is never coming back.
     static constexpr std::int64_t kDefaultLimitBytes = 8LL * 1024 * 1024;
@@ -33,16 +47,18 @@ public:
 
     bool offer(Frame frame);
 
-    [[nodiscard]] std::deque<Frame> drain();
+    bool offerShared(SharedFrame frame);
+
+    [[nodiscard]] std::deque<Entry> drain();
 
     void close();
 
 private:
     std::int64_t limitBytes_;
     mutable std::mutex mutex_;
-    std::deque<Frame> queue_;
+    std::deque<Entry> queue_;
     std::int64_t pending_ = 0;
-    bool open_ = false;
+    std::atomic<bool> open_{false};
     bool overflowed_ = false;
 };
 

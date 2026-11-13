@@ -4,6 +4,7 @@
 #include <basalt/server/world/blending/Blender.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -100,6 +101,17 @@ private:
     Hooks hooks_;
     std::size_t capacity_;
     mutable std::mutex mutex_;
+
+    struct Demand {
+        std::int64_t at;
+        std::int32_t priority;
+    };
+
+    void drainInbox();
+    mutable std::mutex inboxMutex_;
+    std::vector<Demand> inbox_;
+    std::atomic<std::size_t> inboxSize_{0};
+    mutable std::atomic<std::size_t> knownPending_{0};
     std::unordered_map<std::int64_t, std::unique_ptr<Entry>> entries_;
     std::unordered_map<std::int64_t, Request> requests_;
     std::unordered_map<std::int64_t, Area> areas_;

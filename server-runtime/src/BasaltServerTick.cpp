@@ -109,16 +109,19 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
 
     // Decided between turns: with no region running, re-homing a session cannot put two threads in one player.
     const auto worlds = worldRegistry_->worldsForTick();
-    for (player::PlayerSession* player : playerRegistry_.snapshot()) {
-        const auto found = worlds.find(player->worldName);
-        if (found == worlds.end() || found->second->retired()) {
-            continue;
-        }
-        if (player->connection().handOverToRegion) {
-            player->connection().handOverToRegion(*found->second);
-        }
-        if (!found->second->retired() && player->connection().syncOpenWindow) {
-            player->connection().syncOpenWindow(*found->second);
+    {
+        const wire::common::ScopedTiming handover{timings_, "tick.handover"};
+        for (player::PlayerSession* player : *playerRegistry_.view()) {
+            const auto found = worlds.find(player->worldName);
+            if (found == worlds.end() || found->second->retired()) {
+                continue;
+            }
+            if (player->connection().handOverToRegion) {
+                player->connection().handOverToRegion(*found->second);
+            }
+            if (!found->second->retired() && player->connection().syncOpenWindow) {
+                player->connection().syncOpenWindow(*found->second);
+            }
         }
     }
 
@@ -150,6 +153,11 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             }
             const auto drainConsole = [this, &region, &onTaskFailure] {
                 if (region.isPrimary() && region.worldName() == worldRegistry_->defaultWorld().name()) {
+                    for (sched::Region* other : worldRegistry_->scheduler().regionsOf(region.worldName())) {
+                        if (other != &region) {
+                            other->owner().moveConsoleTo(region.owner());
+                        }
+                    }
                     static_cast<void>(region.owner().runConsole(onTaskFailure));
                 }
             };

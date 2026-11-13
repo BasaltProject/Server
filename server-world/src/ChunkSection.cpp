@@ -22,7 +22,20 @@ namespace {
     return static_cast<std::size_t>((quartY << 4) | (quartZ << 2) | quartX);
 }
 
+std::atomic<std::uint64_t> gNextVersion{1};
+
 } // namespace
+
+std::uint64_t ContentVersion::get() const noexcept {
+    std::uint64_t current = value_.load(std::memory_order_relaxed);
+    if (current == 0) {
+        const std::uint64_t fresh = gNextVersion.fetch_add(1, std::memory_order_relaxed);
+        if (value_.compare_exchange_strong(current, fresh, std::memory_order_relaxed)) {
+            return fresh;
+        }
+    }
+    return current;
+}
 
 ChunkSection::ChunkSection() : blockStateIds_(kBlocks, registry::blocks::air().stateId), biomeIds_(kBiomes, 0) {}
 
@@ -48,6 +61,7 @@ bool ChunkSection::setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t 
     if (registry::blockFluids::hasFluid(stateId)) {
         nonEmptyFluidCount_++;
     }
+    version_.clear();
     return true;
 }
 
@@ -57,9 +71,13 @@ std::int32_t ChunkSection::biomeId(std::int32_t quartX, std::int32_t quartY, std
 
 void ChunkSection::setBiomeId(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ, std::int32_t biomeId) {
     biomeIds_.set(biomeIndex(quartX, quartY, quartZ), biomeId);
+    version_.clear();
 }
 
-void ChunkSection::setBiomeIds(std::span<const std::int32_t> ids) { biomeIds_.setAll(ids); }
+void ChunkSection::setBiomeIds(std::span<const std::int32_t> ids) {
+    biomeIds_.setAll(ids);
+    version_.clear();
+}
 
 std::vector<std::int32_t> ChunkSection::biomeIds() const { return biomeIds_.toVector(); }
 
@@ -88,6 +106,7 @@ void ChunkSection::setBlockStateIds(std::span<const std::int32_t> ids) {
             nonEmptyFluidCount_++;
         }
     }
+    version_.clear();
 }
 
 } // namespace basalt::server::world

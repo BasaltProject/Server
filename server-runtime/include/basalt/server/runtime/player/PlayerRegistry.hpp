@@ -34,6 +34,9 @@ public:
 
     [[nodiscard]] std::vector<PlayerSession*> snapshot() const;
 
+    /// The same list as `snapshot`, shared instead of copied: it never changes once handed out.
+    [[nodiscard]] std::shared_ptr<const std::vector<PlayerSession*>> view() const;
+
     [[nodiscard]] std::size_t count() const;
 
 private:
@@ -41,7 +44,7 @@ private:
 
     mutable std::mutex lock_;
     /// Kept in join order, which is the order vanilla lists players in.
-    std::vector<PlayerSession*> order_;
+    std::shared_ptr<const std::vector<PlayerSession*>> order_ = std::make_shared<const std::vector<PlayerSession*>>();
     std::unordered_map<wire::common::Uuid, PlayerSession*> sessions_;
     std::int32_t nextEntityId_ = 1;
     std::vector<std::pair<std::chrono::steady_clock::time_point, std::unique_ptr<PlayerSession>>> retired_;

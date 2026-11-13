@@ -9,7 +9,11 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <deque>
+#include <memory>
+#include <mutex>
 #include <tuple>
+#include <unordered_map>
 
 namespace basalt::server::world::chunkDataCodec {
 namespace {
@@ -76,6 +80,48 @@ masked(const Chunk::PackedLight* sections) {
     return packed;
 }
 
+using EncodedSection = std::shared_ptr<const std::vector<std::uint8_t>>;
+
+/// Wire bytes of a section keyed by its content version, so every player and resend shares one encoding.
+class SectionEncodings {
+public:
+    static constexpr std::size_t kBudgetBytes = 16UL * 1024UL * 1024UL;
+
+    [[nodiscard]] static SectionEncodings& instance() {
+        static SectionEncodings cache;
+        return cache;
+    }
+
+    [[nodiscard]] EncodedSection find(std::uint64_t version) {
+        const std::lock_guard<std::mutex> guard{mutex_};
+        const auto found = entries_.find(version);
+        return found == entries_.end() ? nullptr : found->second;
+    }
+
+    void insert(std::uint64_t version, EncodedSection encoded) {
+        const std::lock_guard<std::mutex> guard{mutex_};
+        if (!entries_.emplace(version, encoded).second) {
+            return;
+        }
+        order_.push_back(version);
+        bytes_ += encoded->size() + kEntryOverhead;
+        while (bytes_ > kBudgetBytes && !order_.empty()) {
+            const auto oldest = entries_.find(order_.front());
+            bytes_ -= oldest->second->size() + kEntryOverhead;
+            entries_.erase(oldest);
+            order_.pop_front();
+        }
+    }
+
+private:
+    static constexpr std::size_t kEntryOverhead = 96;
+
+    std::mutex mutex_;
+    std::unordered_map<std::uint64_t, EncodedSection> entries_;
+    std::deque<std::uint64_t> order_;
+    std::size_t bytes_ = 0;
+};
+
 } // namespace
 
 std::vector<std::uint8_t> encodeSections(const Chunk& chunk) { return encodeSections(chunk, {}); }
@@ -85,18 +131,32 @@ std::vector<std::uint8_t> encodeSections(const Chunk& chunk,
     wire::io::ByteBuffer buffer;
     std::vector<std::int32_t> blockScratch(kBlocksPerSection);
     std::vector<std::int32_t> biomeScratch(kBiomesPerSection);
+    SectionEncodings& cache = SectionEncodings::instance();
     for (std::size_t i = 0; i < chunk.sectionCount(); ++i) {
         const ChunkSection& section = chunk.section(i);
+        const bool replaced = i < replacements.size() && !replacements[i].empty();
+        const std::uint64_t version = replaced ? 0 : section.contentVersion();
+        if (!replaced) {
+            if (const EncodedSection hit = cache.find(version); hit != nullptr) {
+                buffer.writeBytes(*hit);
+                continue;
+            }
+        }
+        const std::size_t start = buffer.writerIndex();
         buffer.writeShort(static_cast<std::int16_t>(section.nonAirBlockCount()));
         // parity: LevelChunkSection.write always writes two shorts, the non-empty block count and then the fluid.
         buffer.writeShort(static_cast<std::int16_t>(section.nonEmptyFluidCount()));
         section.copyBlockStateIdsInto(blockScratch);
-        if (i < replacements.size() && !replacements[i].empty()) {
+        if (replaced) {
             blockScratch = replacements[i];
         }
         play::palettedContainer::write(buffer, blockScratch, play::palettedContainer::kBlockMinIndirectBits,
                                        play::palettedContainer::kBlockMaxIndirectBits, blockDirectBits());
         writeBiomes(buffer, section, biomeScratch);
+        if (!replaced) {
+            const std::span<const std::uint8_t> written = buffer.readable().subspan(start);
+            cache.insert(version, std::make_shared<const std::vector<std::uint8_t>>(written.begin(), written.end()));
+        }
     }
     return buffer.toVector();
 }

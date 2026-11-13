@@ -20,7 +20,7 @@ void MobActionSystem::tickVillager(world::LoadedWorld& world, entity::ServerEnti
                                    .entities = living,
                                    .players = views,
                                    .actions = *this,
-                                   .light = lightAt(world, entity::mobCombat::blockPosition(villager)),
+                                   .lightPosition = entity::mobCombat::blockPosition(villager),
                                    .night = world::beds::isNight(world.clock().totalTicks()),
                                    .dayTime = world.clock().totalTicks(),
                                    .gameTime = world.gameTime(),

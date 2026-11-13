@@ -2,11 +2,32 @@
 
 #include <basalt/server/world/PalettedContainer.hpp>
 
+#include <atomic>
 #include <cstdint>
 #include <span>
 #include <vector>
 
 namespace basalt::server::world {
+
+/// Names one exact content of a section: every write clears it, and a copy shares it until either is written.
+class ContentVersion {
+public:
+    ContentVersion() = default;
+
+    ContentVersion(const ContentVersion& other) noexcept : value_(other.value_.load(std::memory_order_relaxed)) {}
+
+    ContentVersion& operator=(const ContentVersion& other) noexcept {
+        value_.store(other.value_.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        return *this;
+    }
+
+    void clear() noexcept { value_.store(0, std::memory_order_relaxed); }
+
+    [[nodiscard]] std::uint64_t get() const noexcept;
+
+private:
+    mutable std::atomic<std::uint64_t> value_{0};
+};
 
 class ChunkSection {
 public:
@@ -61,7 +82,11 @@ public:
 
     void setBlockStateIds(std::span<const std::int32_t> ids);
 
+    /// Never zero; equal values mean equal blocks, biomes and counts.
+    [[nodiscard]] std::uint64_t contentVersion() const noexcept { return version_.get(); }
+
 private:
+    ContentVersion version_;
     PalettedContainer blockStateIds_;
     PalettedContainer biomeIds_;
     std::int32_t nonAirBlockCount_ = 0;

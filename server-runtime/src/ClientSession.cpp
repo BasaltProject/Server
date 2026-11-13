@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/PlayerLifecycle.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
+#include <basalt/server/runtime/net/FrameCache.hpp>
 #include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/EventHooks.hpp>
@@ -31,6 +32,8 @@
 #include <cstdint>
 #include <future>
 #include <memory>
+#include <optional>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -69,6 +72,65 @@ constexpr float kMaxBurstChunks = 64.0F;
     }
     return plugin;
 }
+
+/// A thread's reusable buffer, or a fresh one when an outer send on the same thread is still using it.
+template <int Slot>
+class BorrowedBuffer {
+public:
+    BorrowedBuffer() {
+        if (!taken()) {
+            taken() = true;
+            shared().clear();
+            use_ = &shared();
+        } else {
+            spare_.emplace();
+            use_ = &*spare_;
+        }
+    }
+
+    BorrowedBuffer(const BorrowedBuffer&) = delete;
+    BorrowedBuffer& operator=(const BorrowedBuffer&) = delete;
+
+    ~BorrowedBuffer() {
+        if (use_ == &shared()) {
+            taken() = false;
+            if (shared().capacity() > kKeptCapacity) {
+                shared() = wire::io::ByteBuffer{};
+            }
+        }
+    }
+
+    [[nodiscard]] wire::io::ByteBuffer& get() noexcept { return *use_; }
+
+private:
+    static constexpr std::size_t kKeptCapacity = 256 * 1024;
+
+    static wire::io::ByteBuffer& shared() {
+        static thread_local wire::io::ByteBuffer buffer;
+        return buffer;
+    }
+
+    static bool& taken() {
+        static thread_local bool flag = false;
+        return flag;
+    }
+
+    std::optional<wire::io::ByteBuffer> spare_;
+    wire::io::ByteBuffer* use_ = nullptr;
+};
+
+/// Labels a task that connection threads hand to the owner, which the tick otherwise lumps into `tick.tasks`.
+class TaskTiming {
+public:
+    TaskTiming(world::LoadedWorld* world, std::string_view name) {
+        if (world != nullptr) {
+            timing_.emplace(world->timings(), name);
+        }
+    }
+
+private:
+    std::optional<wire::common::ScopedTiming> timing_;
+};
 
 } // namespace
 
@@ -160,7 +222,8 @@ void ClientSession::onOwner(std::function<void()> work) {
         work();
         return;
     }
-    sched::Owner& owner = regionOwner_ == nullptr ? world->owner() : *regionOwner_;
+    const std::shared_ptr<sched::Owner> held = regionOwner_.load();
+    sched::Owner& owner = held == nullptr ? world->owner() : *held;
     static_cast<void>(owner.submit([work = std::move(work), guard = ownerWork_] {
         // Counted before the question is asked, so a destructor that already asked sees it and waits.
         guard->running.fetch_add(1);
@@ -187,7 +250,8 @@ void ClientSession::handOverToRegionOf(world::LoadedWorld& world) {
     if (session == nullptr || session->worldName != world.name()) {
         return;
     }
-    regionOwner_ = &world.ownerOf(static_cast<std::int32_t>(session->x), static_cast<std::int32_t>(session->z));
+    regionOwner_.store(
+        world.sharedOwnerOf(static_cast<std::int32_t>(session->x), static_cast<std::int32_t>(session->z)));
 }
 
 void ClientSession::startOutboundLoop() {
@@ -216,6 +280,7 @@ void ClientSession::startOutboundLoop() {
             if (!switching && tickTaskPending_.compare_exchange_strong(idle, true)) {
                 // The player's turn goes to the world's owner; it only queues packets, so it never waits on a socket.
                 onOwner([this] {
+                    const TaskTiming turn{currentWorld_, "tick.tasks.player"};
                     const float rateCap = options_.tuning.chunkSendRate > 0
                                               ? static_cast<float>(options_.tuning.chunkSendRate) / 20.0F
                                               : kMaxBurstChunks;
@@ -224,23 +289,31 @@ void ClientSession::startOutboundLoop() {
                                  std::min(kMaxBurstChunks, std::max(rateCap, 1.0F)));
                     const auto allowed = static_cast<std::int32_t>(chunkStreamer_->sendBudget);
                     if (allowed > 0) {
+                        const TaskTiming chunks{currentWorld_, "tick.tasks.player.chunks"};
                         chunkStreamer_->sendBudget -= static_cast<float>(chunkStreamer_->flushReadyChunks(allowed));
                     }
-                    lifecycle_->tickPlayer();
-                    kickIfIdle();
-                    kickIfFloating();
-                    chatSpam_.tick();
-                    commandSpam_.tick();
-                    trades_->tick();
-                    if (player::PlayerSession* glider = playerSession();
-                        glider != nullptr && currentWorld() != nullptr) {
-                        player::gliding::tick(blockInteraction_->breakContext(), *glider, *currentWorld());
+                    {
+                        const TaskTiming life{currentWorld_, "tick.tasks.player.life"};
+                        lifecycle_->tickPlayer();
+                        kickIfIdle();
+                        kickIfFloating();
+                        chatSpam_.tick();
+                        commandSpam_.tick();
+                        trades_->tick();
+                        if (player::PlayerSession* glider = playerSession();
+                            glider != nullptr && currentWorld() != nullptr) {
+                            player::gliding::tick(blockInteraction_->breakContext(), *glider, *currentWorld());
+                        }
                     }
-                    entityTracker_->syncPlayers();
-                    entityTracker_->syncNpcs();
-                    entityTracker_->syncItemEntities();
-                    entityTracker_->syncSummonedEntities();
-                    entityTracker_->syncGeneratedEntities();
+                    {
+                        const TaskTiming tracking{currentWorld_, "tick.tasks.player.tracking"};
+                        entityTracker_->syncPlayers();
+                        entityTracker_->syncNpcs();
+                        entityTracker_->syncItemEntities();
+                        entityTracker_->syncSummonedEntities();
+                        entityTracker_->syncGeneratedEntities();
+                    }
+                    const TaskTiming ui{currentWorld_, "tick.tasks.player.ui"};
                     uiState_->tickUi();
                     if (menus_->openBlock.has_value() && (menus_->openBlockSize == world::furnaces::kSize ||
                                                           menus_->openBlockSize == world::brewingStands::kSize)) {
@@ -453,7 +526,8 @@ void ClientSession::appendFrame(wire::io::ByteBuffer& frame, std::span<const std
 }
 
 void ClientSession::frameOutgoing(std::span<const std::uint8_t> whole) {
-    wire::io::ByteBuffer frame;
+    BorrowedBuffer<1> borrowed;
+    wire::io::ByteBuffer& frame = borrowed.get();
     if (envelope_.has_value()) {
         const std::vector<std::uint8_t> carried = envelope_->data(whole);
         if (carried.empty()) {
@@ -550,7 +624,10 @@ void ClientSession::handleFrameBody(std::int32_t packetId, wire::io::ByteBuffer&
     // parity: `PacketUtils.ensureRunningOnSameThread`.
     wire::io::ByteBuffer owned;
     owned.writeBytes(body.readable());
-    onOwner([this, packetId, moved = std::move(owned)]() mutable { handlePlay(packetId, moved); });
+    onOwner([this, packetId, moved = std::move(owned)]() mutable {
+        const TaskTiming packet{currentWorld_, "tick.tasks.packet"};
+        handlePlay(packetId, moved);
+    });
 }
 
 void ClientSession::sendPlayPacket(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody) {
@@ -636,7 +713,8 @@ void ClientSession::sendUncompressed(std::int32_t id, const std::function<void(w
 }
 
 void ClientSession::sendCompressed(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody) {
-    wire::io::ByteBuffer body;
+    BorrowedBuffer<0> borrowed;
+    wire::io::ByteBuffer& body = borrowed.get();
     wire::protocol::varInt::write(body, id);
     writeBody(body);
     if (id == play::OpenScreenPacket::kId) {
@@ -650,6 +728,28 @@ void ClientSession::sendCompressed(std::int32_t id, const std::function<void(wir
         }
     }
     dispatchOutgoing(id, body.readable(), true);
+}
+
+void ClientSession::sendDeduplicated(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody) {
+    if (!compressionEnabled_ || translation_ != nullptr || envelope_.has_value() || tapListens(false, id)) {
+        sendCompressed(id, writeBody);
+        return;
+    }
+    BorrowedBuffer<0> borrowed;
+    wire::io::ByteBuffer& body = borrowed.get();
+    wire::protocol::varInt::write(body, id);
+    writeBody(body);
+    if (body.readableBytes() < static_cast<std::size_t>(std::max(options_.compressionThreshold, 0))) {
+        dispatchOutgoing(id, body.readable(), true);
+        return;
+    }
+    const net::SessionOutbox::SharedFrame frame = net::FrameCache::instance().compressed(
+        body.readable(), options_.compressionThreshold, options_.tuning.compressionLevel);
+    if (frame == nullptr) {
+        dispatchOutgoing(id, body.readable(), true);
+    } else if (!outbox_.offerShared(frame)) {
+        writeBytesToSocket(*frame);
+    }
 }
 
 bool ClientSession::retitleScreen(const wire::text::Component& title) {
@@ -688,9 +788,26 @@ void ClientSession::handleCustomPayload(wire::io::ByteBuffer& body) {
     options_.plugins.channelMessage(session->uuid().toString(), packet->channel, packet->data);
 }
 
-void ClientSession::writeToSocket(const wire::io::ByteBuffer& frame) {
+void ClientSession::sendShared(const net::SharedPacket& packet) {
+    const std::int32_t id = packet.id();
+    net::SessionOutbox::SharedFrame frame;
+    if (translation_ == nullptr && !envelope_.has_value() && id != play::OpenScreenPacket::kId &&
+        !tapListens(false, id)) {
+        frame = packet.frame(compressionEnabled_, options_.compressionThreshold, options_.tuning.compressionLevel);
+    }
+    if (frame == nullptr) {
+        sendCompressed(id, [&packet](wire::io::ByteBuffer& buffer) { buffer.writeBytes(packet.payload()); });
+        return;
+    }
+    if (!outbox_.offerShared(frame)) {
+        writeBytesToSocket(*frame);
+    }
+}
+
+void ClientSession::writeToSocket(const wire::io::ByteBuffer& frame) { writeBytesToSocket(frame.readable()); }
+
+void ClientSession::writeBytesToSocket(const std::span<const std::uint8_t> bytes) {
     // With an outbound thread every frame goes through the outbox; during login and configuration writes go direct.
-    const std::span<const std::uint8_t> bytes = frame.readable();
     if (outbox_.isOpen()) {
         static_cast<void>(outbox_.offer(std::vector<std::uint8_t>(bytes.begin(), bytes.end())));
         return;
@@ -736,8 +853,8 @@ void ClientSession::flushOutbox() {
     if (closeWhenDrained_.load()) {
         {
             const std::lock_guard<std::mutex> guard{sendMutex_};
-            for (const std::vector<std::uint8_t>& frame : outbox_.drain()) {
-                writeFrame(frame);
+            for (const net::SessionOutbox::Entry& entry : outbox_.drain()) {
+                writeFrame(entry.bytes());
             }
         }
         outbox_.close();
@@ -751,8 +868,8 @@ void ClientSession::flushOutbox() {
     }
     // Taking and writing under one lock, or two flushers would write their frames in whichever order they woke.
     const std::lock_guard<std::mutex> guard{sendMutex_};
-    for (const std::vector<std::uint8_t>& frame : outbox_.drain()) {
-        writeFrame(frame);
+    for (const net::SessionOutbox::Entry& entry : outbox_.drain()) {
+        writeFrame(entry.bytes());
     }
 }
 

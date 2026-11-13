@@ -5,10 +5,7 @@
 
 namespace basalt::server::runtime::net {
 
-bool SessionOutbox::isOpen() const {
-    const std::lock_guard<std::mutex> lock{mutex_};
-    return open_;
-}
+bool SessionOutbox::isOpen() const { return open_.load(std::memory_order_acquire); }
 
 std::int64_t SessionOutbox::pendingBytes() const {
     const std::lock_guard<std::mutex> lock{mutex_};
@@ -22,12 +19,12 @@ bool SessionOutbox::hasOverflowed() const {
 
 void SessionOutbox::open() {
     const std::lock_guard<std::mutex> lock{mutex_};
-    open_ = true;
+    open_.store(true, std::memory_order_release);
 }
 
 bool SessionOutbox::offer(Frame frame) {
     const std::lock_guard<std::mutex> lock{mutex_};
-    if (!open_) {
+    if (!open_.load(std::memory_order_relaxed)) {
         return false;
     }
     if (pending_ + static_cast<std::int64_t>(frame.size()) > limitBytes_) {
@@ -36,13 +33,27 @@ bool SessionOutbox::offer(Frame frame) {
         return true;
     }
     pending_ += static_cast<std::int64_t>(frame.size());
-    queue_.push_back(std::move(frame));
+    queue_.push_back(Entry{.own = std::move(frame), .shared = nullptr});
     return true;
 }
 
-std::deque<SessionOutbox::Frame> SessionOutbox::drain() {
+bool SessionOutbox::offerShared(SharedFrame frame) {
     const std::lock_guard<std::mutex> lock{mutex_};
-    std::deque<Frame> taken;
+    if (!open_.load(std::memory_order_relaxed)) {
+        return false;
+    }
+    if (pending_ + static_cast<std::int64_t>(frame->size()) > limitBytes_) {
+        overflowed_ = true;
+        return true;
+    }
+    pending_ += static_cast<std::int64_t>(frame->size());
+    queue_.push_back(Entry{.own = {}, .shared = std::move(frame)});
+    return true;
+}
+
+std::deque<SessionOutbox::Entry> SessionOutbox::drain() {
+    const std::lock_guard<std::mutex> lock{mutex_};
+    std::deque<Entry> taken;
     taken.swap(queue_);
     pending_ = 0;
     return taken;
@@ -50,7 +61,7 @@ std::deque<SessionOutbox::Frame> SessionOutbox::drain() {
 
 void SessionOutbox::close() {
     const std::lock_guard<std::mutex> lock{mutex_};
-    open_ = false;
+    open_.store(false, std::memory_order_release);
     queue_.clear();
     pending_ = 0;
 }

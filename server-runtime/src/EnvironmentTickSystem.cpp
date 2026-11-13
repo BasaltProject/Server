@@ -767,7 +767,8 @@ void EnvironmentTickSystem::strikeLightning(world::LoadedWorld& world) {
     if (!world.weather().raining) {
         return;
     }
-    const std::vector<std::array<std::int32_t, 2>> chunks = chunkSimulation_->simulatedChunks(world);
+    const auto simulated = chunkSimulation_->simulatedChunks(world);
+    const auto& chunks = *simulated;
     if (chunks.empty()) {
         return;
     }

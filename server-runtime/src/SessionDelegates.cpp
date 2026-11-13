@@ -480,14 +480,30 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
         .entityId = session->entityId(), .x = x, .y = y, .z = z, .yaw = yaw, .pitch = pitch, .onGround = onGround};
     // The rotation above is the body; without this a head only tips up and down while the face stays put.
     const play::RotateHeadPacket head{.entityId = session->entityId(), .headYaw = yaw};
-    for (const PlayerSession* other : playersInSameWorld()) {
-        if (other->uuid() == session->uuid() || !other->connection().sendPlayPacket) {
+    const net::SharedPacket movedPacket{play::EntityTeleportPacket::kId,
+                                        [&moved](wire::io::ByteBuffer& buffer) { moved.write(buffer); }};
+    const net::SharedPacket headPacket{play::RotateHeadPacket::kId,
+                                       [&head](wire::io::ByteBuffer& buffer) { head.write(buffer); }};
+    const auto send = [](const PlayerSession& other, const net::SharedPacket& packet) {
+        if (other.connection().sendSharedPacket) {
+            other.connection().sendSharedPacket(packet);
+        } else if (other.connection().sendPlayPacket) {
+            other.connection().sendPlayPacket(
+                packet.id(), [&packet](wire::io::ByteBuffer& buffer) { buffer.writeBytes(packet.payload()); });
+        }
+    };
+    const std::shared_ptr<const std::vector<PlayerSession*>> everyone =
+        options_.playerRegistry == nullptr ? nullptr : options_.playerRegistry->view();
+    if (everyone == nullptr) {
+        return;
+    }
+    for (const PlayerSession* other : *everyone) {
+        if (other->worldName != session->worldName || other->uuid() == session->uuid() ||
+            !other->connection().sendPlayPacket) {
             continue;
         }
-        other->connection().sendPlayPacket(play::EntityTeleportPacket::kId,
-                                           [&moved](wire::io::ByteBuffer& buffer) { moved.write(buffer); });
-        other->connection().sendPlayPacket(play::RotateHeadPacket::kId,
-                                           [&head](wire::io::ByteBuffer& buffer) { head.write(buffer); });
+        send(*other, movedPacket);
+        send(*other, headPacket);
     }
 }
 

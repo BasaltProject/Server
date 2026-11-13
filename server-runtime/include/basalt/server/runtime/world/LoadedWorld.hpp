@@ -75,6 +75,8 @@ struct LoadedWorldOptions {
 /// The player list, the database and the command dispatcher are shared, not per world.
 class LoadedWorld : public std::enable_shared_from_this<LoadedWorld> {
 public:
+    [[nodiscard]] wire::common::Timings& timings() noexcept { return timings_; }
+
     static constexpr std::int32_t kDefaultSpawnHeight = 64;
 
     using Options = LoadedWorldOptions;
@@ -126,10 +128,8 @@ public:
     /// parity: `ServerLevel.getRaids`, saved beside the regions.
     [[nodiscard]] entity::RaidManager& raids() noexcept { return raids_; }
 
-    [[nodiscard]] sched::Region& region() const noexcept { return *region_; }
-
     /// Who owns this world's state: its chunks, its blocks and everything living in them.
-    [[nodiscard]] sched::Owner& owner() const noexcept { return region_->owner(); }
+    [[nodiscard]] sched::Owner& owner() const { return *scheduler_.primaryOwner(declaration_.name); }
 
     void setEvents(plugins::EventSink* events) {
         events_ = events;
@@ -141,6 +141,8 @@ public:
 
     /// Who owns the block at these coordinates: always `owner` while a world is one region.
     [[nodiscard]] sched::Owner& ownerOf(std::int32_t x, std::int32_t z) const;
+
+    [[nodiscard]] std::shared_ptr<sched::Owner> sharedOwnerOf(std::int32_t x, std::int32_t z) const;
 
     /// What the client calls this world: a `ResourceKey<Level>`, not a dimension type.
     [[nodiscard]] const std::string& levelKey() const noexcept { return levelKey_; }
@@ -409,7 +411,6 @@ private:
     std::function<void(server::world::Chunk&, std::int64_t, const std::string&)> spawnMobs_;
     sched::RegionScheduler ownScheduler_;
     sched::RegionScheduler& scheduler_;
-    sched::Region* region_ = nullptr;
     std::string levelKey_;
     std::string worldRoot_;
     std::atomic<bool> retired_{false};

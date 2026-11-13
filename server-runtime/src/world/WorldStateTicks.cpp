@@ -85,7 +85,7 @@ bool WorldState::hasScheduledBlockTick(std::int32_t x, std::int32_t y, std::int3
         return false;
     }
     for (const ChunkScheduledTick& tick : chunk->scheduledBlockTicks()) {
-        if (tick.type == type && tick.localX == (x & 15) && tick.y == y && tick.localZ == (z & 15)) {
+        if (tick.localX == (x & 15) && tick.y == y && tick.localZ == (z & 15) && tick.type == type) {
             return true;
         }
     }

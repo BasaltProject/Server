@@ -120,16 +120,19 @@ void PlayerUi::updateTabList(const PlaceholderContext& context) {
         config::selectProfile(configs.tabList.profiles, configs.tabList.defaultProfile(), *placeholders_, context,
                               logger_, reporter_, "tab list")
             .inheriting(configs.tabList.defaultProfile());
-    const std::pair<std::string, Component> header =
-        render(profile.headerLines.value_or(std::vector<std::string>{}), context);
-    const std::pair<std::string, Component> footer =
-        render(profile.footerLines.value_or(std::vector<std::string>{}), context);
-    if (lastTabList_.has_value() && lastTabList_->first == header.first && lastTabList_->second == footer.first) {
+    const std::vector<std::string> noLines;
+    const std::vector<std::string>& headerLines = profile.headerLines.has_value() ? *profile.headerLines : noLines;
+    const std::vector<std::string>& footerLines = profile.footerLines.has_value() ? *profile.footerLines : noLines;
+    std::string header = renderText(headerLines, context);
+    std::string footer = renderText(footerLines, context);
+    if (lastTabList_.has_value() && lastTabList_->first == header && lastTabList_->second == footer) {
         return;
     }
-    lastTabList_ = std::pair{header.first, footer.first};
+    const Component headerComponent = parseLines(!headerLines.empty(), header);
+    const Component footerComponent = parseLines(!footerLines.empty(), footer);
+    lastTabList_ = std::pair{std::move(header), std::move(footer)};
     send_(TabListPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        TabListPacket{.header = header.second, .footer = footer.second}.write(buffer);
+        TabListPacket{.header = headerComponent, .footer = footerComponent}.write(buffer);
     });
 }
 
@@ -336,17 +339,20 @@ float PlayerUi::progressOf(const std::optional<std::string>& raw, const Placehol
     return std::clamp(parseFloat(text).value_or(1.0F), 0.0F, 1.0F);
 }
 
-std::pair<std::string, Component> PlayerUi::render(const std::vector<std::string>& lines,
-                                                   const PlaceholderContext& context) {
-    if (lines.empty()) {
-        return {std::string{}, Component::empty()};
-    }
+std::string PlayerUi::renderText(const std::vector<std::string>& lines, const PlaceholderContext& context) {
     std::string text;
     for (const std::string& line : lines) {
         if (!text.empty()) {
             text += "\n";
         }
         text += substitute(line, context);
+    }
+    return text;
+}
+
+Component PlayerUi::parseLines(const bool hasLines, const std::string& text) {
+    if (!hasLines) {
+        return Component::empty();
     }
     Component component = Component::empty();
     bool first = true;
@@ -364,7 +370,7 @@ std::pair<std::string, Component> PlayerUi::render(const std::vector<std::string
         }
         start = end + 1;
     }
-    return {text, component};
+    return component;
 }
 
 std::string PlayerUi::substitute(std::string_view text, const PlaceholderContext& context) {

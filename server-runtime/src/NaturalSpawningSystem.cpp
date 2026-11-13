@@ -258,7 +258,8 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
     world::LocalMobCaps localCaps{std::move(capPlayers), limits, mobs.spawnRangeChunks};
 
     std::vector<std::array<std::int32_t, 2>> chunks;
-    for (const std::array<std::int32_t, 2>& chunk : chunkSimulation_->simulatedChunks(world)) {
+    const auto simulated = chunkSimulation_->simulatedChunks(world);
+    for (const std::array<std::int32_t, 2>& chunk : *simulated) {
         if (localCaps.isSpawnCandidate(chunk[0], chunk[1])) {
             chunks.push_back(chunk);
         }

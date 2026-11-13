@@ -624,8 +624,6 @@ private:
 
     void eatGrassUnder(world::LoadedWorld& world, const entity::ServerEntity& mob);
 
-    [[nodiscard]] static std::int32_t lightAt(world::LoadedWorld& world, const std::array<std::int32_t, 3>& position);
-
     [[nodiscard]] random::RandomSource freshRandom() const;
 
     bool wardenSwings(world::LoadedWorld& world, entity::ServerEntity& mob);

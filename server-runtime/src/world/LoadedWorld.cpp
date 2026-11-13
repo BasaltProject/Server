@@ -63,8 +63,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       strongholdGenerator_(options.strongholdGenerator), spawnChunkFinder_(std::move(options.spawnChunkFinder)),
       spawnMobs_(std::move(options.spawnMobs)),
       scheduler_(options.scheduler == nullptr ? ownScheduler_ : *options.scheduler),
-      region_(&scheduler_.regionFor(declaration_.name)), levelKey_(levelKeyOf(declaration_, options.vanillaKey)),
-      worldRoot_(worldsRoot + "/" + declaration_.name),
+      levelKey_(levelKeyOf(declaration_, options.vanillaKey)), worldRoot_(worldsRoot + "/" + declaration_.name),
       regions_(declaration_.name, std::move(worldsRoot), config::dimensionFacts(declaration_.dimension).chunkHeight),
       state_({}, [this](std::int32_t chunkX, std::int32_t chunkZ) { return loadOrGenerateChunk(chunkX, chunkZ); }),
       generationQueue_(state_, std::string{config::dimensionFacts(declaration_.dimension).registryPath},
@@ -299,7 +298,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     portals_.load(worldRoot_);
     randomSequences_.load(worldRoot_);
     raids_.load(worldRoot_, config::dimensionFacts(declaration_.dimension).registryPath);
-    state_.setOwner(&region_->owner());
+    state_.setOwner([this] { return scheduler_.primaryOwner(declaration_.name); });
     state_.setInstallOwner(&scheduler_.global());
     state_.setRegionCount([this] {
         return std::max<std::int32_t>(1, static_cast<std::int32_t>(scheduler_.regionsOf(declaration_.name).size()));
@@ -385,6 +384,10 @@ std::vector<wire::common::Identifier> LoadedWorld::structureSetIds() const {
 
 sched::Owner& LoadedWorld::ownerOf(std::int32_t x, std::int32_t z) const {
     return scheduler_.regionFor(declaration_.name, x >> 4, z >> 4).owner();
+}
+
+std::shared_ptr<sched::Owner> LoadedWorld::sharedOwnerOf(std::int32_t x, std::int32_t z) const {
+    return scheduler_.regionFor(declaration_.name, x >> 4, z >> 4).sharedOwner();
 }
 
 void LoadedWorld::setSpawn(std::int32_t x, std::int32_t y, std::int32_t z, float yaw) {

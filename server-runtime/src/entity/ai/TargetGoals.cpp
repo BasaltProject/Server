@@ -45,7 +45,7 @@ bool NearestAttackablePlayerGoal::canUse(MobContext& mob) {
     if (randomInterval_ > 0 && mob.random.nextInt(reducedTickDelay(randomInterval_)) != 0) {
         return false;
     }
-    if (needsDarkness_ && mob.light >= kDarkness) {
+    if (needsDarkness_ && mob.lightLevel() >= kDarkness) {
         return false;
     }
     return mob.nearestPlayer(followRange(mob)) != nullptr;

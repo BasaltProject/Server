@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/net/ProxyProtocol.hpp>
 #include <basalt/server/runtime/net/QueryServer.hpp>
 #include <basalt/server/runtime/net/SessionOutbox.hpp>
+#include <basalt/server/runtime/net/SharedPacket.hpp>
 #include <basalt/server/runtime/net/SocketOptions.hpp>
 #include <basalt/server/runtime/player/PlayerConnection.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -330,7 +331,12 @@ public:
 
     void sendPlayPacket(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody);
 
+    void sendShared(const net::SharedPacket& packet);
+
     void sendCompressed(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody);
+
+    /// Same bytes on the wire as `sendCompressed`, but a plain connection reuses the frame another one already got.
+    void sendDeduplicated(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody);
 
     /// parity: `CraftInventoryView.sendInventoryTitleChange`, the open screen again under a new title.
     bool retitleScreen(const wire::text::Component& title);
@@ -483,6 +489,7 @@ private:
 
     void writeDeferredDirect();
     void writeToSocket(const wire::io::ByteBuffer& frame);
+    void writeBytesToSocket(std::span<const std::uint8_t> bytes);
 
     void sendUncompressed(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody);
 
@@ -683,7 +690,7 @@ private:
 
     std::int32_t lastPacketId_ = -1;
 
-    sched::Owner* regionOwner_ = nullptr;
+    std::atomic<std::shared_ptr<sched::Owner>> regionOwner_;
 
     std::optional<std::string> pendingUsername_;
     std::vector<std::uint8_t> challenge_;

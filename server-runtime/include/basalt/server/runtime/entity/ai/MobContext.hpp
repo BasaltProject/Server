@@ -276,8 +276,7 @@ public:
     const std::vector<ServerEntity*>& entities;
     const std::vector<PlayerView>& players;
     MobActions& actions;
-    /// parity: `Level.getMaxLocalRawBrightness`, which is what the light-shy goals ask.
-    std::int32_t light = 0;
+    std::array<std::int32_t, 3> lightPosition{};
     bool night = false;
     /// parity: the villager schedule reads the day's own time rather than the total.
     std::int64_t dayTime = 0;
@@ -307,6 +306,10 @@ public:
     /// parity: `Level.getSeaLevel` and `getMinY`.
     std::int32_t seaLevel = 63;
     std::int32_t minY = -64;
+    mutable std::int32_t lightCache = -1;
+
+    /// parity: `Level.getMaxLocalRawBrightness` at `lightPosition`, read on first use: most mobs never ask.
+    [[nodiscard]] std::int32_t lightLevel() const;
 
     [[nodiscard]] const PlayerView* nearestPlayer(double range) const;
 

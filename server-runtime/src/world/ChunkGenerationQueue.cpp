@@ -23,8 +23,7 @@ constexpr std::int32_t kMaxWorkers = 8;
 
 constexpr std::chrono::milliseconds kIdlePoll{1};
 constexpr std::chrono::milliseconds kAwaitPoll{10};
-constexpr std::int32_t kIdleSpinsBeforeBackoff = 20;
-constexpr std::chrono::milliseconds kIdleBackoff{20};
+constexpr std::chrono::milliseconds kIdleSafetyWait{200};
 constexpr std::chrono::milliseconds kBetweenChunks{1};
 
 [[nodiscard]] bool rasterBefore(const std::int64_t key, const std::int64_t other) {
@@ -62,7 +61,7 @@ ChunkGenerationQueue::ChunkGenerationQueue(WorldState& world, std::string dimens
 }
 
 void ChunkGenerationQueue::markInstalled(const std::int64_t key) {
-    const std::lock_guard<std::mutex> lock{mutex_};
+    const std::lock_guard<std::mutex> lock{progressMutex_};
     inProgress_.erase(key);
 }
 
@@ -84,8 +83,8 @@ void ChunkGenerationQueue::runWorker() {
     wire::common::nameCurrentThread("Chunk worker");
     // The tick comes first: with every core generating, a late tick costs players more than a late chunk.
     wire::io::lowerCurrentThreadPriority();
-    std::int32_t idleSpins = 0;
     while (running_.load()) {
+        const std::uint64_t seen = wakeEpoch_.load();
         bool generated = false;
         // Caught, or one bad chunk ends this worker and the pool silently shrinks.
         try {
@@ -94,12 +93,23 @@ void ChunkGenerationQueue::runWorker() {
             logger_.error([&failure] { return std::string{"A chunk failed to generate: "} + failure.what(); });
         }
         if (!generated) {
-            ++idleSpins;
-            wire::io::sleepFor(idleSpins > kIdleSpinsBeforeBackoff ? kIdleBackoff : kIdlePoll);
+            std::unique_lock<std::mutex> lock{wakeMutex_};
+            sleepers_.fetch_add(1);
+            wake_.wait_for(lock, kIdleSafetyWait,
+                           [this, seen] { return !running_.load() || wakeEpoch_.load() != seen; });
+            sleepers_.fetch_sub(1);
             continue;
         }
-        idleSpins = 0;
+        wakeWorkers();
         wire::io::sleepFor(kBetweenChunks);
+    }
+}
+
+void ChunkGenerationQueue::wakeWorkers() {
+    wakeEpoch_.fetch_add(1);
+    if (sleepers_.load() > 0) {
+        const std::lock_guard<std::mutex> lock{wakeMutex_};
+        wake_.notify_all();
     }
 }
 
@@ -109,12 +119,13 @@ void ChunkGenerationQueue::request(std::int32_t chunkX, std::int32_t chunkZ, std
         return;
     }
     const std::lock_guard<std::mutex> lock{mutex_};
-    if (inProgress_.contains(key)) {
+    if (std::lock_guard<std::mutex> progress{progressMutex_}; inProgress_.contains(key)) {
         return;
     }
     if (pipeline_ != nullptr) {
         if (pipeline_->pendingCount() < kCapacity) {
             pipeline_->demand(chunkX, chunkZ, priority);
+            wakeWorkers();
         }
         return;
     }
@@ -138,6 +149,7 @@ void ChunkGenerationQueue::request(std::int32_t chunkX, std::int32_t chunkZ, std
         queued_.erase(worst);
     }
     queued_.emplace(key, priority);
+    wakeWorkers();
 }
 
 void ChunkGenerationQueue::requestForced(std::int32_t chunkX, std::int32_t chunkZ) {
@@ -149,6 +161,7 @@ void ChunkGenerationQueue::requestForced(std::int32_t chunkX, std::int32_t chunk
     if (pipeline_ != nullptr) {
         const std::lock_guard<std::mutex> lock{mutex_};
         pipeline_->demandArea(chunkX, chunkZ, kForcedFullRings, kDecoratedRings, 0);
+        wakeWorkers();
         return;
     }
     for (std::int32_t dx = -kForcedFullRings; dx <= kForcedFullRings; ++dx) {
@@ -184,14 +197,18 @@ ChunkGenerationQueue::retainWhere(const std::function<bool(std::int32_t chunkX, 
 
 std::size_t ChunkGenerationQueue::pendingCount() const {
     const std::lock_guard<std::mutex> lock{mutex_};
+    const std::lock_guard<std::mutex> progress{progressMutex_};
     return queued_.size() + inProgress_.size() + (pipeline_ != nullptr ? pipeline_->pendingCount() : 0);
 }
 
 std::unordered_set<std::int64_t> ChunkGenerationQueue::pendingKeys() const {
     const std::lock_guard<std::mutex> lock{mutex_};
     std::unordered_set<std::int64_t> keys;
-    for (const auto& [key, priority] : inProgress_) {
-        keys.insert(key);
+    {
+        const std::lock_guard<std::mutex> progress{progressMutex_};
+        for (const auto& [key, priority] : inProgress_) {
+            keys.insert(key);
+        }
     }
     for (const auto& [key, priority] : queued_) {
         keys.insert(key);
@@ -232,6 +249,7 @@ ChunkGenerationQueue::awaitAll(const std::vector<std::pair<std::int32_t, std::in
 
 void ChunkGenerationQueue::stop() {
     running_.store(false);
+    wakeWorkers();
     const std::lock_guard<std::mutex> lock{mutex_};
     queued_.clear();
     if (pipeline_ != nullptr) {
@@ -244,7 +262,11 @@ void ChunkGenerationQueue::awaitIdle(std::int64_t timeoutMillis) {
     while (waited < timeoutMillis) {
         {
             const std::lock_guard<std::mutex> lock{mutex_};
-            if (inProgress_.empty() && (pipeline_ == nullptr || !pipeline_->busy())) {
+            const bool idle = [this] {
+                const std::lock_guard<std::mutex> progress{progressMutex_};
+                return inProgress_.empty();
+            }();
+            if (idle && (pipeline_ == nullptr || !pipeline_->busy())) {
                 return;
             }
         }
@@ -276,6 +298,7 @@ std::optional<std::int64_t> ChunkGenerationQueue::takeNext() {
         return std::nullopt;
     }
     queued_.erase(bestKey);
+    const std::lock_guard<std::mutex> progress{progressMutex_};
     inProgress_.emplace(bestKey, bestPriority);
     return bestKey;
 }
@@ -286,6 +309,7 @@ bool ChunkGenerationQueue::generatePiped() {
     {
         const std::lock_guard<std::mutex> lock{mutex_};
         finished = pipeline_->takeFinished();
+        const std::lock_guard<std::mutex> progress{progressMutex_};
         for (const Chunk& chunk : finished) {
             inProgress_.emplace(pack(chunk.chunkX(), chunk.chunkZ()), 0);
         }
@@ -321,7 +345,7 @@ bool ChunkGenerationQueue::generateNext() {
             if (handedOff) {
                 return;
             }
-            const std::lock_guard<std::mutex> lock{queue->mutex_};
+            const std::lock_guard<std::mutex> lock{queue->progressMutex_};
             queue->inProgress_.erase(key);
         }
     } finish{this, key};

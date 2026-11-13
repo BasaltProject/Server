@@ -93,6 +93,7 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.sendPlayPacket = [this](std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& write) {
         sendPlayPacket(id, write);
     };
+    connection.sendSharedPacket = [this](const net::SharedPacket& packet) { sendShared(packet); };
     connection.packetEndpoint = [this] { return endpoint(); };
     connection.broadcastEffects = [this](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                                          const std::vector<world::BlockEffect>& effects) {

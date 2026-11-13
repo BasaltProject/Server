@@ -104,9 +104,9 @@ public:
     [[nodiscard]] static std::int64_t key(std::int32_t chunkX, std::int32_t chunkZ);
 
     /// Backs the ownership check: with one region a wrong-thread access only works by luck.
-    void setOwner(sched::Owner* owner) { owner_ = owner; }
+    void setOwner(std::function<sched::Owner*()> owner) { owner_ = std::move(owner); }
 
-    [[nodiscard]] sched::Owner* owner() const noexcept { return owner_; }
+    [[nodiscard]] sched::Owner* owner() const { return owner_ ? owner_() : nullptr; }
 
     void setEvents(const plugins::EventSink* events, std::string worldName);
 
@@ -258,6 +258,19 @@ public:
     void installLater(server::world::Chunk chunk, std::function<void()> installed = {});
 
     [[nodiscard]] std::optional<std::int32_t> blockState(std::int32_t x, std::int32_t y, std::int32_t z) const;
+
+    /// Holds the read lock for a whole query, so `blockState` on this thread skips taking it per call.
+    class BlockReadScope {
+    public:
+        explicit BlockReadScope(const WorldState& world);
+        ~BlockReadScope();
+        BlockReadScope(const BlockReadScope&) = delete;
+        BlockReadScope& operator=(const BlockReadScope&) = delete;
+
+    private:
+        const WorldState* previous_ = nullptr;
+        WorldReadLock lock_;
+    };
 
     [[nodiscard]] entity::entityCollision::BlockAt blockAccessor() const;
 
@@ -481,7 +494,7 @@ private:
     LootUnpacker lootUnpacker_;
     PlayerCheck playerCheck_;
     const config::WorldRules* rules_ = nullptr;
-    sched::Owner* owner_ = nullptr;
+    std::function<sched::Owner*()> owner_;
     sched::Owner* installOwner_ = nullptr;
 
     struct PendingInstall {

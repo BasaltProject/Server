@@ -69,16 +69,11 @@ std::vector<PlayerSession*> RedstoneTickSystem::watchersOf(const world::LoadedWo
 world::WorldState::Ticking RedstoneTickSystem::tickingChunks(const world::LoadedWorld& world,
                                                              const sched::Region& region,
                                                              const std::int32_t extraRadius) const {
-    // Built on the first question: an idle world never builds the set (441 entries at full view distance).
-    auto keys = std::make_shared<std::optional<std::unordered_set<std::int64_t>>>();
+    // Resolved on the first question: an idle world never asks for the set.
+    auto keys = std::make_shared<std::shared_ptr<const ChunkSimulationView::Keys>>();
     return [this, keys, &world, &region, extraRadius](std::int32_t chunkX, std::int32_t chunkZ) {
-        if (!keys->has_value()) {
-            std::unordered_set<std::int64_t> built;
-            for (const std::array<std::int32_t, 2>& position :
-                 chunkSimulation_->simulatedChunks(world, &region, extraRadius)) {
-                built.insert((static_cast<std::int64_t>(position[0]) << 32) | static_cast<std::uint32_t>(position[1]));
-            }
-            *keys = std::move(built);
+        if (*keys == nullptr) {
+            *keys = chunkSimulation_->simulatedKeys(world, &region, extraRadius);
         }
         return (*keys)->contains((static_cast<std::int64_t>(chunkX) << 32) | static_cast<std::uint32_t>(chunkZ));
     };

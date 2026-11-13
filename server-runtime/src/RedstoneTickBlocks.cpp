@@ -191,7 +191,8 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
     if (speed <= 0) {
         return;
     }
-    const std::vector<std::array<std::int32_t, 2>> chunks = chunkSimulation_->simulatedChunks(world, &region, 1);
+    const auto simulated = chunkSimulation_->simulatedChunks(world, &region, 1);
+    const auto& chunks = *simulated;
     if (chunks.empty()) {
         return;
     }
@@ -215,7 +216,8 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
 }
 
 void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sched::Region& region) {
-    const std::vector<std::array<std::int32_t, 2>> chunks = chunkSimulation_->simulatedChunks(world, &region, 1);
+    const auto simulated = chunkSimulation_->simulatedChunks(world, &region, 1);
+    const auto& chunks = *simulated;
     if (chunks.empty()) {
         return;
     }
@@ -419,7 +421,8 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
 }
 
 void RedstoneTickSystem::tickInhabitedTime(world::LoadedWorld& world, const sched::Region& region) {
-    for (const std::array<std::int32_t, 2>& position : chunkSimulation_->simulatedChunks(world, &region)) {
+    const auto simulated = chunkSimulation_->simulatedChunks(world, &region);
+    for (const std::array<std::int32_t, 2>& position : *simulated) {
         server::world::Chunk* chunk = world.state().chunkIfLoaded(position[0], position[1]);
         if (chunk != nullptr) {
             chunk->increaseInhabitedTime();

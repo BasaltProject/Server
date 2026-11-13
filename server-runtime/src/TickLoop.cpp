@@ -14,6 +14,7 @@ namespace {
 constexpr float kMillisPerSecond = 1000.0F;
 constexpr std::int64_t kCatchUpLimit = 20;
 constexpr std::int64_t kSweepPollMillis = 5;
+constexpr std::int64_t kSweepIdleMillis = 50;
 constexpr std::int64_t kStopDrainMillis = 30'000;
 constexpr int kWindowSeconds = 900;
 constexpr std::int64_t kMinAutosaveTicks = 100;
@@ -244,7 +245,7 @@ void TickLoop::runSweeper() {
         unloading = unloadRequested_.compare_exchange_strong(unloading, false, std::memory_order_relaxed);
         players = playersRequested_.compare_exchange_strong(players, false, std::memory_order_relaxed);
         if (!saving && !unloading && !players) {
-            sleepMillis(kSweepPollMillis);
+            sleepMillis(kSweepIdleMillis);
             continue;
         }
         sweeping_.store(true, std::memory_order_relaxed);

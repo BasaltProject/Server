@@ -3,7 +3,9 @@
 #include <basalt/server/runtime/sched/Owner.hpp>
 #include <basalt/server/runtime/sched/RegionMap.hpp>
 
+#include <atomic>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -31,13 +33,19 @@ public:
     /// The world it belongs to. A region never spans two.
     [[nodiscard]] const std::string& worldName() const noexcept { return worldName_; }
 
-    [[nodiscard]] Owner& owner() noexcept { return owner_; }
+    [[nodiscard]] Owner& owner() noexcept { return *owner_; }
 
-    [[nodiscard]] const Owner& owner() const noexcept { return owner_; }
+    [[nodiscard]] const Owner& owner() const noexcept { return *owner_; }
+
+    /// Outlives the region, so a session that kept it after a merge finds a closed owner instead of freed memory.
+    [[nodiscard]] std::shared_ptr<Owner> sharedOwner() const noexcept { return owner_; }
 
     [[nodiscard]] bool isPrimary() const noexcept { return isPrimary_; }
 
     [[nodiscard]] const std::unordered_set<std::int64_t>& sections() const noexcept { return sections_; }
+
+    /// Unique across all regions ever made; changes whenever the owned sections change.
+    [[nodiscard]] std::uint64_t generation() const noexcept { return generation_.load(std::memory_order_acquire); }
 
     [[nodiscard]] bool owns(std::int32_t chunkX, std::int32_t chunkZ) const;
 
@@ -46,12 +54,15 @@ public:
 private:
     friend class RegionScheduler;
 
-    Region(std::int32_t id, std::string worldName) : id_(id), worldName_(std::move(worldName)), owner_(worldName_) {}
+    Region(std::int32_t id, std::string worldName)
+        : id_(id), worldName_(std::move(worldName)), owner_(std::make_shared<Owner>(worldName_)) {}
 
     std::int32_t id_;
     std::string worldName_;
-    Owner owner_;
+    std::shared_ptr<Owner> owner_;
     std::unordered_set<std::int64_t> sections_;
+    std::atomic<std::uint64_t> generation_{nextGeneration()};
+    static std::uint64_t nextGeneration() noexcept;
     bool isPrimary_ = true;
 };
 
@@ -76,6 +87,9 @@ public:
 
     [[nodiscard]] std::vector<Region*> regionsOf(std::string_view worldName) const;
 
+    /// The world's first region owner, creating the region on first use.
+    [[nodiscard]] Owner* primaryOwner(std::string_view worldName);
+
     Region& regionFor(std::string_view worldName, std::int32_t chunkX = 0, std::int32_t chunkZ = 0);
 
     void repartition(std::string_view worldName, std::span<const std::int64_t> loadedChunks,
@@ -98,6 +112,7 @@ private:
     mutable std::mutex mutex_;
 
     std::vector<WorldRegions> byWorld_;
+    std::deque<std::unique_ptr<Region>> graveyard_;
     std::int32_t nextId_ = 0;
     Owner global_{"global"};
 

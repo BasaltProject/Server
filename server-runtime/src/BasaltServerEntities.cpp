@@ -360,14 +360,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         return world::realBlockTags::contains(vanillaData_.blockTags, tag, block);
     };
     // Built lazily; entities stop one chunk sooner than blocks (`ChunkLevel.byStatus`).
-    std::optional<std::unordered_set<std::int64_t>> entityTicking;
+    std::shared_ptr<const ChunkSimulationView::Keys> entityTicking;
     const auto ticking = [this, &entityTicking, &world, &region](double atX, double atZ) {
-        if (!entityTicking.has_value()) {
-            std::unordered_set<std::int64_t> built;
-            for (const std::array<std::int32_t, 2>& at : chunkSimulation_.simulatedChunks(world, &region)) {
-                built.insert((static_cast<std::int64_t>(at[0]) << 32) | static_cast<std::uint32_t>(at[1]));
-            }
-            entityTicking = std::move(built);
+        if (entityTicking == nullptr) {
+            entityTicking = chunkSimulation_.simulatedKeys(world, &region);
         }
         const auto chunkX = static_cast<std::int32_t>(std::floor(atX)) >> 4;
         const auto chunkZ = static_cast<std::int32_t>(std::floor(atZ)) >> 4;

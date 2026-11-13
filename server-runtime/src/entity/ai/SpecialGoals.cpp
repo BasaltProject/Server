@@ -99,7 +99,8 @@ void TeleportAwayGoal::tick(MobContext& mob) {
         return;
     }
     // parity: `customServerAiStep`.
-    if (!mob.mob.targetId.has_value() && !mob.night && mob.light > kDaylight && mob.random.nextInt(kDayOdds) == 0) {
+    if (!mob.mob.targetId.has_value() && !mob.night && mob.lightLevel() > kDaylight &&
+        mob.random.nextInt(kDayOdds) == 0) {
         teleportRandomly(mob);
     }
 }

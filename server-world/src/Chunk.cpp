@@ -371,7 +371,7 @@ void Chunk::scheduleTick(std::vector<ChunkScheduledTick>& ticks, const ChunkSche
         throw std::out_of_range{"scheduled tick outside chunk bounds"};
     }
     const bool duplicate = std::ranges::any_of(ticks, [&tick](const ChunkScheduledTick& one) {
-        return one.type == tick.type && one.localX == tick.localX && one.y == tick.y && one.localZ == tick.localZ;
+        return one.localX == tick.localX && one.y == tick.y && one.localZ == tick.localZ && one.type == tick.type;
     });
     if (duplicate) {
         return;
@@ -397,15 +397,18 @@ void Chunk::advance(std::vector<ChunkScheduledTick>& pending, std::vector<ChunkS
     if (pending.empty()) {
         return;
     }
-    std::size_t index = 0;
-    while (index < pending.size()) {
+    std::size_t kept = 0;
+    for (std::size_t index = 0; index < pending.size(); index++) {
         if (pending[index].delay <= 0) {
-            due.push_back(pending[index]);
-            pending.erase(pending.begin() + static_cast<std::ptrdiff_t>(index));
+            due.push_back(std::move(pending[index]));
         } else {
-            index++;
+            if (kept != index) {
+                pending[kept] = std::move(pending[index]);
+            }
+            kept++;
         }
     }
+    pending.erase(pending.begin() + static_cast<std::ptrdiff_t>(kept), pending.end());
 }
 
 void Chunk::setSavedEntities(std::vector<wire::nbt::NbtCompound> entities) {

@@ -785,6 +785,7 @@ double floorLevel(const world::WorldState& world, std::int32_t x, std::int32_t y
 
 Path findPath(world::WorldState& world, const WalkMob& mob, const Position& target, float maxPathLength,
               std::int32_t reachRange, std::int32_t maxVisitedNodes) {
+    const world::WorldState::BlockReadScope readScope{world};
     Search search{world, mob};
     return search.run(target, maxPathLength, reachRange, maxVisitedNodes);
 }
