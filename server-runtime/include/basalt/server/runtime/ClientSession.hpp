@@ -690,7 +690,8 @@ private:
 
     std::int32_t lastPacketId_ = -1;
 
-    std::atomic<std::shared_ptr<sched::Owner>> regionOwner_;
+    mutable std::mutex regionOwnerMutex_;
+    std::shared_ptr<sched::Owner> regionOwner_;
 
     std::optional<std::string> pendingUsername_;
     std::vector<std::uint8_t> challenge_;

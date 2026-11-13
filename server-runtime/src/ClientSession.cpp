@@ -222,7 +222,11 @@ void ClientSession::onOwner(std::function<void()> work) {
         work();
         return;
     }
-    const std::shared_ptr<sched::Owner> held = regionOwner_.load();
+    std::shared_ptr<sched::Owner> held;
+    {
+        const std::scoped_lock lock{regionOwnerMutex_};
+        held = regionOwner_;
+    }
     sched::Owner& owner = held == nullptr ? world->owner() : *held;
     static_cast<void>(owner.submit([work = std::move(work), guard = ownerWork_] {
         // Counted before the question is asked, so a destructor that already asked sees it and waits.
@@ -250,8 +254,9 @@ void ClientSession::handOverToRegionOf(world::LoadedWorld& world) {
     if (session == nullptr || session->worldName != world.name()) {
         return;
     }
-    regionOwner_.store(
-        world.sharedOwnerOf(static_cast<std::int32_t>(session->x), static_cast<std::int32_t>(session->z)));
+    auto owner = world.sharedOwnerOf(static_cast<std::int32_t>(session->x), static_cast<std::int32_t>(session->z));
+    const std::scoped_lock lock{regionOwnerMutex_};
+    regionOwner_ = std::move(owner);
 }
 
 void ClientSession::startOutboundLoop() {
