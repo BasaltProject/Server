@@ -21,6 +21,8 @@
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/world/WorldHeight.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -43,6 +45,28 @@ namespace crafting = server::world::crafting;
     }
     return "campfire";
 }
+
+/// Whether the loop in `tick` does anything for this block entity type.
+[[nodiscard]] bool hasTicker(std::string_view path) {
+    static constexpr std::array<std::string_view, 18> kTicking{"sculk_sensor",   "calibrated_sculk_sensor",
+                                                               "sculk_shrieker", "potent_sulfur",
+                                                               "jukebox",        "beehive",
+                                                               "sculk_catalyst", "trial_spawner",
+                                                               "bell",           "creaking_heart",
+                                                               "hopper",         "end_gateway",
+                                                               "conduit",        "mob_spawner",
+                                                               "beacon",         "crafter",
+                                                               "brewing_stand",  "campfire"};
+    return std::ranges::find(kTicking, path) != kTicking.end() || path == "soul_campfire" ||
+           furnaces::cookerFor(path).has_value();
+}
+
+struct Pending {
+    std::int32_t localX = 0;
+    std::int32_t y = 0;
+    std::int32_t localZ = 0;
+    std::string path;
+};
 
 /// parity: the three `HAS_BOTTLE` bits a stand shows for the bottles standing in it.
 [[nodiscard]] std::optional<std::int32_t> bottleChange(WorldState& world, std::int32_t x, std::int32_t y,
@@ -135,6 +159,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                               const std::vector<std::array<std::int32_t, 2>>& chunks, random::RandomSource& random,
                               const Hooks& hooks, bool hasSkylight, bool sunMoves, std::int64_t worldSeed) {
     std::vector<BlockChange> changes;
+    std::vector<Pending> pending;
     // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
     if (gameTime % daylightDetectors::kIntervalTicks == 0) {
         for (const std::array<std::int32_t, 2>& position : chunks) {
@@ -142,14 +167,17 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             if (chunk == nullptr) {
                 continue;
             }
-            for (const server::world::ChunkBlockEntity& entity : chunk->blockEntities()) {
-                if (entity.type().path() != "daylight_detector") {
-                    continue;
+            pending.clear();
+            chunk->forEachBlockEntity([&pending](const server::world::ChunkBlockEntity& entity) {
+                if (entity.type().path() == "daylight_detector") {
+                    pending.push_back({entity.localX(), entity.y(), entity.localZ(), {}});
                 }
-                const std::int32_t x = (position[0] << 4) + entity.localX();
-                const std::int32_t z = (position[1] << 4) + entity.localZ();
+            });
+            for (const Pending& entity : pending) {
+                const std::int32_t x = (position[0] << 4) + entity.localX;
+                const std::int32_t z = (position[1] << 4) + entity.localZ;
                 const std::optional<BlockChange> updated =
-                    daylightDetectors::update(world, clock, skyDarken, x, entity.y(), z, hasSkylight, sunMoves);
+                    daylightDetectors::update(world, clock, skyDarken, x, entity.y, z, hasSkylight, sunMoves);
                 if (updated.has_value()) {
                     changes.push_back(*updated);
                 }
@@ -163,11 +191,17 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
         if (chunk == nullptr || chunk->blockEntityCount() == 0) {
             continue;
         }
-        for (const server::world::ChunkBlockEntity& stored : chunk->blockEntities()) {
-            const std::int32_t x = (position[0] << 4) + stored.localX();
-            const std::int32_t y = stored.y();
-            const std::int32_t z = (position[1] << 4) + stored.localZ();
-            const std::string path{stored.type().path()};
+        pending.clear();
+        chunk->forEachBlockEntity([&pending](const server::world::ChunkBlockEntity& stored) {
+            if (hasTicker(stored.type().path())) {
+                pending.push_back({stored.localX(), stored.y(), stored.localZ(), stored.type().path()});
+            }
+        });
+        for (const Pending& stored : pending) {
+            const std::int32_t x = (position[0] << 4) + stored.localX;
+            const std::int32_t y = stored.y;
+            const std::int32_t z = (position[1] << 4) + stored.localZ;
+            const std::string& path = stored.path;
             // parity: `SculkSensorBlockEntity`'s ticker, which is `VibrationSystem.Ticker.tick`: a.
             if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
                 if (const std::optional<BlockChange> heard = vibrations::travelTick(world, x, y, z, gameTime);
@@ -226,7 +260,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 continue;
             }
             if (path == "bell") {
-                server::world::ChunkBlockEntity* bellEntity = chunk->blockEntityAt(stored.localX(), y, stored.localZ());
+                server::world::ChunkBlockEntity* bellEntity = chunk->blockEntityAt(stored.localX, y, stored.localZ);
                 if (bellEntity != nullptr && bells::ringing(bellEntity->data()) && hooks.bell &&
                     hooks.bell(bellEntity->data(), x, y, z)) {
                     chunk->markDirty();
@@ -261,7 +295,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
-            server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(stored.localX(), y, stored.localZ());
+            server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(stored.localX, y, stored.localZ);
             if (entity == nullptr) {
                 continue;
             }

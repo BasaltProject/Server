@@ -27,6 +27,8 @@
 #include <cmath>
 #include <cstdint>
 #include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -257,20 +259,30 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
     }
     world::LocalMobCaps localCaps{std::move(capPlayers), limits, mobs.spawnRangeChunks};
 
-    std::vector<std::array<std::int32_t, 2>> chunks;
     const auto simulated = chunkSimulation_->simulatedChunks(world);
-    for (const std::array<std::int32_t, 2>& chunk : *simulated) {
-        if (localCaps.isSpawnCandidate(chunk[0], chunk[1])) {
-            chunks.push_back(chunk);
+    CandidateChunks& candidates = spawnersFor(world).candidates;
+    if (candidates.source != simulated || candidates.range != mobs.spawnRangeChunks ||
+        candidates.playerChunks != localCaps.playerChunks()) {
+        candidates.source = simulated;
+        candidates.range = mobs.spawnRangeChunks;
+        candidates.playerChunks = localCaps.playerChunks();
+        candidates.chunks.clear();
+        candidates.spawnable.clear();
+        for (const std::array<std::int32_t, 2>& chunk : *simulated) {
+            if (localCaps.isSpawnCandidate(chunk[0], chunk[1])) {
+                candidates.chunks.push_back(chunk);
+            }
+        }
+        candidates.spawnable.reserve(candidates.chunks.size());
+        for (const std::array<std::int32_t, 2>& chunk : candidates.chunks) {
+            candidates.spawnable.insert(chunkKey(chunk[0], chunk[1]));
         }
     }
-    if (chunks.empty()) {
+    if (candidates.chunks.empty()) {
         return;
     }
-    std::set<std::int64_t> spawnableChunks;
-    for (const std::array<std::int32_t, 2>& chunk : chunks) {
-        spawnableChunks.insert(chunkKey(chunk[0], chunk[1]));
-    }
+    std::vector<std::array<std::int32_t, 2>> chunks = candidates.chunks;
+    const std::unordered_set<std::int64_t>& spawnableChunks = candidates.spawnable;
     world::StructureSpawnLists structureSpawnLists{world};
 
     // parity: `NaturalSpawner.createState`.
@@ -304,18 +316,27 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
         return entity::mobCategoryFacts(category).friendly ? !tunables.allowAnimals : !tunables.allowMonsters;
     });
     world::SpawnPotential spawnPotential;
+    std::unordered_map<const server::registry::entityTypeShapes::Shape*, std::optional<MobCategory>> categoryOfShape;
     for (const ServerEntity* entity : alive) {
         const auto blockX = static_cast<std::int32_t>(std::floor(entity->x));
         const auto blockY = static_cast<std::int32_t>(std::floor(entity->y));
         const auto blockZ = static_cast<std::int32_t>(std::floor(entity->z));
-        const std::optional<Identifier> biome = world::naturalSpawner::biomeAt(world, blockX, blockY, blockZ);
-        if (biome.has_value()) {
-            const std::optional<world::MobSpawnCost> cost = biomeSpawns_->costFor(*biome, entity->type());
-            if (cost.has_value()) {
-                spawnPotential.add(blockX, blockY, blockZ, cost->charge);
+        if (biomeSpawns_->anyBiomeCharges(entity->type())) {
+            const std::optional<Identifier> biome = world::naturalSpawner::biomeAt(world, blockX, blockY, blockZ);
+            if (biome.has_value()) {
+                const std::optional<world::MobSpawnCost> cost = biomeSpawns_->costFor(*biome, entity->type());
+                if (cost.has_value()) {
+                    spawnPotential.add(blockX, blockY, blockZ, cost->charge);
+                }
             }
         }
-        const std::optional<MobCategory> category = entity::mobCategoryByName(entity::mobs::categoryOf(entity->type()));
+        const auto known = categoryOfShape.find(entity->shape());
+        const std::optional<MobCategory> category =
+            known != categoryOfShape.end()
+                ? known->second
+                : categoryOfShape
+                      .emplace(entity->shape(), entity::mobCategoryByName(entity::mobs::categoryOf(entity->type())))
+                      .first->second;
         if (!category.has_value()) {
             continue;
         }

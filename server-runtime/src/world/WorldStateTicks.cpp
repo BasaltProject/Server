@@ -245,6 +245,10 @@ DroppedItem& WorldState::restoreItem(DroppedItem dropped) {
 
 std::vector<DroppedItem> WorldState::items() const { return itemPhysics_.items(); }
 
+std::vector<DroppedItem> WorldState::itemsWithin(double x, double z, double radiusSquared) const {
+    return itemPhysics_.itemsWithin(x, z, radiusSquared);
+}
+
 std::optional<DroppedItem> WorldState::itemById(std::int32_t entityId) const { return itemPhysics_.itemById(entityId); }
 
 std::vector<DroppedItem> WorldState::nearbyItems(double x, double y, double z, double radius) const {

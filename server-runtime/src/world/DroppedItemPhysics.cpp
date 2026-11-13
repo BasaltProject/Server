@@ -109,6 +109,19 @@ std::vector<DroppedItem> DroppedItemPhysics::items() const {
     return droppedItems_;
 }
 
+std::vector<DroppedItem> DroppedItemPhysics::itemsWithin(double x, double z, double radiusSquared) const {
+    const WorldWriteLock lock{*mutex_};
+    std::vector<DroppedItem> found;
+    for (const DroppedItem& item : droppedItems_) {
+        const double dx = item.x - x;
+        const double dz = item.z - z;
+        if (!((dx * dx) + (dz * dz) > radiusSquared)) {
+            found.push_back(item);
+        }
+    }
+    return found;
+}
+
 std::optional<DroppedItem> DroppedItemPhysics::itemById(std::int32_t entityId) const {
     const WorldWriteLock lock{*mutex_};
     for (const DroppedItem& item : droppedItems_) {

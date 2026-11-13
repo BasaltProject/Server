@@ -14,6 +14,8 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace basalt::server::runtime::entity {
@@ -87,18 +89,18 @@ private:
     std::set<std::int32_t> trackedItems_;
     std::map<std::int32_t, std::int32_t> trackedItemCounts_;
     std::set<std::int32_t> settledItems_;
-    std::set<std::int32_t> trackedEntities_;
+    std::unordered_set<std::int32_t> trackedEntities_;
     std::map<std::int32_t, std::int32_t> trackedNpcs_;
     bool namelessTeamMade_ = false;
     std::map<std::int32_t, std::pair<float, float>> lastNpcLook_;
-    std::map<std::int32_t, std::array<double, 5>> lastEntityPositions_;
-    std::map<std::int32_t, entity::RuntimeEntityMetadata> lastRuntimeEntityMetadata_;
-    std::map<std::int32_t, std::uint32_t> sentSourceVersion_;
-    std::map<std::int32_t, std::vector<std::int32_t>> lastPassengers_;
-    std::map<std::int32_t, std::int32_t> lastLeashHolders_;
-    std::map<std::int32_t, std::vector<entity::GeneratedEquipment>> lastMobEquipment_;
-    std::map<std::int32_t, wire::nbt::NbtCompound> lastEquipmentNbt_;
-    std::map<std::int32_t, std::string> lastDisplayText_;
+    std::unordered_map<std::int32_t, std::array<double, 5>> lastEntityPositions_;
+    std::unordered_map<std::int32_t, entity::RuntimeEntityMetadata> lastRuntimeEntityMetadata_;
+    std::unordered_map<std::int32_t, std::uint32_t> sentSourceVersion_;
+    std::unordered_map<std::int32_t, std::vector<std::int32_t>> lastPassengers_;
+    std::unordered_map<std::int32_t, std::int32_t> lastLeashHolders_;
+    std::unordered_map<std::int32_t, std::vector<entity::GeneratedEquipment>> lastMobEquipment_;
+    std::unordered_map<std::int32_t, wire::nbt::NbtCompound> lastEquipmentNbt_;
+    std::unordered_map<std::int32_t, std::string> lastDisplayText_;
     std::set<std::int32_t> trackedPlayers_;
     std::map<std::int32_t, std::int64_t> profileSeen_;
     std::map<std::int32_t, player::PlayerEntityData> lastPlayerData_;

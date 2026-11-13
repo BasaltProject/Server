@@ -1,3 +1,4 @@
+#include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/world/RealBiomeSpawns.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
@@ -159,7 +160,11 @@ RealBiomeSpawns::Settings RealBiomeSpawns::parse(std::string_view json) {
 
 const RealBiomeSpawns::Settings& RealBiomeSpawns::settingsOf(const Identifier& biome) const {
     const std::lock_guard<std::mutex> guard{lock_};
-    const std::string key{biome.path()};
+    return settingsLocked(biome.path());
+}
+
+const RealBiomeSpawns::Settings& RealBiomeSpawns::settingsLocked(std::string_view name) const {
+    const std::string key{name};
     const auto cached = cache_.find(key);
     if (cached != cache_.end()) {
         return cached->second;
@@ -173,6 +178,26 @@ const RealBiomeSpawns::Settings& RealBiomeSpawns::settingsOf(const Identifier& b
         logger_.debug([&key] { return "No spawn list for biome '" + key + "'"; });
     }
     return cache_.emplace(key, std::move(settings)).first->second;
+}
+
+bool RealBiomeSpawns::anyBiomeCharges(const Identifier& type) const {
+    const std::lock_guard<std::mutex> guard{lock_};
+    const server::registry::Registry<server::registry::Biome>& biomes = server::registry::biomes::registry();
+    if (!chargedKnown_ || chargedBiomeCount_ != biomes.size()) {
+        chargedTypes_.clear();
+        for (const std::int32_t id : biomes.ids()) {
+            const server::registry::Biome* biome = biomes.byId(id);
+            if (biome == nullptr) {
+                continue;
+            }
+            for (const auto& [charged, cost] : settingsLocked(biome->id.path()).costs) {
+                chargedTypes_.insert(charged);
+            }
+        }
+        chargedBiomeCount_ = biomes.size();
+        chargedKnown_ = true;
+    }
+    return chargedTypes_.contains(type);
 }
 
 std::vector<SpawnerEntry> RealBiomeSpawns::listFor(const Identifier& biome, std::string_view category) const {

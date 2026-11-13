@@ -23,6 +23,18 @@ public:
 
     [[nodiscard]] std::vector<entity::ServerEntity*> entities() const;
 
+    /// The first entity in registry order the predicate accepts; it runs under the lock and must only read.
+    template <typename Predicate>
+    [[nodiscard]] entity::ServerEntity* findFirst(Predicate&& accepts) const {
+        const WorldWriteLock lock{*mutex_};
+        for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
+            if (accepts(*entity)) {
+                return entity.get();
+            }
+        }
+        return nullptr;
+    }
+
     [[nodiscard]] bool hasNaturalSpawnObstruction(const entity::Aabb& spawnBox, const entity::Aabb& entityBox) const;
 
     [[nodiscard]] std::vector<entity::ServerEntity*> entitiesIn(std::int32_t chunkX, std::int32_t chunkZ) const;

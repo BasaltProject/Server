@@ -395,17 +395,21 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         config::dimensionFacts(world.declaration().dimension).hasDayTimeline, world.metadata().seed);
     // parity: `PistonMovingBlockEntity`.
     const std::vector<PlayerSession*> watchers = watchersOf(world);
+    const wire::common::Identifier& pistonBlock = world::pistons::block();
+    std::vector<std::array<std::int32_t, 3>> sliding;
     for (const std::array<std::int32_t, 2>& position : chunks) {
         const server::world::Chunk* chunk = world.state().chunkIfLoaded(position[0], position[1]);
         if (chunk == nullptr || chunk->blockEntityCount() == 0) {
             continue;
         }
-        for (const server::world::ChunkBlockEntity& sliding : chunk->blockEntities()) {
-            if (sliding.type() != world::pistons::block()) {
-                continue;
+        sliding.clear();
+        chunk->forEachBlockEntity([&](const server::world::ChunkBlockEntity& stored) {
+            if (stored.type() == pistonBlock) {
+                sliding.push_back(
+                    {(position[0] << 4) + stored.localX(), stored.y(), (position[1] << 4) + stored.localZ()});
             }
-            const std::array<std::int32_t, 3> at{(position[0] << 4) + sliding.localX(), sliding.y(),
-                                                 (position[1] << 4) + sliding.localZ()};
+        });
+        for (const std::array<std::int32_t, 3>& at : sliding) {
             const std::vector<world::BlockChange> landed = broadcaster_->finishPiston(world, at, watchers);
             changes.insert(changes.end(), landed.begin(), landed.end());
         }

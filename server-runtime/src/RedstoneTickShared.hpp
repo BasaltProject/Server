@@ -55,6 +55,14 @@ using wire::protocol::play::BlockPos;
 using wire::protocol::play::ClientboundBlockUpdatePacket;
 using wire::protocol::play::Gamemode;
 
+/// Half width and height of an entity's box, read from the shape fixed when it was made.
+inline std::pair<double, double> halfAndHeightOf(const entity::ServerEntity& entity) {
+    constexpr double kDefaultSize = 1.0;
+    const server::registry::entityTypeShapes::Shape* shape = entity.shape();
+    return shape == nullptr ? std::pair{kDefaultSize / 2.0, kDefaultSize}
+                            : std::pair{static_cast<double>(shape->width) / 2.0, static_cast<double>(shape->height)};
+}
+
 inline std::int64_t pack(std::int32_t x, std::int32_t y, std::int32_t z) {
     return ((static_cast<std::int64_t>(x) & 0x3ffffff) << 38) | ((static_cast<std::int64_t>(z) & 0x3ffffff) << 12) |
            (static_cast<std::int64_t>(y) & 0xfff);

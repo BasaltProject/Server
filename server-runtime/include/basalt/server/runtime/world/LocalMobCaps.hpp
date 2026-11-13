@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <unordered_map>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -36,6 +35,10 @@ public:
 
     [[nodiscard]] bool isSpawnCandidate(std::int32_t chunkX, std::int32_t chunkZ) const;
 
+    [[nodiscard]] const std::vector<std::pair<std::int32_t, std::int32_t>>& playerChunks() const noexcept {
+        return playerChunks_;
+    }
+
     void add(entity::MobCategory category, std::int32_t chunkX, std::int32_t chunkZ);
 
     [[nodiscard]] std::int32_t count(std::int32_t playerId, entity::MobCategory category) const;
@@ -52,7 +55,18 @@ private:
     double distanceSquared_ = kSpawningDistanceSquared;
     std::vector<std::array<std::int32_t, kCategoryCount>> counts_;
     std::vector<std::pair<std::int32_t, std::int32_t>> playerChunks_;
-    std::unordered_map<std::int64_t, std::pair<std::uint32_t, std::uint32_t>> nearbyCache_;
+
+    struct Slot {
+        std::int64_t key = 0;
+        std::uint32_t first = 0;
+        std::uint32_t length = 0;
+        bool used = false;
+    };
+
+    void growCache();
+
+    std::vector<Slot> nearbyCache_;
+    std::size_t cached_ = 0;
     std::vector<std::uint32_t> nearbyPool_;
 };
 

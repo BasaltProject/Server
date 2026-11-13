@@ -73,6 +73,22 @@ public:
     /// A snapshot safe to iterate outside the lock.
     [[nodiscard]] std::vector<DroppedItem> items() const;
 
+    /// The items within a horizontal distance, in the order `items` gives them.
+    [[nodiscard]] std::vector<DroppedItem> itemsWithin(double x, double z, double radiusSquared) const;
+
+    /// Copies of the items the predicate accepts, in the order `items` gives them; it runs under the lock.
+    template <typename Predicate>
+    [[nodiscard]] std::vector<DroppedItem> itemsMatching(Predicate&& accepts) const {
+        const WorldWriteLock lock{*mutex_};
+        std::vector<DroppedItem> found;
+        for (const DroppedItem& item : droppedItems_) {
+            if (accepts(item)) {
+                found.push_back(item);
+            }
+        }
+        return found;
+    }
+
     [[nodiscard]] std::optional<DroppedItem> itemById(std::int32_t entityId) const;
 
     [[nodiscard]] std::vector<DroppedItem> nearbyItems(double x, double y, double z, double radius) const;

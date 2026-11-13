@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/NaturalSpawner.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -12,6 +13,9 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 namespace basalt::server::runtime::player {
 class PlayerRegistry;
@@ -82,7 +86,17 @@ public:
     void tickSpawning(world::LoadedWorld& world, const sched::Region& region);
 
 private:
+    /// The chunks a spawn pass may touch, kept while the players stay in their chunks and the simulated set stays put.
+    struct CandidateChunks {
+        std::shared_ptr<const std::vector<std::array<std::int32_t, 2>>> source;
+        std::vector<std::pair<std::int32_t, std::int32_t>> playerChunks;
+        std::int32_t range = 0;
+        std::vector<std::array<std::int32_t, 2>> chunks;
+        std::unordered_set<std::int64_t> spawnable;
+    };
+
     struct WorldSpawners {
+        CandidateChunks candidates;
         world::PhantomSpawner phantom;
         world::PatrolSpawner patrol;
         world::CatSpawner cat;

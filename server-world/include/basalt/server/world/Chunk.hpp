@@ -142,6 +142,14 @@ public:
 
     [[nodiscard]] std::vector<ChunkBlockEntity> blockEntities() const;
 
+    /// Visits the block entities in insertion order without copying; the visitor must not change the chunk.
+    template <typename Visitor>
+    void forEachBlockEntity(Visitor&& visit) const {
+        for (const std::int32_t key : blockEntityOrder_) {
+            visit(blockEntities_.at(key));
+        }
+    }
+
     [[nodiscard]] std::size_t blockEntityCount() const noexcept { return blockEntities_.size(); }
 
     [[nodiscard]] std::size_t scheduledTickCount() const noexcept { return blockTicks_.size() + fluidTicks_.size(); }

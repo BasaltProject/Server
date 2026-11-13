@@ -223,12 +223,7 @@ void EntityVisibilityTracker::syncItemEntities() {
         return;
     }
     std::set<std::int32_t> visible;
-    for (const world::DroppedItem& item : owner_->world().items()) {
-        const double dx = item.x - session->x;
-        const double dz = item.z - session->z;
-        if ((dx * dx) + (dz * dz) > kItemViewRadiusSquared) {
-            continue;
-        }
+    for (const world::DroppedItem& item : owner_->world().itemsWithin(session->x, session->z, kItemViewRadiusSquared)) {
         const server::registry::Item* entry = server::registry::items::registry().byName(item.item);
         if (entry == nullptr) {
             continue;

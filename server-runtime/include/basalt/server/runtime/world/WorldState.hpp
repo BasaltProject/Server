@@ -374,6 +374,13 @@ public:
 
     [[nodiscard]] std::vector<DroppedItem> items() const;
 
+    [[nodiscard]] std::vector<DroppedItem> itemsWithin(double x, double z, double radiusSquared) const;
+
+    template <typename Predicate>
+    [[nodiscard]] std::vector<DroppedItem> itemsMatching(Predicate&& accepts) const {
+        return itemPhysics_.itemsMatching(std::forward<Predicate>(accepts));
+    }
+
     [[nodiscard]] std::optional<DroppedItem> itemById(std::int32_t entityId) const;
 
     [[nodiscard]] std::vector<DroppedItem> nearbyItems(double x, double y, double z, double radius) const;
@@ -394,6 +401,11 @@ public:
     [[nodiscard]] std::vector<std::int32_t> tickItems(const sched::Region* region = nullptr);
 
     [[nodiscard]] std::vector<entity::ServerEntity*> entities() const;
+
+    template <typename Predicate>
+    [[nodiscard]] entity::ServerEntity* findEntity(Predicate&& accepts) const {
+        return entityRegistry_.findFirst(std::forward<Predicate>(accepts));
+    }
 
     [[nodiscard]] bool hasNaturalSpawnEntityObstruction(const entity::Aabb& spawnBox,
                                                         const entity::Aabb& entityBox) const;

@@ -108,26 +108,30 @@ struct Container {
 /// parity: `HopperBlockEntity.getEntityContainer`.
 [[nodiscard]] std::optional<Container> cartAround(WorldState& world, double px, double py, double pz, std::int32_t x,
                                                   std::int32_t y, std::int32_t z) {
-    for (entity::ServerEntity* cart : world.entities()) {
-        if (cart == nullptr || cart->removed || !cart->sourceNbt.has_value()) {
-            continue;
+    entity::ServerEntity* cart = world.findEntity([px, py, pz](const entity::ServerEntity& candidate) {
+        if (candidate.removed || !candidate.sourceNbt.has_value()) {
+            return false;
         }
-        const std::string_view path = cart->type().path();
-        const std::optional<std::int32_t> size = containers::sizeOf(path);
-        if (!size.has_value() || !detectorRails::isMinecart(cart->type())) {
-            continue;
+        if (candidate.x + detectorRails::kCartHalfWidth <= px - 0.5 ||
+            candidate.x - detectorRails::kCartHalfWidth >= px + 0.5 ||
+            candidate.z + detectorRails::kCartHalfWidth <= pz - 0.5 ||
+            candidate.z - detectorRails::kCartHalfWidth >= pz + 0.5 ||
+            candidate.y + detectorRails::kCartHeight <= py - 0.5 || candidate.y >= py + 0.5) {
+            return false;
         }
-        if (cart->x + detectorRails::kCartHalfWidth <= px - 0.5 ||
-            cart->x - detectorRails::kCartHalfWidth >= px + 0.5 ||
-            cart->z + detectorRails::kCartHalfWidth <= pz - 0.5 ||
-            cart->z - detectorRails::kCartHalfWidth >= pz + 0.5 || cart->y + detectorRails::kCartHeight <= py - 0.5 ||
-            cart->y >= py + 0.5) {
-            continue;
-        }
-        return Container{
-            .path = path, .size = *size, .data = &*cart->sourceNbt, .x = x, .y = y, .z = z, .isBlock = false};
+        return containers::sizeOf(candidate.type().path()).has_value() && detectorRails::isMinecart(candidate.type());
+    });
+    if (cart == nullptr) {
+        return std::nullopt;
     }
-    return std::nullopt;
+    const std::string_view path = cart->type().path();
+    return Container{.path = path,
+                     .size = *containers::sizeOf(path),
+                     .data = &*cart->sourceNbt,
+                     .x = x,
+                     .y = y,
+                     .z = z,
+                     .isBlock = false};
 }
 
 /// parity: `getContainerAt`.
@@ -496,13 +500,10 @@ void noteChange(const Around& around, const BlockChange& change) {
 [[nodiscard]] bool suckInBox(WorldState& world, double minX, double minY, double minZ, double maxX, double maxY,
                              double maxZ, Slots& slots) {
     bool took = false;
-    for (const DroppedItem& item : world.items()) {
-        if (item.count <= 0) {
-            continue;
-        }
-        if (!itemCrosses(item, minX, minY, minZ, maxX, maxY, maxZ)) {
-            continue;
-        }
+    const auto reached = [&](const DroppedItem& item) {
+        return item.count > 0 && itemCrosses(item, minX, minY, minZ, maxX, maxY, maxZ);
+    };
+    for (const DroppedItem& item : world.itemsMatching(reached)) {
         // parity: what a dropped stack carries goes into the hopper with it.
         const ItemStack picked{.item = item.item, .count = 1, .components = item.components};
         std::int32_t left = item.count;

@@ -8,6 +8,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -61,6 +62,9 @@ public:
     [[nodiscard]] std::optional<MobSpawnCost> costFor(const wire::common::Identifier& biome,
                                                       const wire::common::Identifier& type) const;
 
+    /// Whether some registered biome charges this type, so a type nobody charges never needs its biome looked up.
+    [[nodiscard]] bool anyBiomeCharges(const wire::common::Identifier& type) const;
+
     [[nodiscard]] Settings of(const wire::common::Identifier& biome) const;
 
     /// A file that does not parse offers nothing rather than half a list.
@@ -68,11 +72,15 @@ public:
 
 private:
     [[nodiscard]] const Settings& settingsOf(const wire::common::Identifier& biome) const;
+    [[nodiscard]] const Settings& settingsLocked(std::string_view key) const;
 
     Jar jar_;
     wire::common::Logger logger_;
     mutable std::mutex lock_;
     mutable std::map<std::string, Settings, std::less<>> cache_;
+    mutable std::size_t chargedBiomeCount_ = 0;
+    mutable bool chargedKnown_ = false;
+    mutable std::set<wire::common::Identifier> chargedTypes_;
 };
 
 } // namespace basalt::server::runtime::world

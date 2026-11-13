@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <unordered_set>
 #include <vector>
 
 namespace basalt::server::runtime {
@@ -294,9 +295,14 @@ void EntityVisibilityTracker::syncSummonedEntities() {
         }
         const entity::RuntimeEntityMetadata live = entity::runtimeEntityMetadata(*entity);
         const auto previous = lastRuntimeEntityMetadata_.find(entity->entityId());
-        const std::vector<SetEntityDataPacket::Entry> changes =
-            live.changesFrom(previous == lastRuntimeEntityMetadata_.end() ? nullptr : &previous->second);
-        lastRuntimeEntityMetadata_.insert_or_assign(entity->entityId(), live);
+        std::vector<SetEntityDataPacket::Entry> changes;
+        if (previous == lastRuntimeEntityMetadata_.end()) {
+            changes = live.changesFrom(nullptr);
+            lastRuntimeEntityMetadata_.emplace(entity->entityId(), live);
+        } else if (!(previous->second == live)) {
+            changes = live.changesFrom(&previous->second);
+            previous->second = live;
+        }
         if (!changes.empty()) {
             owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                 SetEntityDataPacket{.entityId = entity->entityId(), .entries = changes}.write(buffer);
@@ -409,20 +415,31 @@ void EntityVisibilityTracker::syncSummonedEntities() {
 
 void EntityVisibilityTracker::syncPassengers(const std::vector<ServerEntity*>& entities, const std::string& viewer,
                                              std::int32_t viewerEntityId) {
-    std::set<std::int32_t> visibleEntityIds;
-    for (const ServerEntity* entity : entities) {
-        if (!entity->removed && visibleTo(*entity, viewer)) {
-            visibleEntityIds.insert(entity->entityId());
+    std::unordered_set<std::int32_t> visibleEntityIds;
+    bool built = false;
+    const auto visibleId = [&](std::int32_t entityId) {
+        if (!built) {
+            built = true;
+            visibleEntityIds.reserve(entities.size());
+            for (const ServerEntity* entity : entities) {
+                if (!entity->removed && visibleTo(*entity, viewer)) {
+                    visibleEntityIds.insert(entity->entityId());
+                }
+            }
         }
-    }
+        return visibleEntityIds.contains(entityId);
+    };
     for (const ServerEntity* vehicle : entities) {
-        if (!trackedEntities_.contains(vehicle->entityId()) || !visibleEntityIds.contains(vehicle->entityId())) {
+        if (vehicle->passengerIds.empty() && lastPassengers_.empty()) {
+            continue;
+        }
+        if (!trackedEntities_.contains(vehicle->entityId()) || !visibleId(vehicle->entityId())) {
             continue;
         }
         std::vector<std::int32_t> passengers;
         for (const std::int32_t passengerId : vehicle->passengerIds) {
             if (passengerId == viewerEntityId || trackedPlayers_.contains(passengerId) ||
-                (trackedEntities_.contains(passengerId) && visibleEntityIds.contains(passengerId))) {
+                (trackedEntities_.contains(passengerId) && visibleId(passengerId))) {
                 passengers.push_back(passengerId);
             }
         }
@@ -443,8 +460,8 @@ void EntityVisibilityTracker::syncPassengers(const std::vector<ServerEntity*>& e
             lastPassengers_.insert_or_assign(vehicle->entityId(), passengers);
         }
     }
-    std::erase_if(lastPassengers_, [this, &visibleEntityIds](const auto& entry) {
-        return !trackedEntities_.contains(entry.first) || !visibleEntityIds.contains(entry.first);
+    std::erase_if(lastPassengers_, [this, &visibleId](const auto& entry) {
+        return !trackedEntities_.contains(entry.first) || !visibleId(entry.first);
     });
 }
 

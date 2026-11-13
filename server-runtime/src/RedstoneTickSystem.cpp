@@ -160,7 +160,7 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
     // parity: `entityInside`.
     for (const entity::ServerEntity* standing : world.state().entities()) {
         if (!standing->removed && !entity::blockTriggers::ignored(standing->type())) {
-            const auto [half, height] = sizeOf(standing->type());
+            const auto [half, height] = halfAndHeightOf(*standing);
             touch(standing->x, standing->y, standing->z, half, height, items.size());
         }
     }
@@ -205,7 +205,7 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
     }
     // parity: `entityInside`.
     for (const entity::ServerEntity* one : world.state().entities()) {
-        if (one == nullptr || one->removed || entity::projectiles::kindOf(one->type()) != nullptr) {
+        if (one == nullptr || one->removed || !one->onGround || entity::projectiles::kindOf(one->type()) != nullptr) {
             continue;
         }
         stand(one->x, one->y, one->z, one->onGround);
@@ -390,7 +390,7 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
             !region.ownsPosition(crossing->x, crossing->z)) {
             continue;
         }
-        const auto [half, height] = sizeOf(crossing->type());
+        const auto [half, height] = halfAndHeightOf(*crossing);
         crossingsOf(world, crossing->x, crossing->y, crossing->z, half, height, crossed);
     }
     for (const std::int64_t packed : crossed) {
@@ -432,7 +432,7 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
             (livingOnly && !server::registry::entityAttributes::isLiving(standing->type()))) {
             continue;
         }
-        const auto [half, height] = sizeOf(standing->type());
+        const auto [half, height] = halfAndHeightOf(*standing);
         if (world::pressurePlates::touches(x, y, z, standing->x, standing->y, standing->z, half, height)) {
             count++;
         }
