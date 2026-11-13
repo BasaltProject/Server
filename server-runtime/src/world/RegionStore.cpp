@@ -81,7 +81,7 @@ LinearRegion& RegionStore::store(std::int64_t regionKey, LinearRegion region) {
     }
     for (auto at = cached_.begin();
          at != cached_.end() && (cached_.size() > capacity_ || cachedBytesLocked() > byteBudget_);) {
-        if (at->key == regionKey || dirtyRegions_.contains(at->key)) {
+        if (at->key == regionKey || dirtyRegions_.contains(at->key) || writing_.contains(at->key)) {
             ++at;
             continue;
         }
@@ -502,6 +502,7 @@ std::size_t RegionStore::flushDirty() {
         for (const std::int64_t regionKey : dirtyRegions_) {
             if (const auto found = byKey_.find(regionKey); found != byKey_.end()) {
                 toWrite.emplace_back(regionKey, &found->second->region);
+                writing_.insert(regionKey);
             }
         }
         dirtyRegions_.clear();
@@ -514,6 +515,8 @@ std::size_t RegionStore::flushDirty() {
         if (held->writeTo(path)) {
             ++written;
         }
+        const std::lock_guard<std::mutex> lock{mutex_};
+        writing_.erase(regionKey);
     }
     return written;
 }

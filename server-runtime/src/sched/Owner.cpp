@@ -1,8 +1,10 @@
 #include <basalt/server/runtime/sched/Owner.hpp>
 
 #include <algorithm>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -19,6 +21,18 @@ namespace {
 }
 
 std::atomic<bool> strictOwnership{false};
+
+std::mutex workMutex;
+std::condition_variable workSignal;
+std::atomic<std::uint64_t> workCounter{0};
+
+void announceWork() {
+    {
+        const std::lock_guard<std::mutex> lock{workMutex};
+        workCounter.fetch_add(1, std::memory_order_relaxed);
+    }
+    workSignal.notify_all();
+}
 
 } // namespace
 
@@ -56,9 +70,19 @@ TaskHandle Owner::submit(std::function<void()> task) {
         task();
         return handle;
     }
-    const std::lock_guard<std::mutex> lock{mutex_};
-    incoming_.push_back(ScheduledTask{.handle = handle, .task = std::move(task), .dueInTicks = 0});
+    {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        incoming_.push_back(ScheduledTask{.handle = handle, .task = std::move(task), .dueInTicks = 0});
+    }
+    announceWork();
     return handle;
+}
+
+std::uint64_t Owner::workEpoch() noexcept { return workCounter.load(std::memory_order_relaxed); }
+
+void Owner::waitForWork(const std::uint64_t seen, const std::chrono::steady_clock::time_point deadline) {
+    std::unique_lock<std::mutex> lock{workMutex};
+    workSignal.wait_until(lock, deadline, [seen] { return workCounter.load(std::memory_order_relaxed) != seen; });
 }
 
 TaskHandle Owner::schedule(std::int32_t delayTicks, std::function<void()> task) {

@@ -39,6 +39,8 @@ public:
     server::plugins::PluginHandle every(std::int32_t delayTicks, std::int32_t periodTicks,
                                         std::function<void()> task) override;
 
+    server::plugins::PluginHandle now(std::function<void()> task) override;
+
 private:
     sched::Owner* owner_;
     std::function<std::int64_t()> currentTick_;

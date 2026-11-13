@@ -221,21 +221,34 @@ void ProtoChunks::refreshWants() {
         decorationWants_.emplace(around, priority);
         decorationOrder_.push_back(around);
     };
+    std::vector<std::uint8_t> seen;
     for (const Unit& unit : units) {
         // Each chunk the unit needs full brings its own 3x3, x outermost, and then the unit's outer rings.
         const std::int32_t full = unit.firstRadius - 1;
+        // `want` answers the same for a key it has seen, so each square of the unit is asked once.
+        const std::int32_t reach = std::max(full + 1, unit.secondRadius);
+        const std::int32_t side = 2 * reach + 1;
+        seen.assign(static_cast<std::size_t>(side) * static_cast<std::size_t>(side), 0);
+        const auto wantOnce = [&](std::int32_t dx, std::int32_t dz) {
+            std::uint8_t& mark = seen[static_cast<std::size_t>((dx + reach) * side + dz + reach)];
+            if (mark != 0) {
+                return;
+            }
+            mark = 1;
+            want(key(xOf(unit.at) + dx, zOf(unit.at) + dz), unit.priority);
+        };
         for (std::int32_t fx = -full; fx <= full; ++fx) {
             for (std::int32_t fz = -full; fz <= full; ++fz) {
                 for (std::int32_t dx = -1; dx <= 1; ++dx) {
                     for (std::int32_t dz = -1; dz <= 1; ++dz) {
-                        want(key(xOf(unit.at) + fx + dx, zOf(unit.at) + fz + dz), unit.priority);
+                        wantOnce(fx + dx, fz + dz);
                     }
                 }
             }
         }
         for (std::int32_t dx = -unit.secondRadius; dx <= unit.secondRadius; ++dx) {
             for (std::int32_t dz = -unit.secondRadius; dz <= unit.secondRadius; ++dz) {
-                want(key(xOf(unit.at) + dx, zOf(unit.at) + dz), unit.priority);
+                wantOnce(dx, dz);
             }
         }
     }

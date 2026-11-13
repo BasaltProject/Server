@@ -70,6 +70,10 @@
 namespace basalt::server::runtime {
 using namespace sessionPlay;
 
+namespace {
+constexpr std::int32_t kMaxJoinsInFlight = 4;
+} // namespace
+
 player::PlayerConnection ClientSession::playerConnection() {
     player::PlayerConnection connection;
     connection.protocolVersion = handshake_.has_value() ? handshake_->protocolVersion : 0;
@@ -443,8 +447,10 @@ player::PlayerConnection ClientSession::playerConnection() {
 }
 
 void ClientSession::enterPlay() {
+    net::ConnectionGate::JoinTicket joinTicket;
     if (!switchingToConfiguration_.load() && options_.gate != nullptr) {
         options_.gate->awaitJoinSlot(options_.tuning.maxJoinsPerTick);
+        joinTicket = options_.gate->awaitJoinInFlight(kMaxJoinsInFlight);
     }
     state_ = wire::protocol::ProtocolState::Play;
     if (switchingToConfiguration_.exchange(false)) {
@@ -597,7 +603,10 @@ void ClientSession::enterPlay() {
     });
     sendPlayerPosition(player.x, player.y, player.z, player.yaw, player.pitch);
 
-    const std::vector<PlayerSession*> others = registry->snapshot();
+    std::vector<wire::common::Uuid> earlierPlayers;
+    for (const PlayerSession* earlier : registry->snapshot()) {
+        earlierPlayers.push_back(earlier->uuid());
+    }
     registry->add(&player);
     // Advancements and recipe book go first: `limited_crafting` consults the book on the first click.
     if (options_.progress != nullptr) {
@@ -646,6 +655,19 @@ void ClientSession::enterPlay() {
             std::chrono::seconds(5)));
     }
 
+    joinTicket = {};
+    // Looked up again at each use: a join can outlast the grace a departed session is kept for, and a stale pointer
+    // would dangle.
+    const auto stillHere = [registry, &earlierPlayers, &player] {
+        std::vector<PlayerSession*> found;
+        for (const wire::common::Uuid& earlier : earlierPlayers) {
+            if (PlayerSession* other = registry->get(earlier); other != nullptr && other != &player) {
+                found.push_back(other);
+            }
+        }
+        return found;
+    };
+    const std::vector<PlayerSession*> others = stillHere();
     std::vector<play::PlayerInfoEntry> entries;
     entries.reserve(others.size() + 1);
     for (const PlayerSession* other : others) {
@@ -666,7 +688,7 @@ void ClientSession::enterPlay() {
 
     // Only players who cannot see this one as an entity; the entity sync sends the entry before the spawn for the rest.
     const play::PlayerInfoUpdatePacket joining = play::PlayerInfoUpdatePacket::initializing({entryFor(player)});
-    for (const PlayerSession* other : others) {
+    for (const PlayerSession* other : stillHere()) {
         if (other->worldName == player.worldName || !other->connection().sendPlayPacket) {
             continue;
         }

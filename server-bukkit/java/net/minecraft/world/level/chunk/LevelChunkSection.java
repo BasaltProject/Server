@@ -223,23 +223,17 @@ public class LevelChunkSection {
         biomes = fresh;
     }
     public void write(FriendlyByteBuf buffer) {
-        int solid = 0;
-        int fluids = 0;
-        for (int y = 0; y < 16; y++) {
-            for (int z = 0; z < 16; z++) {
-                for (int x = 0; x < 16; x++) {
-                    BlockState state = getBlockState(x, y, z);
-                    if (!state.isAir()) {
-                        solid++;
-                    }
-                    if (!state.getFluidState().isEmpty()) {
-                        fluids++;
-                    }
-                }
+        int[] counts = new int[2];
+        getStates().count((state, count) -> {
+            if (!state.isAir()) {
+                counts[0] += count;
             }
-        }
-        buffer.writeShort(solid);
-        buffer.writeShort(fluids);
+            if (!state.getFluidState().isEmpty()) {
+                counts[1] += count;
+            }
+        });
+        buffer.writeShort(counts[0]);
+        buffer.writeShort(counts[1]);
         getStates().write(buffer);
         getBiomes().write(buffer);
     }
@@ -250,16 +244,7 @@ public class LevelChunkSection {
         if (hasOnlyAir()) {
             return predicate.test(net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
         }
-        for (int y = 0; y < 16; y++) {
-            for (int z = 0; z < 16; z++) {
-                for (int x = 0; x < 16; x++) {
-                    if (predicate.test(getBlockState(x, y, z))) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        return getStates().maybeHas(predicate);
     }
     public void fillBiomesFromNoise(BiomeResolver biomeResolver, int quartMinX, int quartMinY, int quartMinZ) {
         PalettedContainer<Holder<Biome>> fresh = getBiomes().recreate();

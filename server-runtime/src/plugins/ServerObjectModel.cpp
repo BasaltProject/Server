@@ -324,12 +324,7 @@ public:
         if (player == nullptr) {
             return;
         }
-        auto& held = player->permissionGrants[std::string{source}];
-        if (granted.has_value()) {
-            held.insert_or_assign(std::string{node}, *granted);
-        } else {
-            held.erase(std::string{node});
-        }
+        player->grantPermission(source, node, granted);
         resendCommands(*player);
     }
 
@@ -342,11 +337,9 @@ public:
         for (const auto& [node, granted] : nodes) {
             next.insert_or_assign(node, granted);
         }
-        auto& held = player->permissionGrants[std::string{source}];
-        if (held == next) {
+        if (!player->replacePermissionGrants(source, std::move(next))) {
             return;
         }
-        held = std::move(next);
         resendCommands(*player);
     }
 

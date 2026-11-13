@@ -229,7 +229,7 @@ std::vector<JigsawStructureGenerator::Start> JigsawStructureGenerator::nearbySta
                 return piece.boundingBox.intersects(clip);
             });
             if (touches) {
-                starts.emplace_back(CandidateKey{seed, candidateX, candidateZ}, &pieces);
+                starts.emplace_back(CandidateKey{seed, candidateX, candidateZ}, assembled);
             }
         }
     }

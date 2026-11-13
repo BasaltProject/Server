@@ -59,6 +59,7 @@ public:
     float sendBudget = 0.0F;
 
 private:
+    std::int32_t retryCountdown_ = 0;
     [[nodiscard]] bool bypassesAntiXray(const world::AntiXray& antiXray) const;
 
     /// parity: `ChunkMap.getPlayerViewDistance`'s floor.
@@ -72,7 +73,7 @@ private:
 
     void prefetchAhead(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t movedX, std::int32_t movedZ);
 
-    [[nodiscard]] bool neighboursLoaded(std::int32_t chunkX, std::int32_t chunkZ);
+    [[nodiscard]] bool neighboursLoaded(std::int32_t chunkX, std::int32_t chunkZ, bool askGenerator);
 
     ClientSession* owner_;
     server::world::ChunkTracker chunkTracker_;

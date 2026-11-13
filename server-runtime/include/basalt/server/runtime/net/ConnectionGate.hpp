@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <map>
 #include <mutex>
@@ -41,12 +42,37 @@ public:
     /// Lets `perTick` callers through each 50 ms window and holds the rest until the next one.
     void awaitJoinSlot(std::int32_t perTick);
 
+    class JoinTicket {
+    public:
+        JoinTicket() = default;
+
+        explicit JoinTicket(ConnectionGate* gate) : gate_(gate) {}
+
+        JoinTicket(const JoinTicket&) = delete;
+        JoinTicket& operator=(const JoinTicket&) = delete;
+
+        JoinTicket(JoinTicket&& other) noexcept : gate_(std::exchange(other.gate_, nullptr)) {}
+
+        JoinTicket& operator=(JoinTicket&& other) noexcept;
+        ~JoinTicket();
+
+    private:
+        ConnectionGate* gate_ = nullptr;
+    };
+
+    /// Holds the caller until fewer than `limit` joins are in flight, so plugin work for joins cannot pile up in a
+    /// tick.
+    [[nodiscard]] JoinTicket awaitJoinInFlight(std::int32_t limit);
+
 private:
     void release(const std::string& address);
+    void releaseJoin();
 
     std::mutex mutex_;
     std::chrono::steady_clock::time_point joinWindow_{};
     std::int32_t joinsInWindow_ = 0;
+    std::condition_variable joinsFree_;
+    std::int32_t joinsInFlight_ = 0;
     std::map<std::string, std::int32_t, std::less<>> open_;
     std::map<std::string, std::chrono::steady_clock::time_point, std::less<>> lastLogin_;
     std::chrono::steady_clock::time_point lastPrune_{};

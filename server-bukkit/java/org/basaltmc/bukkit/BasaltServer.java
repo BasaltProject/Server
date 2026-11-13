@@ -194,6 +194,7 @@ public class BasaltServer extends ServerTail {
 
     @Override
     public boolean dispatchCommand(CommandSender sender, String commandLine) {
+        BasaltPlayer.invalidateCaches();
         String bare = commandLine;
         if (commandMap.getCommand(bare.split(" ", 2)[0].toLowerCase(Locale.ROOT)) == null && bare.startsWith("/")) {
             bare = bare.substring(1);
@@ -203,6 +204,7 @@ public class BasaltServer extends ServerTail {
             return commandMap.dispatch(sender, bare);
         }
         if (sender instanceof Player player) {
+            BasaltPlayer.invalidateCaches();
             return WorldNatives.playerCommand(player.getUniqueId().toString(), bare);
         }
         return sender instanceof ConsoleCommandSender && Natives.runConsoleCommand(bare);

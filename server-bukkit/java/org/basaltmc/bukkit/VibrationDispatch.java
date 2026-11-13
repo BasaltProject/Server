@@ -35,16 +35,18 @@ final class VibrationDispatch {
 
     private static String kLastSignature = "";
     private static final long kRescanTicks = 20;
-    private static final Map<String, Long> kScanned = new HashMap<>();
-    private static final Map<String, List<org.bukkit.entity.Entity>> kFound = new HashMap<>();
+    private static final String[] kListenerTypes = {"minecraft:warden", "minecraft:allay"};
+    private static final Map<String, Long> kScanned = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<String, List<org.bukkit.entity.Entity>> kFound = new java.util.concurrent.ConcurrentHashMap<>();
 
     private static List<org.bukkit.entity.Entity> listeners(BasaltWorld world) {
         long now = Natives.currentTick();
         Long last = kScanned.get(world.getName());
         if (last == null || now - last >= kRescanTicks) {
             List<org.bukkit.entity.Entity> found = new ArrayList<>();
-            for (org.bukkit.entity.Entity candidate : world.getEntities()) {
-                if (candidate instanceof org.bukkit.entity.Warden || candidate instanceof org.bukkit.entity.Allay) {
+            for (int id : WorldNatives.entityIdsOfTypes(world.getName(), kListenerTypes)) {
+                org.bukkit.entity.Entity candidate = world.entity(id);
+                if (candidate != null) {
                     found.add(candidate);
                 }
             }
@@ -56,19 +58,38 @@ final class VibrationDispatch {
 
     static void install() {
         EventBridge.mapAlways("world.game_event", VibrationDispatch::deliver);
+        Thread warm = new Thread(VibrationDispatch::preload, "basalt-vibration-preload");
+        warm.setDaemon(true);
+        warm.start();
     }
 
-    private static synchronized void deliver(EventBridge.Fields f) {
+    /** Loads the classes the first game event would otherwise load on the tick. */
+    private static void preload() {
+        for (String name : new String[] {
+                "net.minecraft.world.entity.monster.warden.Warden", "net.minecraft.world.entity.animal.allay.Allay",
+                "net.minecraft.world.level.gameevent.vibrations.VibrationSystem",
+                "net.minecraft.world.level.gameevent.vibrations.VibrationSystem$Listener",
+                "net.minecraft.world.level.gameevent.GameEvent", "net.minecraft.core.registries.BuiltInRegistries"}) {
+            try {
+                Class.forName(name);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static void deliver(EventBridge.Fields f) {
         BasaltWorld world = f.world();
-        if (world == null) {
+        if (world == null || listeners(world).isEmpty()) {
             return;
         }
         String signature = Natives.currentTick() + "|" + world.getName() + "|" + f.text("event") + "|" + f.real("x") + "|"
             + f.real("y") + "|" + f.real("z") + "|" + f.text("entity_uuid");
-        if (signature.equals(kLastSignature)) {
-            return;
+        synchronized (kTracked) {
+            if (signature.equals(kLastSignature)) {
+                return;
+            }
+            kLastSignature = signature;
         }
-        kLastSignature = signature;
         Holder<GameEvent> event = BuiltInRegistries.GAME_EVENT.get(Identifier.withDefaultNamespace(f.text("event")))
             .map(found -> (Holder<GameEvent>) found).orElse(null);
         if (event == null) {
@@ -89,16 +110,25 @@ final class VibrationDispatch {
                 continue;
             }
             UUID id = candidate.getUniqueId();
-            VibrationSystem.Listener listener = kListeners.computeIfAbsent(id, key -> new VibrationSystem.Listener(system));
+            VibrationSystem.Listener listener;
+            synchronized (kTracked) {
+                listener = kListeners.computeIfAbsent(id, key -> new VibrationSystem.Listener(system));
+            }
             if (listener.handleGameEvent(level, event, context, at)) {
-                kTracked.put(id, new Tracked(system, level));
+                synchronized (kTracked) {
+                    kTracked.put(id, new Tracked(system, level));
+                }
             }
         }
     }
 
-    static synchronized void tick() {
+    static void tick() {
+        Map<UUID, Tracked> snapshot;
+        synchronized (kTracked) {
+            snapshot = new HashMap<>(kTracked);
+        }
         List<UUID> done = new ArrayList<>();
-        kTracked.forEach((id, tracked) -> {
+        snapshot.forEach((id, tracked) -> {
             VibrationSystem.Data data = tracked.system.getVibrationData();
             VibrationSystem.Ticker.tick(tracked.level, data, tracked.system.getVibrationUser());
             tracked.seen |= data.getCurrentVibration() != null;
@@ -106,6 +136,8 @@ final class VibrationDispatch {
                 done.add(id);
             }
         });
-        done.forEach(kTracked::remove);
+        synchronized (kTracked) {
+            done.forEach(kTracked::remove);
+        }
     }
 }

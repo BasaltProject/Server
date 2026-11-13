@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <string>
 
@@ -359,8 +360,12 @@ PlayerLifecycle::Hooks lifecycle(ClientSession& owner, const EventSink& sink) {
             return Announcement{};
         }
         auto farewell = std::make_shared<Announcement>();
-        static_cast<void>(owner.onOwnerWait(
-            [&sink, &who, farewell] {
+        auto abandoned = std::make_shared<std::atomic<bool>>(false);
+        const bool answered = owner.onOwnerWait(
+            [&sink, &who, farewell, abandoned] {
+                if (abandoned->load()) {
+                    return;
+                }
                 const server::plugins::PluginEvent* quit =
                     sink.ask(&playerQuit, [&](PluginEvent& event) { EventSink::player(event, who); });
                 if (quit == nullptr) {
@@ -373,7 +378,10 @@ PlayerLifecycle::Hooks lifecycle(ClientSession& owner, const EventSink& sink) {
                     farewell->silent = *silent;
                 }
             },
-            std::chrono::milliseconds(500)));
+            std::chrono::milliseconds(500));
+        if (!answered) {
+            abandoned->store(true);
+        }
         return *farewell;
     };
     hooks.gamemodeAllowed = [&sink](const player::PlayerSession& who, wire::protocol::play::Gamemode mode,

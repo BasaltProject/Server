@@ -71,9 +71,12 @@ public:
     std::optional<std::string> group;
 
     /// What each plugin grants or denies this session over the group; one answer wins by specificity.
-    std::map<std::string, std::map<std::string, bool, std::less<>>, std::less<>> permissionGrants;
-
     [[nodiscard]] std::optional<bool> permissionGrant(std::string_view node) const;
+
+    void grantPermission(std::string_view source, std::string_view node, std::optional<bool> granted);
+
+    /// Answers false when `source` already held exactly `next`.
+    bool replacePermissionGrants(std::string_view source, std::map<std::string, bool, std::less<>> next);
 
     std::string worldName;
 
@@ -289,6 +292,8 @@ private:
     float health_ = kMaxHealth;
     float maxHealth_ = kMaxHealth;
     mutable std::mutex chatSessionMutex_;
+    mutable std::mutex permissionMutex_;
+    std::map<std::string, std::map<std::string, bool, std::less<>>, std::less<>> permissionGrants_;
     std::optional<wire::protocol::play::RemoteChatSessionData> chatSession_;
 };
 

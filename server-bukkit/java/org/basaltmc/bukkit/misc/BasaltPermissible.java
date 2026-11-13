@@ -24,7 +24,7 @@ public final class BasaltPermissible extends PermissibleBase {
 
     @Override
     public boolean isPermissionSet(String name) {
-        return super.isPermissionSet(name) || id != null && Natives.playerMay(id.toString(), name);
+        return super.isPermissionSet(name) || id != null && PermissionMemo.may(id.toString(), name);
     }
 
     @Override
@@ -37,7 +37,7 @@ public final class BasaltPermissible extends PermissibleBase {
         if (super.isPermissionSet(name)) {
             return super.hasPermission(name);
         }
-        if (id != null && Natives.playerMay(id.toString(), name)) {
+        if (id != null && PermissionMemo.may(id.toString(), name)) {
             return true;
         }
         return super.hasPermission(name);
@@ -58,6 +58,7 @@ public final class BasaltPermissible extends PermissibleBase {
 
     /** Hands the attachments' answers to the server. */
     public void publish() {
+        PermissionMemo.forget();
         if (id == null) {
             return;
         }

@@ -226,10 +226,12 @@ public final class BukkitRuntime {
     }
 
     public static void runTask(long id) {
+        BasaltPlayer.invalidateCaches();
         server.schedulerImpl().run(id);
     }
 
     public static boolean event(String name, int priority, long generation, Object[] fields, boolean cancelled) {
+        BasaltPlayer.invalidateCaches();
         Blocks.begin();
         try {
             if (name.equals("world.chunk_load") && priority == 0) {

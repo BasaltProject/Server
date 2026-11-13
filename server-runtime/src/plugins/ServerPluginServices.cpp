@@ -232,6 +232,11 @@ PluginHandle OwnerTasks::after(std::int32_t delayTicks, std::function<void()> ta
     return PluginHandle{[handle]() mutable { handle.cancel(); }};
 }
 
+PluginHandle OwnerTasks::now(std::function<void()> task) {
+    sched::TaskHandle handle = owner_->submit(std::move(task));
+    return PluginHandle{[handle]() mutable { handle.cancel(); }};
+}
+
 PluginHandle OwnerTasks::every(std::int32_t delayTicks, std::int32_t periodTicks, std::function<void()> task) {
     const std::int32_t period = std::max(periodTicks, 1);
     // Shared because the re-arm outlives the call that made it, and cancelling has to reach both.

@@ -196,7 +196,18 @@ void ClientSession::startOutboundLoop() {
         return;
     }
     // From here this thread owns the socket; sockets block, so a client that stops draining would park any writer.
-    outbox_.open();
+    {
+        const std::lock_guard<std::mutex> guard{sendMutex_};
+        outbox_.open();
+        for (std::vector<std::uint8_t>& frame : deferred_) {
+            static_cast<void>(outbox_.offer(std::move(frame)));
+        }
+        deferred_.clear();
+        deferredBytes_ = 0;
+        if (deferredOverflowed_) {
+            connection_.close();
+        }
+    }
     outbound_ = std::jthread([this] {
         wire::common::nameCurrentThread("Connection out");
         while (streaming_.load()) {
@@ -248,6 +259,7 @@ void ClientSession::startOutboundLoop() {
 }
 
 void ClientSession::run() {
+    ownThread_ = std::this_thread::get_id();
     std::array<std::uint8_t, 4096> readChunk{};
     while (true) {
         const std::expected<std::size_t, wire::io::SocketError> read = connection_.read(readChunk);
@@ -371,6 +383,7 @@ private:
 void ClientSession::closeAfterGoodbye() {
     closeWhenDrained_.store(true);
     if (!outbox_.isOpen()) {
+        writeDeferredDirect();
         outbox_.close();
         connection_.close();
         return;
@@ -588,6 +601,7 @@ void ClientSession::disconnect(const wire::text::Component& requested) {
     // Queued frames must reach the wire first; the owner must not park on a socket, so closing is left to this thread.
     closeWhenDrained_.store(true);
     if (!outbox_.isOpen()) {
+        writeDeferredDirect();
         outbox_.close();
         connection_.close();
         return;
@@ -683,7 +697,28 @@ void ClientSession::writeToSocket(const wire::io::ByteBuffer& frame) {
     }
     // One packet at a time: broadcasts from other threads would interleave mid-packet, and CFB8 is stateful.
     const std::lock_guard<std::mutex> guard{sendMutex_};
+    if (state_ == wire::protocol::ProtocolState::Play && std::this_thread::get_id() != ownThread_) {
+        // Another thread (the tick) must not park on this socket while the join still waits for its chunks.
+        if (outbox_.isOpen()) {
+            static_cast<void>(outbox_.offer(std::vector<std::uint8_t>(bytes.begin(), bytes.end())));
+        } else if (deferredBytes_ + static_cast<std::int64_t>(bytes.size()) > net::SessionOutbox::kDefaultLimitBytes) {
+            deferredOverflowed_ = true;
+        } else {
+            deferredBytes_ += static_cast<std::int64_t>(bytes.size());
+            deferred_.emplace_back(bytes.begin(), bytes.end());
+        }
+        return;
+    }
     writeFrame(bytes);
+}
+
+void ClientSession::writeDeferredDirect() {
+    const std::lock_guard<std::mutex> guard{sendMutex_};
+    for (const std::vector<std::uint8_t>& frame : deferred_) {
+        writeFrame(frame);
+    }
+    deferred_.clear();
+    deferredBytes_ = 0;
 }
 
 void ClientSession::writeFrame(std::span<const std::uint8_t> frame) {

@@ -106,9 +106,16 @@ public abstract class WorldEntities extends WorldGeo {
 
     @Override
     public Entity getEntity(UUID uuid) {
-        for (Entity entity : getEntities()) {
-            if (entity.getUniqueId().equals(uuid)) {
-                return entity;
+        int entityId = WorldNatives.entityByUuid(getName(), uuid.toString());
+        if (entityId >= 0) {
+            Entity found = entity(entityId);
+            if (found != null) {
+                return found;
+            }
+        }
+        for (Player player : getPlayers()) {
+            if (player.getUniqueId().equals(uuid)) {
+                return player;
             }
         }
         return null;

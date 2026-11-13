@@ -90,12 +90,17 @@ void JNICALL nativePlayerPermissions(JNIEnv* env, jclass, jstring uuid, jobjectA
         grants.emplace_back(names[index], flags[index] == JNI_TRUE);
     }
     const auto player = BukkitBridge::current().services().players().byUuid(toStd(env, uuid));
-    if (player != nullptr) {
-        static_cast<void>(jni::onServer<bool>(false, [&] {
-            player->setPermissions("bukkit", grants);
-            return true;
-        }));
+    if (player == nullptr) {
+        return;
     }
+    // Posted without waiting: a Java thread holding a monitor must never block on the tick.
+    auto apply = [player, grants = std::move(grants)] { player->setPermissions("bukkit", grants); };
+    BukkitBridge& bridge = BukkitBridge::current();
+    if (bridge.plugins().onPluginThread()) {
+        apply();
+        return;
+    }
+    static_cast<void>(bridge.services().tasks().now(std::move(apply)));
 }
 
 jobjectArray JNICALL nativeKnownPlayer(JNIEnv* env, jclass, jstring key, jboolean byName) {

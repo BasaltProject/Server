@@ -213,11 +213,24 @@ void TickLoop::runTicks() {
             1, static_cast<std::int64_t>(kMillisPerSecond / targetRate_.load(std::memory_order_relaxed)));
         const std::int64_t remaining = nextTickMillis - millisSince(clock);
         if (remaining > 0) {
-            sleepMillis(remaining);
+            idleFor(remaining);
         } else if (remaining < -kTickMillis * kCatchUpLimit) {
             // Too far behind: skip the backlog rather than spin through it, which turns a stall into a spiral.
             nextTickMillis = millisSince(clock);
         }
+    }
+}
+
+void TickLoop::idleFor(const std::int64_t millis) {
+    const Clock::time_point deadline = Clock::now() + std::chrono::milliseconds{millis};
+    if (!options_.onIdle) {
+        sleepMillis(millis);
+        return;
+    }
+    while (running_.load(std::memory_order_relaxed) && Clock::now() < deadline) {
+        const std::uint64_t seen = sched::Owner::workEpoch();
+        options_.onIdle();
+        sched::Owner::waitForWork(seen, deadline);
     }
 }
 

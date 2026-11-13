@@ -307,12 +307,12 @@ std::vector<std::pair<DroppedItem, DroppedItem>> DroppedItemPhysics::mergeCandid
         }
         for (std::size_t other = 0; other < droppedItems_.size(); ++other) {
             const DroppedItem& candidate = droppedItems_[other];
-            if (other != index && candidate.item == item.item && candidate.count > 0 &&
+            if (other != index && std::abs(candidate.x - item.x) <= mergeRange_ &&
+                std::abs(candidate.z - item.z) <= mergeRange_ && std::abs(candidate.y - item.y) <= kMergeHeight &&
+                candidate.item == item.item && candidate.count > 0 &&
                 sameComponents(candidate.components, item.components) &&
                 item.count + candidate.count <=
-                    registry::itemStacking::maxStackSize(candidate.item, candidate.components) &&
-                std::abs(candidate.x - item.x) <= mergeRange_ && std::abs(candidate.z - item.z) <= mergeRange_ &&
-                std::abs(candidate.y - item.y) <= kMergeHeight) {
+                    registry::itemStacking::maxStackSize(candidate.item, candidate.components)) {
                 found.emplace_back(item, candidate);
             }
         }
@@ -337,10 +337,9 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
         DroppedItem& candidate = droppedItems_[other];
         DroppedItem& item = droppedItems_[index];
         // parity: `ItemEntity.tryToMerge`: same item, same components, and the two counts have to.
-        if (candidate.item != item.item || candidate.count <= 0 ||
-            !sameComponents(candidate.components, item.components) || item.count + candidate.count > maxOf(candidate) ||
-            std::abs(candidate.x - item.x) > mergeRange_ || std::abs(candidate.z - item.z) > mergeRange_ ||
-            std::abs(candidate.y - item.y) > kMergeHeight) {
+        if (std::abs(candidate.x - item.x) > mergeRange_ || std::abs(candidate.z - item.z) > mergeRange_ ||
+            std::abs(candidate.y - item.y) > kMergeHeight || candidate.count <= 0 || candidate.item != item.item ||
+            !sameComponents(candidate.components, item.components) || item.count + candidate.count > maxOf(candidate)) {
             ++other;
             continue;
         }

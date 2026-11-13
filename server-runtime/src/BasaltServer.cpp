@@ -326,6 +326,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             },
         .pauseWhenEmptySeconds = [this] { return settings_.pauseAllowed() ? settings_.pauseWhenEmptySeconds() : 0; },
         .hasPlayers = [this] { return playerRegistry_.count() > 0; },
+        .onIdle =
+            [this] {
+                static_cast<void>(
+                    worldRegistry_->scheduler().global().runPending([this](const std::exception& failure) {
+                        logger_.error([&failure] { return std::string{"A tick task failed: "} + failure.what(); });
+                    }));
+            },
         .onTick =
             [this](bool worldRuns) {
                 if (const bool paused = tickLoop_->isPaused(); paused != pausedLogged_) {

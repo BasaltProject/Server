@@ -481,6 +481,7 @@ private:
     std::int32_t lastScreenId_ = 0;
     std::int32_t lastScreenType_ = -1;
 
+    void writeDeferredDirect();
     void writeToSocket(const wire::io::ByteBuffer& frame);
 
     void sendUncompressed(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody);
@@ -629,6 +630,10 @@ private:
     Options options_;
     wire::common::Logger logger_{"Session"};
     net::SessionOutbox outbox_;
+    std::thread::id ownThread_;
+    std::vector<net::SessionOutbox::Frame> deferred_;
+    std::int64_t deferredBytes_ = 0;
+    bool deferredOverflowed_ = false;
     net::ProxyLogin proxy_;
     std::mutex sendMutex_;
     std::uint64_t connectionId_ = 0;

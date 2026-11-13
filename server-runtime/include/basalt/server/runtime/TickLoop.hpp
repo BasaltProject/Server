@@ -34,6 +34,8 @@ struct TickLoopOptions {
     /// parity: `pause-when-empty-seconds`; 0 or unset never pauses.
     std::function<std::int32_t()> pauseWhenEmptySeconds;
     std::function<bool()> hasPlayers;
+    /// Runs in the time a tick leaves over, whenever another thread hands the owner a task.
+    std::function<void()> onIdle;
     /// parity: `worldRuns` is false while `/tick freeze` holds and no step is owed.
     std::function<void(bool worldRuns)> onTick;
     /// The instant the tick durations are measured from, so they share a clock with whoever reads them back.
@@ -107,6 +109,7 @@ private:
     [[nodiscard]] std::int64_t nextAutosaveInterval() const;
 
     void runTicks();
+    void idleFor(std::int64_t millis);
 
     void runSweeper();
 

@@ -107,7 +107,7 @@ private:
         friend auto operator<=>(const CandidateKey&, const CandidateKey&) = default;
     };
 
-    using Start = std::pair<CandidateKey, const std::vector<structure::PlacedStructurePiece>*>;
+    using Start = std::pair<CandidateKey, std::shared_ptr<const std::vector<structure::PlacedStructurePiece>>>;
     using Samplers = std::map<std::int64_t, DensityChunkSampler>;
 
     [[nodiscard]] structure::StructureBoundingBox chunkClip(std::int32_t chunkX, std::int32_t chunkZ,

@@ -86,9 +86,39 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
         return values == null ? 0.0 : values[index];
     }
 
+    private static volatile long kSerial;
+    private long textSerial = -1;
+    private String[] texts;
+    private long extraSerial = -1;
+    private double[] extras;
+
+    /** Ends the lifetime of every cached answer: called on entering each event or task, and after any mutation. */
+    public static void invalidateCaches() {
+        kSerial++;
+    }
+
+    public static long cacheSerial() {
+        return kSerial;
+    }
+
     private String text(int index) {
-        String[] values = Natives.playerStrings(uuid);
-        return values == null ? "" : values[index];
+        long now = kSerial;
+        if (now != textSerial) {
+            String[] fresh = Natives.playerStrings(uuid);
+            texts = fresh;
+            textSerial = fresh != null && !fresh[1].isEmpty() ? now : -1;
+        }
+        return texts == null ? "" : texts[index];
+    }
+
+    private double[] extra() {
+        long now = kSerial;
+        if (now != extraSerial) {
+            double[] fresh = WorldNatives.playerExtra(uuid);
+            extras = fresh;
+            extraSerial = fresh == null ? -1 : now;
+        }
+        return extras;
     }
 
     @Override
@@ -166,6 +196,7 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
 
     @Override
     public void setGameMode(GameMode mode) {
+        invalidateCaches();
         Natives.playerSetGamemode(uuid, mode.name().toLowerCase(java.util.Locale.ROOT));
     }
 
@@ -199,6 +230,7 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
     public boolean teleport(Location location) {
         World world = location.getWorld() == null ? getWorld() : location.getWorld();
         Blocks.flushAll();
+        invalidateCaches();
         return WorldNatives.playerMove(uuid, world.getName(), location.getX(), location.getY(), location.getZ(),
             location.getYaw(), location.getPitch());
     }
@@ -272,12 +304,13 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
 
     @Override
     public boolean isOp() {
-        double[] extra = WorldNatives.playerExtra(uuid);
-        return extra != null && extra[2] >= 2.0 || Natives.playerMay(uuid, "*");
+        double[] extra = extra();
+        return extra != null && extra[2] >= 2.0 || org.basaltmc.bukkit.misc.PermissionMemo.may(uuid, "*");
     }
 
     @Override
     public void setOp(boolean value) {
+        invalidateCaches();
         OfflineSupport.setOp(id, value);
         perm.recalculatePermissions();
     }
@@ -550,6 +583,7 @@ public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
     @Override
     public boolean performCommand(String command) {
         Blocks.flushAll();
+        invalidateCaches();
         return WorldNatives.playerCommand(uuid, command);
     }
 

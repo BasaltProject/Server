@@ -18,6 +18,7 @@ public final class NativeCommands {
     private NativeCommands() {}
 
     public static int run(CommandSourceStack source, String line) {
+        org.basaltmc.bukkit.BasaltPlayer.invalidateCaches();
         CommandSender sender = BukkitCommandBridge.senderOf(source);
         boolean ok = sender instanceof Player player
             ? WorldNatives.playerCommand(player.getUniqueId().toString(), line)

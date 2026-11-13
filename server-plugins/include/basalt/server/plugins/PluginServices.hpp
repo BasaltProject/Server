@@ -44,6 +44,9 @@ public:
     virtual PluginHandle after(std::int32_t delayTicks, std::function<void()> task) = 0;
 
     virtual PluginHandle every(std::int32_t delayTicks, std::int32_t periodTicks, std::function<void()> task) = 0;
+
+    /// Runs as soon as the owner is free, in the idle time of a tick, instead of waiting for the next one.
+    virtual PluginHandle now(std::function<void()> task) { return after(0, std::move(task)); }
 };
 
 class PluginCommandCall {

@@ -96,6 +96,7 @@ public final class WorldNatives {
     public static native int[] storedChunks(String world, int regionX, int regionZ);
 
     public static native int[] entityIds(String world, int chunkX, int chunkZ, boolean all);
+    public static native int[] entityIdsOfTypes(String world, String[] types);
     public static native String[] entityStrings(String world, int id);
     public static native double[] entityNumbers(String world, int id);
     public static native boolean entityMove(String world, int id, double x, double y, double z, float yaw, float pitch);

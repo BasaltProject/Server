@@ -422,7 +422,7 @@ void ChunkStreamer::prefetchAhead(std::int32_t chunkX, std::int32_t chunkZ, std:
     }
 }
 
-bool ChunkStreamer::neighboursLoaded(std::int32_t chunkX, std::int32_t chunkZ) {
+bool ChunkStreamer::neighboursLoaded(std::int32_t chunkX, std::int32_t chunkZ, bool askGenerator) {
     bool complete = true;
     for (std::int32_t offsetZ = -1; offsetZ <= 1; offsetZ++) {
         for (std::int32_t offsetX = -1; offsetX <= 1; offsetX++) {
@@ -435,7 +435,9 @@ bool ChunkStreamer::neighboursLoaded(std::int32_t chunkX, std::int32_t chunkZ) {
                 continue;
             }
             complete = false;
-            owner_->generationQueue().request(x, z, static_cast<std::int32_t>(squaredDistanceToCenter(x, z)));
+            if (askGenerator) {
+                owner_->generationQueue().request(x, z, static_cast<std::int32_t>(squaredDistanceToCenter(x, z)));
+            }
         }
     }
     return complete;
@@ -451,22 +453,31 @@ std::int32_t ChunkStreamer::flushReadyChunks(std::int32_t limit) {
         if (pendingChunks_.empty()) {
             return 0;
         }
+        // Asking the generator again for every pending square on every turn drowns it in locks; once a second is
+        // enough.
+        const bool askGenerator = retryCountdown_-- <= 0;
+        if (askGenerator) {
+            retryCountdown_ = 19;
+        }
         std::ranges::sort(pendingChunks_, [this](const ChunkPos& left, const ChunkPos& right) {
             return squaredDistanceToCenter(left.x, left.z) < squaredDistanceToCenter(right.x, right.z);
         });
-        ready = pendingChunkBatch::takeReady(pendingChunks_, limit, [this](const ChunkPos& pos) -> Chunk* {
-            Chunk* chunk = owner_->world().chunkIfLoaded(pos.x, pos.z);
-            if (chunk == nullptr) {
-                // Still generating, or evicted before delivery: retry without forgetting the pending send.
-                owner_->generationQueue().request(pos.x, pos.z,
-                                                  static_cast<std::int32_t>(squaredDistanceToCenter(pos.x, pos.z)));
-                return nullptr;
-            }
-            if (!neighboursLoaded(pos.x, pos.z)) {
-                return nullptr;
-            }
-            return chunk;
-        });
+        ready =
+            pendingChunkBatch::takeReady(pendingChunks_, limit, [this, askGenerator](const ChunkPos& pos) -> Chunk* {
+                Chunk* chunk = owner_->world().chunkIfLoaded(pos.x, pos.z);
+                if (chunk == nullptr) {
+                    // Still generating, or evicted before delivery: retry without forgetting the pending send.
+                    if (askGenerator) {
+                        owner_->generationQueue().request(
+                            pos.x, pos.z, static_cast<std::int32_t>(squaredDistanceToCenter(pos.x, pos.z)));
+                    }
+                    return nullptr;
+                }
+                if (!neighboursLoaded(pos.x, pos.z, askGenerator)) {
+                    return nullptr;
+                }
+                return chunk;
+            });
     }
     if (ready.empty()) {
         return 0;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -59,6 +60,12 @@ public:
     void bindToCurrentThread() noexcept;
 
     TaskHandle submit(std::function<void()> task);
+
+    /// Counts the tasks handed to any owner from another thread, so an idle tick thread notices new work.
+    [[nodiscard]] static std::uint64_t workEpoch() noexcept;
+
+    /// Blocks until a task arrives after `seen` or the deadline passes.
+    static void waitForWork(std::uint64_t seen, std::chrono::steady_clock::time_point deadline);
 
     TaskHandle schedule(std::int32_t delayTicks, std::function<void()> task);
 

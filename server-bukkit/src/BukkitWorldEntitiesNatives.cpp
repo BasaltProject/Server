@@ -1,5 +1,8 @@
 #include "AsyncGuard.hpp"
 #include "BukkitWorldNativesShared.hpp"
+#include "JniSupport.hpp"
+
+#include <algorithm>
 
 namespace basalt::server::bukkit {
 namespace {
@@ -12,6 +15,21 @@ jintArray JNICALL nativeEntityIds(JNIEnv* env, jclass, jstring name, jint chunkX
         const auto found = all == JNI_TRUE ? world->entities() : world->entitiesIn(chunkX, chunkZ);
         for (const std::shared_ptr<PluginEntityRef>& entity : found) {
             ids.push_back(entity->id());
+        }
+    }
+    return intArray(env, ids);
+}
+
+jintArray JNICALL nativeEntityIdsOfTypes(JNIEnv* env, jclass, jstring name, jobjectArray types) {
+    const auto world = worldOf(env, name);
+    std::vector<std::int32_t> ids;
+    if (world != nullptr) {
+        const std::vector<std::string> wanted = jni::stringsOf(env, types);
+        for (const std::shared_ptr<PluginEntityRef>& entity : world->entities()) {
+            const std::string type = entity->type();
+            if (std::find(wanted.begin(), wanted.end(), type) != wanted.end()) {
+                ids.push_back(entity->id());
+            }
         }
     }
     return intArray(env, ids);
@@ -272,6 +290,8 @@ void JNICALL nativeInventoryClear(JNIEnv* env, jclass, jstring uuid) {
 void registerWorldNativesEntities(JNIEnv* env, jclass natives) {
     const std::array methods{
         nativeMethod("entityIds", "(Ljava/lang/String;IIZ)[I", reinterpret_cast<void*>(&nativeEntityIds)),
+        nativeMethod("entityIdsOfTypes", "(Ljava/lang/String;[Ljava/lang/String;)[I",
+                     reinterpret_cast<void*>(&nativeEntityIdsOfTypes)),
         nativeMethod("entityStrings", "(Ljava/lang/String;I)[Ljava/lang/String;",
                      reinterpret_cast<void*>(&nativeEntityStrings)),
         nativeMethod("entityNumbers", "(Ljava/lang/String;I)[D", reinterpret_cast<void*>(&nativeEntityNumbers)),

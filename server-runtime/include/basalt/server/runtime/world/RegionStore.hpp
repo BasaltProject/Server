@@ -134,6 +134,7 @@ private:
     bool closed_ = false;
 
     /// Least recently used at the front, so eviction walks forwards.
+    std::unordered_set<std::int64_t> writing_;
     std::list<Entry> cached_;
     std::unordered_map<std::int64_t, std::list<Entry>::iterator> byKey_;
     std::unordered_set<std::int64_t> dirtyRegions_;

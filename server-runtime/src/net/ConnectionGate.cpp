@@ -66,6 +66,37 @@ void ConnectionGate::awaitJoinSlot(std::int32_t perTick) {
     }
 }
 
+ConnectionGate::JoinTicket& ConnectionGate::JoinTicket::operator=(JoinTicket&& other) noexcept {
+    if (this != &other) {
+        if (gate_ != nullptr) {
+            gate_->releaseJoin();
+        }
+        gate_ = std::exchange(other.gate_, nullptr);
+    }
+    return *this;
+}
+
+ConnectionGate::JoinTicket::~JoinTicket() {
+    if (gate_ != nullptr) {
+        gate_->releaseJoin();
+    }
+}
+
+ConnectionGate::JoinTicket ConnectionGate::awaitJoinInFlight(std::int32_t limit) {
+    std::unique_lock<std::mutex> lock{mutex_};
+    joinsFree_.wait(lock, [this, limit] { return joinsInFlight_ < limit; });
+    ++joinsInFlight_;
+    return JoinTicket{this};
+}
+
+void ConnectionGate::releaseJoin() {
+    {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        --joinsInFlight_;
+    }
+    joinsFree_.notify_one();
+}
+
 // parity: CraftBukkit `connection-throttle`, which refreshes the stamp even when it refuses.
 bool ConnectionGate::throttleLogin(const std::string& address, std::int32_t throttleMs,
                                    std::chrono::steady_clock::time_point now) {

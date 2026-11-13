@@ -33,6 +33,6 @@ void postToServer(Body&& body) {
         return;
     }
     BukkitBridge& bridge = BukkitBridge::current();
-    static_cast<void>(bridge.services().tasks().after(0, std::function<void()>(std::forward<Body>(body))));
+    static_cast<void>(bridge.services().tasks().now(std::function<void()>(std::forward<Body>(body))));
 }
 } // namespace basalt::server::bukkit::jni

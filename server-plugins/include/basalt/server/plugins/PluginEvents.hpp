@@ -97,6 +97,8 @@ private:
 
 class PluginEventBus {
 public:
+    PluginEventBus();
+
     using Call = std::function<void(PluginEvent&)>;
 
     void declare(PluginEventType type);
@@ -133,7 +135,7 @@ private:
 
     std::map<std::string, std::vector<Handler>, std::less<>> handlers_;
     std::map<std::string, PluginEventType, std::less<>> types_;
-    std::map<std::string, std::unique_ptr<PluginEvent>, std::less<>> events_;
+    const std::uint64_t serial_;
     std::int64_t nextHandlerId_ = 0;
 };
 

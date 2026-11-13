@@ -70,11 +70,34 @@ void PlayerSession::setChatSession(std::optional<wire::protocol::play::RemoteCha
     chatSession_ = std::move(session);
 }
 
+void PlayerSession::grantPermission(const std::string_view source, const std::string_view node,
+                                    const std::optional<bool> granted) {
+    const std::scoped_lock lock{permissionMutex_};
+    auto& held = permissionGrants_[std::string{source}];
+    if (granted.has_value()) {
+        held.insert_or_assign(std::string{node}, *granted);
+    } else {
+        held.erase(std::string{node});
+    }
+}
+
+bool PlayerSession::replacePermissionGrants(const std::string_view source,
+                                            std::map<std::string, bool, std::less<>> next) {
+    const std::scoped_lock lock{permissionMutex_};
+    auto& held = permissionGrants_[std::string{source}];
+    if (held == next) {
+        return false;
+    }
+    held = std::move(next);
+    return true;
+}
+
 std::optional<bool> PlayerSession::permissionGrant(const std::string_view node) const {
+    const std::scoped_lock lock{permissionMutex_};
     std::optional<bool> exact;
     std::optional<bool> wildcard;
     std::size_t bestLength = 0;
-    for (const auto& [source, grants] : permissionGrants) {
+    for (const auto& [source, grants] : permissionGrants_) {
         for (const auto& [pattern, granted] : grants) {
             if (pattern == node) {
                 exact = exact.value_or(true) && granted;

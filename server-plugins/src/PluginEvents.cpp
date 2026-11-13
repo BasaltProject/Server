@@ -1,6 +1,7 @@
 #include <basalt/server/plugins/PluginEvents.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <utility>
 
@@ -114,12 +115,20 @@ bool PluginEventBus::listening(const PluginEventType& type) const {
     return found != handlers_.end() && !found->second.empty();
 }
 
+PluginEventBus::PluginEventBus()
+    : serial_([] {
+          static std::atomic<std::uint64_t> next{1};
+          return next.fetch_add(1);
+      }()) {}
+
 PluginEvent& PluginEventBus::event(const PluginEventType& type) {
-    const auto found = events_.find(type.name());
-    if (found != events_.end()) {
-        return *found->second;
+    // One scratch event per thread: connection threads fire events concurrently with the plugin thread.
+    thread_local std::map<std::pair<std::uint64_t, const PluginEventType*>, std::unique_ptr<PluginEvent>> scratch;
+    auto& slot = scratch[{serial_, &type}];
+    if (slot == nullptr) {
+        slot = std::make_unique<PluginEvent>(type);
     }
-    return *events_.emplace(type.name(), std::make_unique<PluginEvent>(type)).first->second;
+    return *slot;
 }
 
 PluginHandle PluginEventBus::add(const PluginEventType& type, std::string pluginId, std::int32_t lane,

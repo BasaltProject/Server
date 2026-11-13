@@ -25,7 +25,7 @@ template <typename Result, typename Run>
     constexpr int kWithdrawn = 2;
     const auto shared = std::make_shared<Shared>();
     std::future<Result> result = shared->done.get_future();
-    plugins::PluginHandle handle = bridge.services().tasks().after(0, [shared, run = std::move(run)]() mutable {
+    plugins::PluginHandle handle = bridge.services().tasks().now([shared, run = std::move(run)]() mutable {
         int expected = 0;
         if (shared->state.compare_exchange_strong(expected, kRunning)) {
             shared->done.set_value(run());
