@@ -400,6 +400,8 @@ public:
 
     [[nodiscard]] std::vector<entity::ServerEntity*> entitiesIn(std::int32_t chunkX, std::int32_t chunkZ) const;
 
+    void entitiesIn(std::int32_t chunkX, std::int32_t chunkZ, std::vector<entity::ServerEntity*>& out) const;
+
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> chunksWithEntities() const;
 
     void forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ);

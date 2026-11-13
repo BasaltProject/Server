@@ -327,6 +327,10 @@ std::vector<entity::ServerEntity*> WorldState::entitiesIn(std::int32_t chunkX, s
     return entityRegistry_.entitiesIn(chunkX, chunkZ);
 }
 
+void WorldState::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ, std::vector<entity::ServerEntity*>& out) const {
+    entityRegistry_.entitiesIn(chunkX, chunkZ, out);
+}
+
 std::vector<std::pair<std::int32_t, std::int32_t>> WorldState::chunksWithEntities() const {
     std::vector<std::pair<std::int32_t, std::int32_t>> chunks = entityRegistry_.chunksWithEntities();
     for (const DroppedItem& item : itemPhysics_.items()) {

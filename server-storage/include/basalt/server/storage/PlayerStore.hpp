@@ -6,6 +6,7 @@
 #include <basalt/server/storage/ProgressRepository.hpp>
 #include <basalt/wire/sql/Sqlite.hpp>
 
+#include <cstdint>
 #include <expected>
 #include <memory>
 #include <string>
@@ -15,8 +16,14 @@ struct PlayerDatabaseSchemaError {
     std::string message;
 };
 
+enum class LegacyDatabaseMove : std::uint8_t { NothingToMove, Moved, BothPresent };
+
 class PlayerStore {
 public:
+    /// Renames a database at `from` and its WAL sidecars to `to`; never replaces an existing `to`.
+    [[nodiscard]] static std::expected<LegacyDatabaseMove, PlayerDatabaseSchemaError>
+    moveLegacy(const std::string& from, const std::string& to);
+
     PlayerStore(const PlayerStore&) = delete;
     PlayerStore& operator=(const PlayerStore&) = delete;
     PlayerStore(PlayerStore&&) noexcept = default;

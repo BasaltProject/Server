@@ -398,10 +398,11 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
 
 std::int8_t sharedFlagsOf(const ServerEntity& entity) {
     const bool hasData = entity.sourceNbt.has_value();
+    const bool effected = !entity.effects.empty();
     const bool invisible = (hasData && entity.sourceNbt->getBoolean("Invisible")) ||
-                           entity.effects.contains(wire::common::Identifier::vanilla("invisibility"));
+                           (effected && entity.effects.contains(wire::common::Identifier::vanilla("invisibility")));
     const bool glowing = (hasData && entity.sourceNbt->getBoolean("Glowing")) ||
-                         entity.effects.contains(wire::common::Identifier::vanilla("glowing"));
+                         (effected && entity.effects.contains(wire::common::Identifier::vanilla("glowing")));
     std::int8_t flags = 0;
     if (entity.visualFire < 0 ? entity.fireTicks > 0 : entity.visualFire > 0) {
         flags |= SetEntityDataPacket::kFlagOnFire;
@@ -416,53 +417,89 @@ std::int8_t sharedFlagsOf(const ServerEntity& entity) {
     return flags;
 }
 
+std::uint32_t computeTypeTraits(const wire::common::Identifier& type) {
+    const std::string_view path = type.path();
+    std::uint32_t bits = 0;
+    const auto set = [&bits](bool held, std::uint32_t bit) {
+        if (held) {
+            bits |= bit;
+        }
+    };
+    set(path == "fox", traits::kFox);
+    set(path == "panda", traits::kPanda);
+    set(mobs::isMob(type), traits::kMob);
+    set(ageableMobs::hasBabyMetadata(path), traits::kBabyMetadata);
+    set(cubeMobs::isCube(type), traits::kCube);
+    const bool horse = abstractHorseTypes().contains(path);
+    set(horse, traits::kAbstractHorse);
+    set(horse && horses::isChested(type), traits::kChestedHorse);
+    set(horse && horses::isCamel(type), traits::kCamelHorse);
+    set(path == "experience_orb", traits::kExperienceOrb);
+    set(path == "pufferfish", traits::kPufferfish);
+    set(server::registry::entityAttributes::isLiving(type), traits::kLiving);
+    set(wardens::isWarden(type), traits::kWarden);
+    set(path == "piglin", traits::kPiglin);
+    set(path == "wither_skull", traits::kWitherSkull);
+    set(path == "sulfur_cube", traits::kSulfurCube);
+    set(path == "wolf", traits::kWolf);
+    set(path == "enderman", traits::kEnderman);
+    set(areaEffectClouds::isCloud(type), traits::kCloud);
+    set(path == "trident", traits::kTrident);
+    set(creakings::isCreaking(type), traits::kCreaking);
+    set(world::endCrystals::isCrystal(type), traits::kCrystal);
+    set(path == "phantom", traits::kPhantom);
+    set(path == "block_display" || path == "item_display" || path == "text_display", traits::kDisplay);
+    return bits;
+}
+
 RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     RuntimeEntityMetadata live{.airSupply = entity.airSupply};
+    const auto has = [bits = entity.typeTraits()](std::uint32_t bit) { return (bits & bit) != 0; };
     live.sharedFlags = sharedFlagsOf(entity);
     live.customName = entity.customName;
     live.nameVisible = entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("CustomNameVisible");
     live.silent = entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("Silent");
     live.noGravity = entity.noGravity;
-    if (entity.type().path() == "fox") {
+    if (has(traits::kFox)) {
         constexpr std::int32_t kSitting = 1;
         constexpr std::int32_t kSleeping = 32;
         live.foxFlags = static_cast<std::int8_t>(entity.foxFlags | (entity.sitting ? kSitting : 0) |
                                                  (entity.sleeping ? kSleeping : 0));
-    } else if (entity.type().path() == "panda") {
+    } else if (has(traits::kPanda)) {
         live.pandaFlags = static_cast<std::int8_t>(entity.pandaFlags);
         live.pandaUnhappy = entity.pandaUnhappy;
         live.pandaSneeze = entity.pandaSneeze;
         live.pandaEat = entity.pandaEat;
     }
-    if (mobs::isMob(entity.type())) {
+    if (has(traits::kMob)) {
         live.mobFlags = static_cast<std::int8_t>(
             (entity.noAi ? 1 : 0) |
             (entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("LeftHanded") ? 2 : 0) |
             (entity.aggressive ? 4 : 0));
     }
     live.vehicle = vehicleDataOf(entity);
-    if (ageableMobs::hasBabyMetadata(entity.type().path())) {
+    if (has(traits::kBabyMetadata)) {
         live.baby = entity.age < 0;
     }
-    if (cubeMobs::isCube(entity.type())) {
+    if (has(traits::kCube)) {
         live.cubeSize = entity.cubeSize;
     }
-    if (abstractHorseTypes().contains(entity.type().path())) {
+    if (has(traits::kAbstractHorse)) {
         live.horseFlags = horses::flagsOf(entity);
-        if (horses::isChested(entity.type())) {
+        if (has(traits::kChestedHorse)) {
             live.horseChest = horses::hasChest(entity);
         }
-        if (horses::isCamel(entity.type())) {
+        if (has(traits::kCamelHorse)) {
             live.camelDash = entity.horse != nullptr && entity.horse->dashing;
         }
     }
-    if (entity.type().path() == "experience_orb" && entity.sourceNbt.has_value()) {
+    if (has(traits::kExperienceOrb) && entity.sourceNbt.has_value()) {
         live.orbValue = entity.sourceNbt->getShort("Value");
     }
-    if (entity.type().path() == "pufferfish") {
+    if (has(traits::kPufferfish)) {
         live.pufferfishPuff = entity.puffState;
     }
-    if (server::registry::entityAttributes::isLiving(entity.type())) {
+    if (has(traits::kLiving)) {
         const mobStatusEffects::Swirl swirl = mobStatusEffects::swirlOf(entity.effects);
         SetEntityDataPacket::ParticlesValue particles;
         for (const mobStatusEffects::Swirl::Particle& particle : swirl.particles) {
@@ -483,7 +520,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         // parity: `areAllEffectsAmbient` over no effects at all answers false on a fresh entity.
         live.effectsAmbient = !entity.effects.empty() && swirl.allAmbient;
     }
-    if (wardens::isWarden(entity.type())) {
+    if (has(traits::kWarden)) {
         live.pose = wardenBrain::poseOf(entity);
         // parity: `AngerManagement.getActiveAnger`: the target's, or the only suspect's.
         if (entity.targetId.has_value()) {
@@ -493,7 +530,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
                 entity.anger.has_value() && entity.anger->size() == 1 ? entity.anger->begin()->second : 0;
         }
     }
-    if (entity.type().path() == "wither_skull") {
+    if (has(traits::kWitherSkull)) {
         live.dangerousSkull = entity.dangerousSkull;
     }
     if (entity.copperGolem != nullptr) {
@@ -550,7 +587,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     if (entity.axolotl != nullptr) {
         live.axolotlPlayingDead = axolotls::playingDead(entity);
     }
-    if (entity.type().path() == "piglin") {
+    if (has(traits::kPiglin)) {
         live.baby.reset();
         live.piglinBaby = entity.age < 0;
         if (entity.piglin != nullptr) {
@@ -574,7 +611,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
             live.witchUsing = held->witchDrinking;
         }
     }
-    if (entity.type().path() == "sulfur_cube") {
+    if (has(traits::kSulfurCube)) {
         live.sulfurMaxFuse = entity.fuse;
     }
     if (entity.allay != nullptr) {
@@ -585,11 +622,11 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         live.beeFlags = bees::flagsOf(*entity.bee);
         live.beeAngerEnd = entity.bee->angerEndTime;
     }
-    if (entity.type().path() == "wolf") {
+    if (has(traits::kWolf)) {
         live.wolfAngerEnd = entity.neutral != nullptr ? entity.neutral->endTime : -1;
         live.wolfInterested = entity.begging;
     }
-    if (entity.type().path() == "enderman") {
+    if (has(traits::kEnderman)) {
         // parity: `setTarget` raises `DATA_CREEPY` with a target and lowers both without one.
         live.endermanCreepy = entity.neutral != nullptr && entity.neutral->creepy.has_value() &&
                                       entity.neutral->creepyTarget == entity.targetId
@@ -616,7 +653,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         live.fireworkAttached = entity.firework->attachedTo;
         live.fireworkShotAtAngle = entity.firework->shotAtAngle;
     }
-    if (areaEffectClouds::isCloud(entity.type())) {
+    if (has(traits::kCloud)) {
         const areaEffectClouds::Cloud cloud = areaEffectClouds::read(entity);
         live.cloudRadius = cloud.radius;
         const std::int32_t waitTime = entity.sourceNbt.has_value() ? entity.sourceNbt->getInt("WaitTime", 20) : 20;
@@ -636,11 +673,11 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
             }
         }
     }
-    if (entity.type().path() == "trident") {
+    if (has(traits::kTrident)) {
         live.tridentLoyalty = std::max<std::int8_t>(entity.tridentLoyalty, 0);
         live.tridentFoil = entity.tridentFoil;
     }
-    if (creakings::isCreaking(entity.type())) {
+    if (has(traits::kCreaking)) {
         const creakings::CreakingState* state = entity.creaking.get();
         live.creakingCanMove = state == nullptr || state->canMove;
         live.creakingActive = state != nullptr && state->active;
@@ -651,7 +688,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
                 wire::protocol::play::BlockPos{.x = (*state->home)[0], .y = (*state->home)[1], .z = (*state->home)[2]};
         }
     }
-    if (world::endCrystals::isCrystal(entity.type())) {
+    if (has(traits::kCrystal)) {
         const std::optional<std::array<std::int32_t, 3>> beam = world::endCrystals::beamTarget(entity);
         live.crystalBeam =
             beam.has_value()
@@ -662,7 +699,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     if (entity.activeSlot >= 0 || entity.riptiding) {
         live.livingFlags = static_cast<std::int8_t>((entity.activeSlot >= 0 ? 1 : 0) |
                                                     (entity.activeSlot == 1 ? 2 : 0) | (entity.riptiding ? 4 : 0));
-    } else if (server::registry::entityAttributes::isLiving(entity.type())) {
+    } else if (has(traits::kLiving)) {
         live.livingFlags = 0;
     }
     if (entity.forcedPose >= 0) {

@@ -111,6 +111,6 @@ version-protocol = -1
 # address, and dynamic addresses change hands. Fine for saying hello, never for
 # deciding what someone may do, which is why permissions cannot be driven by it.
 #
-# The address is one column in players.db, overwritten on each login, and turning
+# The address is one column in .basalt/players.db, overwritten on each login, and turning
 # this off stops it being written but does not erase what is already there.
 remember-ip = false

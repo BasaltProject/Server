@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <string_view>
+#include <system_error>
 #include <utility>
 
 namespace basalt::server::storage {
@@ -74,6 +76,52 @@ std::expected<std::unique_ptr<PlayerStore>, PlayerDatabaseSchemaError> PlayerSto
         return std::unexpected(*mismatch);
     }
     return std::unique_ptr<PlayerStore>{new PlayerStore{std::move(database)}};
+}
+
+std::expected<LegacyDatabaseMove, PlayerDatabaseSchemaError> PlayerStore::moveLegacy(const std::string& from,
+                                                                                     const std::string& to) {
+    std::error_code error;
+    const auto present = [&error](const std::string& path) -> std::expected<bool, PlayerDatabaseSchemaError> {
+        const bool found = std::filesystem::exists(path, error);
+        if (error) {
+            return std::unexpected(PlayerDatabaseSchemaError{path + " could not be inspected: " + error.message()});
+        }
+        return found;
+    };
+    const std::expected<bool, PlayerDatabaseSchemaError> legacy = present(from);
+    if (!legacy.has_value() || !*legacy) {
+        return legacy.transform([](bool) { return LegacyDatabaseMove::NothingToMove; });
+    }
+    const std::expected<bool, PlayerDatabaseSchemaError> target = present(to);
+    if (!target.has_value() || *target) {
+        return target.transform([](bool) { return LegacyDatabaseMove::BothPresent; });
+    }
+    const std::filesystem::path parent = std::filesystem::path{to}.parent_path();
+    if (!parent.empty()) {
+        std::filesystem::create_directories(parent, error);
+        if (error) {
+            return std::unexpected(
+                PlayerDatabaseSchemaError{parent.string() + " could not be created: " + error.message()});
+        }
+    }
+    // The main file goes last, so an interrupted move is finished by the next start instead of losing the WAL.
+    for (const std::string_view suffix : {"-wal", "-shm", ""}) {
+        const std::string source = from + std::string{suffix};
+        const std::string destination = to + std::string{suffix};
+        const std::expected<bool, PlayerDatabaseSchemaError> found = present(source);
+        if (!found.has_value()) {
+            return std::unexpected(found.error());
+        }
+        if (!*found) {
+            continue;
+        }
+        std::filesystem::rename(source, destination, error);
+        if (error) {
+            return std::unexpected(
+                PlayerDatabaseSchemaError{source + " could not be moved to " + destination + ": " + error.message()});
+        }
+    }
+    return LegacyDatabaseMove::Moved;
 }
 
 void PlayerStore::close() {

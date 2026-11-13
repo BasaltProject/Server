@@ -162,6 +162,9 @@ struct RuntimeEntityMetadata {
 
 [[nodiscard]] RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity);
 
+/// The `traits` bits that hold for this entity type.
+[[nodiscard]] std::uint32_t computeTypeTraits(const wire::common::Identifier& type);
+
 /// parity: `Entity.DATA_SHARED_FLAGS_ID` as far as a non-player entity sets it: on fire, invisible and glowing.
 [[nodiscard]] std::int8_t sharedFlagsOf(const ServerEntity& entity);
 

@@ -29,36 +29,66 @@ public class ClientboundLevelChunkPacketData {
     private static final StreamCodec<ByteBuf, Map<Heightmap.Types, long[]>> HEIGHTMAPS = ByteBufCodecs.map(size -> new EnumMap<>(Heightmap.Types.class), Heightmap.Types.STREAM_CODEC, ByteBufCodecs.LONG_ARRAY);
     private static final int TWO_MEGABYTES = 2097152;
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundLevelChunkPacketData> STREAM_CODEC = StreamCodec.composite(
-        HEIGHTMAPS, data -> data.heightmaps,
-        ByteBufCodecs.byteArray(TWO_MEGABYTES), data -> data.buffer,
-        BlockEntityInfo.STREAM_CODEC.apply(ByteBufCodecs.list()), data -> data.blockEntitiesData,
+        HEIGHTMAPS, ClientboundLevelChunkPacketData::heightmapsOf,
+        ByteBufCodecs.byteArray(TWO_MEGABYTES), ClientboundLevelChunkPacketData::bufferOf,
+        BlockEntityInfo.STREAM_CODEC.apply(ByteBufCodecs.list()), ClientboundLevelChunkPacketData::blockEntitiesOf,
         ClientboundLevelChunkPacketData::new);
-    private final Map<Heightmap.Types, long[]> heightmaps;
-    private final byte[] buffer;
-    private final List<BlockEntityInfo> blockEntitiesData;
+    private Map<Heightmap.Types, long[]> heightmaps;
+    private byte[] buffer;
+    private List<BlockEntityInfo> blockEntitiesData;
+    private LevelChunk source;
 
+    /** The payload is built when a field is first asked for; the chunk's pending edits are handed to the engine now. */
     public ClientboundLevelChunkPacketData(LevelChunk levelChunk) {
-        this.heightmaps = new EnumMap<>(Heightmap.Types.class);
-        for (Object entry : levelChunk.heightmaps.entrySet()) {
-            Map.Entry<Heightmap.Types, Heightmap> each = (Map.Entry<Heightmap.Types, Heightmap>) entry;
-            if (each.getKey().sendToClient()) {
-                heightmaps.put(each.getKey(), each.getValue().getRawData().clone());
-            }
-        }
-        ByteBuf sink = Unpooled.buffer();
-        extractChunkData(new FriendlyByteBuf(sink), levelChunk);
-        this.buffer = new byte[sink.readableBytes()];
-        sink.readBytes(buffer);
-        this.blockEntitiesData = new ArrayList<>();
-        for (Object entry : levelChunk.getBlockEntities().values()) {
-            blockEntitiesData.add(BlockEntityInfo.create((BlockEntity) entry));
-        }
+        levelChunk.syncForSend();
+        this.source = levelChunk;
     }
 
     private ClientboundLevelChunkPacketData(Map<Heightmap.Types, long[]> heightmaps, byte[] buffer, List<BlockEntityInfo> blockEntitiesData) {
         this.heightmaps = heightmaps;
         this.buffer = buffer;
         this.blockEntitiesData = blockEntitiesData;
+    }
+
+    private synchronized void materialize() {
+        LevelChunk levelChunk = source;
+        if (levelChunk == null) {
+            return;
+        }
+        Map<Heightmap.Types, long[]> maps = new EnumMap<>(Heightmap.Types.class);
+        for (Object entry : levelChunk.heightmaps.entrySet()) {
+            Map.Entry<Heightmap.Types, Heightmap> each = (Map.Entry<Heightmap.Types, Heightmap>) entry;
+            if (each.getKey().sendToClient()) {
+                maps.put(each.getKey(), each.getValue().getRawData().clone());
+            }
+        }
+        ByteBuf sink = Unpooled.buffer();
+        extractChunkData(new FriendlyByteBuf(sink), levelChunk);
+        byte[] bytes = new byte[sink.readableBytes()];
+        sink.readBytes(bytes);
+        List<BlockEntityInfo> infos = new ArrayList<>();
+        for (Object entry : levelChunk.getBlockEntities().values()) {
+            infos.add(BlockEntityInfo.create((BlockEntity) entry));
+        }
+        heightmaps = maps;
+        buffer = bytes;
+        blockEntitiesData = infos;
+        source = null;
+    }
+
+    private static Map<Heightmap.Types, long[]> heightmapsOf(ClientboundLevelChunkPacketData data) {
+        data.materialize();
+        return data.heightmaps;
+    }
+
+    private static byte[] bufferOf(ClientboundLevelChunkPacketData data) {
+        data.materialize();
+        return data.buffer;
+    }
+
+    private static List<BlockEntityInfo> blockEntitiesOf(ClientboundLevelChunkPacketData data) {
+        data.materialize();
+        return data.blockEntitiesData;
     }
 
     public static void extractChunkData(FriendlyByteBuf buffer, LevelChunk chunk) {
@@ -69,18 +99,18 @@ public class ClientboundLevelChunkPacketData {
 
     public void forEachBlockEntityTag(int chunkX, int chunkZ, BlockEntityTagOutput output) {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (BlockEntityInfo data : blockEntitiesData) {
+        for (BlockEntityInfo data : blockEntitiesOf(this)) {
             pos.set(chunkX * 16 + SectionPos.sectionRelative(data.packedXZ >> 4), data.y, chunkZ * 16 + SectionPos.sectionRelative(data.packedXZ));
             output.accept(pos, data.type, data.tag.orElse(null));
         }
     }
 
     public FriendlyByteBuf getReadBuffer() {
-        return new FriendlyByteBuf(Unpooled.wrappedBuffer(buffer));
+        return new FriendlyByteBuf(Unpooled.wrappedBuffer(bufferOf(this)));
     }
 
     public Map<Heightmap.Types, long[]> getHeightmaps() {
-        return heightmaps;
+        return heightmapsOf(this);
     }
 
     static record BlockEntityInfo(byte packedXZ, short y, BlockEntityType<?> type, Optional<CompoundTag> tag) {

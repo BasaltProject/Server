@@ -179,8 +179,12 @@ std::shared_ptr<PluginEntityRef> LoadedWorldRef::entityById(std::int32_t id) con
 }
 
 std::shared_ptr<PluginEntityRef> LoadedWorldRef::entityByUuid(std::string_view uuid) const {
+    const std::optional<wire::common::Uuid> wanted = wire::common::Uuid::parse(uuid);
+    if (!wanted.has_value() || wanted->toString() != uuid) {
+        return nullptr;
+    }
     for (const entity::ServerEntity* alive : world_->state().entities()) {
-        if (!alive->removed && alive->uuid().toString() == uuid) {
+        if (!alive->removed && alive->uuid() == *wanted) {
             return std::make_shared<WorldEntityRef>(*world_, alive->entityId(), alive->type().toString(), shared_,
                                                     players_);
         }

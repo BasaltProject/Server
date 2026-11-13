@@ -1,5 +1,7 @@
 #include "BukkitWorldNativesShared.hpp"
 
+#include <algorithm>
+
 namespace basalt::server::bukkit {
 namespace {
 using namespace shared;
@@ -47,8 +49,9 @@ jint JNICALL nativeApplyChunks(JNIEnv* env, jclass, jstring name, jintArray chun
     const std::vector<std::int32_t> sectionList = ints(env, sections);
     const std::vector<std::int32_t> next = ints(env, states);
     std::vector<std::int32_t> before(previous == nullptr ? 0 : static_cast<std::size_t>(env->GetArrayLength(previous)));
-    const jint changed =
-        guarded<jint>(-1, [&] { return world->applyChunks(chunkList, sectionList, next, resend == JNI_TRUE, before); });
+    const jint changed = guarded<jint>(
+        -1, [&] { return world->applyChunks(chunkList, sectionList, next, resend == JNI_TRUE, before); },
+        "bukkit.native.applyChunks");
     if (previous != nullptr && !before.empty()) {
         env->SetIntArrayRegion(previous, 0, static_cast<jsize>(before.size()), before.data());
     }
@@ -82,7 +85,9 @@ jbyteArray JNICALL nativeBlockEntityNbt(JNIEnv* env, jclass, jstring name, jint 
 jboolean JNICALL nativeSetBlockEntityNbt(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jbyteArray nbt) {
     const auto world = worldOf(env, name);
     const std::vector<std::uint8_t> data = bytes(env, nbt);
-    return world != nullptr && guarded<bool>(false, [&] { return world->setBlockEntityNbt(x, y, z, data); })
+    return world != nullptr &&
+                   guarded<bool>(
+                       false, [&] { return world->setBlockEntityNbt(x, y, z, data); }, "bukkit.native.blockEntity")
                ? JNI_TRUE
                : JNI_FALSE;
 }
@@ -113,7 +118,9 @@ jint JNICALL nativeSpawnEntityNbt(JNIEnv* env, jclass, jstring name, jbyteArray 
 jboolean JNICALL nativeCreateBlockEntity(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jbyteArray nbt) {
     const auto world = worldOf(env, name);
     const std::vector<std::uint8_t> data = bytes(env, nbt);
-    return world != nullptr && guarded<bool>(false, [&] { return world->createBlockEntity(x, y, z, data); })
+    return world != nullptr &&
+                   guarded<bool>(
+                       false, [&] { return world->createBlockEntity(x, y, z, data); }, "bukkit.native.blockEntity")
                ? JNI_TRUE
                : JNI_FALSE;
 }
@@ -146,7 +153,8 @@ jboolean JNICALL nativeReadBiomes(JNIEnv* env, jclass, jstring name, jint chunkX
         return JNI_FALSE;
     }
     std::vector<std::int32_t> read(static_cast<std::size_t>(env->GetArrayLength(out)));
-    const bool ok = guarded<bool>(false, [&] { return world->readBiomes(chunkX, chunkZ, read); });
+    const bool ok =
+        guarded<bool>(false, [&] { return world->readBiomes(chunkX, chunkZ, read); }, "bukkit.native.readBiomes");
     if (ok) {
         env->SetIntArrayRegion(out, 0, static_cast<jsize>(read.size()), read.data());
     }
@@ -156,7 +164,9 @@ jboolean JNICALL nativeReadBiomes(JNIEnv* env, jclass, jstring name, jint chunkX
 jboolean JNICALL nativeWriteBiomes(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jintArray ids) {
     const auto world = worldOf(env, name);
     const std::vector<std::int32_t> next = ints(env, ids);
-    return world != nullptr && guarded<bool>(false, [&] { return world->writeBiomes(chunkX, chunkZ, next); })
+    return world != nullptr &&
+                   guarded<bool>(
+                       false, [&] { return world->writeBiomes(chunkX, chunkZ, next); }, "bukkit.native.writeBiomes")
                ? JNI_TRUE
                : JNI_FALSE;
 }
@@ -167,10 +177,13 @@ void JNICALL nativeRelightChunks(JNIEnv* env, jclass, jstring name, jintArray ch
         return;
     }
     const std::vector<std::int32_t> pairs = ints(env, chunks);
-    static_cast<void>(guarded<int>(0, [&] {
-        world->relightChunks(pairs);
-        return 0;
-    }));
+    static_cast<void>(guarded<int>(
+        0,
+        [&] {
+            world->relightChunks(pairs);
+            return 0;
+        },
+        "bukkit.native.relightChunks"));
 }
 
 jboolean JNICALL nativeReadSections(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jboolean load,
@@ -183,7 +196,8 @@ jboolean JNICALL nativeReadSections(JNIEnv* env, jclass, jstring name, jint chun
     // A loaded chunk is copied under the world's read lock, so no thread hop is needed.
     bool ok = world->readSections(chunkX, chunkZ, false, read);
     if (!ok && load == JNI_TRUE) {
-        ok = guarded<bool>(false, [&] { return world->readSections(chunkX, chunkZ, true, read); });
+        ok = guarded<bool>(
+            false, [&] { return world->readSections(chunkX, chunkZ, true, read); }, "bukkit.native.readSections");
     }
     if (ok) {
         env->SetIntArrayRegion(out, 0, static_cast<jsize>(read.size()), read.data());
@@ -194,6 +208,26 @@ jboolean JNICALL nativeReadSections(JNIEnv* env, jclass, jstring name, jint chun
 jint JNICALL nativeChunkStatus(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
     const auto world = worldOf(env, name);
     return world == nullptr ? 0 : world->chunkStatus(chunkX, chunkZ);
+}
+
+constexpr std::size_t kSectionBlocks = 4096;
+
+jlong JNICALL nativeHashIds(JNIEnv* env, jclass, jintArray ids, jint offset) {
+    std::array<std::int32_t, kSectionBlocks> held;
+    env->GetIntArrayRegion(ids, offset, static_cast<jsize>(kSectionBlocks), held.data());
+    constexpr std::uint64_t kPrime = 0x100000001b3ULL;
+    std::uint64_t hash = 0xcbf29ce484222325ULL;
+    for (const std::int32_t id : held) {
+        hash = (hash ^ static_cast<std::uint64_t>(static_cast<std::int64_t>(id))) * kPrime;
+    }
+    return static_cast<jlong>(hash);
+}
+
+jint JNICALL nativeUniformId(JNIEnv* env, jclass, jintArray ids, jint offset) {
+    std::array<std::int32_t, kSectionBlocks> held;
+    env->GetIntArrayRegion(ids, offset, static_cast<jsize>(kSectionBlocks), held.data());
+    const auto other = std::ranges::find_if(held, [first = held[0]](std::int32_t id) { return id != first; });
+    return other == held.end() ? held[0] : -1;
 }
 } // namespace
 
@@ -228,6 +262,8 @@ void registerWorldNativesChunks(JNIEnv* env, jclass natives) {
         nativeMethod("relightChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeRelightChunks)),
         nativeMethod("readSections", "(Ljava/lang/String;IIZ[I)Z", reinterpret_cast<void*>(&nativeReadSections)),
         nativeMethod("chunkStatus", "(Ljava/lang/String;II)I", reinterpret_cast<void*>(&nativeChunkStatus)),
+        nativeMethod("hashIds", "([II)J", reinterpret_cast<void*>(&nativeHashIds)),
+        nativeMethod("uniformId", "([II)I", reinterpret_cast<void*>(&nativeUniformId)),
     };
     registerMethods(env, natives, methods.data(), static_cast<jint>(methods.size()));
 }

@@ -13,7 +13,38 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
+
+namespace basalt::server::registry::entityTypeShapes {
+struct Shape;
+}
+
+namespace basalt::server::runtime::entity::traits {
+inline constexpr std::uint32_t kFox = 1U << 0;
+inline constexpr std::uint32_t kPanda = 1U << 1;
+inline constexpr std::uint32_t kMob = 1U << 2;
+inline constexpr std::uint32_t kBabyMetadata = 1U << 3;
+inline constexpr std::uint32_t kCube = 1U << 4;
+inline constexpr std::uint32_t kAbstractHorse = 1U << 5;
+inline constexpr std::uint32_t kChestedHorse = 1U << 6;
+inline constexpr std::uint32_t kCamelHorse = 1U << 7;
+inline constexpr std::uint32_t kExperienceOrb = 1U << 8;
+inline constexpr std::uint32_t kPufferfish = 1U << 9;
+inline constexpr std::uint32_t kLiving = 1U << 10;
+inline constexpr std::uint32_t kWarden = 1U << 11;
+inline constexpr std::uint32_t kPiglin = 1U << 12;
+inline constexpr std::uint32_t kWitherSkull = 1U << 13;
+inline constexpr std::uint32_t kSulfurCube = 1U << 14;
+inline constexpr std::uint32_t kWolf = 1U << 15;
+inline constexpr std::uint32_t kEnderman = 1U << 16;
+inline constexpr std::uint32_t kCloud = 1U << 17;
+inline constexpr std::uint32_t kTrident = 1U << 18;
+inline constexpr std::uint32_t kCreaking = 1U << 19;
+inline constexpr std::uint32_t kCrystal = 1U << 20;
+inline constexpr std::uint32_t kDisplay = 1U << 21;
+inline constexpr std::uint32_t kPhantom = 1U << 22;
+} // namespace basalt::server::runtime::entity::traits
 
 namespace basalt::server::runtime::config {
 struct MobOverride;
@@ -164,6 +195,11 @@ public:
     [[nodiscard]] const wire::common::Uuid& uuid() const noexcept { return uuid_; }
 
     [[nodiscard]] const wire::common::Identifier& type() const noexcept { return type_; }
+
+    /// Type predicates settled once at construction; see `typeTraits`.
+    [[nodiscard]] std::uint32_t typeTraits() const noexcept { return typeTraits_; }
+
+    [[nodiscard]] const server::registry::entityTypeShapes::Shape* shape() const noexcept { return shape_; }
 
     /// The type's builder box, looked up once: it is read several times a tick by every mob.
     [[nodiscard]] float baseWidth() const noexcept { return baseWidth_; }
@@ -610,6 +646,8 @@ public:
 
     [[nodiscard]] double width() const;
     [[nodiscard]] double height() const;
+    /// Width and height as `width()` and `height()` give them, with one box lookup instead of two.
+    [[nodiscard]] std::pair<double, double> dimensions() const;
 
     [[nodiscard]] bool hasTag(std::string_view tag) const;
 
@@ -622,6 +660,8 @@ private:
     std::int32_t entityId_ = 0;
     wire::common::Uuid uuid_;
     wire::common::Identifier type_;
+    std::uint32_t typeTraits_ = 0;
+    const server::registry::entityTypeShapes::Shape* shape_ = nullptr;
     float baseWidth_ = 1.0F;
     float baseHeight_ = 1.0F;
     std::int32_t protocolType_ = 0;

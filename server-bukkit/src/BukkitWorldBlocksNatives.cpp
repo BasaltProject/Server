@@ -19,7 +19,8 @@ jboolean JNICALL nativeSetState(JNIEnv* env, jclass, jstring name, jint x, jint 
         return JNI_FALSE;
     }
     return guarded<jboolean>(
-        JNI_FALSE, [&] { return world->setStateAt(x, y, z, state, notify == JNI_TRUE) ? JNI_TRUE : JNI_FALSE; });
+        JNI_FALSE, [&] { return world->setStateAt(x, y, z, state, notify == JNI_TRUE) ? JNI_TRUE : JNI_FALSE; },
+        "bukkit.native.setState");
 }
 
 jint JNICALL nativeReadStates(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray out, jboolean load) {
@@ -46,7 +47,8 @@ jint JNICALL nativeWriteStates(JNIEnv* env, jclass, jstring name, jintArray posi
     env->GetIntArrayRegion(positions, 0, static_cast<jsize>(at.size()), at.data());
     std::vector<std::int32_t> next(static_cast<std::size_t>(env->GetArrayLength(states)));
     env->GetIntArrayRegion(states, 0, static_cast<jsize>(next.size()), next.data());
-    return guarded<jint>(0, [&] { return world->writeStates(at, next, notify == JNI_TRUE); });
+    return guarded<jint>(
+        0, [&] { return world->writeStates(at, next, notify == JNI_TRUE); }, "bukkit.native.writeStates");
 }
 
 jboolean JNICALL nativeReadSection(JNIEnv* env, jclass, jstring name, jint chunkX, jint sectionY, jint chunkZ,
@@ -77,9 +79,10 @@ jboolean JNICALL nativeWriteSection(JNIEnv* env, jclass, jstring name, jint chun
     }
     std::vector<std::int32_t> next(4096);
     env->GetIntArrayRegion(states, 0, 4096, next.data());
-    return guarded<jboolean>(JNI_FALSE, [&] {
-        return world->writeSection(chunkX, sectionY, chunkZ, next, notify == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
-    });
+    return guarded<jboolean>(
+        JNI_FALSE,
+        [&] { return world->writeSection(chunkX, sectionY, chunkZ, next, notify == JNI_TRUE) ? JNI_TRUE : JNI_FALSE; },
+        "bukkit.native.writeSection");
 }
 
 jint JNICALL nativeApplySections(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jintArray sections,
@@ -93,8 +96,9 @@ jint JNICALL nativeApplySections(JNIEnv* env, jclass, jstring name, jint chunkX,
     std::vector<std::int32_t> next(static_cast<std::size_t>(env->GetArrayLength(states)));
     env->GetIntArrayRegion(states, 0, static_cast<jsize>(next.size()), next.data());
     std::vector<std::int32_t> before(previous == nullptr ? 0 : static_cast<std::size_t>(env->GetArrayLength(previous)));
-    const jint changed =
-        guarded<jint>(-1, [&] { return world->applySections(chunkX, chunkZ, ys, next, resend == JNI_TRUE, before); });
+    const jint changed = guarded<jint>(
+        -1, [&] { return world->applySections(chunkX, chunkZ, ys, next, resend == JNI_TRUE, before); },
+        "bukkit.native.applySections");
     if (previous != nullptr && changed >= 0) {
         env->SetIntArrayRegion(previous, 0, static_cast<jsize>(before.size()), before.data());
     }
@@ -108,10 +112,13 @@ void JNICALL nativeResendChunks(JNIEnv* env, jclass, jstring name, jintArray chu
     }
     std::vector<std::int32_t> pairs(static_cast<std::size_t>(env->GetArrayLength(chunks)));
     env->GetIntArrayRegion(chunks, 0, static_cast<jsize>(pairs.size()), pairs.data());
-    static_cast<void>(guarded<int>(0, [&] {
-        world->resendChunks(pairs);
-        return 0;
-    }));
+    static_cast<void>(guarded<int>(
+        0,
+        [&] {
+            world->resendChunks(pairs);
+            return 0;
+        },
+        "bukkit.native.resendChunks"));
 }
 
 jstring JNICALL nativeBiome(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z) {

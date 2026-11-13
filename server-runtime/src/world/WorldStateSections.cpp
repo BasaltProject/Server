@@ -526,30 +526,63 @@ std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectio
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(state);
         return block != nullptr && block->path() == "moving_piston";
     };
+
+    struct StateFacts {
+        std::int32_t state = -1;
+        bool ownsBlockEntity = false;
+        bool sensor = false;
+    };
+
+    struct PairFacts {
+        std::int32_t was = -1;
+        std::int32_t state = -1;
+        bool shapeChanged = false;
+        bool lightChanged = false;
+        bool poiChanged = false;
+        bool knownBefore = false;
+    };
+
+    constexpr std::size_t kMemo = 16;
+    std::array<StateFacts, kMemo> stateMemo{};
+    std::array<PairFacts, kMemo> pairMemo{};
     for (const std::uint16_t at : changed) {
         const std::int32_t was = before[at];
         const std::int32_t stateId = merged[at];
         const std::int32_t x = baseX + (at & 15);
         const std::int32_t y = baseY + (at >> 8);
         const std::int32_t z = baseZ + ((at >> 4) & 15);
+        StateFacts& state = stateMemo[static_cast<std::size_t>(stateId) % kMemo];
+        if (state.state != stateId) {
+            const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+            state = {.state = stateId,
+                     .ownsBlockEntity = block != nullptr && block->path() != "moving_piston" &&
+                                        registry::blockEntityTypes::ofBlock(*block) != nullptr,
+                     .sensor = block != nullptr &&
+                               (block->path() == "sculk_sensor" || block->path() == "calibrated_sculk_sensor")};
+        }
+        PairFacts& pair = pairMemo[(static_cast<std::size_t>(was) * 31 + static_cast<std::size_t>(stateId)) % kMemo];
+        if (pair.was != was || pair.state != stateId) {
+            pair = {.was = was,
+                    .state = stateId,
+                    .shapeChanged = !std::ranges::equal(registry::blockShapes::collisionBoxes(was),
+                                                        registry::blockShapes::collisionBoxes(stateId)) ||
+                                    moving(was) || moving(stateId),
+                    .lightChanged = server::world::changesLight(was, stateId),
+                    .poiChanged = poi::poiTypes::forState(was) != poi::poiTypes::forState(stateId),
+                    .knownBefore = registry::blockStateDefinitions::blockOf(was) != nullptr};
+        }
         // parity: `LevelChunk.setBlockState` gives a state that owns a block entity one whenever.
-        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-        if (block != nullptr && block->path() != "moving_piston" &&
-            registry::blockEntityTypes::ofBlock(*block) != nullptr &&
-            chunk->blockEntityAt(x & 15, y, z & 15) == nullptr) {
+        if (state.ownsBlockEntity && chunk->blockEntityAt(x & 15, y, z & 15) == nullptr) {
+            const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
             chunk->setBlockEntity(
                 server::world::ChunkBlockEntity{x & 15, y, z & 15, *block, blockEntityDefaults::of(*block, stateId)});
         }
-        poi_.noteBlockChange(poi::BlockPos{x, y, z}, was, stateId);
-        if (!std::ranges::equal(registry::blockShapes::collisionBoxes(was),
-                                registry::blockShapes::collisionBoxes(stateId)) ||
-            moving(was) || moving(stateId)) {
-            ++shapes;
+        if (pair.poiChanged) {
+            poi_.noteBlockChange(poi::BlockPos{x, y, z}, was, stateId);
         }
-        lightChanged = lightChanged || server::world::changesLight(was, stateId);
-        if (block != nullptr && (block->path() == "sculk_sensor" || block->path() == "calibrated_sculk_sensor")) {
-            sculkSensors_.remember(x, y, z, stateId);
-        } else if (registry::blockStateDefinitions::blockOf(was) != nullptr) {
+        shapes += pair.shapeChanged ? 1 : 0;
+        lightChanged = lightChanged || pair.lightChanged;
+        if ((state.sensor || pair.knownBefore) && (state.sensor || sculkSensors_.anyTracked())) {
             sculkSensors_.remember(x, y, z, stateId);
         }
     }

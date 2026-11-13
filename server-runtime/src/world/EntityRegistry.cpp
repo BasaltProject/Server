@@ -5,6 +5,7 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <utility>
 
@@ -12,6 +13,16 @@ namespace basalt::server::runtime::world {
 namespace {
 
 [[nodiscard]] std::int32_t chunkOf(double coordinate) { return wire::common::mth::floor(coordinate) >> 4; }
+
+// Equal to `chunkOf(coordinate) == chunk`, with the two range compares standing in for the floor when it is exact.
+[[nodiscard]] bool inChunk(double coordinate, std::int32_t chunk) {
+    constexpr double kExactBound = 1.0e9;
+    if (std::abs(coordinate) < kExactBound) {
+        const double low = static_cast<double>(chunk) * 16.0;
+        return coordinate >= low && coordinate < low + 16.0;
+    }
+    return chunkOf(coordinate) == chunk;
+}
 
 } // namespace
 
@@ -38,6 +49,13 @@ bool EntityRegistry::hasNaturalSpawnObstruction(const entity::Aabb& spawnBox, co
 void EntityRegistry::beginTick() noexcept { indexValid_ = false; }
 
 std::vector<entity::ServerEntity*> EntityRegistry::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ) const {
+    std::vector<entity::ServerEntity*> found;
+    entitiesIn(chunkX, chunkZ, found);
+    return found;
+}
+
+void EntityRegistry::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ,
+                                std::vector<entity::ServerEntity*>& out) const {
     const WorldWriteLock lock{*mutex_};
     if (!indexValid_) {
         index_.clear();
@@ -50,7 +68,7 @@ std::vector<entity::ServerEntity*> EntityRegistry::entitiesIn(std::int32_t chunk
         indexValid_ = true;
     }
     // Nothing moves a chunk's width in one tick, so the neighbours hold whatever walked in since the build.
-    std::vector<Indexed> candidates;
+    candidates_.clear();
     for (std::int32_t dx = -1; dx <= 1; ++dx) {
         for (std::int32_t dz = -1; dz <= 1; ++dz) {
             const auto bucket =
@@ -59,19 +77,18 @@ std::vector<entity::ServerEntity*> EntityRegistry::entitiesIn(std::int32_t chunk
                 continue;
             }
             for (const Indexed& held : bucket->second) {
-                if (!held.entity->removed && chunkOf(held.entity->x) == chunkX && chunkOf(held.entity->z) == chunkZ) {
-                    candidates.push_back(held);
+                if (!held.entity->removed && inChunk(held.entity->x, chunkX) && inChunk(held.entity->z, chunkZ)) {
+                    candidates_.push_back(held);
                 }
             }
         }
     }
-    std::ranges::sort(candidates, {}, &Indexed::order);
-    std::vector<entity::ServerEntity*> found;
-    found.reserve(candidates.size());
-    for (const Indexed& held : candidates) {
-        found.push_back(held.entity);
+    if (!std::ranges::is_sorted(candidates_, {}, &Indexed::order)) {
+        std::ranges::sort(candidates_, {}, &Indexed::order);
     }
-    return found;
+    for (const Indexed& held : candidates_) {
+        out.push_back(held.entity);
+    }
 }
 
 std::vector<std::pair<std::int32_t, std::int32_t>> EntityRegistry::chunksWithEntities() const {

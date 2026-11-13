@@ -49,7 +49,7 @@ resource-pack-prompt = ""
 gamemode = "survival"
 
 # Only let players on the whitelist in. Who is on it is state, not configuration:
-# it lives in players.db and is edited with /whitelist add and /whitelist remove.
+# it lives in .basalt/players.db and is edited with /whitelist add and /whitelist remove.
 # /whitelist on and off move this for the run; a restart follows this file again.
 whitelist = false
 

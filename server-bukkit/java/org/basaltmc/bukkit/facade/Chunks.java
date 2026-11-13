@@ -25,21 +25,11 @@ public final class Chunks {
     }
 
     public static long hash(int[] ids, int offset) {
-        long h = 0xcbf29ce484222325L;
-        for (int i = 0; i < kSection; i++) {
-            h = (h ^ ids[offset + i]) * 0x100000001b3L;
-        }
-        return h;
+        return WorldNatives.hashIds(ids, offset);
     }
 
     public static int uniform(int[] ids, int offset) {
-        int first = ids[offset];
-        for (int i = 1; i < kSection; i++) {
-            if (ids[offset + i] != first) {
-                return -1;
-            }
-        }
-        return first;
+        return WorldNatives.uniformId(ids, offset);
     }
 
     public static PalettedContainer<BlockState> states(PalettedContainerFactory factory, int[] all, int offset) {

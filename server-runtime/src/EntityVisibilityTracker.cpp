@@ -136,14 +136,13 @@ bool visibleTo(const ServerEntity& entity, const std::string& viewer) {
 
 /// Spigot's tracking categories: animals, monsters, misc (non-mobs), display and other (misc-category mobs).
 std::size_t trackingCategory(const ServerEntity& entity) {
-    const std::string_view path = entity.type().path();
-    if (path == "block_display" || path == "item_display" || path == "text_display") {
+    if ((entity.typeTraits() & entity::traits::kDisplay) != 0) {
         return 3;
     }
-    if (!entity::mobs::isMob(entity.type())) {
+    if ((entity.typeTraits() & entity::traits::kMob) == 0) {
         return 2;
     }
-    const std::string_view category = entity::mobs::categoryOf(entity.type());
+    const std::string_view category = entity.shape() == nullptr ? "misc" : entity.shape()->category;
     if (category == "monster") {
         return 1;
     }
@@ -153,7 +152,7 @@ std::size_t trackingCategory(const ServerEntity& entity) {
 /// parity: `ChunkMap.TrackedEntity.updatePlayer`, the horizontal range an entity is drawn within.
 bool inTrackingRange(const ServerEntity& entity, double viewerX, double viewerZ, std::int32_t viewDistanceChunks,
                      std::int32_t broadcastPercentage, const config::MobSettings& mobs) {
-    const server::registry::entityTypeShapes::Shape* shape = server::registry::entityTypeShapes::of(entity.type());
+    const server::registry::entityTypeShapes::Shape* shape = entity.shape();
     if (shape == nullptr || shape->trackingRange <= 0) {
         return true;
     }
@@ -196,6 +195,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
     const std::string me = session->uuid().toString();
     const std::vector<ServerEntity*> entities = owner_->world().entities();
     const std::int32_t viewDistance = owner_->chunkStreamer().trackedRadius();
+    const config::MobSettings& mobSettings = owner_->currentWorld()->mobSettings();
     for (ServerEntity* entity : entities) {
         if (entity->removed) {
             continue;
@@ -204,7 +204,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             !inTrackingRange(
                 *entity, session->x, session->z, viewDistance,
                 owner_->options().tuning.live->entityBroadcastRangePercentage.load(std::memory_order_relaxed),
-                owner_->currentWorld()->mobSettings())) {
+                mobSettings)) {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
                 lastRuntimeEntityMetadata_.erase(entity->entityId());

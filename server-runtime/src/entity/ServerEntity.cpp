@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -145,6 +146,8 @@ ServerEntity::ServerEntity(std::int32_t entityId, wire::common::Uuid uuid, wire:
                            std::int32_t protocolType, double x, double y, double z, float yaw, float pitch)
     : x(x), y(y), z(z), yaw(yaw), pitch(pitch), entityId_(entityId), uuid_(uuid), type_(std::move(type)),
       protocolType_(protocolType) {
+    typeTraits_ = computeTypeTraits(type_);
+    shape_ = registry::entityTypeShapes::of(type_);
     baseWidth_ = static_cast<float>(registry::entityTypeShapes::widthOf(type_));
     baseHeight_ = static_cast<float>(registry::entityTypeShapes::heightOf(type_));
     const bool dolphin = type_.path() == "dolphin";
@@ -259,7 +262,7 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
 [[nodiscard]] float ageScaleOf(std::string_view type) { return type == "happy_ghast" ? 0.2375F : 0.5F; }
 
 [[nodiscard]] bool baby(const ServerEntity& entity) {
-    return entity.age < 0 && ageableMobs::hasBabyMetadata(entity.type().path());
+    return entity.age < 0 && (entity.typeTraits() & traits::kBabyMetadata) != 0;
 }
 
 /// parity: `getDefaultDimensions` for a baby.
@@ -267,18 +270,19 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
     const float width = entity.baseWidth();
     const float height = entity.baseHeight();
     const std::string_view path = type.path();
-    if (path == "slime" || path == "magma_cube" || path == "sulfur_cube") {
+    const std::uint32_t kinds = entity.typeTraits();
+    if ((kinds & traits::kCube) != 0) {
         const auto size = static_cast<float>(entity.cubeSize);
         return {width * size, height * size};
     }
     // parity: `Phantom.getDefaultDimensions`, fifteen per cent more a size.
-    if (path == "phantom") {
+    if ((kinds & traits::kPhantom) != 0) {
         const std::int32_t size = entity.sourceNbt.has_value() ? entityNbt::numericInt(*entity.sourceNbt, "size") : 0;
         const float scale = 1.0F + (0.15F * static_cast<float>(size));
         return {width * scale, height * scale};
     }
     // parity: `Pufferfish.getScale`.
-    if (path == "pufferfish") {
+    if ((kinds & traits::kPufferfish) != 0) {
         const float scale = entity.puffState == 0 ? 0.5F : (entity.puffState == 1 ? 0.7F : 1.0F);
         return {width * scale, height * scale};
     }
@@ -321,6 +325,37 @@ double ServerEntity::height() const {
         return static_cast<double>(age < 0 ? digging * 0.5F : digging);
     }
     return static_cast<double>(defaultBox(*this, type_).second);
+}
+
+std::pair<double, double> ServerEntity::dimensions() const {
+    std::optional<std::pair<float, float>> box;
+    const auto defaults = [&]() -> const std::pair<float, float>& {
+        if (!box.has_value()) {
+            box = defaultBox(*this, type_);
+        }
+        return *box;
+    };
+    double width = 0.0;
+    if (babyCamel(*this)) {
+        width = static_cast<double>(kBabyCamelWidth);
+    } else if (sniffer != nullptr && sniffer->pose == sniffers::Pose::Digging && age < 0) {
+        width = static_cast<double>(baseWidth_ * 0.5F);
+    } else {
+        width = static_cast<double>(defaults().first);
+    }
+    double height = 0.0;
+    if (camel != nullptr && camel->lastPoseTick < 0) {
+        height = babyCamel(*this) ? static_cast<double>(kBabyCamelSittingHeight)
+                                  : static_cast<double>(baseHeight_ - kCamelSittingDrop);
+    } else if (babyCamel(*this)) {
+        height = static_cast<double>(kBabyCamelHeight);
+    } else if (sniffer != nullptr && sniffer->pose == sniffers::Pose::Digging) {
+        const float digging = baseHeight_ - kSnifferDiggingDrop;
+        height = static_cast<double>(age < 0 ? digging * 0.5F : digging);
+    } else {
+        height = static_cast<double>(defaults().second);
+    }
+    return {width, height};
 }
 
 bool ServerEntity::hasTag(std::string_view tag) const { return std::ranges::find(tags, tag) != tags.end(); }

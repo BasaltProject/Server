@@ -177,11 +177,21 @@ void Chunk::replaceSectionStates(std::size_t sectionIndex, std::span<const std::
     section.copyBlockStateIdsInto(before);
     const std::int32_t baseY = (bounds_.minSection() + static_cast<std::int32_t>(sectionIndex)) << 4;
     bool lightChanged = false;
+    std::int32_t lastBefore = -1;
+    std::int32_t lastNext = -1;
+    bool lastLight = false;
     for (std::size_t at = 0; at < ChunkSection::kBlocks; ++at) {
         if (before[at] == next[at]) {
             continue;
         }
-        lightChanged = lightChanged || changesLight(before[at], next[at]);
+        if (!lightChanged) {
+            if (before[at] != lastBefore || next[at] != lastNext) {
+                lastBefore = before[at];
+                lastNext = next[at];
+                lastLight = changesLight(lastBefore, lastNext);
+            }
+            lightChanged = lastLight;
+        }
         if (!blockEntities_.empty() && changesBlock(before[at], next[at])) {
             removeBlockEntityAt(static_cast<std::int32_t>(at & 15), baseY + static_cast<std::int32_t>(at >> 8),
                                 static_cast<std::int32_t>((at >> 4) & 15));

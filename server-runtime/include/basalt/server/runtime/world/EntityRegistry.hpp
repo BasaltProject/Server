@@ -27,6 +27,9 @@ public:
 
     [[nodiscard]] std::vector<entity::ServerEntity*> entitiesIn(std::int32_t chunkX, std::int32_t chunkZ) const;
 
+    /// Appends to `out`, which is not cleared, what `entitiesIn` would return.
+    void entitiesIn(std::int32_t chunkX, std::int32_t chunkZ, std::vector<entity::ServerEntity*>& out) const;
+
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> chunksWithEntities() const;
 
     /// Throws away the per-chunk index so the next `entitiesIn` rebuilds it from where everything stands now.
@@ -62,6 +65,7 @@ private:
     /// for by reading the neighbours and checking each hit against where it stands now. Guarded by `mutex_`.
     mutable std::unordered_map<std::int64_t, std::vector<Indexed>> index_;
     mutable bool indexValid_ = false;
+    mutable std::vector<Indexed> candidates_;
 };
 
 } // namespace basalt::server::runtime::world

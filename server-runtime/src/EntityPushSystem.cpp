@@ -118,7 +118,8 @@ EntityPushSystem::EntityPushSystem(player::PlayerRegistry& players, CombatSystem
 
 Aabb EntityPushSystem::boxOf(const Body& body) {
     if (body.mob != nullptr) {
-        return Aabb::of(body.mob->x, body.mob->y, body.mob->z, body.mob->width(), body.mob->height());
+        const auto [width, height] = body.mob->dimensions();
+        return Aabb::of(body.mob->x, body.mob->y, body.mob->z, width, height);
     }
     const double width = body.player->pose == Pose::Sleeping || body.player->pose == Pose::Dying ? 0.2 : 0.6;
     return Aabb::of(body.player->x, body.player->y, body.player->z, width, playerHeight(body.player->pose));
@@ -229,13 +230,16 @@ bool EntityPushSystem::pushableBy(world::LoadedWorld& world, const Body& pusher,
 std::vector<EntityPushSystem::Body> EntityPushSystem::entitiesIn(world::LoadedWorld& world, const Body& self,
                                                                  const Aabb& box) const {
     std::vector<Body> found;
+    std::vector<ServerEntity*> mobs;
     // parity: `EntitySectionStorage`.
     constexpr double kMargin = 2.0;
     for (std::int32_t chunkX = mth::floor(box.minX - kMargin) >> 4; chunkX <= mth::floor(box.maxX + kMargin) >> 4;
          ++chunkX) {
         for (std::int32_t chunkZ = mth::floor(box.minZ - kMargin) >> 4; chunkZ <= mth::floor(box.maxZ + kMargin) >> 4;
              ++chunkZ) {
-            for (ServerEntity* mob : world.state().entitiesIn(chunkX, chunkZ)) {
+            mobs.clear();
+            world.state().entitiesIn(chunkX, chunkZ, mobs);
+            for (ServerEntity* mob : mobs) {
                 if (mob == self.mob || mob->removed) {
                     continue;
                 }

@@ -64,6 +64,8 @@ public final class WorldNatives {
     public static native void checkLight(String world, int[] positions);
     public static native boolean readSections(String world, int chunkX, int chunkZ, boolean load, int[] out);
     public static native int chunkStatus(String world, int chunkX, int chunkZ);
+    public static native long hashIds(int[] ids, int offset);
+    public static native int uniformId(int[] ids, int offset);
     public static native void requestChunk(String world, int chunkX, int chunkZ, boolean generate, int priority, java.util.concurrent.CompletableFuture<Boolean> done);
     public static native boolean holdChunks(String world, String token, int[] chunks);
     public static native void releaseChunks(String world, String token);

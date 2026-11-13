@@ -143,6 +143,12 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         return writeBack();
     }
 
+    /** What building a chunk packet does to the engine's view, without reading the chunk back. */
+    public void syncForSend() {
+        level.getChunkSource().noteHanded(this);
+        flush();
+    }
+
     private synchronized boolean writeBack() {
         int changed = 0;
         boolean anyBiomes = false;
@@ -157,6 +163,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         if (changed == 0 && !anyBiomes) {
             return false;
         }
+        long started = System.nanoTime();
         if (changed > 0) {
             int[] ys = new int[changed];
             int[] states = new int[changed << 12];
@@ -186,6 +193,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         syncedVersion = WorldNatives.blockVersion(handle);
         unsaved = true;
         level.getChunkSource().noteChanged(locX, locZ);
+        org.basaltmc.bukkit.Natives.recordSection("bukkit.java.writeBack", System.nanoTime() - started);
         return true;
     }
 

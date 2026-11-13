@@ -1,7 +1,7 @@
 # Permission groups.
 #
 # This file says what a group IS. Who belongs to it is player state, so it lives in
-# players.db and is set with `op`, `deop` or `group`, never by editing this file.
+# .basalt/players.db and is set with `op`, `deop` or `group`, never by editing this file.
 #
 # A permission is a dotted name. A trailing `*` matches everything below it, and a
 # name prefixed with `-` denies instead of granting. The most specific rule wins, so

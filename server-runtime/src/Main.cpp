@@ -318,7 +318,8 @@ int main(int argc, char** argv) {
         } catch (const std::exception& failure) {
             live.store(nullptr, std::memory_order_release);
             wire::common::Logger{"Server"}.error([&failure] { return failure.what(); });
-            exitCode = std::string_view{failure.what()}.starts_with("players.db") ? kDatabaseExitCode : kBindExitCode;
+            exitCode = std::string_view{failure.what()}.starts_with(kPlayersDatabaseFailure) ? kDatabaseExitCode
+                                                                                             : kBindExitCode;
             break;
         }
         live.store(nullptr, std::memory_order_release);

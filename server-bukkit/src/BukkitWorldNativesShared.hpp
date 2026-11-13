@@ -64,8 +64,10 @@ using plugins::PluginWorldRef;
 
 // No C++ exception may reach Java; a plugin worker thread has the call run on the tick thread and waits for it.
 template <typename Result, typename Body>
-[[nodiscard]] Result guarded(Result fallback, Body&& body) {
-    const auto run = [&fallback, &body]() -> Result {
+[[nodiscard]] Result guarded(Result fallback, Body&& body, std::string_view section = {}) {
+    const auto run = [&fallback, &body, section]() -> Result {
+        const wire::common::ScopedTiming timed{BukkitBridge::current().profiler(),
+                                               section.empty() ? std::string_view{"bukkit.native.other"} : section};
         try {
             return static_cast<Result>(body());
         } catch (const std::exception& error) {

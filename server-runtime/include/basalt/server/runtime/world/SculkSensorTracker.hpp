@@ -31,6 +31,9 @@ public:
 
     [[nodiscard]] std::size_t size() const;
 
+    /// For callers already holding the world lock.
+    [[nodiscard]] bool anyTracked() const noexcept { return !sculkSensors_.empty(); }
+
 private:
     WorldMutex* mutex_;
     std::vector<std::int64_t> sculkSensors_;

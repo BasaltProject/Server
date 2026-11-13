@@ -82,6 +82,23 @@ void golemSpawned(entity::ServerEntity* golem, world::AdvancementTriggers* trigg
     return wire::protocol::play::Gamemode::Survival;
 }
 
+void moveLegacyPlayersDatabase(const wire::common::Logger& logger) {
+    const std::string from{kLegacyPlayersDatabasePath};
+    const std::string to{kPlayersDatabasePath};
+    const std::expected<storage::LegacyDatabaseMove, storage::PlayerDatabaseSchemaError> moved =
+        storage::PlayerStore::moveLegacy(from, to);
+    if (!moved.has_value()) {
+        throw std::runtime_error(std::string{kPlayersDatabaseFailure} + moved.error().message);
+    }
+    if (*moved == storage::LegacyDatabaseMove::Moved) {
+        logger.info([&] { return "Moved " + from + " to " + to + "."; });
+    } else if (*moved == storage::LegacyDatabaseMove::BothPresent) {
+        logger.warn([&] {
+            return "Both " + from + " and " + to + " exist; using " + to + " and leaving " + from + " untouched.";
+        });
+    }
+}
+
 } // namespace
 
 BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::WorldsConfig& worldsConfig,
@@ -95,11 +112,14 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     // A percentage needs two readings; this is the first, so nobody asking later gets nothing.
     cpuMeter_.prime();
 
-    // Player state sits beside `worlds/`, so a world can be deleted, copied or reset without touching a row.
+    if (options_.playersDatabasePath == kPlayersDatabasePath) {
+        moveLegacyPlayersDatabase(logger_);
+    }
+    // Player state lives outside `worlds/`, so a world can be deleted, copied or reset without touching a row.
     std::expected<std::unique_ptr<storage::PlayerStore>, storage::PlayerDatabaseSchemaError> store =
         storage::PlayerStore::open(options_.playersDatabasePath);
     if (!store.has_value()) {
-        throw std::runtime_error("players.db: " + store.error().message);
+        throw std::runtime_error(std::string{kPlayersDatabaseFailure} + store.error().message);
     }
     playerStore_ = std::move(*store);
     playerProgress_ = std::make_unique<world::PlayerProgress>(&playerStore_->progress());

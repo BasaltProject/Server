@@ -87,6 +87,11 @@ namespace basalt::server::runtime {
 class BlockTests;
 class LoadingServer;
 
+inline constexpr std::string_view kPlayersDatabasePath = ".basalt/players.db";
+inline constexpr std::string_view kLegacyPlayersDatabasePath = "players.db";
+/// Prefix of the startup failure Main reports with the database exit code.
+inline constexpr std::string_view kPlayersDatabaseFailure = "Player database: ";
+
 class BasaltServer {
 public:
     struct Options {
@@ -101,7 +106,7 @@ public:
                                                   wire::multiversion::UnknownProtocolPolicy::Refuse,
                                                   wire::multiversion::UnknownProtocolPolicy::Refuse};
         std::string pluginsRoot = ".";
-        std::string playersDatabasePath = "players.db";
+        std::string playersDatabasePath{kPlayersDatabasePath};
         std::string worldsRoot = "worlds";
         wire::text::LangTable lang;
         LoadingServer* loading = nullptr;
