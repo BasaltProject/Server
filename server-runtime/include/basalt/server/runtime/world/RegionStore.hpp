@@ -6,6 +6,7 @@
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <atomic>
 #include <cstdint>
 #include <list>
 #include <mutex>
@@ -79,6 +80,11 @@ public:
     /// `saveChunks` for snapshots; answers how many region files were rewritten.
     std::size_t saveSnapshots(std::vector<Snapshot> snapshots, std::int32_t timestamp);
 
+    /// Defers region writes and spreads encoding over all cores until the next `flush`; for shutdown only.
+    void beginBatch();
+
+    [[nodiscard]] bool batching() const noexcept { return batching_.load(); }
+
     std::size_t flush();
 
     /// Permanently fence disk I/O after unload; retained views cannot recreate deleted files.
@@ -132,6 +138,7 @@ private:
     /// Serializes region staging and file writes; see the class comment for the lock order.
     std::mutex writeMutex_;
     bool closed_ = false;
+    std::atomic<bool> batching_{false};
 
     /// Least recently used at the front, so eviction walks forwards.
     std::unordered_set<std::int64_t> writing_;

@@ -364,6 +364,9 @@ public:
 
     void flushRegions();
 
+    /// Region writes wait for `flushRegions` and run in parallel, so a shutdown writes each region once.
+    void beginShutdownWrites();
+
 private:
     [[nodiscard]] server::world::Chunk generateChunk(std::int32_t chunkX, std::int32_t chunkZ);
 

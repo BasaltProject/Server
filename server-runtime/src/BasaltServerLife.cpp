@@ -378,6 +378,9 @@ void BasaltServer::shutdown() {
     bukkit_.reset();
     plugins_->unloadAll();
     for (const auto& [name, world] : worldRegistry_->worlds()) {
+        world->beginShutdownWrites();
+    }
+    for (const auto& [name, world] : worldRegistry_->worlds()) {
         world->stopGenerating(kShutdownDrainTimeoutMillis);
     }
 

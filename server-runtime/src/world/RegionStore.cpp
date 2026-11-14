@@ -1,15 +1,19 @@
 #include <basalt/metamorph/datafix/DataFixer.hpp>
 #include <basalt/metamorph/region/AnvilRegion.hpp>
+#include <basalt/server/runtime/world/ParallelFor.hpp>
 #include <basalt/server/runtime/world/RegionStore.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
+#include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <map>
 #include <span>
 #include <string_view>
+#include <thread>
 #include <utility>
 
 namespace basalt::server::runtime::world {
@@ -406,12 +410,12 @@ std::size_t RegionStore::saveChunks(std::span<Chunk* const> allChunks, std::int3
     std::int64_t encodeTotal = 0;
     for (const auto& [regionKey, regionChunks] : byRegion) {
         const std::chrono::steady_clock::time_point encodeStart = std::chrono::steady_clock::now();
-        std::vector<std::pair<Chunk*, std::vector<std::uint8_t>>> encoded;
-        encoded.reserve(regionChunks.size());
-        for (Chunk* chunk : regionChunks) {
-            encoded.emplace_back(chunk, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(
-                                            server::world::region::chunkNbt::write(*chunk))));
-        }
+        std::vector<std::pair<Chunk*, std::vector<std::uint8_t>>> encoded(regionChunks.size());
+        parallelFor(regionChunks.size(), batching_.load(), [&](std::size_t at) {
+            Chunk* chunk = regionChunks[at];
+            encoded[at] = {chunk, wire::nbt::nbtIO::write(
+                                      wire::nbt::NbtTag::ofCompound(server::world::region::chunkNbt::write(*chunk)))};
+        });
         encodeTotal += millisSince(encodeStart);
 
         const std::lock_guard<std::mutex> lock{mutex_};
@@ -425,7 +429,7 @@ std::size_t RegionStore::saveChunks(std::span<Chunk* const> allChunks, std::int3
         dirtyRegions_.insert(regionKey);
     }
     encodeMillis_ = encodeTotal;
-    const std::size_t touched = flushDirty();
+    const std::size_t touched = batching_.load() ? 0 : flushDirty();
     writeMillis_ = millisSince(start) - encodeTotal;
     for (Chunk* chunk : chunks) {
         chunk->markClean();
@@ -456,11 +460,11 @@ std::size_t RegionStore::saveSnapshots(std::vector<Snapshot> snapshots, std::int
     std::int64_t encodeTotal = 0;
     for (const auto& [regionKey, regionSnapshots] : byRegion) {
         const std::chrono::steady_clock::time_point encodeStart = std::chrono::steady_clock::now();
-        std::vector<std::pair<const Snapshot*, std::vector<std::uint8_t>>> encoded;
-        encoded.reserve(regionSnapshots.size());
-        for (const Snapshot* snapshot : regionSnapshots) {
-            encoded.emplace_back(snapshot, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(snapshot->nbt)));
-        }
+        std::vector<std::pair<const Snapshot*, std::vector<std::uint8_t>>> encoded(regionSnapshots.size());
+        parallelFor(regionSnapshots.size(), batching_.load(), [&](std::size_t at) {
+            const Snapshot* snapshot = regionSnapshots[at];
+            encoded[at] = {snapshot, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(snapshot->nbt))};
+        });
         encodeTotal += millisSince(encodeStart);
 
         const std::lock_guard<std::mutex> lock{mutex_};
@@ -474,10 +478,12 @@ std::size_t RegionStore::saveSnapshots(std::vector<Snapshot> snapshots, std::int
         dirtyRegions_.insert(regionKey);
     }
     encodeMillis_ = encodeTotal;
-    const std::size_t touched = flushDirty();
+    const std::size_t touched = batching_.load() ? 0 : flushDirty();
     writeMillis_ = millisSince(start) - encodeTotal;
     return touched;
 }
+
+void RegionStore::beginBatch() { batching_.store(true); }
 
 std::size_t RegionStore::flush() {
     const std::lock_guard<std::mutex> writeLock{writeMutex_};
@@ -508,8 +514,9 @@ std::size_t RegionStore::flushDirty() {
         dirtyRegions_.clear();
     }
 
-    std::size_t written = 0;
-    for (const auto& [regionKey, held] : toWrite) {
+    std::atomic<std::size_t> written{0};
+    parallelFor(toWrite.size(), batching_.load(), [&](std::size_t at) {
+        const auto& [regionKey, held] = toWrite[at];
         const std::string path = regionPath(regionXOf(regionKey), regionZOf(regionKey));
         wire::io::fileIO::createDirectories(parentOf(path));
         if (held->writeTo(path)) {
@@ -517,8 +524,9 @@ std::size_t RegionStore::flushDirty() {
         }
         const std::lock_guard<std::mutex> lock{mutex_};
         writing_.erase(regionKey);
-    }
-    return written;
+    });
+    batching_.store(false);
+    return written.load();
 }
 
 } // namespace basalt::server::runtime::world

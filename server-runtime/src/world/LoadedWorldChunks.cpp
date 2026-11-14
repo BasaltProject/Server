@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/ParallelFor.hpp>
 #include <basalt/server/runtime/world/SavedDataFiles.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/runtime/world/WorldSpawnPoint.hpp>
@@ -223,12 +224,13 @@ void LoadedWorld::stashEntities(const std::vector<Chunk*>& chunks) {
 std::vector<RegionStore::Snapshot> LoadedWorld::snapshotOf(const std::vector<Chunk*>& chunks) {
     stashEntities(chunks);
     std::vector<RegionStore::Snapshot> snapshots;
-    snapshots.reserve(chunks.size());
-    for (Chunk* chunk : chunks) {
-        snapshots.push_back(
-            RegionStore::Snapshot{chunk->chunkX(), chunk->chunkZ(), server::world::region::chunkNbt::write(*chunk)});
+    snapshots.resize(chunks.size());
+    parallelFor(chunks.size(), regions_.batching(), [&](std::size_t at) {
+        Chunk* chunk = chunks[at];
+        snapshots[at] =
+            RegionStore::Snapshot{chunk->chunkX(), chunk->chunkZ(), server::world::region::chunkNbt::write(*chunk)};
         chunk->markClean();
-    }
+    });
     return snapshots;
 }
 
@@ -506,6 +508,8 @@ void LoadedWorld::retire() {
 }
 
 void LoadedWorld::closeOwner() { owner().close(); }
+
+void LoadedWorld::beginShutdownWrites() { regions_.beginBatch(); }
 
 void LoadedWorld::flushRegions() { static_cast<void>(regions_.flush()); }
 
