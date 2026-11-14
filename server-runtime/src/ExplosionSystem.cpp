@@ -119,12 +119,11 @@ void measureExposures(world::LoadedWorld& world, const std::vector<player::Playe
         }
     }
     const auto chunkOf = [](double coordinate) { return static_cast<std::int32_t>(std::floor(coordinate)) >> 4; };
-    std::vector<entity::ServerEntity*> nearby;
+    thread_local std::vector<entity::ServerEntity*> nearby;
+    nearby.clear();
     for (std::int32_t chunkX = chunkOf(x - doubleRadius); chunkX <= chunkOf(x + doubleRadius); ++chunkX) {
         for (std::int32_t chunkZ = chunkOf(z - doubleRadius); chunkZ <= chunkOf(z + doubleRadius); ++chunkZ) {
-            for (entity::ServerEntity* entity : world.state().entitiesIn(chunkX, chunkZ)) {
-                nearby.push_back(entity);
-            }
+            world.state().entitiesIn(chunkX, chunkZ, nearby);
         }
     }
     for (const entity::ServerEntity* entity : nearby) {
@@ -136,7 +135,9 @@ void measureExposures(world::LoadedWorld& world, const std::vector<player::Playe
             world::explosions::seenPercent(
                 world.state(), x, y, z, boxAround(entity->x, entity->y, entity->z, entity->width(), entity->height())));
     }
-    for (const world::DroppedItem& item : world.state().nearbyItems(x, y, z, doubleRadius + 1.0)) {
+    thread_local std::vector<world::ItemPoint> items;
+    world.state().nearbyItemPoints(x, y, z, doubleRadius + 1.0, items);
+    for (const world::ItemPoint& item : items) {
         if (within(item.x, item.y, item.z)) {
             world::explosions::recordExposure(
                 item.entityId, world::explosions::seenPercent(world.state(), x, y, z,
@@ -156,7 +157,9 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
 
 ExplosionSystem::ExplosionSystem(player::PlayerRegistry& players, world::RealLootTables& lootTables, Hooks hooks,
                                  Options options)
-    : players_(&players), lootTables_(&lootTables), hooks_(std::move(hooks)), options_(std::move(options)) {}
+    : players_(&players), lootTables_(&lootTables), hooks_(std::move(hooks)), options_(std::move(options)) {
+    world::explosions::warmTables();
+}
 
 std::int32_t ExplosionSystem::particleId(std::string_view path) {
     const reg::ParticleType* type = reg::particleTypes::of(Identifier::vanilla(std::string{path}));
@@ -232,7 +235,9 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     }
 
     // parity: `ServerExplosion.explode`.
-    for (const world::DroppedItem& item : world.state().nearbyItems(x, y, z, doubleRadius + 1.0)) {
+    thread_local std::vector<world::ItemPoint> hurtItems;
+    world.state().nearbyItemPoints(x, y, z, doubleRadius + 1.0, hurtItems);
+    for (const world::ItemPoint& item : hurtItems) {
         const double distance =
             std::sqrt((item.x - x) * (item.x - x) + (item.y - y) * (item.y - y) + (item.z - z) * (item.z - z));
         if (distance / doubleRadius > 1.0) {
@@ -254,7 +259,10 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
 
     for (const world::explosions::Broken& block : broken) {
         sendBlock(watchers, block.x, block.y, block.z, reg::blocks::air().stateId);
-        if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(block.stateId); state.has_value()) {
+        if (const Identifier* owner = reg::blockStateDefinitions::blockOf(block.stateId); owner != nullptr) {
+            collectExplodedBlock(world, *owner, block.stateId, block.x, block.y, block.z, power, drops);
+        } else if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(block.stateId);
+                   state.has_value()) {
             collectExplodedBlock(world, state->block, block.stateId, block.x, block.y, block.z, power, drops);
         }
         if (block.hive.has_value() && hooks_.hiveBlown) {
@@ -289,7 +297,10 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
             [this, &world, &watchers, &drops](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
                 sendBlock(watchers, bx, by, bz, reg::blocks::air().stateId);
                 // parity: `dropResources` has no radius.
-                if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(stateId); state.has_value()) {
+                if (const Identifier* owner = reg::blockStateDefinitions::blockOf(stateId); owner != nullptr) {
+                    collectExplodedBlock(world, *owner, stateId, bx, by, bz, 0.0F, drops);
+                } else if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(stateId);
+                           state.has_value()) {
                     collectExplodedBlock(world, state->block, stateId, bx, by, bz, 0.0F, drops);
                 }
             },

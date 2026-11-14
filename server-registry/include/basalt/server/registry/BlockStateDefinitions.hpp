@@ -46,6 +46,9 @@ private:
 
 [[nodiscard]] const wire::common::Identifier* blockOf(std::int32_t stateId);
 
+/// One past the highest state id a definition may own.
+[[nodiscard]] std::int32_t stateIdBound();
+
 [[nodiscard]] std::map<std::string, std::string> propertiesOf(std::int32_t stateId);
 
 [[nodiscard]] std::optional<std::int32_t> stateIdOf(const wire::common::Identifier& block,

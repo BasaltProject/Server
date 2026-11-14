@@ -20,6 +20,13 @@ inline constexpr std::int32_t kUnlimitedLifetimeAge = -32768;
 
 inline constexpr std::int32_t kItemHealth = 5;
 
+struct ItemPoint {
+    std::int32_t entityId = 0;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+};
+
 struct DroppedItem {
     std::int32_t entityId = 0;
     wire::common::Uuid uuid;

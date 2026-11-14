@@ -355,6 +355,21 @@ std::optional<std::int32_t> WorldState::blockStateLocked(std::int32_t x, std::in
     return chunk->blockStateId(x & 15, y, z & 15);
 }
 
+std::optional<std::int32_t> WorldState::CachedBlockReader::at(std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::int32_t chunkX = x >> 4;
+    const std::int32_t chunkZ = z >> 4;
+    if (!primed_ || chunkX != chunkX_ || chunkZ != chunkZ_) {
+        chunk_ = world_->chunkAtLocked(key(chunkX, chunkZ));
+        chunkX_ = chunkX;
+        chunkZ_ = chunkZ;
+        primed_ = true;
+    }
+    if (chunk_ == nullptr || y < chunk_->verticalBounds().minY() || y > chunk_->verticalBounds().maxY()) {
+        return std::nullopt;
+    }
+    return chunk_->blockStateId(x & 15, y, z & 15);
+}
+
 entity::entityCollision::BlockAt WorldState::blockAccessor() const {
     return [this](std::int32_t x, std::int32_t y, std::int32_t z) { return blockState(x, y, z); };
 }

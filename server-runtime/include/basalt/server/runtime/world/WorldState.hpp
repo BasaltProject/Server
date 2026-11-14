@@ -273,6 +273,22 @@ public:
         WorldReadLock lock_;
     };
 
+    /// Reads blocks under one read lock, remembering the last chunk found; nothing may write the world meanwhile.
+    class CachedBlockReader {
+    public:
+        explicit CachedBlockReader(const WorldState& world) : world_(&world), scope_(world) {}
+
+        [[nodiscard]] std::optional<std::int32_t> at(std::int32_t x, std::int32_t y, std::int32_t z);
+
+    private:
+        const WorldState* world_;
+        BlockReadScope scope_;
+        std::int32_t chunkX_ = 0;
+        std::int32_t chunkZ_ = 0;
+        const server::world::Chunk* chunk_ = nullptr;
+        bool primed_ = false;
+    };
+
     [[nodiscard]] entity::entityCollision::BlockAt blockAccessor() const;
 
     /// parity: `Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`.
@@ -385,6 +401,8 @@ public:
     [[nodiscard]] std::optional<DroppedItem> itemById(std::int32_t entityId) const;
 
     [[nodiscard]] std::vector<DroppedItem> nearbyItems(double x, double y, double z, double radius) const;
+
+    void nearbyItemPoints(double x, double y, double z, double radius, std::vector<ItemPoint>& out) const;
 
     [[nodiscard]] std::optional<DroppedItem> removeItem(std::int32_t entityId);
 

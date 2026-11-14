@@ -255,6 +255,10 @@ std::vector<DroppedItem> WorldState::nearbyItems(double x, double y, double z, d
     return itemPhysics_.nearbyItems(x, y, z, radius);
 }
 
+void WorldState::nearbyItemPoints(double x, double y, double z, double radius, std::vector<ItemPoint>& out) const {
+    itemPhysics_.nearbyItemPoints(x, y, z, radius, out);
+}
+
 bool WorldState::shiftItem(std::int32_t entityId, double dx, double dy, double dz) {
     return itemPhysics_.shiftItem(entityId, dx, dy, dz);
 }

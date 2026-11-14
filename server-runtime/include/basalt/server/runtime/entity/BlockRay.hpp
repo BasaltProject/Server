@@ -31,6 +31,9 @@ inline constexpr std::int32_t kMaxSteps = 256;
 [[nodiscard]] bool crosses(world::WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY,
                            double toZ, const std::function<bool(std::int32_t stateId)>& matches);
 
+/// Builds the per-state tables now so the first ray does not pay for them.
+void warmTables();
+
 /// parity: `ClipContext.Block`.
 enum class ClipShape : std::uint8_t {
     /// parity: `COLLIDER`, the collision shape.
@@ -52,6 +55,10 @@ struct ClipViewer {
 /// parity: `BlockGetter.clip`.
 [[nodiscard]] bool clips(world::WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY,
                          double toZ, ClipShape shape, const ClipViewer& viewer);
+
+/// The same, reading through a reader the caller holds across several rays.
+[[nodiscard]] bool clips(world::WorldState::CachedBlockReader& reader, double fromX, double fromY, double fromZ,
+                         double toX, double toY, double toZ, ClipShape shape, const ClipViewer& viewer);
 
 } // namespace blockRay
 

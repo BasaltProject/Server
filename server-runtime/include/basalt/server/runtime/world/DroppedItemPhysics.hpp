@@ -93,6 +93,9 @@ public:
 
     [[nodiscard]] std::vector<DroppedItem> nearbyItems(double x, double y, double z, double radius) const;
 
+    /// The same items and order as `nearbyItems`, as bare positions into a reused buffer.
+    void nearbyItemPoints(double x, double y, double z, double radius, std::vector<ItemPoint>& out) const;
+
     [[nodiscard]] std::optional<DroppedItem> removeItem(std::int32_t entityId);
 
     bool shiftItem(std::int32_t entityId, double dx, double dy, double dz);

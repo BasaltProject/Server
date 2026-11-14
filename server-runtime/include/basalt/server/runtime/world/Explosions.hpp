@@ -34,6 +34,9 @@ using Spares =
 using Resistance = std::function<float(std::int32_t stateId, float resistance)>;
 
 /// parity: `MinecartTNT.getBlockExplosionResistance`.
+/// Builds the per-state tables now so the first blast does not pay for them.
+void warmTables();
+
 [[nodiscard]] bool sparesRails(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
 /// The blocks are already gone from the world; their drops are the caller's business, as in vanilla.

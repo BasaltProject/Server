@@ -12,6 +12,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace basalt::server::runtime::entity::blockRay {
 namespace {
@@ -40,7 +41,7 @@ constexpr Box kPowderSnowFalling{0.0, 0.0, 0.0, 1.0, static_cast<double>(0.9F), 
 
 enum class Special : std::uint8_t { None, Empty, Full, Fence, SnowLayers, Scaffolding, PowderSnow };
 
-[[nodiscard]] Special specialOf(std::int32_t stateId, ClipShape kind) {
+[[nodiscard]] Special computeSpecial(std::int32_t stateId, ClipShape kind) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
         return Special::None;
@@ -69,6 +70,27 @@ enum class Special : std::uint8_t { None, Empty, Full, Fence, SnowLayers, Scaffo
         return Special::PowderSnow;
     }
     return Special::None;
+}
+
+[[nodiscard]] const std::vector<Special>& specialTable(ClipShape kind) {
+    static const std::array<std::vector<Special>, 2> built = [] {
+        std::array<std::vector<Special>, 2> tables;
+        const std::int32_t bound = registry::blockStateDefinitions::stateIdBound();
+        for (std::size_t shape = 0; shape < tables.size(); ++shape) {
+            tables[shape].reserve(static_cast<std::size_t>(bound));
+            for (std::int32_t stateId = 0; stateId < bound; ++stateId) {
+                tables[shape].push_back(computeSpecial(stateId, static_cast<ClipShape>(shape)));
+            }
+        }
+        return tables;
+    }();
+    return built[static_cast<std::size_t>(kind)];
+}
+
+[[nodiscard]] Special specialOf(std::int32_t stateId, ClipShape kind) {
+    const std::vector<Special>& table = specialTable(kind);
+    return stateId >= 0 && static_cast<std::size_t>(stateId) < table.size() ? table[static_cast<std::size_t>(stateId)]
+                                                                            : computeSpecial(stateId, kind);
 }
 
 [[nodiscard]] std::string propertyOf(std::int32_t stateId, const std::string& name) {
@@ -175,6 +197,9 @@ bool anyBox(std::int32_t stateId, std::int32_t blockY, ClipShape kind, const Cli
     if ((delta[0] * delta[0]) + (delta[1] * delta[1]) + (delta[2] * delta[2]) < 1.0E-7) {
         return false;
     }
+    if (specialOf(stateId, kind) == Special::None && registry::blockShapes::isEmptyShape(stateId)) {
+        return false;
+    }
     // parity: `isFullWide` at the point a thousandth of the way along.
     const double testX = from[0] + (delta[0] * 0.001) - blockX;
     const double testY = from[1] + (delta[1] * 0.001) - blockY;
@@ -204,15 +229,23 @@ bool anyBox(std::int32_t stateId, std::int32_t blockY, ClipShape kind, const Cli
 
 } // namespace
 
+void warmTables() { static_cast<void>(specialTable(ClipShape::Collider)); }
+
 bool clips(world::WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY, double toZ,
            ClipShape shape, const ClipViewer& viewer) {
+    world::WorldState::CachedBlockReader reader{world};
+    return clips(reader, fromX, fromY, fromZ, toX, toY, toZ, shape, viewer);
+}
+
+bool clips(world::WorldState::CachedBlockReader& reader, double fromX, double fromY, double fromZ, double toX,
+           double toY, double toZ, ClipShape shape, const ClipViewer& viewer) {
     if (fromX == toX && fromY == toY && fromZ == toZ) {
         return false;
     }
     const std::array<double, 3> from{fromX, fromY, fromZ};
     const std::array<double, 3> to{toX, toY, toZ};
     const auto hitsAt = [&](std::int32_t x, std::int32_t y, std::int32_t z) {
-        const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+        const std::optional<std::int32_t> stateId = reader.at(x, y, z);
         return stateId.has_value() && shapeClips(*stateId, x, y, z, from, to, shape, viewer);
     };
     // parity: `BlockGetter.traverseBlocks`, `Mth.lerp(-1.0E-7, ...)` on both ends.

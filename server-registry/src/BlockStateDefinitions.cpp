@@ -142,6 +142,8 @@ const Identifier* blockOf(std::int32_t stateId) {
     return index.has_value() ? &table().ownerBlocks[*index] : nullptr;
 }
 
+std::int32_t stateIdBound() { return static_cast<std::int32_t>(table().slotOfState.size()); }
+
 std::map<std::string, std::string> propertiesOf(std::int32_t stateId) {
     const std::optional<std::size_t> index = indexOf(stateId);
     if (!index.has_value()) {

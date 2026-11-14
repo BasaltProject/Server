@@ -148,6 +148,24 @@ std::vector<DroppedItem> DroppedItemPhysics::nearbyItems(double x, double y, dou
     return found;
 }
 
+void DroppedItemPhysics::nearbyItemPoints(double x, double y, double z, double radius,
+                                          std::vector<ItemPoint>& out) const {
+    const WorldWriteLock lock{*mutex_};
+    const double radiusSquared = radius * radius;
+    out.clear();
+    for (const DroppedItem& item : droppedItems_) {
+        if (squaredDistance(item, x, y, z) <= radiusSquared) {
+            out.push_back({item.entityId, item.x, item.y, item.z});
+        }
+    }
+    std::ranges::stable_sort(out, [x, y, z](const ItemPoint& first, const ItemPoint& second) {
+        const auto distance = [x, y, z](const ItemPoint& point) {
+            return (point.x - x) * (point.x - x) + (point.y - y) * (point.y - y) + (point.z - z) * (point.z - z);
+        };
+        return distance(first) < distance(second);
+    });
+}
+
 std::optional<DroppedItem> DroppedItemPhysics::removeItem(std::int32_t entityId) {
     const WorldWriteLock lock{*mutex_};
     const auto at =

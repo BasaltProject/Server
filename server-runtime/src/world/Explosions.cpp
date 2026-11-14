@@ -6,11 +6,12 @@
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <set>
 #include <unordered_map>
+#include <vector>
 
 namespace basalt::server::runtime::world::explosions {
 namespace {
@@ -18,6 +19,7 @@ namespace {
 constexpr std::int32_t kRays = 16;
 /// parity: the shell of a 16-cubed grid, so the last index on each axis is fifteen.
 constexpr float kLastRay = 15.0F;
+constexpr std::size_t kHitReserve = 1024;
 constexpr float kStep = 0.3F;
 constexpr float kStepCost = 0.22500001F;
 constexpr float kResistanceBias = 0.3F;
@@ -47,6 +49,37 @@ constexpr float kImmuneResistance = 3600000.0F;
     return hardness == nullptr || !hardness->isUnbreakable();
 }
 
+[[nodiscard]] std::int32_t airState() {
+    static const std::int32_t air = registry::blocks::air().stateId;
+    return air;
+}
+
+struct StateFacts {
+    float resistance = 0.0F;
+    bool breakable = false;
+};
+
+[[nodiscard]] StateFacts computeFacts(std::int32_t stateId) { return {resistanceOf(stateId), canBreak(stateId)}; }
+
+[[nodiscard]] StateFacts factsOf(std::int32_t stateId) {
+    static const std::vector<StateFacts> table = [] {
+        std::vector<StateFacts> built;
+        const std::int32_t bound = registry::blockStateDefinitions::stateIdBound();
+        built.reserve(static_cast<std::size_t>(bound));
+        for (std::int32_t id = 0; id < bound; ++id) {
+            built.push_back(computeFacts(id));
+        }
+        return built;
+    }();
+    return stateId >= 0 && static_cast<std::size_t>(stateId) < table.size() ? table[static_cast<std::size_t>(stateId)]
+                                                                            : computeFacts(stateId);
+}
+
+[[nodiscard]] std::int32_t floorOf(double value) {
+    const auto truncated = static_cast<std::int32_t>(value);
+    return truncated - static_cast<std::int32_t>(value < static_cast<double>(truncated));
+}
+
 [[nodiscard]] std::int64_t packed(std::int32_t x, std::int32_t y, std::int32_t z) {
     return ((static_cast<std::int64_t>(x) & 0x3FFFFFF) << 38) | ((static_cast<std::int64_t>(z) & 0x3FFFFFF) << 12) |
            (static_cast<std::int64_t>(y) & 0xFFF);
@@ -60,6 +93,11 @@ constexpr float kImmuneResistance = 3600000.0F;
 
 } // namespace
 
+void warmTables() {
+    static_cast<void>(factsOf(0));
+    entity::blockRay::warmTables();
+}
+
 bool sparesRails(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                  const std::int32_t stateId) {
     if (rails::isRail(stateId)) {
@@ -71,7 +109,8 @@ bool sparesRails(WorldState& world, const std::int32_t x, const std::int32_t y, 
 
 std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y, double z,
                             float power, random::RandomSource& random, const Spares& stops) {
-    std::set<std::int64_t> hit;
+    std::vector<std::int64_t> hit;
+    WorldState::CachedBlockReader reader{world};
     for (std::int32_t rayX = 0; rayX < kRays; ++rayX) {
         for (std::int32_t rayY = 0; rayY < kRays; ++rayY) {
             for (std::int32_t rayZ = 0; rayZ < kRays; ++rayZ) {
@@ -98,7 +137,7 @@ std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t m
                     if (blockY < minY || blockY > maxY) {
                         break;
                     }
-                    const std::optional<std::int32_t> stateId = world.blockState(blockX, blockY, blockZ);
+                    const std::optional<std::int32_t> stateId = reader.at(blockX, blockY, blockZ);
                     if (!stateId.has_value()) {
                         break;
                     }
@@ -107,7 +146,7 @@ std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t m
                     }
                     // parity: `shouldBlockExplode` is a plain true for this calculator, so every.
                     if (remaining > 0.0F) {
-                        hit.insert(packed(blockX, blockY, blockZ));
+                        hit.push_back(packed(blockX, blockY, blockZ));
                     }
                     px += dx * static_cast<double>(kStep);
                     py += dy * static_cast<double>(kStep);
@@ -117,13 +156,15 @@ std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t m
             }
         }
     }
+    std::ranges::sort(hit);
+    hit.erase(std::ranges::unique(hit).begin(), hit.end());
     std::vector<Broken> knocked;
     knocked.reserve(hit.size());
     for (const std::int64_t position : hit) {
         const std::int32_t bx = unpackX(position);
         const std::int32_t by = unpackY(position);
         const std::int32_t bz = unpackZ(position);
-        const std::optional<std::int32_t> stateId = world.blockState(bx, by, bz);
+        const std::optional<std::int32_t> stateId = reader.at(bx, by, bz);
         if (stateId.has_value()) {
             knocked.push_back(Broken{.x = bx, .y = by, .z = bz, .stateId = *stateId});
         }
@@ -134,56 +175,79 @@ std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t m
 std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y, double z,
                             float power, random::RandomSource& random, const Spares& spares,
                             const Resistance& resistance) {
-    std::set<std::int64_t> hit;
-    for (std::int32_t rayX = 0; rayX < kRays; ++rayX) {
-        for (std::int32_t rayY = 0; rayY < kRays; ++rayY) {
-            for (std::int32_t rayZ = 0; rayZ < kRays; ++rayZ) {
-                const bool onShell =
-                    rayX == 0 || rayX == kRays - 1 || rayY == 0 || rayY == kRays - 1 || rayZ == 0 || rayZ == kRays - 1;
-                if (!onShell) {
-                    continue;
-                }
-                // parity: the three components are worked out in float and only then widened, which.
-                double dx = static_cast<double>((static_cast<float>(rayX) / kLastRay * 2.0F) - 1.0F);
-                double dy = static_cast<double>((static_cast<float>(rayY) / kLastRay * 2.0F) - 1.0F);
-                double dz = static_cast<double>((static_cast<float>(rayZ) / kLastRay * 2.0F) - 1.0F);
-                const double length = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
-                dx /= length;
-                dy /= length;
-                dz /= length;
-                float remaining = power * (0.7F + (random.nextFloat() * 0.6F));
-                double px = x;
-                double py = y;
-                double pz = z;
-                while (remaining > 0.0F) {
-                    const auto blockX = static_cast<std::int32_t>(std::floor(px));
-                    const auto blockY = static_cast<std::int32_t>(std::floor(py));
-                    const auto blockZ = static_cast<std::int32_t>(std::floor(pz));
-                    if (blockY < minY || blockY > maxY) {
-                        break;
+    std::vector<std::int64_t> hit;
+    hit.reserve(kHitReserve);
+    {
+        WorldState::CachedBlockReader reader{world};
+        for (std::int32_t rayX = 0; rayX < kRays; ++rayX) {
+            for (std::int32_t rayY = 0; rayY < kRays; ++rayY) {
+                for (std::int32_t rayZ = 0; rayZ < kRays; ++rayZ) {
+                    const bool onShell = rayX == 0 || rayX == kRays - 1 || rayY == 0 || rayY == kRays - 1 ||
+                                         rayZ == 0 || rayZ == kRays - 1;
+                    if (!onShell) {
+                        continue;
                     }
-                    const std::optional<std::int32_t> stateId = world.blockState(blockX, blockY, blockZ);
-                    if (!stateId.has_value()) {
-                        break;
+                    // parity: the three components are worked out in float and only then widened, which.
+                    double dx = static_cast<double>((static_cast<float>(rayX) / kLastRay * 2.0F) - 1.0F);
+                    double dy = static_cast<double>((static_cast<float>(rayY) / kLastRay * 2.0F) - 1.0F);
+                    double dz = static_cast<double>((static_cast<float>(rayZ) / kLastRay * 2.0F) - 1.0F);
+                    const double length = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+                    dx /= length;
+                    dy /= length;
+                    dz /= length;
+                    float remaining = power * (0.7F + (random.nextFloat() * 0.6F));
+                    double px = x;
+                    double py = y;
+                    double pz = z;
+                    std::int64_t lastBlock = 0;
+                    bool haveLast = false;
+                    float lastCost = 0.0F;
+                    bool lastBreaks = false;
+                    bool fresh = false;
+                    while (remaining > 0.0F) {
+                        const std::int32_t blockX = floorOf(px);
+                        const std::int32_t blockY = floorOf(py);
+                        const std::int32_t blockZ = floorOf(pz);
+                        if (blockY < minY || blockY > maxY) {
+                            break;
+                        }
+                        const std::int64_t here = packed(blockX, blockY, blockZ);
+                        if (!haveLast || here != lastBlock) {
+                            const std::optional<std::int32_t> stateId = reader.at(blockX, blockY, blockZ);
+                            if (!stateId.has_value()) {
+                                break;
+                            }
+                            const bool spared = spares && spares(world, blockX, blockY, blockZ, *stateId);
+                            const StateFacts facts = factsOf(*stateId);
+                            lastCost = 0.0F;
+                            if (*stateId != airState()) {
+                                const float base = facts.resistance;
+                                const float held = resistance ? resistance(*stateId, base) : base;
+                                lastCost = ((spared ? 0.0F : held) + kResistanceBias) * kStep;
+                            }
+                            lastBreaks = !spared && facts.breakable;
+                            lastBlock = here;
+                            haveLast = true;
+                            fresh = true;
+                        } else {
+                            fresh = false;
+                        }
+                        remaining -= lastCost;
+                        if (remaining > 0.0F && lastBreaks && fresh) {
+                            hit.push_back(here);
+                        }
+                        // parity: `xp += xd * 0.3F`, where the float step is widened for the sum.
+                        px += dx * static_cast<double>(kStep);
+                        py += dy * static_cast<double>(kStep);
+                        pz += dz * static_cast<double>(kStep);
+                        remaining -= kStepCost;
                     }
-                    const bool spared = spares && spares(world, blockX, blockY, blockZ, *stateId);
-                    if (*stateId != registry::blocks::air().stateId) {
-                        const float base = resistanceOf(*stateId);
-                        const float held = resistance ? resistance(*stateId, base) : base;
-                        remaining -= ((spared ? 0.0F : held) + kResistanceBias) * kStep;
-                    }
-                    if (remaining > 0.0F && !spared && canBreak(*stateId)) {
-                        hit.insert(packed(blockX, blockY, blockZ));
-                    }
-                    // parity: `xp += xd * 0.3F`, where the float step is widened for the sum.
-                    px += dx * static_cast<double>(kStep);
-                    py += dy * static_cast<double>(kStep);
-                    pz += dz * static_cast<double>(kStep);
-                    remaining -= kStepCost;
                 }
             }
         }
     }
+    std::ranges::sort(hit);
+    hit.erase(std::ranges::unique(hit).begin(), hit.end());
     std::vector<Broken> broken;
     for (const std::int64_t position : hit) {
         const std::int32_t bx = unpackX(position);
@@ -240,6 +304,7 @@ float seenPercent(WorldState& world, const double centerX, const double centerY,
     }
     std::int32_t hits = 0;
     std::int32_t count = 0;
+    WorldState::CachedBlockReader reader{world};
     const entity::blockRay::ClipViewer viewer{.feetY = box.minY};
     for (double xx = 0.0; xx <= 1.0; xx += xs) {
         for (double yy = 0.0; yy <= 1.0; yy += ys) {
@@ -247,7 +312,7 @@ float seenPercent(WorldState& world, const double centerX, const double centerY,
                 const double x = box.minX + (xx * (box.maxX - box.minX));
                 const double y = box.minY + (yy * (box.maxY - box.minY));
                 const double z = box.minZ + (zz * (box.maxZ - box.minZ));
-                if (!entity::blockRay::clips(world, x + xOffset, y, z + zOffset, centerX, centerY, centerZ,
+                if (!entity::blockRay::clips(reader, x + xOffset, y, z + zOffset, centerX, centerY, centerZ,
                                              entity::blockRay::ClipShape::Collider, viewer)) {
                     ++hits;
                 }
