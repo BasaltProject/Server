@@ -421,9 +421,8 @@ void ClientSession::handleEnvelopeFrame(wire::io::ByteBuffer& body) {
         carried_->receive(outcome.packet);
         return;
     }
-    wire::io::ByteBuffer original;
-    original.writeBytes(outcome.packet);
-    handleOriginalPacket(original);
+    body.skip(static_cast<std::size_t>(outcome.packet.data() - body.readable().data()));
+    handleOriginalPacket(body);
 }
 
 class ClientSession::BedrockChannel final : public bedrock::Channel {
@@ -534,11 +533,14 @@ void ClientSession::frameOutgoing(std::span<const std::uint8_t> whole) {
     BorrowedBuffer<1> borrowed;
     wire::io::ByteBuffer& frame = borrowed.get();
     if (envelope_.has_value()) {
-        const std::vector<std::uint8_t> carried = envelope_->data(whole);
-        if (carried.empty()) {
+        if (envelope_->state() != wire::protocol::sessionEnvelope::EnvelopeEndpoint::State::kActive) {
             return;
         }
-        appendFrame(frame, carried);
+        BorrowedBuffer<2> wrapping;
+        wire::io::ByteBuffer& carried = wrapping.get();
+        carried.writeByte(wire::protocol::sessionEnvelope::kDataFrameKind);
+        carried.writeBytes(whole);
+        appendFrame(frame, carried.readable());
     } else {
         appendFrame(frame, whole);
     }
