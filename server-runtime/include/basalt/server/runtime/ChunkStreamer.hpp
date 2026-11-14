@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <utility>
 #include <vector>
@@ -86,6 +87,8 @@ private:
     mutable std::mutex chunkStreamMutex_;
     std::vector<server::world::ChunkPos> pendingChunks_;
     std::set<wire::common::Identifier> loggedUnknownBlockEntities_;
+    // One permission check per chunk batch: a provider may be a plugin, too costly per chunk.
+    mutable std::optional<bool> batchBypass_;
 };
 
 } // namespace basalt::server::runtime

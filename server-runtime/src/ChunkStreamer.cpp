@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/config/GroupsConfig.hpp>
+#include <basalt/server/runtime/permission/ServerPermissions.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/AntiXray.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
@@ -96,6 +97,7 @@ void ChunkStreamer::sendInitialChunks(const server::world::ChunkTracker::Delta& 
             loginChunks.push_back(chunk);
         }
     }
+    batchBypass_.reset();
     owner_->sendCompressed(wire::protocol::play::kChunkBatchStartId, [](wire::io::ByteBuffer&) {});
     for (Chunk* chunk : loginChunks) {
         sendChunk(*chunk);
@@ -185,6 +187,7 @@ void ChunkStreamer::resendChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     if (chunk == nullptr) {
         return;
     }
+    batchBypass_.reset();
     owner_->sendPlayPacket(wire::protocol::play::kChunkBatchStartId, [](wire::io::ByteBuffer&) {});
     sendChunk(*chunk);
     owner_->sendPlayPacket(ChunkBatchFinishedPacket::kId, [](wire::io::ByteBuffer& buffer) {
@@ -221,8 +224,10 @@ bool ChunkStreamer::bypassesAntiXray(const world::AntiXray& antiXray) const {
     if (!antiXray.usePermission() || session == nullptr || dispatcher == nullptr) {
         return false;
     }
-    return session->permissionGrant(kBypass).value_or(
-        dispatcher->environment().groups().resolve(session->group, kBypass));
+    if (!batchBypass_.has_value()) {
+        batchBypass_ = permission::has(*session, dispatcher->environment().groups(), kBypass);
+    }
+    return *batchBypass_;
 }
 
 void ChunkStreamer::sendChunk(Chunk& chunk) {
@@ -481,6 +486,7 @@ std::int32_t ChunkStreamer::flushReadyChunks(std::int32_t limit) {
     if (ready.empty()) {
         return 0;
     }
+    batchBypass_.reset();
     owner_->sendCompressed(wire::protocol::play::kChunkBatchStartId, [](wire::io::ByteBuffer&) {});
     for (Chunk* chunk : ready) {
         sendChunk(*chunk);

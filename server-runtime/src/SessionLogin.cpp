@@ -231,9 +231,6 @@ void ClientSession::handleLoginStart(wire::io::ByteBuffer& body) {
         startForwardedLogin(*loginStart);
         return;
     }
-    if (pluginRefusesLogin(loginStart->name, loginStart->profileId.toString())) {
-        return;
-    }
     wire::auth::SessionService* online = options_.onlineMode;
     if (online == nullptr) {
         finishLogin(Uuid::offlinePlayer(loginStart->name), loginStart->name, {});
@@ -291,9 +288,6 @@ void ClientSession::startForwardedLogin(const login::LoginStartPacket& loginStar
         return;
     }
     const wire::auth::forwarding::ForwardedLogin& forwarded = *proxy_.login();
-    if (pluginRefusesLogin(loginStart.name, forwarded.profileId.toString())) {
-        return;
-    }
     finishLogin(forwarded.profileId, loginStart.name, forwarded.properties);
 }
 
@@ -314,9 +308,6 @@ void ClientSession::handleForwardingAnswer(wire::io::ByteBuffer& body) {
     }
     const wire::auth::forwarding::ForwardedLogin& forwarded = *proxy_.login();
     const std::string name = forwarded.name.value_or(*pendingUsername_);
-    if (pluginRefusesLogin(name, forwarded.profileId.toString())) {
-        return;
-    }
     finishLogin(forwarded.profileId, name, forwarded.properties);
 }
 
@@ -426,6 +417,9 @@ std::optional<wire::text::Component> ClientSession::serverFullRefusal(Uuid id) {
 
 void ClientSession::finishLogin(Uuid id, const std::string& name,
                                 const std::vector<wire::auth::SessionProfileProperty>& properties) {
+    if (pluginRefusesLogin(name, id.toString())) {
+        return;
+    }
     std::optional<wire::text::Component> refusal = loginRefusal(id, name);
     if (!refusal.has_value()) {
         refusal = serverFullRefusal(id);

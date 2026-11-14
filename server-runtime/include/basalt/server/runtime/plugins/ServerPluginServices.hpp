@@ -171,6 +171,7 @@ public:
         server::plugins::PluginSelectors* selectors = nullptr;
         server::plugins::PluginStructures* structures = nullptr;
         server::plugins::PluginWorldgen* worldgen = nullptr;
+        server::plugins::permissions::PluginPermissions* permissions = nullptr;
         std::function<sched::Owner*(const std::string& world, double x, double z)> ownerAt;
     };
 
@@ -203,6 +204,7 @@ public:
     [[nodiscard]] server::plugins::PluginSelectors& selectors() override;
     [[nodiscard]] server::plugins::PluginStructures& structures() override;
     [[nodiscard]] server::plugins::PluginWorldgen& worldgen() override;
+    [[nodiscard]] server::plugins::permissions::PluginPermissions& permissions() override;
 
     bool at(std::string_view world, double x, double z, std::function<void()> task) override;
 

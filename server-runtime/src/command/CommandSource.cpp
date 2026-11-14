@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/command/CommandSource.hpp>
+#include <basalt/server/runtime/permission/ServerPermissions.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <atomic>
@@ -44,9 +45,8 @@ std::string PlayerCommandSource::name() const { return player_->name(); }
 wire::text::Component PlayerCommandSource::displayName() const { return wire::text::Component::text(player_->name()); }
 
 std::int32_t PlayerCommandSource::permissionLevel() const {
-    const std::optional<bool> granted = player_->permissionGrant(kAdminPermission);
-    return granted.value_or(groups_->resolve(player_->group, kAdminPermission)) ? permissionLevel::operatorLevel()
-                                                                                : permissionLevel::kAll;
+    return permission::has(*player_, *groups_, kAdminPermission) ? permissionLevel::operatorLevel()
+                                                                 : permissionLevel::kAll;
 }
 
 std::array<double, 3> PlayerCommandSource::position() const { return {player_->x, player_->y, player_->z}; }
@@ -61,7 +61,7 @@ bool PlayerCommandSource::hasPermission(std::optional<std::string_view> node) co
     if (!node.has_value()) {
         return false;
     }
-    return player_->permissionGrant(*node).value_or(groups_->resolve(player_->group, *node));
+    return permission::has(*player_, *groups_, *node);
 }
 
 CommandBlockSource::CommandBlockSource(std::array<double, 3> at, std::string name, bool speaks,

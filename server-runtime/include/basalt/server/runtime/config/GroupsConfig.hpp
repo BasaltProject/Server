@@ -63,7 +63,13 @@ public:
 
     [[nodiscard]] const PermissionGroup& get(std::optional<std::string_view> name) const;
 
-    [[nodiscard]] bool resolve(std::optional<std::string_view> groupName, std::string_view node) const;
+    [[nodiscard]] bool resolve(std::optional<std::string_view> groupName, std::string_view node) const {
+        return decide(groupName, node).value_or(false);
+    }
+
+    /// The nearest rule naming the node, ignoring rules less specific than `minSpecificity` (a bare `*` is 0).
+    [[nodiscard]] std::optional<bool> decide(std::optional<std::string_view> groupName, std::string_view node,
+                                             std::int32_t minSpecificity = 0) const;
 
 private:
     [[nodiscard]] const PermissionGroup& at(std::size_t index) const noexcept;

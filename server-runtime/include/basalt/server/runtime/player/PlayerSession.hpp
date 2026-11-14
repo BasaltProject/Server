@@ -34,6 +34,10 @@ namespace basalt::server::runtime::plugins {
 class EventSink;
 }
 
+namespace basalt::server::runtime::permission {
+class ServerPermissions;
+}
+
 namespace basalt::server::runtime::player {
 
 class PlayerSession {
@@ -69,6 +73,9 @@ public:
     std::int32_t fallFlyTicks = 0;
 
     std::optional<std::string> group;
+
+    /// Set when the session is registered; until then permissions are the plugin grants over the group.
+    const permission::ServerPermissions* permissions = nullptr;
 
     /// What each plugin grants or denies this session over the group; one answer wins by specificity.
     [[nodiscard]] std::optional<bool> permissionGrant(std::string_view node) const;

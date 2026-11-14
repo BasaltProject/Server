@@ -173,6 +173,7 @@ basalt_module(server-runtime-core
         src/BlockUseHelpers.cpp
         src/BlockUseOn.cpp
         src/BlockUseOnBlocks.cpp
+        src/permission/ServerPermissions.cpp
         src/plugins/EventHooks.cpp
         src/plugins/EventHooksContainer.cpp
         src/plugins/EventSink.cpp
@@ -818,7 +819,7 @@ basalt_module(server-runtime-core
         src/world/WorldStateTicks.cpp
         src/world/SpawnPotential.cpp
     DEPENDS basalt::metamorph-datafix basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io basalt::server-remote
-            basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
+            basalt::wire-multiversion basalt::wire-nbt basalt::wire-permissions basalt::wire-protocol basalt::wire-text
 )
 
 # Only this file sees the version, so stamping a new one does not recompile (or invalidate the cache of) the rest.

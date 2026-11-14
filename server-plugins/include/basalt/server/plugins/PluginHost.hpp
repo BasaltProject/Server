@@ -19,6 +19,7 @@
 #include <basalt/wire/plugins/PluginPackage.hpp>
 #include <basalt/wire/plugins/PluginSignature.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -215,6 +216,11 @@ public:
              const std::function<void(wire::lua::LuaArgs&)>& read);
 
     void report(LoadedPlugin& plugin, const wire::lua::LuaFailure& failure, std::string_view why);
+
+    /// Runs `body` holding the interpreter while `open` holds, for calls that come in from other threads.
+    void whileOpen(const std::atomic<bool>& open, const std::function<void()>& body);
+
+    void underLock(const std::function<void()>& body);
 
     void resuming(LoadedPlugin& plugin, const std::function<void()>& resume);
 

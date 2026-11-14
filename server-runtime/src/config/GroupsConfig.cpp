@@ -84,7 +84,8 @@ const PermissionGroup& GroupsConfig::get(std::optional<std::string_view> name) c
     return found == nullptr ? defaultGroup() : *found;
 }
 
-bool GroupsConfig::resolve(std::optional<std::string_view> groupName, std::string_view node) const {
+std::optional<bool> GroupsConfig::decide(std::optional<std::string_view> groupName, std::string_view node,
+                                         std::int32_t minSpecificity) const {
     const PermissionRule* best = nullptr;
     std::int32_t bestDepth = std::numeric_limits<std::int32_t>::max();
     std::int32_t depth = 0;
@@ -95,7 +96,7 @@ bool GroupsConfig::resolve(std::optional<std::string_view> groupName, std::strin
     while (current != nullptr && std::ranges::find(seen, std::string_view{current->name}) == seen.end()) {
         seen.emplace_back(current->name);
         for (const PermissionRule& rule : current->rules) {
-            if (!rule.matches(node)) {
+            if (rule.specificity() < minSpecificity || !rule.matches(node)) {
                 continue;
             }
             // A group is read before what it inherits, so at equal specificity the one found first is nearer.
@@ -109,7 +110,7 @@ bool GroupsConfig::resolve(std::optional<std::string_view> groupName, std::strin
         current = current->inherits.has_value() ? find(*current->inherits) : nullptr;
         ++depth;
     }
-    return best != nullptr && best->granted();
+    return best == nullptr ? std::nullopt : std::optional{best->granted()};
 }
 
 std::expected<GroupsConfig, std::string> GroupsConfig::load(const ConfigDirectory& directory,

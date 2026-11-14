@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
+#include <basalt/server/runtime/permission/ServerPermissions.hpp>
 #include <basalt/server/runtime/placeholder/AnimationPlaceholders.hpp>
 #include <basalt/server/runtime/placeholder/PlayerPlaceholders.hpp>
 #include <basalt/server/runtime/placeholder/ServerPlaceholders.hpp>
@@ -106,6 +107,21 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     : config_(&config), worldsConfig_(&worldsConfig), live_(&live), options_(std::move(options)),
       protocolGate_(options_.compatibility.gate(wire::multiversion::java::javaTranslators::supported(), logger_)),
       vanillaData_(dataJar(), logger_), chunkSimulation_(playerRegistry_) {
+    permissions_ = std::make_unique<permission::ServerPermissions>(permission::ServerPermissions::Options{
+        .groups = [this]() -> const config::GroupsConfig& { return live_->current()->groups; },
+        .online = [this](std::string_view uuid) -> const player::PlayerSession* {
+            const std::optional<wire::common::Uuid> parsed = wire::common::Uuid::parse(uuid);
+            return parsed.has_value() ? playerRegistry_.get(*parsed) : nullptr;
+        },
+        .changed =
+            [this] {
+                for (player::PlayerSession* session : playerRegistry_.snapshot()) {
+                    if (session->connection().sendCommandTree) {
+                        session->connection().sendCommandTree();
+                    }
+                }
+            }});
+    playerRegistry_.setPermissions(permissions_.get());
     if (options_.compatibility.nameSubstitutes()) {
         substitutionLabels_ = std::make_unique<SubstituteLabels>();
     }
@@ -967,6 +983,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     parts.selectors = miscServices_.selectors.get();
     parts.structures = miscServices_.structures.get();
     parts.worldgen = miscServices_.worldgen.get();
+    parts.permissions = permissions_.get();
     parts.ownerAt = [this](const std::string& name, double x, double z) -> sched::Owner* {
         const std::map<std::string, world::LoadedWorld*> loaded = worldRegistry_->worlds();
         const auto found = loaded.find(name);

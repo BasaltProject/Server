@@ -32,7 +32,7 @@ TEST_CASE("every function the Lua API installs is listed in the Kiln API manifes
     }
     REQUIRE_FALSE(listed.empty());
 
-    static const std::set<std::string> kInternal{"cancel",    "data.index",  "data.newindex",
+    static const std::set<std::string> kInternal{"cancel",    "remove",      "data.index",    "data.newindex",
                                                  "store.top", "store.index", "store.newindex"};
     const std::regex call{
         R"re((?:pushHostFunction|installWaitingFunction)\(\s*[\w*.>-]+,\s*(\w+ \? )?("[\w.]+")( : ("[\w.]+"))?)re"};

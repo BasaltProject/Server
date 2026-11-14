@@ -21,6 +21,7 @@ void PlayerRegistry::add(PlayerSession* session) {
     if (session == nullptr) {
         return;
     }
+    session->permissions = permissions_;
     const std::lock_guard<std::mutex> guard{lock_};
     const auto found = sessions_.find(session->uuid());
     auto next = std::make_shared<std::vector<PlayerSession*>>(*order_);

@@ -379,6 +379,10 @@ void pushPlayerData(LuaArgs& lua, PluginStorage& storage, std::string pluginId, 
 
 void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginStorage* storage,
                 const std::string& pluginId, const PluginText* text) {
+    const auto hasPermission = [player](LuaArgs& args) {
+        args.pushBoolean(player->may(args.checkString(firstArgument(args))));
+        return 1;
+    };
     PluginObject object{"player"};
     object.reads("name", [player] { return PluginValue{player->name()}; })
         .reads("uuid", [player] { return PluginValue{player->uuid()}; })
@@ -494,11 +498,8 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
                     player->kick(resolved(text, args));
                     return 0;
                 })
-        .method("may",
-                [player](LuaArgs& args) {
-                    args.pushBoolean(player->may(args.checkString(firstArgument(args))));
-                    return 1;
-                })
+        .method("has_permission", hasPermission)
+        .method("may", hasPermission)
         .method("grant",
                 [player, pluginId](LuaArgs& args) {
                     player->setPermission(pluginId, args.checkString(firstArgument(args)), true);

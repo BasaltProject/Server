@@ -601,6 +601,11 @@ server::plugins::PluginWorldgen& ServerPluginServices::worldgen() {
     return parts_.worldgen == nullptr ? server::plugins::PluginWorldgen::unavailable() : *parts_.worldgen;
 }
 
+server::plugins::permissions::PluginPermissions& ServerPluginServices::permissions() {
+    return parts_.permissions == nullptr ? server::plugins::permissions::PluginPermissions::unavailable()
+                                         : *parts_.permissions;
+}
+
 server::plugins::PluginSelectors& ServerPluginServices::selectors() {
     return parts_.selectors == nullptr ? server::plugins::PluginSelectors::unavailable() : *parts_.selectors;
 }

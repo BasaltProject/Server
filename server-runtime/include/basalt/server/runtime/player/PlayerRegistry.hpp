@@ -22,6 +22,9 @@ public:
 
     void add(PlayerSession* session);
 
+    /// Handed to every session added from now on.
+    void setPermissions(const permission::ServerPermissions* permissions) noexcept { permissions_ = permissions; }
+
     void remove(const wire::common::Uuid& uuid);
 
     void retire(std::unique_ptr<PlayerSession> session);
@@ -43,6 +46,7 @@ private:
     static constexpr std::chrono::seconds kRetirement{2};
 
     mutable std::mutex lock_;
+    const permission::ServerPermissions* permissions_ = nullptr;
     /// Kept in join order, which is the order vanilla lists players in.
     std::shared_ptr<const std::vector<PlayerSession*>> order_ = std::make_shared<const std::vector<PlayerSession*>>();
     std::unordered_map<wire::common::Uuid, PlayerSession*> sessions_;

@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/config/GroupsConfig.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
+#include <basalt/server/runtime/permission/ServerPermissions.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
@@ -316,7 +317,7 @@ public:
         if (player == nullptr || !hooks_->groups) {
             return false;
         }
-        return player->permissionGrant(permission).value_or(hooks_->groups().resolve(player->group, permission));
+        return runtime::permission::has(*player, hooks_->groups(), permission);
     }
 
     void setPermission(std::string_view source, std::string_view node, std::optional<bool> granted) override {

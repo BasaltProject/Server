@@ -83,6 +83,10 @@
 #include <string_view>
 #include <vector>
 
+namespace basalt::server::runtime::permission {
+class ServerPermissions;
+}
+
 namespace basalt::server::runtime {
 class BlockTests;
 class LoadingServer;
@@ -222,6 +226,7 @@ private:
     Options options_;
     wire::common::Logger logger_{"Server"};
 
+    std::unique_ptr<permission::ServerPermissions> permissions_;
     player::PlayerRegistry playerRegistry_;
     wire::multiversion::ProtocolGate protocolGate_;
     std::unique_ptr<SubstituteLabels> substitutionLabels_;

@@ -9,6 +9,7 @@ basalt_module(server-plugins
         src/PluginMechanicsApi.cpp
         src/PluginWorldApi.cpp
         src/PluginMiscApi.cpp
+        src/PluginPermissionsApi.cpp
         src/PluginServerTablesApi.cpp
         src/PluginSettingsApi.cpp
         src/PluginChannelHost.cpp

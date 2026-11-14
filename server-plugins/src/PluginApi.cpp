@@ -1,4 +1,5 @@
 #include "PluginApiShared.hpp"
+#include "PluginCallGate.hpp"
 #include "PluginFilePath.hpp"
 
 #include <basalt/server/plugins/PluginFiles.hpp>
@@ -209,12 +210,22 @@ void installMessaging(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
             args.raise("placeholder(name, fn) needs a function");
         }
         const auto fn = std::make_shared<LuaRef>(LuaRef::of(args.state(), 2));
+        const auto gate = std::make_shared<PluginCallGate>();
         PluginHandle handle = server->services().placeholders().registerPlaceholder(
-            target->manifest.id, name, [server, target, fn](PluginPlayerRef* player) {
-                return server->answer(*target, *fn, player, "placeholder");
+            target->manifest.id, name, [server, target, fn, gate](PluginPlayerRef* player) {
+                std::string said;
+                const PluginCallGate::Pass pass{*gate};
+                if (pass.entered()) {
+                    gate->run(*server, [&] { said = server->answer(*target, *fn, player, "placeholder"); });
+                }
+                return said;
             });
         static_cast<void>(target->registrations.add("placeholder(%" + target->manifest.id + "_" + name + "%)",
-                                                    [moved = std::move(handle)]() mutable { moved.remove(); }));
+                                                    [server, fn, gate, moved = std::move(handle)]() mutable {
+                                                        moved.remove();
+                                                        gate->close(*server);
+                                                        server->underLock([&fn] { fn->release(); });
+                                                    }));
         return 0;
     });
     lua.setGlobal("placeholder");
@@ -660,6 +671,7 @@ void install(PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, s
     installWorld(lua, instance, plugin, host);
     installMechanics(lua);
     installMessaging(lua, plugin, host);
+    installPermissions(lua, plugin, host);
     installListeners(lua, instance, plugin, host);
     installGranted(lua, plugin, host);
     installMisc(lua, plugin, host);

@@ -193,6 +193,18 @@ void PluginHost::enter(LoadedPlugin& plugin, PluginInstance& instance, const wir
                                                 }));
 }
 
+void PluginHost::whileOpen(const std::atomic<bool>& open, const std::function<void()>& body) {
+    const std::lock_guard<std::recursive_mutex> turn{luaMutex_};
+    if (open.load(std::memory_order_acquire)) {
+        body();
+    }
+}
+
+void PluginHost::underLock(const std::function<void()>& body) {
+    const std::lock_guard<std::recursive_mutex> turn{luaMutex_};
+    body();
+}
+
 void PluginHost::report(LoadedPlugin& plugin, const wire::lua::LuaFailure& failure, std::string_view why) {
     plugin.strikes++;
     plugin.failures++;
