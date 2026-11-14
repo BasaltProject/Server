@@ -48,6 +48,8 @@ namespace {
     return static_cast<std::int32_t>(hashed & 0xFFFFFFU);
 }
 
+constexpr std::int32_t kArrivalEmptyRadius = 3;
+
 /// parity: `Attributes.MOVEMENT_SPEED`'s default for a player.
 constexpr float kWalkSpeed = 0.1F;
 
@@ -654,6 +656,31 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
                                             static_cast<float>(y) + wire::bedrock::kPlayerEyeHeight,
                                             static_cast<float>(z), false);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ChangeDimension), body.toVector());
+
+        // parity: Geyser's dimension switch; the client waits for the acknowledgement and the columns around it.
+        body.clear();
+        wire::bedrock::writeStopSound(body, "", true);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::StopSound), body.toVector());
+        body.clear();
+        wire::bedrock::writeDimensionChangeAck(body, kRuntimeEntityId);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayerAction), body.toVector());
+
+        const std::int32_t arrivalColumnX = static_cast<std::int32_t>(std::floor(x)) >> 4;
+        const std::int32_t arrivalColumnZ = static_cast<std::int32_t>(std::floor(z)) >> 4;
+        const std::uint32_t sections = dimension_ == wire::bedrock::BedrockDimension::Overworld ? 24U
+                                       : dimension_ == wire::bedrock::BedrockDimension::Nether  ? 8U
+                                                                                                : 16U;
+        for (std::int32_t dx = -kArrivalEmptyRadius; dx <= kArrivalEmptyRadius; ++dx) {
+            for (std::int32_t dz = -kArrivalEmptyRadius; dz <= kArrivalEmptyRadius; ++dz) {
+                body.clear();
+                wire::bedrock::writeEmptyLevelChunk(body, arrivalColumnX + dx, arrivalColumnZ + dz, sections,
+                                                    static_cast<std::int32_t>(dimension_), protocol_);
+                mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelChunk), body.toVector());
+            }
+        }
+        // The real columns go out on the next tick, replacing the empty ones even when the column is the same.
+        columns_.clear();
+        lastColumn_ = std::pair{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()};
         return true;
     };
 
