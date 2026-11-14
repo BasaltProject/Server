@@ -19,7 +19,7 @@ namespace basalt::server::world::structure {
 struct StructureBlockInfo {
     StructurePos pos;
     std::int32_t stateId = 0;
-    std::optional<wire::nbt::NbtCompound> blockEntityNbt;
+    std::shared_ptr<const wire::nbt::NbtCompound> blockEntityNbt;
     std::optional<StructureDirection> frontFacing;
     std::optional<StructureDirection> topFacing;
     std::shared_ptr<const std::map<std::string, std::string>> properties;

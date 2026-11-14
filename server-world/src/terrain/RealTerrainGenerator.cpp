@@ -99,7 +99,8 @@ GeneratedTerrain buildTerrain(const NoiseRouter& router, const surface::SurfaceR
     // parity: `ChunkGenerator.createBiomes` samples the climate through a cached context of its own.
     auto biomeContext = std::make_unique<densityfunction::SamplerContext>(
         densityfunction::SamplerContext::Options{.enableCaches = true});
-    auto biomes = std::make_unique<surface::ChunkBiomeEnvironment>(environment, biomeContext.get());
+    auto biomes = std::make_unique<surface::ChunkBiomeEnvironment>(environment, biomeContext.get(), chunkX, chunkZ,
+                                                                   chunk.verticalBounds());
     generationMetrics::measure(generationMetrics::Phase::BiomeFill,
                                [&] { fillBiomes(chunk, *biomes, biomeContext.get(), blender); });
     NoiseChunk noiseChunk{router, std::move(beardifier),
@@ -278,7 +279,8 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
 GeneratedTerrain adopt(const surface::SurfaceRuleEnvironment& environment, Chunk chunk) {
     auto context = std::make_unique<densityfunction::SamplerContext>(
         densityfunction::SamplerContext::Options{.enableCaches = true});
-    auto biomes = std::make_unique<surface::ChunkBiomeEnvironment>(environment, context.get());
+    auto biomes = std::make_unique<surface::ChunkBiomeEnvironment>(environment, context.get(), chunk.chunkX(),
+                                                                   chunk.chunkZ(), chunk.verticalBounds());
     return GeneratedTerrain{std::move(chunk), std::move(context), std::move(biomes)};
 }
 

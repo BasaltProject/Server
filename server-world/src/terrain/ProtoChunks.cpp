@@ -433,6 +433,7 @@ void ProtoChunks::runTask(Task& task) {
         ProtoRegion region{chunkX, chunkZ, task.region};
         hooks_.decorate(*task.decorating, region);
         task.decorating->chunk().setStage(ChunkStage::Decorated);
+        task.decorating->releaseWorkingSet();
         break;
     }
     case Task::Kind::Finish:

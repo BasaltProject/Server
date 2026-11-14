@@ -129,7 +129,7 @@ ServerStructures::scan(std::span<const std::uint8_t> structure,
             at = {at.x + origin.x, at.y + origin.y, at.z + origin.z};
         }
         server::plugins::PluginTemplateBlock block{.x = at.x, .y = at.y, .z = at.z, .stateId = info.stateId};
-        if (info.blockEntityNbt.has_value()) {
+        if (info.blockEntityNbt != nullptr) {
             block.nbt = bytesOf(*info.blockEntityNbt);
         }
         out.blocks.push_back(std::move(block));

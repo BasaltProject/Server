@@ -86,6 +86,12 @@ public:
 
     [[nodiscard]] const surface::SurfaceRuleEnvironment& environment() const noexcept { return *environment_; }
 
+    /// Drops the sampler caches and the biome memo; only decoration reads them, so call it once decorated.
+    void releaseWorkingSet() noexcept {
+        environment_.reset();
+        cache_.reset();
+    }
+
 private:
     Chunk chunk_;
     std::unique_ptr<densityfunction::SamplerContext> cache_;

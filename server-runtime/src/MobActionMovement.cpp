@@ -237,8 +237,9 @@ void MobActionSystem::emitMovement(world::LoadedWorld& world, ServerEntity& mob)
         const std::int32_t feetState = state.blockState(feet[0], feet[1], feet[2]).value_or(0);
         const wire::common::Identifier* feetBlock = server::registry::blockStateDefinitions::blockOf(feetState);
         const bool climbing = feetBlock != nullptr && blockTagged("minecraft:climbable", *feetBlock).value_or(false);
-        const bool floating = mob.effects.contains(wire::common::Identifier::vanilla("slow_falling")) ||
-                              mob.effects.contains(wire::common::Identifier::vanilla("levitation"));
+        const bool floating =
+            !mob.effects.empty() && (mob.effects.contains(wire::common::Identifier::vanilla("slow_falling")) ||
+                                     mob.effects.contains(wire::common::Identifier::vanilla("levitation")));
         const bool lava = mob.type().path() == "strider" && feetBlock != nullptr && feetBlock->path() == "lava";
         if (inWater || climbing || lava || (floating && dy <= 0.0)) {
             mob.fallDistance = 0.0;

@@ -514,7 +514,7 @@ void NetherRuinedPortalGenerator::placeTemplate(const PortalStart& start, Portal
         processed.push_back(
             Processed{.position = worldPos,
                       .stateId = state.transform(start.mirror, start.rotation).stateId(),
-                      .nbt = blockInfo.blockEntityNbt.has_value() ? &*blockInfo.blockEntityNbt : nullptr});
+                      .nbt = blockInfo.blockEntityNbt != nullptr ? &*blockInfo.blockEntityNbt : nullptr});
     }
 
     for (const Processed& block : processed) {
@@ -538,7 +538,7 @@ void NetherRuinedPortalGenerator::placeTemplate(const PortalStart& start, Portal
         const StructurePos position{start.position.x + relative.x, start.position.y + relative.y,
                                     start.position.z + relative.z};
         std::string finalState = "minecraft:air";
-        if (blockInfo.blockEntityNbt.has_value()) {
+        if (blockInfo.blockEntityNbt != nullptr) {
             finalState = std::string{blockInfo.blockEntityNbt->getString("final_state", "minecraft:air")};
         }
         const std::size_t bracket = finalState.find('[');

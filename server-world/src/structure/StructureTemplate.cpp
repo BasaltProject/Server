@@ -252,7 +252,7 @@ struct Palette {
         info.stateId =
             paletteIndex < palette.stateIds.size() ? palette.stateIds[paletteIndex] : registry::blocks::air().stateId;
         if (const NbtCompound* blockEntity = blockTag->getCompound("nbt"); blockEntity != nullptr) {
-            info.blockEntityNbt = *blockEntity;
+            info.blockEntityNbt = std::make_shared<const NbtCompound>(*blockEntity);
         }
         if (paletteIndex < palette.frontFacing.size()) {
             info.frontFacing = palette.frontFacing[paletteIndex];
@@ -323,7 +323,7 @@ struct ProcessedBlock {
 
 /// parity: `AppendLoot`, the block entity modifier a processor rule carries.
 void placeAppendedLoot(Chunk& chunk, std::int32_t stateId, StructurePos worldPos, const std::string& table,
-                       const std::optional<NbtCompound>& existing = std::nullopt) {
+                       const NbtCompound* existing = nullptr) {
     static const std::map<std::string, std::string, std::less<>> types{{"suspicious_sand", "brushable_block"},
                                                                        {"suspicious_gravel", "brushable_block"}};
     const auto type = types.find(pathOf(stateId));
@@ -332,7 +332,7 @@ void placeAppendedLoot(Chunk& chunk, std::int32_t stateId, StructurePos worldPos
     }
     random::RandomSource lootRandom = random::RandomSource::worldgen(
         random::RandomSource::legacy(random::positionalSeed(worldPos.x, worldPos.y, worldPos.z)));
-    NbtCompound data = existing.value_or(NbtCompound{});
+    NbtCompound data = existing != nullptr ? *existing : NbtCompound{};
     data.remove("id");
     data.set("LootTable", NbtTag::ofString(table));
     data.set("LootTableSeed", NbtTag::ofLong(lootRandom.nextLong()));
@@ -344,7 +344,7 @@ void placeAppendedLoot(Chunk& chunk, std::int32_t stateId, StructurePos worldPos
 
 void placeBlockEntityInto(Chunk& chunk, const StructureBlockInfo& blockInfo, std::int32_t stateId,
                           StructurePos worldPos, random::RandomSource* random, bool decoration) {
-    if (!blockInfo.blockEntityNbt.has_value()) {
+    if (blockInfo.blockEntityNbt == nullptr) {
         return;
     }
     const std::string finalPath = pathOf(stateId);
@@ -412,7 +412,7 @@ void StructureTemplate::load(const NbtCompound& nbt) {
     for (std::size_t index = 0; index < blocks.size(); ++index) {
         const StructureBlockInfo& blockInfo = blocks[index];
         if (blockInfo.frontFacing.has_value() && blockInfo.topFacing.has_value() &&
-            blockInfo.blockEntityNbt.has_value()) {
+            blockInfo.blockEntityNbt != nullptr) {
             jigsawIndices_.push_back(static_cast<std::uint32_t>(index));
         }
     }
@@ -479,7 +479,7 @@ std::vector<StructureDataMarker> StructureTemplate::dataMarkers(const StructureP
                                                                 const StructurePos pivot) const {
     std::vector<StructureDataMarker> markers;
     for (const StructureBlockInfo& blockInfo : blocks()) {
-        if (pathOf(blockInfo.stateId) != "structure_block" || !blockInfo.blockEntityNbt.has_value()) {
+        if (pathOf(blockInfo.stateId) != "structure_block" || blockInfo.blockEntityNbt == nullptr) {
             continue;
         }
         std::string mode{blockInfo.blockEntityNbt->getString("mode")};
@@ -620,7 +620,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         // parity: the jigsaw replacement, applied to every jigsaw block unconditionally.
         if (blockInfo.frontFacing.has_value()) {
             const std::string finalStateName =
-                blockInfo.blockEntityNbt.has_value()
+                blockInfo.blockEntityNbt != nullptr
                     ? std::string{blockInfo.blockEntityNbt->getString("final_state", "minecraft:air")}
                     : std::string{"minecraft:air"};
             const std::size_t open = finalStateName.find('[');
@@ -706,7 +706,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         }
         placeBlockEntityInto(chunk, *entry.block, finalStateId, entry.worldPos, placement.random, false);
         if (const auto loot = cappedLoot.find(index); loot != cappedLoot.end()) {
-            placeAppendedLoot(chunk, finalStateId, entry.worldPos, loot->second, entry.block->blockEntityNbt);
+            placeAppendedLoot(chunk, finalStateId, entry.worldPos, loot->second, entry.block->blockEntityNbt.get());
         }
     }
     if (!placement.ignoreEntities) {
