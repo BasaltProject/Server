@@ -46,6 +46,23 @@ inline constexpr std::uint32_t kDisplay = 1U << 21;
 inline constexpr std::uint32_t kPhantom = 1U << 22;
 } // namespace basalt::server::runtime::entity::traits
 
+namespace basalt::server::runtime::entity::kinds {
+inline constexpr std::uint32_t kBee = 1U << 0;
+inline constexpr std::uint32_t kCopperGolem = 1U << 1;
+inline constexpr std::uint32_t kHorse = 1U << 2;
+inline constexpr std::uint32_t kVex = 1U << 3;
+inline constexpr std::uint32_t kRavager = 1U << 4;
+inline constexpr std::uint32_t kSnowGolem = 1U << 5;
+inline constexpr std::uint32_t kSkeletonHorse = 1U << 6;
+inline constexpr std::uint32_t kDolphin = 1U << 7;
+inline constexpr std::uint32_t kZombifiedPiglin = 1U << 8;
+inline constexpr std::uint32_t kNeutralMob = 1U << 9;
+inline constexpr std::uint32_t kParrot = 1U << 10;
+inline constexpr std::uint32_t kTrader = 1U << 11;
+inline constexpr std::uint32_t kShulker = 1U << 12;
+inline constexpr std::uint32_t kCamel = 1U << 13;
+} // namespace basalt::server::runtime::entity::kinds
+
 namespace basalt::server::runtime::config {
 struct MobOverride;
 }
@@ -198,6 +215,13 @@ public:
 
     /// Type predicates settled once at construction; see `typeTraits`.
     [[nodiscard]] std::uint32_t typeTraits() const noexcept { return typeTraits_; }
+
+    /// The `kinds` bits that hold for this entity type, for the checks a mob makes every tick.
+    [[nodiscard]] std::uint32_t tickKinds() const noexcept { return tickKinds_; }
+
+    [[nodiscard]] std::uint8_t mobCategoryIndex() const noexcept { return mobCategoryIndex_; }
+
+    [[nodiscard]] std::optional<float> ownEye() const noexcept { return ownEye_; }
 
     [[nodiscard]] bool livingType() const noexcept { return (typeTraits_ & traits::kLiving) != 0; }
 
@@ -663,6 +687,9 @@ private:
     wire::common::Uuid uuid_;
     wire::common::Identifier type_;
     std::uint32_t typeTraits_ = 0;
+    std::uint32_t tickKinds_ = 0;
+    std::uint8_t mobCategoryIndex_ = 0;
+    std::optional<float> ownEye_;
     const server::registry::entityTypeShapes::Shape* shape_ = nullptr;
     const std::map<std::string, double, std::less<>>* baseAttributes_ = nullptr;
     float baseWidth_ = 1.0F;

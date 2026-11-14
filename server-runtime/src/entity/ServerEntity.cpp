@@ -147,6 +147,10 @@ ServerEntity::ServerEntity(std::int32_t entityId, wire::common::Uuid uuid, wire:
     : x(x), y(y), z(z), yaw(yaw), pitch(pitch), entityId_(entityId), uuid_(uuid), type_(std::move(type)),
       protocolType_(protocolType) {
     typeTraits_ = computeTypeTraits(type_);
+    tickKinds_ = computeTickKinds(type_);
+    mobCategoryIndex_ = static_cast<std::uint8_t>(
+        mobCategoryByName(mobs::categoryOf(type_)).value_or(MobCategory::Misc));
+    ownEye_ = mobBreathing::ownEyeOf(type_.path());
     shape_ = registry::entityTypeShapes::of(type_);
     baseAttributes_ = &registry::entityAttributes::of(type_);
     baseWidth_ = static_cast<float>(registry::entityTypeShapes::widthOf(type_));

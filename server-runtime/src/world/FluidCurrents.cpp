@@ -272,7 +272,11 @@ Contact carry(LoadedWorld& world, entity::ServerEntity& entity, const realBlockT
         return {};
     }
     const BlockAt blocks = blocksOf(world);
-    Contact contact = touch(blocks, *box, true, blockTags);
+    Contact contact;
+    {
+        const WorldState::BlockReadScope readScope{world.state()};
+        contact = touch(blocks, *box, true, blockTags);
+    }
     if (!pushedByFluid(entity, contact)) {
         contact.water = {};
         contact.lava = {};

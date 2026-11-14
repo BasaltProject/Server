@@ -452,6 +452,31 @@ std::uint32_t computeTypeTraits(const wire::common::Identifier& type) {
     return bits;
 }
 
+std::uint32_t computeTickKinds(const wire::common::Identifier& type) {
+    const std::string_view path = type.path();
+    std::uint32_t bits = 0;
+    const auto set = [&bits](bool held, std::uint32_t bit) {
+        if (held) {
+            bits |= bit;
+        }
+    };
+    set(bees::isBee(type), kinds::kBee);
+    set(copperGolems::isCopperGolem(type), kinds::kCopperGolem);
+    set(horses::isHorse(type), kinds::kHorse);
+    set(path == "vex", kinds::kVex);
+    set(path == "ravager", kinds::kRavager);
+    set(path == "snow_golem", kinds::kSnowGolem);
+    set(path == "skeleton_horse", kinds::kSkeletonHorse);
+    set(path == "dolphin", kinds::kDolphin);
+    set(path == "zombified_piglin", kinds::kZombifiedPiglin);
+    set(path == "wolf" || path == "iron_golem" || path == "polar_bear" || path == "enderman", kinds::kNeutralMob);
+    set(path == "parrot", kinds::kParrot);
+    set(path == "wandering_trader" || path == "trader_llama", kinds::kTrader);
+    set(shulkers::isShulker(type), kinds::kShulker);
+    set(horses::isCamel(type), kinds::kCamel);
+    return bits;
+}
+
 RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     RuntimeEntityMetadata live{.airSupply = entity.airSupply};
     const auto has = [bits = entity.typeTraits()](std::uint32_t bit) { return (bits & bit) != 0; };

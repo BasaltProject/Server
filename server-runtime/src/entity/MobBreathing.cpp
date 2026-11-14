@@ -161,6 +161,8 @@ enum class Gasp : std::uint8_t { None, WaterAnimal, Axolotl, Nautilus };
 
 } // namespace
 
+std::optional<float> ownEyeOf(std::string_view typePath) { return eyeIn(kEyes, typePath); }
+
 std::int32_t maxAirOf(std::string_view typePath) {
     if (typePath == "dolphin") {
         return ServerEntity::kDolphinMaxAir;
@@ -177,7 +179,7 @@ double eyeHeightOf(const ServerEntity& mob) {
         return static_cast<double>(kSleepingEye);
     }
     const std::string_view path = mob.type().path();
-    float eye = eyeIn(kEyes, path).value_or(static_cast<float>(mob.height()) * kEyeShare);
+    float eye = mob.ownEye().value_or(static_cast<float>(mob.height()) * kEyeShare);
     const bool baby = mob.age < 0 || (mob.sourceNbt.has_value() && mob.sourceNbt->getBoolean("IsBaby"));
     if (baby) {
         const std::optional<float> own = eyeIn(kBabyEyes, path);
@@ -203,7 +205,7 @@ std::vector<Hurt> tick(ServerEntity& mob, const Surroundings& at) {
         mob.airSupply = path == "dolphin" ? maxAir : std::min(mob.airSupply + 4, maxAir);
     };
     const auto has = [&mob](std::string_view effect) {
-        return mob.effects.contains(wire::common::Identifier::vanilla(std::string{effect}));
+        return !mob.effects.empty() && mob.effects.contains(wire::common::Identifier::vanilla(std::string{effect}));
     };
     // parity: `MobEffectUtil.hasWaterBreathing` and `shouldEffectsRefillAirsupply`.
     const bool waterBreathing = has("water_breathing") || has("conduit_power") || has("breath_of_the_nautilus");

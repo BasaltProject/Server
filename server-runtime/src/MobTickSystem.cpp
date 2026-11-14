@@ -190,13 +190,13 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
             --entity.stingerCount;
         }
     }
-    if (entity::wardens::isWarden(entity.type())) {
+    if ((entity.typeTraits() & entity::traits::kWarden) != 0) {
         actions_->tickWarden(world, watchers, entity);
         if (entity.removed) {
             return;
         }
     }
-    if (entity::copperGolems::isCopperGolem(entity.type())) {
+    if ((entity.tickKinds() & entity::kinds::kCopperGolem) != 0) {
         actions_->tickCopperGolem(world, entity, random);
         if (entity.removed) {
             return;
@@ -205,23 +205,23 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (entity.panicTicks > 0) {
         entity.panicTicks--;
     }
-    if (entity.type().path() == "vex") {
+    if ((entity.tickKinds() & entity::kinds::kVex) != 0) {
         actions_->tickVexLife(watchers, entity);
     }
     actions_->tickFire(world, watchers, entity, random);
     actions_->tickMobEffects(world, watchers, entity);
     actions_->tickBreath(world, watchers, entity, random);
-    if (entity.type().path() == "ravager") {
+    if ((entity.tickKinds() & entity::kinds::kRavager) != 0) {
         actions_->tickRavager(world, watchers, entity);
     }
     if (actions_->tickConversion(world, watchers, entity)) {
         return;
     }
     // parity: `SnowGolem.aiStep` is the living entity's own turn.
-    if (entity.type().path() == "snow_golem") {
+    if ((entity.tickKinds() & entity::kinds::kSnowGolem) != 0) {
         actions_->trailSnow(world, entity);
     }
-    if (entity.type().path() == "skeleton_horse" && entity.skeletonTrap) {
+    if ((entity.tickKinds() & entity::kinds::kSkeletonHorse) != 0 && entity.skeletonTrap) {
         const double rangeSquared = world::skeletonHorseTrap::kPlayerRange * world::skeletonHorseTrap::kPlayerRange;
         bool nearbyAlivePlayer = false;
         if (!entity.noAi) {
@@ -247,7 +247,7 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         }
     }
     // parity: a saddled mount a player steers moves by that player's client, not by its own goals.
-    const bool steered = entity::horses::isHorse(entity.type()) && entity::horses::saddled(entity) &&
+    const bool steered = (entity.tickKinds() & entity::kinds::kHorse) != 0 && entity::horses::saddled(entity) &&
                          !entity.passengerIds.empty() &&
                          std::ranges::any_of(watchers, [&entity](const PlayerSession* player) {
                              return player->entityId() == entity.passengerIds.front();
@@ -270,7 +270,7 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         if (entity.targetId != targeted) {
             actions_->retarget(world, entity, targeted);
         }
-        if (entity.type().path() == "dolphin") {
+        if ((entity.tickKinds() & entity::kinds::kDolphin) != 0) {
             actions_->dolphinPicksUp(world, entity);
         }
         if (entity.tuning != nullptr) {
@@ -281,10 +281,10 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
             actions_->breed(world, entity, *partner);
         }
     }
-    if (entity::horses::isHorse(entity.type())) {
+    if ((entity.tickKinds() & entity::kinds::kHorse) != 0) {
         actions_->tickHorse(world, entity, random);
     }
-    if (steered && entity::camels::isCamel(entity.type())) {
+    if (steered && (entity.tickKinds() & entity::kinds::kCamel) != 0) {
         for (const PlayerSession* rider : watchers) {
             if (rider->entityId() == entity.passengerIds.front()) {
                 actions_->camelRidden(world, entity, *rider);
@@ -292,27 +292,26 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         }
     }
     // parity: `Bee.customServerAiStep` and the rest of `Bee.aiStep`, after the goals.
-    if (entity::bees::isBee(entity.type())) {
+    if ((entity.tickKinds() & entity::kinds::kBee) != 0) {
         actions_->tickBee(world, watchers, entity, random);
     }
-    if (entity.type().path() == "zombified_piglin") {
+    if ((entity.tickKinds() & entity::kinds::kZombifiedPiglin) != 0) {
         actions_->tickZombifiedPiglin(world, entity, random);
     }
-    if (const std::string_view kind = entity.type().path();
-        kind == "wolf" || kind == "iron_golem" || kind == "polar_bear" || kind == "enderman") {
+    if ((entity.tickKinds() & entity::kinds::kNeutralMob) != 0) {
         actions_->tickNeutralMob(world, entity, random);
     }
-    if (entity.type().path() == "parrot") {
+    if ((entity.tickKinds() & entity::kinds::kParrot) != 0) {
         actions_->tickParrot(world, entity);
     }
-    if (entity.type().path() == "sulfur_cube") {
+    if ((entity.typeTraits() & entity::traits::kSulfurCube) != 0) {
         actions_->tickSulfurCube(world, entity);
         if (entity.removed) {
             return;
         }
     }
     // parity: `Pufferfish.tick` and `aiStep`.
-    if (entity.type().path() == "pufferfish") {
+    if ((entity.typeTraits() & entity::traits::kPufferfish) != 0) {
         actions_->tickPufferfish(world, watchers, entity, living);
     }
     // parity: `LivingEntity.aiStep`'s `pushEntities`, after the travel.
@@ -322,11 +321,10 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         return;
     }
     // parity: `Shulker.tick`, after the living entity's own turn.
-    if (entity::shulkers::isShulker(entity.type())) {
+    if ((entity.tickKinds() & entity::kinds::kShulker) != 0) {
         actions_->tickShulker(world, watchers, living, entity, random);
     }
-    const std::string_view path = entity.type().path();
-    if (path == "wandering_trader" || path == "trader_llama") {
+    if ((entity.tickKinds() & entity::kinds::kTrader) != 0) {
         std::set<std::int32_t> playerIds;
         for (const PlayerSession* player : watchers) {
             playerIds.insert(player->entityId());
@@ -336,8 +334,7 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
             return;
         }
     }
-    const entity::MobCategory category =
-        entity::mobCategoryByName(entity::mobs::categoryOf(entity.type())).value_or(entity::MobCategory::Misc);
+    const auto category = static_cast<entity::MobCategory>(entity.mobCategoryIndex());
     const config::MobSettings& mobs = world.mobSettings();
     const auto categoryAt = static_cast<std::size_t>(category);
     entity::mobDespawn::Ranges ranges;

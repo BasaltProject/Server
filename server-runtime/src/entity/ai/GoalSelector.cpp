@@ -7,7 +7,7 @@
 namespace basalt::server::runtime::entity::ai {
 
 WrappedGoal::WrappedGoal(std::int32_t priority, std::unique_ptr<Goal> goal, std::string name, bool plugin)
-    : priority_(priority), goal_(std::move(goal)), name_(std::move(name)), plugin_(plugin) {}
+    : priority_(priority), goal_(std::move(goal)), name_(std::move(name)), flags_(goal_->flags()), plugin_(plugin) {}
 
 bool WrappedGoal::canBeReplacedBy(const WrappedGoal& other) const {
     return goal_->isInterruptable() && other.priority_ < priority_;
@@ -105,7 +105,7 @@ bool GoalSelector::isRunning(const std::function<bool(const Goal&)>& predicate) 
 }
 
 bool GoalSelector::canTakeFlags(const WrappedGoal& wrapped) const {
-    for (const GoalFlag flag : wrapped.goal().flags()) {
+    for (const GoalFlag flag : wrapped.flags()) {
         const auto held = lockedFlags_.find(flag);
         if (held != lockedFlags_.end() && !held->second->canBeReplacedBy(wrapped)) {
             return false;
@@ -150,7 +150,7 @@ void GoalSelector::tick(MobContext& mob) {
         if (!usable) {
             continue;
         }
-        for (const GoalFlag flag : wrapped->goal().flags()) {
+        for (const GoalFlag flag : wrapped->flags()) {
             if (const auto held = lockedFlags_.find(flag); held != lockedFlags_.end()) {
                 held->second->stop(mob);
             }

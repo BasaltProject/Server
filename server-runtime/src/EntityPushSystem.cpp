@@ -250,7 +250,8 @@ std::vector<EntityPushSystem::Body> EntityPushSystem::entitiesIn(world::LoadedWo
             }
         }
     }
-    for (PlayerSession* player : players_->snapshot()) {
+    const std::shared_ptr<const std::vector<PlayerSession*>> everyone = players_->view();
+    for (PlayerSession* player : *everyone) {
         if (player == self.player || player->worldName != world.name() || player->dead) {
             continue;
         }

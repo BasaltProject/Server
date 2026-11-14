@@ -78,12 +78,11 @@ namespace {
     ServerEntity* best = nullptr;
     double bestDistance = range * range;
     for (ServerEntity* candidate : mob.entities) {
-        if (candidate == nullptr || candidate == &mob.mob || candidate->removed ||
-            !targets.contains(candidate->type().path()) || candidate->health <= 0.0) {
+        if (candidate == nullptr || candidate == &mob.mob || candidate->removed || candidate->health <= 0.0) {
             continue;
         }
         const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);
-        if (distance > bestDistance) {
+        if (distance > bestDistance || !targets.contains(candidate->type().path())) {
             continue;
         }
         bestDistance = distance;

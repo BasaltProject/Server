@@ -37,6 +37,8 @@ public:
 
     void noteUsable(bool usable) noexcept { lastUsable_ = usable; }
 
+    [[nodiscard]] const std::set<GoalFlag>& flags() const noexcept { return flags_; }
+
     [[nodiscard]] bool canBeReplacedBy(const WrappedGoal& other) const;
 
     void start(MobContext& mob);
@@ -47,6 +49,7 @@ private:
     std::int32_t priority_;
     std::unique_ptr<Goal> goal_;
     std::string name_;
+    std::set<GoalFlag> flags_;
     bool plugin_ = false;
     bool retired_ = false;
     bool running_ = false;

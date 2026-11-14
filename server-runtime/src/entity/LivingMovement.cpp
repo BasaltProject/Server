@@ -94,6 +94,7 @@ void addInput3(ServerEntity& entity, double strafe, double up, double forward, d
 
 /// parity: `Entity.move(SELF)`, or the straight add of a mob with `noPhysics`.
 void moveBy(world::WorldState& world, ServerEntity& entity, bool noPhysics) {
+    const world::WorldState::BlockReadScope readScope{world};
     if (noPhysics) {
         entity.x += entity.velocityX;
         entity.y += entity.velocityY;
@@ -130,6 +131,7 @@ void moveBy(world::WorldState& world, ServerEntity& entity, bool noPhysics) {
 
 void travelAir(world::WorldState& world, ServerEntity& entity, const Input& input, double speed, double gravity,
                bool omnidirectional, bool noPhysics) {
+    const world::WorldState::BlockReadScope readScope{world};
     const double blockFriction =
         entity.onGround ? static_cast<double>(registry::blockMovement::frictionOf(blockUnder(world, entity))) : 1.0;
     addInput3(entity, input.strafe, input.up, input.forward, frictionInfluencedSpeed(entity, speed, blockFriction));
@@ -159,6 +161,7 @@ void travelFlying(world::WorldState& world, ServerEntity& entity, const Input& i
 
 void travel(world::WorldState& world, ServerEntity& entity, double forward, double strafe, double speed,
             double gravity) {
+    const world::WorldState::BlockReadScope readScope{world};
     const double blockFriction =
         entity.onGround ? static_cast<double>(registry::blockMovement::frictionOf(blockUnder(world, entity))) : 1.0;
     addInput(entity, forward, strafe, frictionInfluencedSpeed(entity, speed, blockFriction));
@@ -198,6 +201,7 @@ void travel(world::WorldState& world, ServerEntity& entity, double forward, doub
 }
 
 void travelInWater(world::WorldState& world, ServerEntity& entity, double forward, double strafe) {
+    const world::WorldState::BlockReadScope readScope{world};
     addInput(entity, forward, strafe, kWaterInput);
 
     const Aabb box = Aabb::of(entity.x, entity.y, entity.z, entity.width(), entity.height());
@@ -227,6 +231,7 @@ void travelInWater(world::WorldState& world, ServerEntity& entity, double forwar
 }
 
 void swimStep(world::WorldState& world, ServerEntity& entity, double forward, double up, double speed) {
+    const world::WorldState::BlockReadScope readScope{world};
     const double length = (forward * forward) + (up * up);
     if (length >= 1.0e-7) {
         const double scale = length > 1.0 ? speed / std::sqrt(length) : speed;

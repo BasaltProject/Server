@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -32,6 +33,8 @@ struct Hurt {
 };
 
 [[nodiscard]] std::int32_t maxAirOf(std::string_view typePath);
+
+[[nodiscard]] std::optional<float> ownEyeOf(std::string_view typePath);
 
 [[nodiscard]] bool breathesUnderwater(std::string_view typePath);
 
