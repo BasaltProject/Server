@@ -245,6 +245,7 @@ public:
 
 private:
     std::set<std::string, std::less<>> avoided_;
+    std::string key_;
     double distance_;
     double walkSpeed_;
     double sprintSpeed_;

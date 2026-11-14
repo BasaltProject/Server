@@ -55,11 +55,7 @@ bool CombatSystem::deflected(const std::vector<PlayerSession*>& watchers, const 
     }
     const std::set<Identifier>& deflectors =
         world::realEntityTypeTags::membersOf(*options_.entityTags, Identifier::vanilla("deflects_projectiles"));
-    const auto deflects = [&deflectors](const Identifier& type) {
-        return std::ranges::any_of(deflectors, [&type](const Identifier& member) { return member == type; });
-    };
-    if (deflectors.empty() ||
-        std::ranges::none_of(living, [&deflects](const ServerEntity* mob) { return deflects(mob->type()); })) {
+    if (deflectors.empty()) {
         return false;
     }
     const std::optional<Target> target = targetAlong(watchers, living, projectile, fromX, fromY, fromZ);
@@ -165,7 +161,21 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
         return spared != nullptr ? std::ranges::contains(*spared, id)
                                  : projectile.ownerId.has_value() && id == *projectile.ownerId;
     };
+    // A box is never wider than this around its position, so anything farther off the swept span cannot be clipped.
+    constexpr double kReach = 80.0;
+    const double reach = kReach + margin;
+    const double lowX = std::min(fromX, projectile.x) - reach;
+    const double highX = std::max(fromX, projectile.x) + reach;
+    const double lowZ = std::min(fromZ, projectile.z) - reach;
+    const double highZ = std::max(fromZ, projectile.z) + reach;
+    const double lowY = std::min(fromY, projectile.y) - reach;
+    const double highY = std::max(fromY, projectile.y) + margin;
     for (ServerEntity* candidate : living) {
+        if (candidate->dragon == nullptr && (candidate->typeTraits() & entity::traits::kPhantom) == 0 &&
+            (candidate->x < lowX || candidate->x > highX || candidate->z < lowZ || candidate->z > highZ ||
+             candidate->y < lowY || candidate->y > highY)) {
+            continue;
+        }
         if (candidate->entityId() == projectile.entityId() || sparedId(candidate->entityId()) ||
             std::ranges::contains(projectile.piercedIds, candidate->entityId())) {
             continue;

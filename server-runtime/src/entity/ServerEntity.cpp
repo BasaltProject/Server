@@ -148,11 +148,12 @@ ServerEntity::ServerEntity(std::int32_t entityId, wire::common::Uuid uuid, wire:
       protocolType_(protocolType) {
     typeTraits_ = computeTypeTraits(type_);
     tickKinds_ = computeTickKinds(type_);
-    mobCategoryIndex_ = static_cast<std::uint8_t>(
-        mobCategoryByName(mobs::categoryOf(type_)).value_or(MobCategory::Misc));
+    mobCategoryIndex_ =
+        static_cast<std::uint8_t>(mobCategoryByName(mobs::categoryOf(type_)).value_or(MobCategory::Misc));
     ownEye_ = mobBreathing::ownEyeOf(type_.path());
     shape_ = registry::entityTypeShapes::of(type_);
     baseAttributes_ = &registry::entityAttributes::of(type_);
+    baseScale_ = attribute("minecraft:scale");
     baseWidth_ = static_cast<float>(registry::entityTypeShapes::widthOf(type_));
     baseHeight_ = static_cast<float>(registry::entityTypeShapes::heightOf(type_));
     const bool dolphin = type_.path() == "dolphin";
@@ -202,6 +203,15 @@ double ServerEntity::attributeWithModifiers(std::string_view id) const {
         }
     }
     return value;
+}
+
+double ServerEntity::scale() const {
+    constexpr std::string_view kScale = "minecraft:scale";
+    if ((attributeValues.empty() || !attributeValues.contains(kScale)) &&
+        (attributeModifiers.empty() || !attributeModifiers.contains(kScale))) {
+        return baseScale_;
+    }
+    return attributeWithModifiers(kScale);
 }
 
 namespace {

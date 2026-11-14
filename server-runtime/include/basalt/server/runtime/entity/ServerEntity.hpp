@@ -670,6 +670,9 @@ public:
 
     [[nodiscard]] double attributeWithModifiers(std::string_view id) const;
 
+    /// `attributeWithModifiers("minecraft:scale")`, answered from the type's base while nothing overrides it.
+    [[nodiscard]] double scale() const;
+
     [[nodiscard]] double width() const;
     [[nodiscard]] double height() const;
     /// Width and height as `width()` and `height()` give them, with one box lookup instead of two.
@@ -694,6 +697,7 @@ private:
     const std::map<std::string, double, std::less<>>* baseAttributes_ = nullptr;
     float baseWidth_ = 1.0F;
     float baseHeight_ = 1.0F;
+    double baseScale_ = 1.0;
     std::int32_t protocolType_ = 0;
 };
 

@@ -48,6 +48,41 @@ bool EntityRegistry::hasNaturalSpawnObstruction(const entity::Aabb& spawnBox, co
 
 void EntityRegistry::beginTick() noexcept { indexValid_ = false; }
 
+void EntityRegistry::beginSnapshot() {
+    const std::scoped_lock lock{snapshotMutex_};
+    snapshotMatches_.clear();
+    snapshotData_ = nullptr;
+    snapshotSize_ = 0;
+}
+
+EntityRegistry::Matches
+EntityRegistry::snapshotMatching(const std::vector<entity::ServerEntity*>& snapshot, const std::string& key,
+                                 const std::function<bool(const entity::ServerEntity&)>& accepts) const {
+    const auto scan = [&snapshot, &accepts] {
+        auto found = std::make_shared<std::vector<entity::ServerEntity*>>();
+        for (entity::ServerEntity* candidate : snapshot) {
+            if (accepts(*candidate)) {
+                found->push_back(candidate);
+            }
+        }
+        return found;
+    };
+    const std::scoped_lock lock{snapshotMutex_};
+    // Another vector than the one cached is scanned afresh, so a stray caller never reads a stale answer.
+    if (snapshotData_ == nullptr) {
+        snapshotData_ = snapshot.data();
+        snapshotSize_ = snapshot.size();
+    }
+    if (snapshotData_ != snapshot.data() || snapshotSize_ != snapshot.size()) {
+        return scan();
+    }
+    const auto cached = snapshotMatches_.find(key);
+    if (cached != snapshotMatches_.end()) {
+        return cached->second;
+    }
+    return snapshotMatches_.emplace(key, scan()).first->second;
+}
+
 std::vector<entity::ServerEntity*> EntityRegistry::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ) const {
     std::vector<entity::ServerEntity*> found;
     entitiesIn(chunkX, chunkZ, found);

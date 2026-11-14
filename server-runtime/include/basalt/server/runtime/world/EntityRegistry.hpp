@@ -6,7 +6,10 @@
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -44,6 +47,15 @@ public:
 
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> chunksWithEntities() const;
 
+    using Matches = std::shared_ptr<const std::vector<entity::ServerEntity*>>;
+
+    /// Forgets what `snapshotMatching` cached for the previous tick's entity snapshot.
+    void beginSnapshot();
+
+    /// The members of `snapshot`, in its order, that `accepts` takes, scanned once per key and tick.
+    [[nodiscard]] Matches snapshotMatching(const std::vector<entity::ServerEntity*>& snapshot, const std::string& key,
+                                           const std::function<bool(const entity::ServerEntity&)>& accepts) const;
+
     /// Throws away the per-chunk index so the next `entitiesIn` rebuilds it from where everything stands now.
     void beginTick() noexcept;
 
@@ -78,6 +90,11 @@ private:
     mutable std::unordered_map<std::int64_t, std::vector<Indexed>> index_;
     mutable bool indexValid_ = false;
     mutable std::vector<Indexed> candidates_;
+
+    mutable std::mutex snapshotMutex_;
+    mutable const entity::ServerEntity* const* snapshotData_ = nullptr;
+    mutable std::size_t snapshotSize_ = 0;
+    mutable std::unordered_map<std::string, Matches> snapshotMatches_;
 };
 
 } // namespace basalt::server::runtime::world

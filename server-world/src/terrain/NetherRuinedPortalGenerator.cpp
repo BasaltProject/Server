@@ -491,7 +491,7 @@ void NetherRuinedPortalGenerator::placeTemplate(const PortalStart& start, Portal
 
     std::vector<Processed> processed;
     for (const structure::StructureBlockInfo& blockInfo : start.piece->blocks()) {
-        const PortalState input = PortalState::from(blockInfo.stateId, blockInfo.properties);
+        const PortalState input = PortalState::from(blockInfo.stateId, blockInfo.props());
         if (input.path == "structure_block") {
             continue;
         }
@@ -531,7 +531,7 @@ void NetherRuinedPortalGenerator::placeTemplate(const PortalStart& start, Portal
 
     // parity: `TemplateStructurePiece` runs this second pass outside the processor chain.
     for (const structure::StructureBlockInfo& blockInfo : start.piece->blocks()) {
-        if (PortalState::from(blockInfo.stateId, blockInfo.properties).path != "jigsaw") {
+        if (PortalState::from(blockInfo.stateId, blockInfo.props()).path != "jigsaw") {
             continue;
         }
         const StructurePos relative = structure::transform(blockInfo.pos, start.mirror, start.rotation, start.pivot);

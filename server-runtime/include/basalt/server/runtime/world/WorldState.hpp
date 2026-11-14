@@ -415,6 +415,14 @@ public:
 
     void entitiesIn(std::int32_t chunkX, std::int32_t chunkZ, std::vector<entity::ServerEntity*>& out) const;
 
+    void beginEntitySnapshot() { entityRegistry_.beginSnapshot(); }
+
+    [[nodiscard]] EntityRegistry::Matches
+    entitySnapshotMatching(const std::vector<entity::ServerEntity*>& snapshot, const std::string& key,
+                           const std::function<bool(const entity::ServerEntity&)>& accepts) const {
+        return entityRegistry_.snapshotMatching(snapshot, key, accepts);
+    }
+
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> chunksWithEntities() const;
 
     void forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ);

@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -21,7 +22,12 @@ struct StructureBlockInfo {
     std::optional<wire::nbt::NbtCompound> blockEntityNbt;
     std::optional<StructureDirection> frontFacing;
     std::optional<StructureDirection> topFacing;
-    std::map<std::string, std::string> properties;
+    std::shared_ptr<const std::map<std::string, std::string>> properties;
+
+    [[nodiscard]] const std::map<std::string, std::string>& props() const {
+        static const std::map<std::string, std::string> kNone;
+        return properties ? *properties : kNone;
+    }
 };
 
 /// parity: `StructureTemplate.StructureEntityInfo`.
@@ -83,7 +89,7 @@ class StructureTemplate {
 public:
     [[nodiscard]] StructurePos size() const noexcept { return size_; }
 
-    [[nodiscard]] const std::vector<StructureBlockInfo>& blocks() const noexcept { return blocks_; }
+    [[nodiscard]] const std::vector<StructureBlockInfo>& blocks() const noexcept { return primary(); }
 
     [[nodiscard]] const std::vector<StructureEntityInfo>& entities() const noexcept { return entities_; }
 
@@ -116,11 +122,15 @@ public:
 private:
     [[nodiscard]] const std::vector<StructureBlockInfo>& paletteBlocks(std::size_t index) const;
 
+    [[nodiscard]] const std::vector<StructureBlockInfo>& primary() const noexcept {
+        static const std::vector<StructureBlockInfo> kNone;
+        return palettes_.empty() ? kNone : palettes_.front();
+    }
+
     void placeEntities(Chunk& chunk, StructurePos position, StructureRotation rotation, StructureMirror mirror,
                        StructurePos pivot, const StructureBoundingBox* clipTo) const;
 
     StructurePos size_;
-    std::vector<StructureBlockInfo> blocks_;
     std::vector<std::uint32_t> jigsawIndices_;
     std::vector<std::vector<StructureBlockInfo>> palettes_;
     std::vector<StructureEntityInfo> entities_;

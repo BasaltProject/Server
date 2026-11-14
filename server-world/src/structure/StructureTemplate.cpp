@@ -159,13 +159,13 @@ const std::set<std::string, std::less<>>& blockEntityBlocks() {
 } // namespace
 
 const std::vector<StructureBlockInfo>& StructureTemplate::paletteBlocks(const std::size_t index) const {
-    return index < palettes_.size() ? palettes_[index] : blocks_;
+    return index < palettes_.size() ? palettes_[index] : primary();
 }
 
 namespace {
 
 struct Palette {
-    std::vector<std::map<std::string, std::string>> properties;
+    std::vector<std::shared_ptr<const std::map<std::string, std::string>>> properties;
     std::vector<std::int32_t> stateIds;
     std::vector<std::optional<StructureDirection>> frontFacing;
     std::vector<std::optional<StructureDirection>> topFacing;
@@ -225,7 +225,7 @@ struct Palette {
                 }
             }
         }
-        palette.properties.push_back(std::move(properties));
+        palette.properties.push_back(std::make_shared<const std::map<std::string, std::string>>(std::move(properties)));
         palette.stateIds.push_back(stateId);
         palette.frontFacing.push_back(front);
         palette.topFacing.push_back(top);
@@ -377,7 +377,6 @@ void placeBlockEntityInto(Chunk& chunk, const StructureBlockInfo& blockInfo, std
 } // namespace
 
 void StructureTemplate::load(const NbtCompound& nbt) {
-    blocks_.clear();
     jigsawIndices_.clear();
     palettes_.clear();
     entities_.clear();
@@ -409,9 +408,9 @@ void StructureTemplate::load(const NbtCompound& nbt) {
     for (const NbtList* paletteList : paletteLists) {
         palettes_.push_back(readPalette(*paletteList, *blockList));
     }
-    blocks_ = palettes_.front();
-    for (std::size_t index = 0; index < blocks_.size(); ++index) {
-        const StructureBlockInfo& blockInfo = blocks_[index];
+    const std::vector<StructureBlockInfo>& blocks = palettes_.front();
+    for (std::size_t index = 0; index < blocks.size(); ++index) {
+        const StructureBlockInfo& blockInfo = blocks[index];
         if (blockInfo.frontFacing.has_value() && blockInfo.topFacing.has_value() &&
             blockInfo.blockEntityNbt.has_value()) {
             jigsawIndices_.push_back(static_cast<std::uint32_t>(index));
@@ -454,7 +453,7 @@ std::vector<PlacedJigsaw> StructureTemplate::jigsawBlocks(const StructurePos pos
     std::vector<PlacedJigsaw> placed;
     placed.reserve(jigsawIndices_.size());
     for (const std::uint32_t index : jigsawIndices_) {
-        const StructureBlockInfo& blockInfo = blocks_[index];
+        const StructureBlockInfo& blockInfo = blocks()[index];
         const StructurePos worldPos = plus(transform(blockInfo.pos, mirror, rotation, pivot), position);
         const NbtCompound& nbt = *blockInfo.blockEntityNbt;
         const std::string_view joint = nbt.getString("joint");
@@ -479,7 +478,7 @@ std::vector<StructureDataMarker> StructureTemplate::dataMarkers(const StructureP
                                                                 const StructureMirror mirror,
                                                                 const StructurePos pivot) const {
     std::vector<StructureDataMarker> markers;
-    for (const StructureBlockInfo& blockInfo : blocks_) {
+    for (const StructureBlockInfo& blockInfo : blocks()) {
         if (pathOf(blockInfo.stateId) != "structure_block" || !blockInfo.blockEntityNbt.has_value()) {
             continue;
         }
@@ -643,7 +642,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
             }
             const std::map<std::string, std::string> properties =
                 *processedStateId == blockInfo.stateId
-                    ? blockInfo.properties
+                    ? blockInfo.props()
                     : registry::blockStateDefinitions::propertiesOf(*processedStateId);
             stateId = transformedStateId(*processedStateId, properties, placement.mirror, placement.rotation);
             // parity: a plain `RuleProcessor` rule hands its `append_loot` to the block it outputs.
@@ -653,7 +652,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
                 ruleLoot[resolved.size()] = std::move(*loot);
             }
         } else {
-            stateId = transformedStateId(blockInfo.stateId, blockInfo.properties, placement.mirror, placement.rotation);
+            stateId = transformedStateId(blockInfo.stateId, blockInfo.props(), placement.mirror, placement.rotation);
         }
         if (placement.blockProcessor) {
             const std::int32_t worldStateId =
@@ -718,7 +717,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
 
 bool StructureTemplate::placeDecorationInto(Chunk& chunk, const StructurePos position, const StructureRotation rotation,
                                             random::RandomSource& random) const {
-    if (size_.x < 1 || size_.y < 1 || size_.z < 1 || (blocks_.empty() && entities_.empty())) {
+    if (size_.x < 1 || size_.y < 1 || size_.z < 1 || (blocks().empty() && entities_.empty())) {
         return false;
     }
     // The palette draw happens even for vanilla's single retained palette.
@@ -726,12 +725,12 @@ bool StructureTemplate::placeDecorationInto(Chunk& chunk, const StructurePos pos
     const StructureMirror mirror = StructureMirror::None;
     const StructurePos pivot{0, 0, 0};
     const ChunkHeight bounds = chunk.verticalBounds();
-    for (const StructureBlockInfo& blockInfo : blocks_) {
+    for (const StructureBlockInfo& blockInfo : blocks()) {
         const StructurePos worldPos = plus(transform(blockInfo.pos, mirror, rotation, pivot), position);
         if (worldPos.y < bounds.minY() || worldPos.y > bounds.maxY()) {
             continue;
         }
-        const std::int32_t stateId = transformedStateId(blockInfo.stateId, blockInfo.properties, mirror, rotation);
+        const std::int32_t stateId = transformedStateId(blockInfo.stateId, blockInfo.props(), mirror, rotation);
         chunk.setDecorationBlockStateId(worldPos.x, worldPos.y, worldPos.z, stateId, std::nullopt, true);
         placeBlockEntityInto(chunk, blockInfo, stateId, worldPos, &random, true);
     }

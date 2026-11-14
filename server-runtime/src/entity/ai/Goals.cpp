@@ -361,17 +361,26 @@ void EatBlockGoal::tick(MobContext& mob) {
 
 AvoidEntityGoal::AvoidEntityGoal(std::set<std::string, std::less<>> avoided, double distance, double walkSpeed,
                                  double sprintSpeed)
-    : avoided_(std::move(avoided)), distance_(distance), walkSpeed_(walkSpeed), sprintSpeed_(sprintSpeed) {}
+    : avoided_(std::move(avoided)), distance_(distance), walkSpeed_(walkSpeed), sprintSpeed_(sprintSpeed) {
+    for (const std::string& name : avoided_) {
+        key_ += name;
+        key_ += ',';
+    }
+}
 
 bool AvoidEntityGoal::canUse(MobContext& mob) {
     threat_ = nullptr;
     double bestDistance = distance_ * distance_;
-    for (ServerEntity* candidate : mob.entities) {
+    const world::EntityRegistry::Matches avoidable =
+        mob.world.entitySnapshotMatching(mob.entities, key_, [this](const ServerEntity& candidate) {
+            return avoided_.contains(candidate.type().path());
+        });
+    for (ServerEntity* candidate : *avoidable) {
         if (candidate == nullptr || candidate->removed) {
             continue;
         }
         const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);
-        if (distance > bestDistance || !avoided_.contains(candidate->type().path())) {
+        if (distance > bestDistance) {
             continue;
         }
         bestDistance = distance;
