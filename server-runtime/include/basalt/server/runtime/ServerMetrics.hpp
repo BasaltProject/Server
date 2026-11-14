@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -12,12 +13,16 @@ class ServerMetrics {
 public:
     [[nodiscard]] std::optional<std::uint64_t> residentBytes() const;
 
+    [[nodiscard]] std::optional<std::uint64_t> residentBytesWithin(std::chrono::milliseconds maxAge) const;
+
     [[nodiscard]] std::uint64_t peakResidentBytes() const noexcept { return peak_.load(std::memory_order_relaxed); }
 
     [[nodiscard]] std::string memoryReport() const;
 
 private:
     mutable std::atomic<std::uint64_t> peak_{0};
+    mutable std::atomic<std::int64_t> cachedAtMillis_{std::numeric_limits<std::int64_t>::min()};
+    mutable std::atomic<std::uint64_t> cachedBytes_{0};
 };
 
 class CpuMeter {

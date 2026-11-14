@@ -308,7 +308,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         return total;
     };
-    facts.liveHeapBytes = [this] { return metrics_.residentBytes(); };
+    facts.liveHeapBytes = [this] { return metrics_.residentBytesWithin(std::chrono::milliseconds{500}); };
     facts.tickRates = [this]() -> std::optional<std::array<double, 3>> {
         const TickRates rates = tickLoop_->tickRates();
         return std::array<double, 3>{rates.oneMinute, rates.fiveMinutes, rates.fifteenMinutes};

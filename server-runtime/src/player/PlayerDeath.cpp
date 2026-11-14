@@ -11,6 +11,15 @@ namespace basalt::server::runtime::player {
 
 using wire::text::Component;
 
+namespace {
+
+const wire::text::LangTable& langOf(const DeathContext& context) {
+    static const wire::text::LangTable kEmpty;
+    return context.lang == nullptr ? kEmpty : *context.lang;
+}
+
+} // namespace
+
 void killPlayer(PlayerSession& session, const std::string_view deathMessageId, const std::optional<Component>& killer,
                 const DeathContext& context, const std::optional<Component>& tracked) {
     if (session.dead) {
@@ -52,7 +61,7 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     Announcement said;
     DeathLoot loot = context.lootOf ? context.lootOf(session) : DeathLoot{};
     if (context.died) {
-        said = context.died(session, wire::text::resolvePlainText(message, context.lang), loot);
+        said = context.died(session, wire::text::resolvePlainText(message, langOf(context)), loot);
     }
     if (context.spread) {
         context.spread(session, loot);
@@ -64,7 +73,7 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     if (said.silent || !loot.showMessages) {
         return;
     }
-    context.logger.info([&] { return wire::text::resolvePlainText(announced, context.lang); });
+    context.logger.info([&] { return wire::text::resolvePlainText(announced, langOf(context)); });
 
     if (context.registry == nullptr) {
         return;

@@ -310,7 +310,7 @@ player::DamageContext CombatHandler::damageContext() const {
     };
     context.death.registry = owner_->options().playerRegistry;
     context.death.logger = owner_->logger();
-    context.death.lang = owner_->consoleLang();
+    context.death.lang = &owner_->consoleLang();
     context.death.died = hooks_.died;
     context.death.lootOf = [this](PlayerSession& session) { return deathLootOf(session); };
     context.death.spread = [this](PlayerSession& session, const player::DeathLoot& loot) {
@@ -389,7 +389,7 @@ void CombatHandler::die(std::string_view deathMessageId, const std::optional<Com
     player::DeathContext context;
     context.registry = owner_->options().playerRegistry;
     context.logger = owner_->logger();
-    context.lang = owner_->consoleLang();
+    context.lang = &owner_->consoleLang();
     context.died = hooks_.died;
     context.lootOf = [this](PlayerSession& session) { return deathLootOf(session); };
     context.spread = [this](PlayerSession& session, const player::DeathLoot& loot) { spreadDeathLoot(session, loot); };

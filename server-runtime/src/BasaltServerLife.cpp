@@ -545,7 +545,7 @@ player::DamageContext BasaltServer::damageContext() {
     };
     context.death.registry = &playerRegistry_;
     context.death.logger = logger_;
-    context.death.lang = options_.lang;
+    context.death.lang = &options_.lang;
     return context;
 }
 
@@ -699,8 +699,10 @@ void BasaltServer::startBedrockListener() {
         return spawn;
     };
 
+    const auto sharedLang = std::make_shared<const wire::text::LangTable>(options_.lang);
     hooks.join =
-        [this](const bedrock::BedrockListener::Joining& joining) -> std::unique_ptr<bedrock::BedrockListener::Player> {
+        [this, sharedLang](
+            const bedrock::BedrockListener::Joining& joining) -> std::unique_ptr<bedrock::BedrockListener::Player> {
         bedrock::BedrockPlayer::Context context;
         context.registry = &playerRegistry_;
         // Queued onto the owner because a decider only runs where plugins do, with copies since the player may be gone.
@@ -815,7 +817,7 @@ void BasaltServer::startBedrockListener() {
                 player::DeathContext death;
                 death.registry = &playerRegistry_;
                 death.logger = logger_;
-                death.lang = options_.lang;
+                death.lang = &options_.lang;
                 player::killPlayer(*session, reason, std::nullopt, death);
             });
         };
@@ -2242,7 +2244,7 @@ void BasaltServer::startBedrockListener() {
                 answer(!event->cancelled(), std::move(message));
             });
         };
-        context.lang = options_.lang;
+        context.lang = sharedLang;
         context.logger = logger_;
         context.uiConfigs = [this] { return live_->current()->ui; };
         context.placeholders = &placeholders_;

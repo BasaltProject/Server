@@ -179,13 +179,16 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     state_.setGameplay(settings_.gameplay);
     state_.setOnNeighbourhoodComplete([this](std::int32_t chunkX, std::int32_t chunkZ, bool delayed) {
         const std::int64_t key = ChunkGenerationQueue::pack(chunkX, chunkZ);
-        const std::lock_guard<std::mutex> lock{lightQueueMutex_};
-        if (lightQueue_.size() >= kLightQueueLimit || lightPending_.contains(key)) {
-            return;
+        {
+            const std::lock_guard<std::mutex> lock{lightQueueMutex_};
+            if (lightQueue_.size() >= kLightQueueLimit || lightPending_.contains(key)) {
+                return;
+            }
+            const auto due =
+                std::chrono::steady_clock::now() + (delayed ? kLightDebounce : std::chrono::milliseconds{0});
+            lightPending_.emplace(key, due);
+            lightQueue_.emplace(due, key);
         }
-        const auto due = std::chrono::steady_clock::now() + (delayed ? kLightDebounce : std::chrono::milliseconds{0});
-        lightPending_.emplace(key, due);
-        lightQueue_.emplace(due, key);
         lightWake_.notify_one();
     });
     lightWorker_ = std::jthread{[this](const std::stop_token stop) {

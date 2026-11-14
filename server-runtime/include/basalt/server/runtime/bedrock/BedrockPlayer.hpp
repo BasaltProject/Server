@@ -190,7 +190,7 @@ public:
         double spawnZ = 0.0;
         std::int32_t worldTime = 0;
         world::WorldWeather weather;
-        wire::text::LangTable lang;
+        std::shared_ptr<const wire::text::LangTable> lang = std::make_shared<const wire::text::LangTable>();
         wire::common::Logger logger{"Bedrock"};
     };
 

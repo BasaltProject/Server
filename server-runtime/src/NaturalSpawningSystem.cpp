@@ -281,7 +281,8 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
     if (candidates.chunks.empty()) {
         return;
     }
-    std::vector<std::array<std::int32_t, 2>> chunks = candidates.chunks;
+    std::vector<std::array<std::int32_t, 2>>& chunks = candidates.shuffled;
+    chunks.assign(candidates.chunks.begin(), candidates.chunks.end());
     const std::unordered_set<std::int64_t>& spawnableChunks = candidates.spawnable;
     world::StructureSpawnLists structureSpawnLists{world};
 

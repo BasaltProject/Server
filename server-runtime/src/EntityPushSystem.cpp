@@ -230,7 +230,7 @@ bool EntityPushSystem::pushableBy(world::LoadedWorld& world, const Body& pusher,
 std::vector<EntityPushSystem::Body> EntityPushSystem::entitiesIn(world::LoadedWorld& world, const Body& self,
                                                                  const Aabb& box) const {
     std::vector<Body> found;
-    std::vector<ServerEntity*> mobs;
+    thread_local std::vector<ServerEntity*> mobs;
     // parity: `EntitySectionStorage`.
     constexpr double kMargin = 2.0;
     for (std::int32_t chunkX = mth::floor(box.minX - kMargin) >> 4; chunkX <= mth::floor(box.maxX + kMargin) >> 4;

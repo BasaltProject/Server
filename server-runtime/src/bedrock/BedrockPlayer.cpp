@@ -782,7 +782,7 @@ void BedrockPlayer::say(std::string message) {
         context_.registry->snapshot(),
         chat::PlayerChatMessage::unsignedFrom(session_->uuid(), std::move(message), chat::nowMillis()),
         chat::BoundChatType{.type = chat::chatType::kChat, .name = chat::displayName(*session_, nullptr)},
-        context_.logger, context_.lang);
+        context_.logger, *context_.lang);
 }
 
 void BedrockPlayer::move(const double x, const double y, const double z, const float yaw, const float pitch) {
@@ -871,7 +871,7 @@ void BedrockPlayer::showMenu(const std::string& title, const std::map<std::int32
 
 void BedrockPlayer::showDialog(const world::dialogs::Dialog& dialog) {
     const auto flatten = [this](const wire::text::Component& text) {
-        return wire::text::toLegacyText(wire::text::resolveComponent(text, context_.lang));
+        return wire::text::toLegacyText(wire::text::resolveComponent(text, *context_.lang));
     };
     std::string content;
     for (const wire::text::Component& line : dialog.body) {
@@ -1742,7 +1742,7 @@ void BedrockPlayer::syncOthers() {
 void BedrockPlayer::announceAndSay(const Component& message) const {
     // Logged like the Java side: operators watch the console for joins and leaves; chat says itself where read.
     wire::common::Logger{"Server"}.info(
-        [this, &message] { return wire::text::resolvePlainText(message, context_.lang); });
+        [this, &message] { return wire::text::resolvePlainText(message, *context_.lang); });
     announce(message);
 }
 

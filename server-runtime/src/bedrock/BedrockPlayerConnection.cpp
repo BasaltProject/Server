@@ -105,14 +105,14 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     connection.sendSystemMessage = [mailbox = joining.mailbox, lang = context_.lang](const Component& message) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeText(body, wire::bedrock::TextType::Raw, "",
-                                 wire::text::toLegacyText(wire::text::resolveComponent(message, lang)));
+                                 wire::text::toLegacyText(wire::text::resolveComponent(message, *lang)));
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Text), body.toVector());
     };
 
     connection.disconnect = [mailbox = joining.mailbox, lang = context_.lang](const Component& reason) {
         wire::io::ByteBuffer body;
         // Plain, not legacy: the disconnect screen prints section signs instead of acting on them.
-        wire::bedrock::writeDisconnect(body, wire::text::toPlainText(wire::text::resolveComponent(reason, lang)));
+        wire::bedrock::writeDisconnect(body, wire::text::toPlainText(wire::text::resolveComponent(reason, *lang)));
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Disconnect), body.toVector(), true);
     };
     // That edition has no packet for an objective nobody sees, and its lines are numbered rather than named.
@@ -138,7 +138,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             return;
         }
         board->titles[objective] =
-            title.has_value() ? wire::text::toLegacyText(wire::text::resolveComponent(*title, lang)) : objective;
+            title.has_value() ? wire::text::toLegacyText(wire::text::resolveComponent(*title, *lang)) : objective;
         for (const auto& [slot, shown] : board->slots) {
             if (shown == objective) {
                 showObjective(slot, objective);
@@ -265,7 +265,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     connection.sendActionBar = [mailbox = joining.mailbox, lang = context_.lang](const Component& message) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeSetTitle(body, wire::bedrock::TitleType::ActionBar,
-                                     wire::text::toLegacyText(wire::text::resolveComponent(message, lang)), 0,
+                                     wire::text::toLegacyText(wire::text::resolveComponent(message, *lang)), 0,
                                      wire::bedrock::kActionBarTicks, 0);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTitle), body.toVector());
     };
@@ -294,7 +294,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
         const std::int32_t hold = piece == player::TitlePiece::ActionBar ? wire::bedrock::kActionBarTicks : stay;
         wire::io::ByteBuffer body;
-        wire::bedrock::writeSetTitle(body, type, wire::text::toLegacyText(wire::text::resolveComponent(text, lang)),
+        wire::bedrock::writeSetTitle(body, type, wire::text::toLegacyText(wire::text::resolveComponent(text, *lang)),
                                      fadeIn, hold, fadeOut);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTitle), body.toVector());
     };
@@ -309,11 +309,11 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         };
         // Timings first, as on the other edition: they are read for the title that follows.
         send(wire::bedrock::TitleType::Times, "", fadeIn, stay, fadeOut);
-        const std::string under = wire::text::toLegacyText(wire::text::resolveComponent(subtitle, lang));
+        const std::string under = wire::text::toLegacyText(wire::text::resolveComponent(subtitle, *lang));
         if (!under.empty()) {
             send(wire::bedrock::TitleType::Subtitle, under, fadeIn, stay, fadeOut);
         }
-        send(wire::bedrock::TitleType::Title, wire::text::toLegacyText(wire::text::resolveComponent(title, lang)),
+        send(wire::bedrock::TitleType::Title, wire::text::toLegacyText(wire::text::resolveComponent(title, *lang)),
              fadeIn, stay, fadeOut);
     };
 
@@ -362,7 +362,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
 
     connection.sendCombatDeath = [mailbox = joining.mailbox, lang = context_.lang](const Component& message) {
         wire::io::ByteBuffer body;
-        wire::bedrock::writeDeathInfo(body, wire::text::toLegacyText(wire::text::resolveComponent(message, lang)));
+        wire::bedrock::writeDeathInfo(body, wire::text::toLegacyText(wire::text::resolveComponent(message, *lang)));
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::DeathInfo), body.toVector());
     };
     connection.killPlayer = [this](const std::string_view deathMessageId) {
@@ -735,7 +735,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
                 "record.nowPlaying", {Component::translatable("jukebox_song.minecraft." + song)});
             wire::io::ByteBuffer popup;
             wire::bedrock::writeText(popup, wire::bedrock::TextType::JukeboxPopup, "",
-                                     wire::text::toLegacyText(wire::text::resolveComponent(playing, lang)));
+                                     wire::text::toLegacyText(wire::text::resolveComponent(playing, *lang)));
             mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Text), popup.toVector());
             return;
         }
@@ -809,7 +809,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             wire::bedrock::writeBossEvent(body, bossId, wire::bedrock::BedrockBossAction::Remove, "", 0.0F, protocol_);
             shownBars_.erase(bossId);
         } else {
-            const std::string text = wire::text::toLegacyText(wire::text::resolveComponent(title, context_.lang));
+            const std::string text = wire::text::toLegacyText(wire::text::resolveComponent(title, *context_.lang));
             wire::bedrock::writeBossEvent(body, bossId,
                                           drawn ? wire::bedrock::BedrockBossAction::UpdatePercentage
                                                 : wire::bedrock::BedrockBossAction::Create,

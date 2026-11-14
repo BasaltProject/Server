@@ -35,7 +35,7 @@ struct DeathLoot {
 struct DeathContext {
     PlayerRegistry* registry = nullptr;
     wire::common::Logger logger{"Server"};
-    wire::text::LangTable lang;
+    const wire::text::LangTable* lang = nullptr;
     std::function<DeathLoot(PlayerSession& player)> lootOf;
     std::function<void(PlayerSession& player, const DeathLoot& loot)> spread;
     std::function<Announcement(const PlayerSession& player, const std::string& deathMessage, DeathLoot& loot)> died;

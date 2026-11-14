@@ -92,6 +92,7 @@ private:
         std::vector<std::pair<std::int32_t, std::int32_t>> playerChunks;
         std::int32_t range = 0;
         std::vector<std::array<std::int32_t, 2>> chunks;
+        std::vector<std::array<std::int32_t, 2>> shuffled;
         std::unordered_set<std::int64_t> spawnable;
     };
 
