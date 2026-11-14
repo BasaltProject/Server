@@ -232,10 +232,22 @@ void runCommand(const std::function<CommandDispatcher*()>& current, const std::s
     const CommandEnvironment& environment = dispatcher->environment();
     const auto named = environment.options().worlds.find(environment.options().defaultWorldName);
     world::LoadedWorld* defaultWorld = named == environment.options().worlds.end() ? nullptr : named->second;
-    auto source = std::make_shared<ConsoleCommandSource>(
-        wire::common::Logger{"Console"}, environment.lang(), [defaultWorld]() -> std::array<double, 3> {
-            return defaultWorld == nullptr ? std::array<double, 3>{0.0, 0.0, 0.0} : defaultWorld->spawn();
-        });
+    // The source owns a copy of the whole lang table, so one is built per dispatcher and not per command.
+    static std::mutex sourceMutex;
+    static const CommandDispatcher* sourceFor = nullptr;
+    static std::shared_ptr<ConsoleCommandSource> cachedSource;
+    std::shared_ptr<ConsoleCommandSource> source;
+    {
+        const std::lock_guard lock{sourceMutex};
+        if (cachedSource == nullptr || sourceFor != dispatcher) {
+            cachedSource = std::make_shared<ConsoleCommandSource>(
+                wire::common::Logger{"Console"}, environment.lang(), [defaultWorld]() -> std::array<double, 3> {
+                    return defaultWorld == nullptr ? std::array<double, 3>{0.0, 0.0, 0.0} : defaultWorld->spawn();
+                });
+            sourceFor = dispatcher;
+        }
+        source = cachedSource;
+    }
     const std::function<void()> run = [dispatcher, source, command, &environment] {
         std::string line = command;
         server::plugins::PluginEventBus* bus = environment.pluginEvents();

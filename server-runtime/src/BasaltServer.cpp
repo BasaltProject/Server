@@ -447,13 +447,29 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         return total;
     };
-    sources.chunkBytes = [this] {
-        std::int64_t total = 0;
-        for (const auto& [name, world] : worldRegistry_->worlds()) {
-            total += world->state().chunkMemory().bytes;
-        }
-        return total;
-    };
+    const auto chunkMemory = [this] {
+        struct Memo {
+            std::chrono::steady_clock::time_point at{};
+            world::WorldState::ChunkMemory total;
+        };
+        const auto memo = std::make_shared<Memo>();
+        return [this, memo] {
+            const auto now = std::chrono::steady_clock::now();
+            if (now - memo->at > std::chrono::milliseconds{250}) {
+                memo->total = {};
+                for (const auto& [name, world] : worldRegistry_->worlds()) {
+                    const auto one = world->state().chunkMemory();
+                    memo->total.bytes += one.bytes;
+                    memo->total.blockEntities += one.blockEntities;
+                    memo->total.scheduledTicks += one.scheduledTicks;
+                    memo->total.generatedEntities += one.generatedEntities;
+                }
+                memo->at = now;
+            }
+            return memo->total;
+        };
+    }();
+    sources.chunkBytes = [chunkMemory] { return static_cast<std::int64_t>(chunkMemory().bytes); };
     sources.regionCacheBytes = [this] {
         std::int64_t total = 0;
         for (const auto& [name, world] : worldRegistry_->worlds()) {
@@ -461,26 +477,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         return total;
     };
-    sources.chunkBlockEntities = [this] {
-        std::int32_t total = 0;
-        for (const auto& [name, world] : worldRegistry_->worlds()) {
-            total += world->state().chunkMemory().blockEntities;
-        }
-        return total;
-    };
-    sources.chunkScheduledTicks = [this] {
-        std::int32_t total = 0;
-        for (const auto& [name, world] : worldRegistry_->worlds()) {
-            total += world->state().chunkMemory().scheduledTicks;
-        }
-        return total;
-    };
-    sources.chunkGeneratedEntities = [this] {
-        std::int32_t total = 0;
-        for (const auto& [name, world] : worldRegistry_->worlds()) {
-            total += world->state().chunkMemory().generatedEntities;
-        }
-        return total;
+    sources.chunkBlockEntities = [chunkMemory] { return static_cast<std::int32_t>(chunkMemory().blockEntities); };
+    sources.chunkScheduledTicks = [chunkMemory] { return static_cast<std::int32_t>(chunkMemory().scheduledTicks); };
+    sources.chunkGeneratedEntities = [chunkMemory] {
+        return static_cast<std::int32_t>(chunkMemory().generatedEntities);
     };
     sources.worldCount = [this] { return static_cast<std::int32_t>(worldRegistry_->worlds().size()); };
     sources.cpuPercent = [this] { return cpuMeter_.percent(); };
@@ -543,7 +543,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     nativeSampler_.start();
     sources.sampledThreads = [this] {
-        std::vector<std::string> threads = nativeSampler_.threadsJson();
+        std::vector<std::string> threads;
         for (std::string& java : javaProfile()) {
             threads.push_back(std::move(java));
         }
@@ -554,6 +554,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         return threads;
     };
+    sources.backgroundThreads = [this] { return nativeSampler_.threadsJson(); };
     sources.configuration = [this] {
         const auto flag = [](bool on) { return std::string{on ? "true" : "false"}; };
         const world::LoadedWorld& main = worldRegistry_->defaultWorld();

@@ -17,8 +17,8 @@ using wire::common::JsonValue;
 
 class CapturingSource final : public command::CommandSource {
 public:
-    CapturingSource(std::string name, wire::text::LangTable lang, command::ConsoleCommandSource::SpawnAt spawn)
-        : name_(std::move(name)), lang_(std::move(lang)), spawn_(std::move(spawn)) {}
+    CapturingSource(std::string name, const wire::text::LangTable& lang, command::ConsoleCommandSource::SpawnAt spawn)
+        : name_(std::move(name)), lang_(lang), spawn_(std::move(spawn)) {}
 
     [[nodiscard]] std::string name() const override { return name_; }
 
@@ -51,7 +51,7 @@ public:
 
 private:
     std::string name_;
-    wire::text::LangTable lang_;
+    const wire::text::LangTable& lang_;
     command::ConsoleCommandSource::SpawnAt spawn_;
     mutable std::mutex lock_;
     mutable std::string output_;

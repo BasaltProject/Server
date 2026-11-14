@@ -549,6 +549,11 @@ std::string TimingsReport::render(const ReportSources& sources, std::int64_t now
             json.raw(thread);
         }
     }
+    if (sources.backgroundThreads) {
+        for (const std::string& thread : sources.backgroundThreads()) {
+            json.raw(thread);
+        }
+    }
     json.endArray();
 
     json.endObject();

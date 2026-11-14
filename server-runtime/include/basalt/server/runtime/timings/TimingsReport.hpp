@@ -76,6 +76,8 @@ struct ReportSources {
     std::function<LiveFacts()> live;
     /// Threads sampled outside the server's own sections, such as Java ones; each is one finished JSON object.
     std::function<std::vector<std::string>()> sampledThreads;
+    /// Like sampledThreads, but safe to read off the tick thread, so it is never frozen there.
+    std::function<std::vector<std::string>()> backgroundThreads;
 };
 
 class TimingsReport {
