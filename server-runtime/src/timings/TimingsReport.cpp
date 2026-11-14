@@ -291,9 +291,43 @@ void TimingsReport::sampleIfDue(std::int64_t nowNanos) const {
     }
 }
 
+ReportSources TimingsReport::frozenSources() const {
+    const auto freeze = [](auto& source) {
+        if (source) {
+            source = [value = source()] { return value; };
+        }
+    };
+    ReportSources frozen = sources_;
+    freeze(frozen.uptimeSeconds);
+    freeze(frozen.onlinePlayers);
+    freeze(frozen.maxPlayers);
+    freeze(frozen.loadedChunks);
+    freeze(frozen.regionCacheBytes);
+    freeze(frozen.chunkBytes);
+    freeze(frozen.chunkBlockEntities);
+    freeze(frozen.chunkScheduledTicks);
+    freeze(frozen.chunkGeneratedEntities);
+    freeze(frozen.worldgenCaches);
+    freeze(frozen.worldCount);
+    freeze(frozen.cpuPercent);
+    freeze(frozen.liveHeapBytes);
+    freeze(frozen.residentBytes);
+    freeze(frozen.systemCpuPercent);
+    freeze(frozen.worlds);
+    freeze(frozen.plugins);
+    freeze(frozen.configuration);
+    freeze(frozen.live);
+    freeze(frozen.sampledThreads);
+    return frozen;
+}
+
 std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) const {
+    return render(sources_, nowNanos, user);
+}
+
+std::string TimingsReport::render(const ReportSources& sources, std::int64_t nowNanos, std::string_view user) const {
     const std::int64_t measuredSeconds = timings_->windowNanos(nowNanos) / TickDurations::kNanosPerSecond;
-    const SystemFacts system = readSystemFacts(sources_.diskPath);
+    const SystemFacts system = readSystemFacts(sources.diskPath);
     const auto cores = static_cast<double>(std::max<std::int32_t>(system.cpuThreads, 1));
     const std::int64_t nowEpoch =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
@@ -317,10 +351,10 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
     json.member("window_seconds", wire::common::Timings::kWindowSeconds);
     json.key("platform");
     json.beginObject();
-    json.member("brand", sources_.brand);
-    json.member("version", sources_.buildVersion);
-    json.member("minecraft", sources_.versionName);
-    json.member("protocol", sources_.protocolVersion);
+    json.member("brand", sources.brand);
+    json.member("version", sources.buildVersion);
+    json.member("minecraft", sources.versionName);
+    json.member("protocol", sources.protocolVersion);
     json.endObject();
     json.endObject();
 
@@ -341,33 +375,33 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
 
     json.key("server");
     json.beginObject();
-    json.member("uptime_seconds", sourced(sources_.uptimeSeconds));
-    json.member("players_online", sourced(sources_.onlinePlayers));
-    json.member("players_max", sourced(sources_.maxPlayers));
-    json.member("worlds", sourced(sources_.worldCount));
-    json.member("chunks_loaded", sourced(sources_.loadedChunks));
-    json.member("region_cache_bytes", sourced(sources_.regionCacheBytes));
-    json.member("chunk_bytes", sourced(sources_.chunkBytes));
-    json.member("chunk_block_entities", sourced(sources_.chunkBlockEntities));
-    json.member("chunk_scheduled_ticks", sourced(sources_.chunkScheduledTicks));
-    json.member("chunk_generated_entities", sourced(sources_.chunkGeneratedEntities));
+    json.member("uptime_seconds", sourced(sources.uptimeSeconds));
+    json.member("players_online", sourced(sources.onlinePlayers));
+    json.member("players_max", sourced(sources.maxPlayers));
+    json.member("worlds", sourced(sources.worldCount));
+    json.member("chunks_loaded", sourced(sources.loadedChunks));
+    json.member("region_cache_bytes", sourced(sources.regionCacheBytes));
+    json.member("chunk_bytes", sourced(sources.chunkBytes));
+    json.member("chunk_block_entities", sourced(sources.chunkBlockEntities));
+    json.member("chunk_scheduled_ticks", sourced(sources.chunkScheduledTicks));
+    json.member("chunk_generated_entities", sourced(sources.chunkGeneratedEntities));
     const std::vector<std::int64_t> worldgen =
-        sources_.worldgenCaches ? sources_.worldgenCaches() : std::vector<std::int64_t>{};
+        sources.worldgenCaches ? sources.worldgenCaches() : std::vector<std::int64_t>{};
     json.member("worldgen_templates", at(worldgen, 0));
     json.member("worldgen_template_blocks", at(worldgen, 1));
     json.member("worldgen_assemblies", at(worldgen, 2));
     json.member("worldgen_assembly_pieces", at(worldgen, 3));
-    const std::optional<double> processCpu = sources_.cpuPercent ? sources_.cpuPercent() : std::nullopt;
+    const std::optional<double> processCpu = sources.cpuPercent ? sources.cpuPercent() : std::nullopt;
     json.member("cpu_percent_of_one_core", processCpu);
     json.member("cpu_process_percent", processCpu.has_value() ? std::optional{*processCpu / cores} : std::nullopt);
-    json.member("cpu_system_percent", sources_.systemCpuPercent ? sources_.systemCpuPercent() : std::nullopt);
-    json.member("heap_bytes_live", sources_.liveHeapBytes ? sources_.liveHeapBytes() : std::nullopt);
-    json.member("process_resident_bytes", sources_.residentBytes ? sources_.residentBytes() : std::nullopt);
+    json.member("cpu_system_percent", sources.systemCpuPercent ? sources.systemCpuPercent() : std::nullopt);
+    json.member("heap_bytes_live", sources.liveHeapBytes ? sources.liveHeapBytes() : std::nullopt);
+    json.member("process_resident_bytes", sources.residentBytes ? sources.residentBytes() : std::nullopt);
     json.endObject();
 
     json.key("world_statistics");
     json.beginObject();
-    const std::vector<WorldFacts> worlds = sources_.worlds ? sources_.worlds() : std::vector<WorldFacts>{};
+    const std::vector<WorldFacts> worlds = sources.worlds ? sources.worlds() : std::vector<WorldFacts>{};
     std::map<std::string, std::int32_t> totalByType;
     std::int32_t totalEntities = 0;
     std::int32_t totalOrphans = 0;
@@ -409,8 +443,8 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
 
     json.key("configuration");
     json.beginObject();
-    if (sources_.configuration) {
-        for (const auto& [name, setting] : sources_.configuration()) {
+    if (sources.configuration) {
+        for (const auto& [name, setting] : sources.configuration()) {
             json.member(name, setting);
         }
     }
@@ -418,8 +452,8 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
 
     json.key("plugins");
     json.beginArray();
-    if (sources_.plugins) {
-        for (const PluginFacts& plugin : sources_.plugins()) {
+    if (sources.plugins) {
+        for (const PluginFacts& plugin : sources.plugins()) {
             json.beginObject();
             json.member("id", plugin.id);
             json.member("name", plugin.name);
@@ -510,8 +544,8 @@ std::string TimingsReport::json(std::int64_t nowNanos, std::string_view user) co
         writeNode(json, thread.root, withWindows);
         json.endObject();
     }
-    if (sources_.sampledThreads) {
-        for (const std::string& thread : sources_.sampledThreads()) {
+    if (sources.sampledThreads) {
+        for (const std::string& thread : sources.sampledThreads()) {
             json.raw(thread);
         }
     }

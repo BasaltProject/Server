@@ -38,7 +38,7 @@ public:
 private:
     void start(const CommandContext& context, std::int32_t timeoutSeconds) const;
 
-    /// Builds the report on the tick thread, then uploads it from a worker so the server never waits on the network.
+    /// Reads live state on the tick thread, then renders, saves and uploads the report from a worker.
     void finish(const std::string& requester, bool stopMeasuring) const;
 
     [[nodiscard]] static std::string requesterOf(const CommandContext& context);

@@ -121,49 +121,53 @@ void TimingsCommand::finish(const std::string& requester, bool stopMeasuring) co
         timings_->setEnabled(false);
         timer_.request_stop();
     }
-    const std::string json = report_->json(now, startedBy_);
-    const std::string path = report_->save(json);
     const std::int64_t seconds = timings_->windowNanos(now) / wire::common::TickDurations::kNanosPerSecond;
-    const timings::TimingsReport& report = *report_;
-    const auto tell = [this, requester](const Component& message) {
-        if (hooks_.tell) {
-            hooks_.tell(requester, message);
-        }
-    };
-
-    std::vector<Component> opening{Component::text("Profiled " + spanOf(seconds), kGreen)};
-    if (!report.hasProfile()) {
-        opening.push_back(Component::text(", but nothing measurable ran. Start it, let the server do the thing you "
-                                          "are investigating, then stop.",
-                                          kYellow));
-    }
-    tell(line(std::move(opening)));
-
-    if (hooks_.viewerUrl.empty() || !hooks_.postToTick) {
-        tell(line({Component::text("Saved to ", kGray), Component::text(path, kWhite)}));
-        return;
-    }
-    tell(Component::text("Uploading the report...", kGray));
-    const std::scoped_lock lock{workersMutex_};
-    workers_.emplace_back([this, requester, json, path] {
-        const std::string trust =
-            hooks_.caFile.empty() ? std::string{} : wire::io::fileIO::readText(hooks_.caFile).value_or("");
-        const auto uploaded = timings::uploadReport(hooks_.viewerUrl, json, trust);
-        hooks_.postToTick([this, requester, uploaded, path] {
+    // Live state is read here, on the tick thread; rendering, writing and uploading run on a worker.
+    auto job = [this, requester, now, seconds, user = startedBy_, sources = report_->frozenSources()] {
+        const std::string json = report_->render(sources, now, user);
+        const std::string path = report_->save(json);
+        const bool profiled = report_->hasProfile();
+        const auto tell = [this, requester](Component message) {
             if (!hooks_.tell) {
                 return;
             }
-            if (uploaded.has_value()) {
-                hooks_.tell(requester, line({Component::text("Report: ", kGreen), linkTo(uploaded->url)}));
+            if (hooks_.postToTick) {
+                hooks_.postToTick([this, requester, message = std::move(message)] { hooks_.tell(requester, message); });
             } else {
-                hooks_.tell(requester,
-                            line({Component::text("Could not upload (" + uploaded.error() + "), saved to ", kRed),
-                                  Component::text(path, kWhite)}));
-                return;
+                hooks_.tell(requester, message);
             }
-            hooks_.tell(requester, Component::text("Also saved to " + path, kGray));
-        });
-    });
+        };
+
+        std::vector<Component> opening{Component::text("Profiled " + spanOf(seconds), kGreen)};
+        if (!profiled) {
+            opening.push_back(Component::text(", but nothing measurable ran. Start it, let the server do the thing you "
+                                              "are investigating, then stop.",
+                                              kYellow));
+        }
+        tell(line(std::move(opening)));
+
+        if (hooks_.viewerUrl.empty() || !hooks_.postToTick) {
+            tell(line({Component::text("Saved to ", kGray), Component::text(path, kWhite)}));
+            return;
+        }
+        tell(Component::text("Uploading the report...", kGray));
+        const std::string trust =
+            hooks_.caFile.empty() ? std::string{} : wire::io::fileIO::readText(hooks_.caFile).value_or("");
+        const auto uploaded = timings::uploadReport(hooks_.viewerUrl, json, trust);
+        if (uploaded.has_value()) {
+            tell(line({Component::text("Report: ", kGreen), linkTo(uploaded->url)}));
+            tell(Component::text("Also saved to " + path, kGray));
+        } else {
+            tell(line({Component::text("Could not upload (" + uploaded.error() + "), saved to ", kRed),
+                       Component::text(path, kWhite)}));
+        }
+    };
+    if (!hooks_.postToTick) {
+        job();
+        return;
+    }
+    const std::scoped_lock lock{workersMutex_};
+    workers_.emplace_back(std::move(job));
 }
 
 void TimingsCommand::build(const CommandNodeBuilder& root) const {

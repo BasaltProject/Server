@@ -153,6 +153,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             }
             const auto drainConsole = [this, &region, &onTaskFailure] {
                 if (region.isPrimary() && region.worldName() == worldRegistry_->defaultWorld().name()) {
+                    const wire::common::ScopedTiming consoleTiming{timings_, "world.", "Console drain"};
                     for (sched::Region* other : worldRegistry_->scheduler().regionsOf(region.worldName())) {
                         if (other != &region) {
                             other->owner().moveConsoleTo(region.owner());

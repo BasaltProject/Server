@@ -97,6 +97,11 @@ public:
     /// `user` is who asked for the profile, or empty for the console.
     [[nodiscard]] std::string json(std::int64_t nowNanos, std::string_view user = {}) const;
 
+    /// The sources read once, on the calling thread, so `render` can then run anywhere.
+    [[nodiscard]] ReportSources frozenSources() const;
+
+    [[nodiscard]] std::string render(const ReportSources& sources, std::int64_t nowNanos, std::string_view user) const;
+
     /// What a viewer needs to tell a report from another: the time it covers and what ran in it.
     [[nodiscard]] bool hasProfile() const;
 
