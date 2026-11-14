@@ -263,19 +263,20 @@ void TickLoop::runSweeper() {
 
 void TickLoop::stop() {
     running_.store(false, std::memory_order_relaxed);
+    // A stop from inside the tick would make the ticker join itself, so the destructor does the join.
+    if (ticker_.joinable() && ticker_.get_id() != std::this_thread::get_id()) {
+        ticker_.join();
+    }
+    // Cleared before the sweeper is joined: its hops onto the owner would wait for a tick that never comes.
+    sched::Owner::tickThreadRunning(false);
     std::int64_t waited = 0;
     while (sweeping_.load(std::memory_order_relaxed) && waited < kStopDrainMillis) {
         sleepMillis(kSweepPollMillis);
         waited += kSweepPollMillis;
     }
-    // A stop from inside the tick would make the ticker join itself, so the destructor does the join.
-    if (ticker_.joinable() && ticker_.get_id() != std::this_thread::get_id()) {
-        ticker_.join();
-    }
     if (sweeper_.joinable()) {
         sweeper_.join();
     }
-    sched::Owner::tickThreadRunning(false);
 }
 
 } // namespace basalt::server::runtime
