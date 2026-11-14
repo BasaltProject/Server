@@ -7,3 +7,6 @@
 [submodule "shim"]
 	path = shim
 	url = https://github.com/BasaltProject/Shim.git
+[submodule "stratum"]
+	path = stratum
+	url = https://github.com/BasaltProject/Stratum.git

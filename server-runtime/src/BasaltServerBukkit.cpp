@@ -8,7 +8,7 @@
 #include <future>
 
 #ifdef BASALT_WITH_BUKKIT
-#include <basalt/server/bukkit/BukkitHost.hpp>
+#include <basalt/stratum/bukkit/BukkitHost.hpp>
 #endif
 
 namespace basalt::server::runtime {
@@ -49,18 +49,18 @@ void BasaltServer::startBukkit() {
             [&] { return std::format("{} Bukkit plugin(s) in {}/ cannot load: {}.", count, folder, files.error()); });
         return;
     }
-    server::bukkit::BukkitOptions options{.libjvm = files->libjvm,
-                                          .bootClasspath = files->bootClasspath,
-                                          .runtimeJar = files->runtimeJar,
-                                          .libraries = files->libraries,
-                                          .pluginsFolder = folder};
-    std::expected<std::unique_ptr<server::bukkit::BukkitHost>, std::string> host =
-        server::bukkit::BukkitHost::start(options, *plugins_);
+    stratum::bukkit::BukkitOptions options{.libjvm = files->libjvm,
+                                           .bootClasspath = files->bootClasspath,
+                                           .runtimeJar = files->runtimeJar,
+                                           .libraries = files->libraries,
+                                           .pluginsFolder = folder};
+    std::expected<std::unique_ptr<stratum::bukkit::BukkitHost>, std::string> host =
+        stratum::bukkit::BukkitHost::start(options, *plugins_);
     if (!host.has_value()) {
         logger_.error([&host] { return "Bukkit compatibility could not start: " + host.error(); });
         return;
     }
-    bukkit_ = std::shared_ptr<server::bukkit::BukkitHost>(std::move(*host));
+    bukkit_ = std::shared_ptr<stratum::bukkit::BukkitHost>(std::move(*host));
 #else
     logger_.warn([&] {
         return std::format(
@@ -73,7 +73,7 @@ void BasaltServer::startBukkit() {
 std::vector<std::string> BasaltServer::javaProfile() const {
 #ifdef BASALT_WITH_BUKKIT
     if (bukkit_ != nullptr) {
-        return static_cast<const server::bukkit::BukkitHost*>(bukkit_.get())->sampledThreads();
+        return static_cast<const stratum::bukkit::BukkitHost*>(bukkit_.get())->sampledThreads();
     }
 #endif
     return {};
@@ -84,12 +84,12 @@ void BasaltServer::enableBukkit() {
     if (bukkit_ == nullptr) {
         return;
     }
-    auto* host = static_cast<server::bukkit::BukkitHost*>(bukkit_.get());
+    auto* host = static_cast<stratum::bukkit::BukkitHost*>(bukkit_.get());
     std::promise<void> done;
     std::future<void> finished = done.get_future();
     worldRegistry_->scheduler().global().schedule(0, [this, host, &done] {
         host->enable();
-        for (const server::bukkit::BukkitHost::PluginState& state : host->plugins()) {
+        for (const stratum::bukkit::BukkitHost::PluginState& state : host->plugins()) {
             for (bukkit::JavaPluginJar& jar : javaPlugins_) {
                 if (lowered(jar.name) == lowered(state.name)) {
                     jar.loaded = state.enabled;

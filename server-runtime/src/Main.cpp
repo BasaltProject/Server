@@ -31,7 +31,7 @@
 #include <basalt/wire/io/Platform.hpp>
 
 #ifdef BASALT_WITH_BUKKIT
-#include <basalt/server/bukkit/ShimHost.hpp>
+#include <basalt/stratum/bukkit/ShimHost.hpp>
 #endif
 
 #include <atomic>
@@ -332,7 +332,7 @@ int main(int argc, char** argv) {
     command::consoleReader::stop();
     wire::io::terminal::restoreMode();
 #ifdef BASALT_WITH_BUKKIT
-    if (server::bukkit::ShimHost::leftRunning()) {
+    if (stratum::bukkit::ShimHost::leftRunning()) {
         std::fflush(nullptr);
         std::_Exit(exitCode);
     }

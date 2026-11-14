@@ -1,4 +1,0 @@
-//// ProfiledDuration.java
-public interface ProfiledDuration {
-    void finish(boolean success);
-}

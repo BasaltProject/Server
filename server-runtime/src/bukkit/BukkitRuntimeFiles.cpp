@@ -1,6 +1,6 @@
 #include <basalt/server/assets/AssetCache.hpp>
-#include <basalt/server/bukkit/BukkitEmbedded.hpp>
 #include <basalt/server/runtime/bukkit/BukkitRuntimeFiles.hpp>
+#include <basalt/stratum/bukkit/BukkitEmbedded.hpp>
 #include <basalt/wire/auth/HttpsClient.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
@@ -111,7 +111,7 @@ struct Coordinate {
     return error ? std::optional{"could not move " + partial.string() + " into place"} : std::nullopt;
 }
 
-[[nodiscard]] std::expected<fs::path, std::string> unpackEmbedded(const server::bukkit::EmbeddedRuntime& embedded) {
+[[nodiscard]] std::expected<fs::path, std::string> unpackEmbedded(const stratum::bukkit::EmbeddedRuntime& embedded) {
     std::string identity = assets::AssetCache::sha1Hex(embedded.libjvm);
     identity += assets::AssetCache::sha1Hex(embedded.bootClasspath) + assets::AssetCache::sha1Hex(embedded.runtimeJar);
     const std::span<const std::uint8_t> identityBytes{reinterpret_cast<const std::uint8_t*>(identity.data()),
@@ -145,7 +145,7 @@ struct Coordinate {
 } // namespace
 
 std::expected<BukkitRuntimeFiles, std::string> locateRuntime(const wire::common::Logger& logger) {
-    const server::bukkit::EmbeddedRuntime embedded = server::bukkit::embeddedRuntime();
+    const stratum::bukkit::EmbeddedRuntime embedded = stratum::bukkit::embeddedRuntime();
     if (!embedded.complete()) {
         return std::unexpected("this build does not carry the Basalt Shim runtime (it needs a JDK and a working Shim "
                                "build when the server is compiled), so use an official release");

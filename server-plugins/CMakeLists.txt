@@ -5,6 +5,7 @@ basalt_module(server-plugins
         src/PluginHookEventTypes.cpp
         src/PluginDispatch.cpp
         src/PluginApi.cpp
+        src/PluginMechanics.cpp
         src/PluginMechanicsApi.cpp
         src/PluginWorldApi.cpp
         src/PluginMiscApi.cpp
@@ -36,7 +37,7 @@ basalt_module(server-plugins
         src/PluginSurfaces.cpp
         src/PluginServiceRegistry.cpp
         src/PluginValues.cpp
-    DEPENDS basalt::metamorph-datafix basalt::server-entity basalt::server-registry basalt::wire-common basalt::wire-io basalt::wire-lua basalt::wire-nbt basalt::wire-plugins
+    DEPENDS basalt::metamorph-datafix basalt::server-entity basalt::server-registry basalt::server-world basalt::wire-common basalt::wire-io basalt::wire-lua basalt::wire-nbt basalt::wire-plugins
     # The event view builds a metatable and holds a registry reference, which the argument facade
     # deliberately does not expose. `lua.h` stays out of every header here and lives in that one
     # `.cpp`, which is the same rule the rest of the project follows for a fat dependency.

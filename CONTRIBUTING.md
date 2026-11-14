@@ -40,7 +40,7 @@ cmake --build build/asan
 ctest --test-dir build/asan --output-on-failure
 ```
 
-Changes to `server-bukkit` also need the compatibility layer enabled and its tests
+Changes to `stratum` also need the compatibility layer enabled and its tests
 run. Building that layer on supported targets requires a JDK 25 with JNI headers,
 `javac` and `jar`; set `JAVA_HOME` when discovery needs help. The AUTO configuration
 can omit it if the toolchain is unavailable, so check the configure output rather
@@ -77,7 +77,7 @@ when a check was not run. Documentation-only changes do not require a native bui
   Native tests use doctest; follow the existing module's test structure.
 - Use portable code and consider the CI targets. Document a new dependency's
   purpose, source, license and platform impact before adding it.
-- The main implementation areas include server-runtime, server-world, server-plugins and server-bukkit.
+- The main implementation areas include server-runtime, server-world, server-plugins and the Stratum submodule (Bukkit layer).
   If a change belongs in a shared submodule, submit it there and link that change
   from the consuming pull request. Update only the necessary pinned revisions.
 

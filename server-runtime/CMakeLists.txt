@@ -824,8 +824,8 @@ basalt_module(server-runtime-core
 # Only this file sees the version, so stamping a new one does not recompile (or invalidate the cache of) the rest.
 set_source_files_properties(src/BuildInfo.cpp PROPERTIES COMPILE_DEFINITIONS BASALT_VERSION="${BASALT_VERSION}")
 
-if(BASALT_BUKKIT_ACTIVE)
-    target_link_libraries(server-runtime-core PUBLIC basalt::server-bukkit)
+if(STRATUM_BUKKIT_ACTIVE)
+    target_link_libraries(server-runtime-core PUBLIC basalt::stratum-bukkit)
     target_compile_definitions(server-runtime-core PUBLIC BASALT_WITH_BUKKIT=1)
     target_sources(server-runtime-core PRIVATE src/bukkit/BukkitRuntimeFiles.cpp)
 endif()
