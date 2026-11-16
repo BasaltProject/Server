@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,10 +21,12 @@ public:
         std::int32_t y = 0;
         std::int32_t z = 0;
         std::string event;
+        std::optional<std::int32_t> ownerId;
     };
 
     /// parity: `TntBlock.explode`, which spawns the entity where the block stood.
-    void primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event);
+    void primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event,
+                  std::optional<std::int32_t> ownerId = std::nullopt);
 
     [[nodiscard]] std::vector<Primed> takePrimedTnt();
 

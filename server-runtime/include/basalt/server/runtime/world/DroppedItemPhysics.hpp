@@ -124,8 +124,7 @@ private:
     void moveItem(DroppedItem& item);
     using Pair = std::pair<std::int32_t, std::int32_t>;
 
-    void mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,
-                             std::vector<std::int32_t>& absorbed, const std::set<Pair>& denied);
+    void mergeAll(std::vector<std::int32_t>& despawned, const std::set<Pair>& denied);
 
     [[nodiscard]] std::vector<std::pair<DroppedItem, DroppedItem>> mergeCandidates() const;
 

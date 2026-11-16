@@ -23,7 +23,21 @@ inline constexpr std::int32_t kSize = 5;
 /// parity: `HopperBlockEntity.MOVE_ITEM_SPEED`.
 inline constexpr std::int32_t kVanillaCooldown = 8;
 
+/// One item about to cross between two inventories; the hopper at `x y z` starts it.
+struct Move {
+    std::int32_t fromX = 0;
+    std::int32_t fromY = 0;
+    std::int32_t fromZ = 0;
+    std::int32_t toX = 0;
+    std::int32_t toY = 0;
+    std::int32_t toZ = 0;
+    wire::common::Identifier item;
+    bool pushing = true;
+};
+
 struct Around {
+    /// parity: the Bukkit `InventoryMoveItemEvent`, asked once per item before it leaves or enters the hopper.
+    std::function<bool(const Move& move)> allowMove;
     /// parity: `ChiseledBookShelfBlockEntity.acceptsItemType`.
     std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
     /// parity: `does_not_block_hoppers`.

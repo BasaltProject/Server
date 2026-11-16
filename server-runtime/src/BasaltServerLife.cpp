@@ -91,6 +91,7 @@
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
+#include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -700,6 +701,35 @@ void BasaltServer::startBedrockListener() {
         spawn.yaw = stored->yaw;
         spawn.pitch = stored->pitch;
         return spawn;
+    };
+
+    // parity: `PlayerList.canPlayerLogin`, which a Java login runs and a Bedrock one has to run as well.
+    hooks.refuse = [this](const wire::common::Uuid& uuid, const std::string& address) -> std::optional<std::string> {
+        if (playerStore_ == nullptr || !playerStore_->isOpen()) {
+            return std::nullopt;
+        }
+        const auto plain = [this](const wire::text::Component& reason) {
+            return wire::text::toPlainText(wire::text::resolveComponent(reason, options_.lang));
+        };
+        storage::AccessRepository& access = playerStore_->access();
+        if (const std::optional<storage::BanRecord> ban = access.banOf(uuid.toString(), storage::BanKind::Player);
+            ban.has_value()) {
+            return plain(wire::text::Component::translatable("multiplayer.disconnect.banned.reason",
+                                                             {wire::text::Component::text(ban->reason)}));
+        }
+        const std::string host = address.substr(0, address.rfind(':'));
+        if (const std::optional<storage::BanRecord> ipBan = access.banOf(host, storage::BanKind::Ip);
+            ipBan.has_value()) {
+            return plain(wire::text::Component::translatable("multiplayer.disconnect.banned_ip.reason",
+                                                             {wire::text::Component::text(ipBan->reason)}));
+        }
+        if (whitelistEnforced_ && !access.isWhitelisted(uuid.toString())) {
+            return plain(wire::text::Component::translatable("multiplayer.disconnect.not_whitelisted"));
+        }
+        if (static_cast<std::int32_t>(playerRegistry_.count()) >= config_->maxPlayers) {
+            return plain(wire::text::Component::translatable("multiplayer.disconnect.server_full"));
+        }
+        return std::nullopt;
     };
 
     const auto sharedLang = std::make_shared<const wire::text::LangTable>(options_.lang);
@@ -2188,6 +2218,18 @@ void BasaltServer::startBedrockListener() {
             return named;
         };
 
+        context.chatFormat = [this](const player::PlayerSession& player) -> std::optional<std::string> {
+            if (plugins_ == nullptr || pluginServices_ == nullptr) {
+                return std::nullopt;
+            }
+            const std::shared_ptr<server::plugins::PluginPlayerRef> ref =
+                pluginServices_->players().byUuid(player.uuid().toString());
+            if (ref == nullptr) {
+                return std::nullopt;
+            }
+            const auto drawn = plugins_->surfaces().content(server::plugins::PluginSurface::ChatFormat, *ref);
+            return drawn.has_value() ? std::optional{drawn->second.title} : std::nullopt;
+        };
         context.runCommand = [this](const player::PlayerSession& player, std::string line) {
             const wire::common::Uuid uuid = player.uuid();
             const std::string name = player.name();

@@ -41,7 +41,7 @@ lines = [
 # their own once the Nether and the End are generated.
 [profiles.nether]
 priority = 10
-when = ["%basalt_player_dimension% = the_nether"]
+when = ["%basalt_player_dimension% = nether"]
 title = "<bold><red>NETHER</red></bold>"
 lines = [
     "",
@@ -53,7 +53,7 @@ lines = [
 
 [profiles.end]
 priority = 10
-when = ["%basalt_player_dimension% = the_end"]
+when = ["%basalt_player_dimension% = end"]
 title = "<bold><light_purple>THE END</light_purple></bold>"
 lines = [
     "",

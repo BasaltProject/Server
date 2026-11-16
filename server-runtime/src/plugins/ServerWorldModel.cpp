@@ -7,6 +7,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
+#include <basalt/server/registry/BlockTraits.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
@@ -222,7 +223,10 @@ std::vector<double> LoadedWorlds::blockInfo(std::int32_t stateId) const {
             static_cast<double>(color & 0xFFFFFFU),
             static_cast<double>(reg::fireOdds::igniteOdds(stateId)),
             static_cast<double>(reg::fireOdds::burnOdds(stateId)),
-            static_cast<double>(instrumentIndex(stateId))};
+            static_cast<double>(instrumentIndex(stateId)),
+            reg::blockTraits::ignitedByLava(stateId) ? 1.0 : 0.0,
+            reg::blockTraits::isSignalSource(stateId) ? 1.0 : 0.0,
+            reg::blockTraits::hasAnalogOutputSignal(stateId) ? 1.0 : 0.0};
 }
 
 std::vector<std::string> LoadedWorlds::gameRuleSpecs() const {
@@ -294,6 +298,14 @@ std::vector<double> LoadedWorlds::toolFacts(std::string_view item, std::int32_t 
     };
     return {reg::itemTools::isCorrectForDrops(tool, *block, contains) ? 1.0 : 0.0,
             static_cast<double>(reg::itemTools::miningSpeed(tool, *block, contains))};
+}
+
+std::vector<double> LoadedWorlds::visualBoxes(std::int32_t stateId) const {
+    return reg::blockShapes::visualBoxes(stateId);
+}
+
+std::vector<double> LoadedWorlds::outlineBoxes(std::int32_t stateId, std::int32_t x, std::int32_t z) const {
+    return reg::blockShapes::outlineBoxes(stateId, x, z);
 }
 
 std::vector<std::int32_t> LoadedWorlds::collisionBoxes(std::int32_t stateId) const {

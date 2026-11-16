@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
+#include <basalt/server/world/loot/LootContext.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -55,6 +56,9 @@ struct DispenseShot {
 ServerEntity& spawn(world::WorldState& world, const Kind& kind, std::int32_t entityId, std::int32_t protocolType,
                     double x, double y, double z, double dirX, double dirY, double dirZ, float power, float uncertainty,
                     random::RandomSource& random);
+
+/// parity: `ProjectileItem.asProjectile`, which hands the stack to the projectile.
+void arm(ServerEntity& entity, const DispenseShot& config, const server::world::loot::ItemStack& stack);
 
 void shoot(ServerEntity& entity, double dirX, double dirY, double dirZ, float power, float uncertainty,
            random::RandomSource& random);

@@ -4,8 +4,10 @@ basalt_module(server-registry
     src/BlockStateFamilies.cpp
         src/BlockConnections.cpp
         src/BlockFluids.cpp
+        src/BlockOutlines.cpp
         src/BlockShapes.cpp
         src/BlockSupport.cpp
+        src/BlockTraits.cpp
         src/Blocks.cpp
         src/CreativeTabItems.cpp
         src/Entities.cpp

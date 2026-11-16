@@ -892,25 +892,7 @@ void shoot(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, st
         x + 0.5 + (config.reach * registry::stepX(out)), y + 0.5 + (config.reach * registry::stepY(out)) + config.lift,
         z + 0.5 + (config.reach * registry::stepZ(out)), registry::stepX(out), registry::stepY(out),
         registry::stepZ(out), config.power, config.uncertainty, context.random);
-    // parity: `ProjectileItem.asProjectile` hands the stack to the projectile.
-    if (config.carries) {
-        shot.heldItem = stack.item.path();
-        if (stack.item.path().ends_with("_potion")) {
-            shot.heldItemComponents = stack.components;
-        }
-    }
-    // parity: `ArrowItem.asProjectile`.
-    if (config.kind->sticks) {
-        shot.heldItem = stack.item.path();
-        shot.heldItemComponents = stack.components;
-        shot.arrowPickup = entity::ServerEntity::ArrowPickup::Allowed;
-        // parity: `ThrownTrident`'s `ID_FOIL`, the stack's glint.
-        const wire::nbt::NbtTag* glint = stack.components.find("minecraft:enchantment_glint_override");
-        const wire::nbt::NbtCompound* enchanted = stack.components.getCompound("minecraft:enchantments");
-        shot.tridentFoil = glint != nullptr && glint->get<std::int8_t>() != nullptr
-                               ? *glint->get<std::int8_t>() != 0
-                               : enchanted != nullptr && !enchanted->empty();
-    }
+    entity::projectiles::arm(shot, config, stack);
 }
 
 } // namespace

@@ -125,3 +125,19 @@ TEST_CASE("a cycle is refused rather than followed forever") {
     REQUIRE_FALSE(resolved.has_value());
     CHECK(resolved.error().kind == TagError::Kind::Cycle);
 }
+
+TEST_CASE("a plant's outline moves with its column and a stone's does not") {
+    namespace shapes = basalt::server::registry::blockShapes;
+    const auto stone =
+        basalt::server::registry::blocks::defaultStateIdOf(basalt::wire::common::Identifier::vanilla("stone"));
+    const auto poppy =
+        basalt::server::registry::blocks::defaultStateIdOf(basalt::wire::common::Identifier::vanilla("poppy"));
+    REQUIRE(stone.has_value());
+    REQUIRE(poppy.has_value());
+    CHECK(shapes::outlineBoxes(*stone, 5, 3) == std::vector<double>{0.0, 0.0, 0.0, 1.0, 1.0, 1.0});
+    const std::vector<double> here = shapes::outlineBoxes(*poppy, 5, 3);
+    const std::vector<double> there = shapes::outlineBoxes(*poppy, 6, 9);
+    REQUIRE(here.size() == 6);
+    CHECK(here != there);
+    CHECK(std::abs((here[3] - here[0]) - (there[3] - there[0])) < 1e-9);
+}

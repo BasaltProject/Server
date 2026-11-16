@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
@@ -679,7 +680,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         return endFight_ != nullptr && endFight_->killOutright(world, entity);
     };
     wiring.requestRestart = [this] { requestRestart(); };
-    wiring.onConfigsReloaded = [this] { worldRegistry_->onConfigsReloaded(); };
+    wiring.onConfigsReloaded = [this] {
+        worldRegistry_->onConfigsReloaded();
+        rebuildCommands();
+    };
     wiring.nowNanos = [this] {
         return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - serverClock_)
             .count();
@@ -1378,6 +1382,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                             }
                                             born.persistent = hatched.persistent;
                                             born.headYaw = hatched.yaw;
+                                            if (hatched.home.has_value()) {
+                                                entity::mobMisc::of(born).turtleHome = hatched.home;
+                                            }
                                         });
                 },
             .advancementTriggers = advancementTriggers_.get(),
@@ -1797,13 +1804,17 @@ bool BasaltServer::reloadCommandConfig() {
         return false;
     }
     live_->replace(std::move(*next));
+    rebuildCommands();
+    return true;
+}
+
+void BasaltServer::rebuildCommands() {
     wired_.dispatcher->rebuild();
     for (player::PlayerSession* session : playerRegistry_.snapshot()) {
         if (session->connection().sendCommandTree) {
             session->connection().sendCommandTree();
         }
     }
-    return true;
 }
 
 } // namespace basalt::server::runtime

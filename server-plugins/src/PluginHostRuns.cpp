@@ -73,7 +73,8 @@ void PluginAnnouncements::announce(PluginHost& host, LoadedPlugin& plugin, const
     }));
 }
 
-std::int32_t PluginAnnouncements::emit(PluginHost& host, const std::string& name, const wire::lua::LuaRef& payload) {
+std::int32_t PluginAnnouncements::emit(PluginHost& host, const std::string& name,
+                                       const std::function<void(wire::lua::LuaArgs&)>& pushPayload) {
     const auto found = listeners_.find(name);
     if (found == listeners_.end()) {
         return 0;
@@ -90,8 +91,8 @@ std::int32_t PluginAnnouncements::emit(PluginHost& host, const std::string& name
             continue;
         }
         const bool ran = host.ask(*plugin, *handler, "emit " + name,
-                                  [&payload](wire::lua::LuaArgs& lua) {
-                                      payload.push(lua);
+                                  [&pushPayload](wire::lua::LuaArgs& lua) {
+                                      pushPayload(lua);
                                       return 1;
                                   },
                                   {});

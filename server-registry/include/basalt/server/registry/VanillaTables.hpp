@@ -35,6 +35,10 @@ struct FireOddsEntry {
 
 [[nodiscard]] std::string_view blockShapeIndexTable();
 
+[[nodiscard]] std::span<const std::string_view> blockOutlineSpecsTable();
+
+[[nodiscard]] std::string_view blockOutlineIndexTable();
+
 [[nodiscard]] std::span<const std::string_view> supportRulesTable();
 
 [[nodiscard]] std::span<const std::string_view> supportSetsTable();

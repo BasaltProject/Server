@@ -33,7 +33,9 @@ struct Hooks {
         recipeFor;
     std::function<void(const Dropped&)> onDropped;
     /// parity: the Bukkit `InventoryMoveItemEvent` a hopper fires before it moves anything.
-    std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z)> allowHopperMove;
+    std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view kind,
+                       const hoppers::Move& move)>
+        allowHopperMove;
     std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view cooker,
                        const server::world::loot::ItemStack& input, server::world::loot::ItemStack& result,
                        std::string_view recipe)>

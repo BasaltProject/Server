@@ -466,7 +466,8 @@ public:
     [[nodiscard]] std::vector<std::int32_t> collectRemovedEntities();
 
     /// parity: `TntBlock.explode`, which spawns the entity where the block stood.
-    void primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event);
+    void primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event,
+                  std::optional<std::int32_t> ownerId = std::nullopt);
 
     /// Asks the plugins whether the TNT block here may be lit, by `reason` and, if any, `who`.
     [[nodiscard]] bool tntMayPrime(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view reason,
@@ -525,6 +526,13 @@ private:
     };
 
     std::vector<CollectedTick> collectedBlockTicks_;
+    /// The types still waiting to run at each position, so taking one out of the turn is not a scan of the turn.
+    std::unordered_map<std::int64_t, std::vector<wire::common::Identifier>> collectedByPosition_;
+
+    [[nodiscard]] static std::int64_t packedTickPosition(std::int32_t x, std::int32_t y, std::int32_t z) noexcept {
+        return ((static_cast<std::int64_t>(x) & 0x3FFFFFF) << 38) | ((static_cast<std::int64_t>(z) & 0x3FFFFFF) << 12) |
+               (static_cast<std::int64_t>(y) & 0xFFF);
+    }
 
     std::vector<std::array<std::int32_t, 3>> slidesStarted_;
 

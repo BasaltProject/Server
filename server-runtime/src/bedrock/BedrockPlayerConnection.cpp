@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecords.hpp>
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
@@ -667,9 +668,8 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
 
         const std::int32_t arrivalColumnX = static_cast<std::int32_t>(std::floor(x)) >> 4;
         const std::int32_t arrivalColumnZ = static_cast<std::int32_t>(std::floor(z)) >> 4;
-        const std::uint32_t sections = dimension_ == wire::bedrock::BedrockDimension::Overworld ? 24U
-                                       : dimension_ == wire::bedrock::BedrockDimension::Nether  ? 8U
-                                                                                                : 16U;
+        const auto sections = static_cast<std::uint32_t>(
+            config::dimensionFacts(target.declaration().dimension).chunkHeight.sectionCount());
         for (std::int32_t dx = -kArrivalEmptyRadius; dx <= kArrivalEmptyRadius; ++dx) {
             for (std::int32_t dz = -kArrivalEmptyRadius; dz <= kArrivalEmptyRadius; ++dz) {
                 body.clear();

@@ -95,13 +95,22 @@ void redstone(RedstoneTickSystem::Hooks& hooks, const EventSink& sink) {
             event.set("face", std::string{face});
         });
     };
-    hooks.allowHopperMove = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z) {
+    hooks.allowHopperMove = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                                    std::string_view kind, const world::hoppers::Move& move) {
         return sink.allowed(&inventoryMoveItem, [&](PluginEvent& event) {
             event.set("world", std::string{worldName});
             event.set("x", static_cast<std::int64_t>(x));
             event.set("y", static_cast<std::int64_t>(y));
             event.set("z", static_cast<std::int64_t>(z));
-            event.set("kind", std::string{"hopper"});
+            event.set("kind", std::string{kind});
+            event.set("from_x", static_cast<std::int64_t>(move.fromX));
+            event.set("from_y", static_cast<std::int64_t>(move.fromY));
+            event.set("from_z", static_cast<std::int64_t>(move.fromZ));
+            event.set("to_x", static_cast<std::int64_t>(move.toX));
+            event.set("to_y", static_cast<std::int64_t>(move.toY));
+            event.set("to_z", static_cast<std::int64_t>(move.toZ));
+            event.set("item", move.item.toString());
+            event.set("initiator", std::string{move.pushing ? "source" : "destination"});
         });
     };
     hooks.allowSmelt = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,

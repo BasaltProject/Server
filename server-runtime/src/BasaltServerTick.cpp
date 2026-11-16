@@ -262,9 +262,10 @@ void BasaltServer::tickPrimedTnt(world::LoadedWorld& world) {
         random::RandomSource lighting = random::RandomSource::legacy(scratchSeed());
         for (const world::PrimedTntQueue::Primed& lit : world.state().takePrimedTnt()) {
             const std::array<std::int32_t, 3> position{lit.x, lit.y, lit.z};
-            static_cast<void>(entity::primedTnt::prime(world.state(), position[0], position[1], position[2],
-                                                       playerRegistry_.allocateEntityId(), tntType->protocolId,
-                                                       lighting.nextDouble() * kFullTurn));
+            entity::ServerEntity& primed = entity::primedTnt::prime(
+                world.state(), position[0], position[1], position[2], playerRegistry_.allocateEntityId(),
+                tntType->protocolId, lighting.nextDouble() * kFullTurn);
+            primed.ownerId = lit.ownerId;
             // parity: `TntBlock.prime`.
             if (world.state().hasSculkSensorNear(position[0], position[1], position[2],
                                                  world::vibrations::kCalibratedRange)) {

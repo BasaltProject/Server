@@ -2,10 +2,12 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/ScheduledBlocks.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -33,6 +35,7 @@ void buddingAmethyst(WorldState& world, std::int32_t x, std::int32_t y, std::int
 
 /// parity: `TurtleEggBlock.randomTick`.
 void turtleEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+               const std::function<void(const scheduledBlocks::Hatchling&)>& spawnHatchling,
                random::RandomSource& random, std::vector<BlockChange>& changes);
 
 /// parity: `DriedGhastBlock.randomTick` only asks to be looked at again in 5000 ticks.

@@ -372,27 +372,35 @@ std::vector<ChunkBlockEntity> Chunk::blockEntities() const {
     return all;
 }
 
-void Chunk::scheduleBlockTick(const ChunkScheduledTick& tick) { scheduleTick(blockTicks_, tick); }
+void Chunk::scheduleBlockTick(const ChunkScheduledTick& tick) { scheduleTick(blockTicks_, blockTickCells_, tick); }
 
-void Chunk::scheduleFluidTick(const ChunkScheduledTick& tick) { scheduleTick(fluidTicks_, tick); }
+void Chunk::scheduleFluidTick(const ChunkScheduledTick& tick) { scheduleTick(fluidTicks_, fluidTickCells_, tick); }
 
-void Chunk::scheduleTick(std::vector<ChunkScheduledTick>& ticks, const ChunkScheduledTick& tick) {
+namespace {
+
+[[nodiscard]] std::uint32_t tickCell(const ChunkScheduledTick& tick) {
+    return (static_cast<std::uint32_t>(tick.localX & 15) << 28) | (static_cast<std::uint32_t>(tick.localZ & 15) << 24) |
+           (static_cast<std::uint32_t>(tick.y) & 0xFFFFFFU);
+}
+
+} // namespace
+
+void Chunk::scheduleTick(std::vector<ChunkScheduledTick>& ticks, TickCells& cells, const ChunkScheduledTick& tick) {
     if (tick.y < bounds_.minY() || tick.y > bounds_.maxY()) {
         throw std::out_of_range{"scheduled tick outside chunk bounds"};
     }
-    const bool duplicate = std::ranges::any_of(ticks, [&tick](const ChunkScheduledTick& one) {
-        return one.localX == tick.localX && one.y == tick.y && one.localZ == tick.localZ && one.type == tick.type;
-    });
-    if (duplicate) {
+    std::vector<wire::common::Identifier>& pending = cells[tickCell(tick)];
+    if (std::ranges::find(pending, tick.type) != pending.end()) {
         return;
     }
+    pending.push_back(tick.type);
     ticks.push_back(tick);
     // parity: `LevelChunkTicks.schedule` does not mark the chunk unsaved.
 }
 
-void Chunk::advanceBlockTicks(std::vector<ChunkScheduledTick>& due) { advance(blockTicks_, due); }
+void Chunk::advanceBlockTicks(std::vector<ChunkScheduledTick>& due) { advance(blockTicks_, blockTickCells_, due); }
 
-void Chunk::advanceFluidTicks(std::vector<ChunkScheduledTick>& due) { advance(fluidTicks_, due); }
+void Chunk::advanceFluidTicks(std::vector<ChunkScheduledTick>& due) { advance(fluidTicks_, fluidTickCells_, due); }
 
 void Chunk::openTurn() {
     for (ChunkScheduledTick& tick : blockTicks_) {
@@ -403,13 +411,22 @@ void Chunk::openTurn() {
     }
 }
 
-void Chunk::advance(std::vector<ChunkScheduledTick>& pending, std::vector<ChunkScheduledTick>& due) {
+void Chunk::advance(std::vector<ChunkScheduledTick>& pending, TickCells& cells, std::vector<ChunkScheduledTick>& due) {
     if (pending.empty()) {
         return;
     }
     std::size_t kept = 0;
     for (std::size_t index = 0; index < pending.size(); index++) {
         if (pending[index].delay <= 0) {
+            if (const auto cell = cells.find(tickCell(pending[index])); cell != cells.end()) {
+                std::vector<wire::common::Identifier>& types = cell->second;
+                if (const auto type = std::ranges::find(types, pending[index].type); type != types.end()) {
+                    types.erase(type);
+                }
+                if (types.empty()) {
+                    cells.erase(cell);
+                }
+            }
             due.push_back(std::move(pending[index]));
         } else {
             if (kept != index) {

@@ -56,7 +56,8 @@ constexpr double kMaxSignal = 15.0;
 }
 
 /// parity: `TntBlock.onProjectileHit` into `TntBlock.prime`.
-[[nodiscard]] std::optional<BlockChange> primeTnt(WorldState& world, const entity::BlockHit& hit, bool tntExplodes) {
+[[nodiscard]] std::optional<BlockChange> primeTnt(WorldState& world, const entity::BlockHit& hit, bool tntExplodes,
+                                                  std::optional<std::int32_t> ownerId) {
     // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off.
     if (!tntExplodes || !world.tntMayPrime(hit.blockX, hit.blockY, hit.blockZ, "projectile")) {
         return std::nullopt;
@@ -65,7 +66,7 @@ constexpr double kMaxSignal = 15.0;
     if (!world.setBlockState(hit.blockX, hit.blockY, hit.blockZ, air)) {
         return std::nullopt;
     }
-    world.primeTnt(hit.blockX, hit.blockY, hit.blockZ, "prime_fuse");
+    world.primeTnt(hit.blockX, hit.blockY, hit.blockZ, "prime_fuse", ownerId);
     return BlockChange{hit.blockX, hit.blockY, hit.blockZ, air, {}};
 }
 
@@ -137,7 +138,8 @@ constexpr double kBellTopEdge = static_cast<double>(0.8124F);
 } // namespace
 
 std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const entity::BlockHit& hit, bool byArrow,
-                                 bool burning, bool tntExplodes, const OnDestroyed& destroyed) {
+                                 bool burning, bool tntExplodes, const OnDestroyed& destroyed,
+                                 std::optional<std::int32_t> ownerId) {
     const std::optional<std::int32_t> stateId = world.blockState(hit.blockX, hit.blockY, hit.blockZ);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -152,7 +154,7 @@ std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const
     }
     // parity: `TntBlock.onProjectileHit`.
     if (path == "tnt") {
-        return burning ? primeTnt(world, hit, tntExplodes) : std::nullopt;
+        return burning ? primeTnt(world, hit, tntExplodes, ownerId) : std::nullopt;
     }
     // parity: `ChorusFlowerBlock` and `DecoratedPotBlock`.
     if (path == "chorus_flower" || path == "decorated_pot") {

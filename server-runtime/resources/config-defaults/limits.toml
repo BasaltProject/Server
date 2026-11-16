@@ -27,3 +27,11 @@ command-threshold-seconds = 10
 # Commands that do not count toward the command spam limit, by name without the slash, as Spigot's
 # spam-exclusions does. NO VANILLA: vanilla counts every command.
 excluded-commands = []
+
+[items]
+# Longest text, in characters, a client may put on an item it hands the server whole (creative inventory
+# and book edits). 0 means no limit, which is what vanilla does.
+custom-name-max-length = 0
+lore-line-max-length = 0
+book-page-max-length = 0
+book-title-max-length = 0

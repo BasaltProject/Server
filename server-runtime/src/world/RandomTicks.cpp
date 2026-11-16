@@ -517,7 +517,7 @@ void actOnce(const randomTicks::Context& context, std::int32_t x, std::int32_t y
     } else if (path == "budding_amethyst") {
         miscGrowth::buddingAmethyst(context.world, x, y, z, random, changes);
     } else if (path == "turtle_egg") {
-        miscGrowth::turtleEgg(context.world, x, y, z, stateId, random, changes);
+        miscGrowth::turtleEgg(context.world, x, y, z, stateId, context.spawnHatchling, random, changes);
     } else if (path == "lava") {
         lavaGrowth::lava(context.world, x, y, z, random, changes);
     } else if (std::ranges::contains(kClimbingPlants, path)) {

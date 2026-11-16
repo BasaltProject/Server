@@ -278,10 +278,13 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 if (gameTime % hooks.hopperCheckTicks != 0) {
                     continue;
                 }
-                if (hooks.allowHopperMove && !hooks.allowHopperMove(worldName, x, y, z)) {
-                    continue;
-                }
                 const hoppers::Around around{
+                    .allowMove = hooks.allowHopperMove
+                                     ? std::function<bool(const hoppers::Move&)>{[&hooks, worldName, x, y,
+                                                                                  z](const hoppers::Move& move) {
+                                           return hooks.allowHopperMove(worldName, x, y, z, "hopper", move);
+                                       }}
+                                     : std::function<bool(const hoppers::Move&)>{},
                     .isBookshelfBook = hooks.isBookshelfBook,
                     .doesNotBlockHoppers = hooks.doesNotBlockHoppers,
                     .recipeFor = hooks.recipeFor,

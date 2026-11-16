@@ -447,6 +447,16 @@ void noteChange(const Around& around, const BlockChange& change) {
         if (!slot.has_value()) {
             continue;
         }
+        if (around.allowMove && !around.allowMove(Move{.fromX = x,
+                                                       .fromY = y,
+                                                       .fromZ = z,
+                                                       .toX = tx,
+                                                       .toY = ty,
+                                                       .toZ = tz,
+                                                       .item = slot->item,
+                                                       .pushing = true})) {
+            continue;
+        }
         if (!insert(world, *target, *slot, registry::opposite(out), around)) {
             continue;
         }
@@ -457,7 +467,8 @@ void noteChange(const Around& around, const BlockChange& change) {
 }
 
 /// parity: `suckInItems` for the container half: one item out of whatever sits on top.
-[[nodiscard]] bool pullFrom(WorldState& world, const Container& above, Slots& slots, const std::int64_t gameTime) {
+[[nodiscard]] bool pullFrom(WorldState& world, const Container& above, Slots& slots, const Around& around,
+                            const std::int64_t gameTime) {
     Slots source = blockInventory::readFor(above.path, *above.data, above.size);
     const std::vector<std::int32_t> takeable = slotsFor(above.path, above.size, registry::BlockFace::Down);
     for (const std::int32_t slot : takeable) {
@@ -470,6 +481,16 @@ void noteChange(const Around& around, const BlockChange& change) {
         }
         // parity: `canTakeItemThroughFace`, which is what stops a hopper under a furnace draining.
         if (!containers::givesThroughFace(above.path, slot, (*stack)->item, registry::BlockFace::Down)) {
+            continue;
+        }
+        if (around.allowMove && !around.allowMove(Move{.fromX = above.x,
+                                                       .fromY = above.y,
+                                                       .fromZ = above.z,
+                                                       .toX = above.x,
+                                                       .toY = above.y - 1,
+                                                       .toZ = above.z,
+                                                       .item = (*stack)->item,
+                                                       .pushing = false})) {
             continue;
         }
         add(slots, **stack);
@@ -543,7 +564,7 @@ void noteChange(const Around& around, const BlockChange& change) {
 } // namespace
 
 bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
-          const Around& around) {
+          const Around& outer) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return false;
@@ -574,6 +595,16 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
         return false;
     }
     Slots slots = blockInventory::read(entity->data(), kSize);
+    // parity: `HopperBlockEntity.applyCooldown`, a vetoed move still costs the hopper its rest.
+    bool vetoed = false;
+    Around around = outer;
+    if (outer.allowMove) {
+        around.allowMove = [&outer, &vetoed](const Move& move) {
+            const bool allowed = outer.allowMove(move);
+            vetoed = vetoed || !allowed;
+            return allowed;
+        };
+    }
     // parity: `tryMoveItems` gives one away when it has something and takes one when it has room.
     bool moved = false;
     for (std::int32_t repeat = 0; repeat < around.amount && !isEmpty(slots); repeat++) {
@@ -589,12 +620,12 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
         const bool taken = takeCompost(world, x, y + 1, z, slots, around.gameTime) ||
                            takeDisc(world, x, y + 1, z, slots, around) ||
                            unshelveBook(world, x, y + 1, z, slots, around) ||
-                           (above.has_value() ? pullFrom(world, *above, slots, around.gameTime)
+                           (above.has_value() ? pullFrom(world, *above, slots, around, around.gameTime)
                                               : suckIn(world, x, y, z, slots, around));
         moved = taken || moved;
         // Not vanilla when `amount` is above one: more of the same turn.
         for (std::int32_t repeat = 1; taken && repeat < around.amount && !isFull(slots); repeat++) {
-            const bool more = above.has_value() ? pullFrom(world, *above, slots, around.gameTime)
+            const bool more = above.has_value() ? pullFrom(world, *above, slots, around, around.gameTime)
                                                 : suckIn(world, x, y, z, slots, around);
             if (!more) {
                 break;
@@ -602,7 +633,10 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
         }
     }
     if (!moved) {
-        return false;
+        if (vetoed) {
+            entity->data().putInt(kCooldownKey, around.transferTicks);
+        }
+        return vetoed;
     }
     blockInventory::write(entity->data(), slots);
     entity->data().putInt(kCooldownKey, around.transferTicks);
@@ -626,7 +660,7 @@ bool tickCart(WorldState& world, entity::ServerEntity& cart, const std::int64_t 
     const double levelY = cart.y + kCartLevelRise;
     const std::optional<Container> above = containerAtPoint(world, cart.x, levelY + 1.0, cart.z);
     // parity: a cart's `isGridAligned` is false.
-    bool took = above.has_value() ? pullFrom(world, *above, slots, gameTime)
+    bool took = above.has_value() ? pullFrom(world, *above, slots, Around{}, gameTime)
                                   : suckInBox(world, cart.x - 0.5, levelY - 0.5 + kSuckBottom, cart.z - 0.5,
                                               cart.x + 0.5, levelY - 0.5 + kSuckTop, cart.z + 0.5, slots);
     if (!took) {

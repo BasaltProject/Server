@@ -444,7 +444,8 @@ void CombatSystem::hitBlock(world::LoadedWorld& world, const std::vector<PlayerS
         world.gameRules().get(world::gameRules::kTntExplodes),
         [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             broadcaster_.dropBrokenBlock(world, bx, by, bz, stateId, true);
-        });
+        },
+        projectile.ownerId);
     if (!change.has_value()) {
         return;
     }

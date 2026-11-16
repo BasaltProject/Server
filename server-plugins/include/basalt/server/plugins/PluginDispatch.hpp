@@ -40,7 +40,7 @@ public:
 
 private:
     void dispatch(PluginHost& host, LoadedPlugin& plugin, PluginInstance& instance, const wire::lua::LuaRef& handler,
-                  PluginEventView& view, bool observer, const std::string& typeName);
+                  PluginEventView& view, const std::string& typeName);
 
     PluginHost* host_;
     bool warnedAboutThread_ = false;

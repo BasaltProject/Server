@@ -156,10 +156,14 @@ void installScheduling(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plu
     PluginHost* server = &host;
 
     wire::lua::installWaitingFunction(
-        *instance.sandbox, "wait", [server, target, lane](wire::lua::LuaCall::Resume resume) {
+        *instance.sandbox, "wait",
+        [lane]() -> std::optional<std::string> {
             if (lane->deciderDepth > 0) {
-                return;
+                return "wait() cannot be used in a handler that decides: it must answer now. Use watch to wait";
             }
+            return std::nullopt;
+        },
+        [server, target, lane](wire::lua::LuaCall::Resume resume) {
             PluginHandle handle = server->services().tasks().after(1, [server, target, lane, resume] {
                 lane->sandbox->refill();
                 server->resuming(*target, resume);

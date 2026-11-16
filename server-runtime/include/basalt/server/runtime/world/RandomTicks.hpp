@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/SaplingGrowth.hpp>
+#include <basalt/server/runtime/world/ScheduledBlocks.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -52,6 +53,7 @@ struct Context {
     bool spawnsPortalPiglins = false;
 
     std::function<std::int32_t()> allocateEntityId;
+    std::function<void(const scheduledBlocks::Hatchling&)> spawnHatchling;
     /// Unset, every change goes through, as on a server with no plugins.
     MayChange mayChange;
     saplingGrowth::Flowering flowering;

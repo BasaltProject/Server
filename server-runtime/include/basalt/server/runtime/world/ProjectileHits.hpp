@@ -22,7 +22,8 @@ using OnDestroyed = std::function<void(std::int32_t stateId, std::int32_t x, std
 
 [[nodiscard]] std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const entity::BlockHit& hit,
                                                bool byArrow, bool burning, bool tntExplodes,
-                                               const OnDestroyed& destroyed = {});
+                                               const OnDestroyed& destroyed = {},
+                                               std::optional<std::int32_t> ownerId = std::nullopt);
 
 /// parity: `TargetBlock.getRedstoneStrength`.
 [[nodiscard]] std::int32_t signalFor(const entity::BlockHit& hit);

@@ -341,12 +341,25 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
         hooks.surfaces.sidebar = [host, players](const std::string& uuid) {
             return surfaceContent(*host, *players, server::plugins::PluginSurface::Sidebar, uuid);
         };
+        hooks.surfaces.holdsTabList = [host] {
+            return host->surfaces().anyClaimOn(server::plugins::PluginSurface::TabList);
+        };
+        hooks.surfaces.tabList = [host, players](const std::string& uuid) {
+            return surfaceContent(*host, *players, server::plugins::PluginSurface::TabList, uuid);
+        };
         hooks.surfaces.holdsBossBar = [host] {
             return host->surfaces().anyClaimOn(server::plugins::PluginSurface::BossBar);
         };
         hooks.surfaces.bossBar = [host, players](const std::string& uuid) {
             return surfaceContent(*host, *players, server::plugins::PluginSurface::BossBar, uuid);
         };
+        hooks.surfaces.holdsNameTag = [host] {
+            return host->surfaces().anyClaimOn(server::plugins::PluginSurface::NameTag);
+        };
+        hooks.surfaces.nameTag = [host, players](const std::string& uuid) {
+            return surfaceContent(*host, *players, server::plugins::PluginSurface::NameTag, uuid);
+        };
+        hooks.surfaces.inVanillaTeam = [this](const std::string& name) { return teams_.teamOf(name) != nullptr; };
     }
 
     hooks.npcs = [this] {
@@ -401,16 +414,38 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
             });
         return event == nullptr || !event->cancelled();
     };
-    hooks.chatAllowed = [bus](const player::PlayerSession& player, std::string& message) {
+    if (players != nullptr) {
+        hooks.chatFormat = [host, players](const player::PlayerSession& player) -> std::optional<std::string> {
+            const std::optional<ui::SurfaceContent> drawn =
+                surfaceContent(*host, *players, server::plugins::PluginSurface::ChatFormat, player.uuid().toString());
+            return drawn.has_value() ? std::optional{drawn->title} : std::nullopt;
+        };
+    }
+    hooks.chatAllowed = [bus](const player::PlayerSession& player, std::string& message,
+                              ClientSession::PluginHooks::ChatRouting& routing) {
         const server::plugins::PluginEvent* event = server::plugins::emit(
             bus, &server::plugins::pluginEventTypes::playerChat(), [&](server::plugins::PluginEvent& filled) {
                 fillPlayer(filled, player);
                 filled.set(3, message);
+                filled.set(4, std::string{});
+                filled.set(5, std::string{"*"});
             });
         if (event == nullptr) {
             return true;
         }
         message = textOf(event->get(3), message);
+        routing.format = textOf(event->get(4), "");
+        if (const std::string recipients = textOf(event->get(5), "*"); recipients != "*") {
+            std::vector<std::string>& named = routing.recipients.emplace();
+            for (std::size_t from = 0; from < recipients.size();) {
+                std::size_t comma = recipients.find(',', from);
+                comma = comma == std::string::npos ? recipients.size() : comma;
+                if (comma > from) {
+                    named.push_back(recipients.substr(from, comma - from));
+                }
+                from = comma + 1;
+            }
+        }
         return !event->cancelled();
     };
     hooks.commandAllowed = [bus](const player::PlayerSession& player, std::string& command) {

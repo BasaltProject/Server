@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
 #include <basalt/wire/bedrock/BedrockMaps.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
+#include <basalt/wire/bedrock/BedrockTokenKeys.hpp>
 #include <basalt/wire/bedrock/BedrockTypes.hpp>
 #include <basalt/wire/common/timings/NativeSampler.hpp>
 #include <basalt/wire/io/Platform.hpp>
@@ -298,6 +299,7 @@ bool BedrockListener::start() {
         logger_.info([] { return "Bedrock is off in server.toml."; });
         return false;
     }
+    wire::bedrock::MojangTokenKeys::instance().start();
 
     auto keys = wire::bedrock::EcKeyPair::generate();
     if (!keys) {
@@ -1011,6 +1013,17 @@ void BedrockListener::onReady(Session& session) {
     };
 
     const wire::common::Uuid uuid = uuidOf(session.login.xuid.empty() ? session.login.name : session.login.xuid);
+    if (hooks_.refuse) {
+        if (const std::optional<std::string> reason = hooks_.refuse(uuid, session.address); reason.has_value()) {
+            logger_.info([&session, &reason] { return "Refused " + session.login.name + ": " + *reason; });
+            wire::io::ByteBuffer goodbye;
+            wire::bedrock::writeDisconnect(goodbye, *reason);
+            session.link->sendPacket(BedrockPacket::Disconnect, goodbye.readable());
+            session.link->flush();
+            session.link->close();
+            return;
+        }
+    }
     const Spawn spawn = hooks_.spawn ? hooks_.spawn(uuid) : Spawn{};
 
     wire::bedrock::StartGameInfo info;

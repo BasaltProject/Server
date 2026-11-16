@@ -158,8 +158,14 @@ public:
         struct Surfaces {
             std::function<bool()> holdsSidebar;
             std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> sidebar;
+            std::function<bool()> holdsTabList;
+            std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> tabList;
             std::function<bool()> holdsBossBar;
             std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> bossBar;
+            std::function<bool()> holdsNameTag;
+            /// The title is the prefix and the first line the suffix, both in MiniMessage.
+            std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> nameTag;
+            std::function<bool(const std::string& playerName)> inVanillaTeam;
         };
 
         Surfaces surfaces;
@@ -171,7 +177,18 @@ public:
         std::function<bool(const player::PlayerSession& player, double fromX, double fromY, double fromZ, double toX,
                            double toY, double toZ)>
             moveAllowed;
-        std::function<bool(const player::PlayerSession& player, std::string& message)> chatAllowed;
+
+        /// What a plugin decided about a chat line beyond its text: an empty format keeps vanilla's.
+        struct ChatRouting {
+            std::string format;
+            std::optional<std::vector<std::string>> recipients;
+        };
+
+        std::function<bool(const player::PlayerSession& player, std::string& message, ChatRouting& routing)>
+            chatAllowed;
+        /// A plugin's chat line with {player} and {message} still in it; sent unsigned, since the client cannot
+        /// decorate it.
+        std::function<std::optional<std::string>(const player::PlayerSession& player)> chatFormat;
         std::function<bool(const player::PlayerSession& player, std::string& command)> commandAllowed;
         std::function<bool(const player::PlayerSession& player)> swapHandsAllowed;
         std::function<bool(std::string& message)> broadcastAllowed;

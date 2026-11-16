@@ -46,6 +46,7 @@ struct Config {
     float totalMobsAddedPerPlayer = 2.0F;
     float simultaneousMobsAddedPerPlayer = 1.0F;
     std::int32_t ticksBetweenSpawn = 40;
+    std::int32_t ticksBetweenItemSpawners = 160;
     std::vector<WeightedSpawnData> spawnPotentials;
     std::vector<WeightedTable> lootTablesToEject;
     std::string itemsToDropWhenOminous;

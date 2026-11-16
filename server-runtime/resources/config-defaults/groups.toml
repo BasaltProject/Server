@@ -18,6 +18,10 @@ permissions = [
     "basalt.command.help",
     "basalt.command.list",
     "basalt.command.me",
+    "basalt.command.msg",
+    "basalt.command.random",
+    "basalt.command.teammsg",
+    "basalt.command.trigger",
 ]
 
 [groups.operator]

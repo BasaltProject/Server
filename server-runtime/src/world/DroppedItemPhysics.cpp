@@ -263,42 +263,47 @@ void DroppedItemPhysics::restartAge(std::int32_t entityId) {
 std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* region) {
     std::unique_lock<WorldMutex> lock{*mutex_};
     std::vector<std::int32_t> despawned;
-    for (std::size_t index = 0; index < droppedItems_.size();) {
+    std::size_t kept = 0;
+    for (std::size_t index = 0; index < droppedItems_.size(); ++index) {
         DroppedItem& item = droppedItems_[index];
-        if (region != nullptr && !region->ownsPosition(item.x, item.z)) {
-            ++index;
-            continue;
-        }
-        item.previousX = item.x;
-        item.previousY = item.y;
-        item.previousZ = item.z;
-        if (item.age != kUnlimitedLifetimeAge) {
-            ++item.age;
-        }
-        if (item.pickupDelay > 0) {
-            --item.pickupDelay;
-        }
-        if (item.age >= lifetimeTicks_) {
-            despawned.push_back(item.entityId);
-            droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(index));
-            continue;
-        }
-        // parity: `ItemEntity.tick` lets the current in twice.
-        carryByFluid(item);
-        moveItem(item);
-        carryByFluid(item);
-        // parity: `applyEffectsFromBlocks` runs on every tick of an item.
-        item.health -= cactusDamage(blockAt_, item);
-        if (item.health <= 0) {
-            if (item.item.path().ends_with("shulker_box")) {
-                destroyed_.push_back(item);
+        bool survives = true;
+        if (region == nullptr || region->ownsPosition(item.x, item.z)) {
+            item.previousX = item.x;
+            item.previousY = item.y;
+            item.previousZ = item.z;
+            if (item.age != kUnlimitedLifetimeAge) {
+                ++item.age;
             }
-            despawned.push_back(item.entityId);
-            droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(index));
-            continue;
+            if (item.pickupDelay > 0) {
+                --item.pickupDelay;
+            }
+            if (item.age >= lifetimeTicks_) {
+                despawned.push_back(item.entityId);
+                survives = false;
+            } else {
+                // parity: `ItemEntity.tick` lets the current in twice.
+                carryByFluid(item);
+                moveItem(item);
+                carryByFluid(item);
+                // parity: `applyEffectsFromBlocks` runs on every tick of an item.
+                item.health -= cactusDamage(blockAt_, item);
+                if (item.health <= 0) {
+                    if (item.item.path().ends_with("shulker_box")) {
+                        destroyed_.push_back(item);
+                    }
+                    despawned.push_back(item.entityId);
+                    survives = false;
+                }
+            }
         }
-        ++index;
+        if (survives) {
+            if (kept != index) {
+                droppedItems_[kept] = std::move(item);
+            }
+            ++kept;
+        }
     }
+    droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(kept), droppedItems_.end());
 
     // parity: `ItemEntity.mergeWithNeighbours`.
     std::set<Pair> denied;
@@ -312,18 +317,7 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
         }
         lock.lock();
     }
-    std::vector<std::int32_t> absorbed;
-    for (std::size_t index = 0; index < droppedItems_.size(); ++index) {
-        const DroppedItem& item = droppedItems_[index];
-        if (std::ranges::find(absorbed, item.entityId) != absorbed.end()) {
-            continue;
-        }
-        const std::int32_t interval = item.crossedBlock ? kMergeMovingInterval : kMergeRestingInterval;
-        if (item.age % interval != 0) {
-            continue;
-        }
-        mergeWithNeighbours(index, despawned, absorbed, denied);
-    }
+    mergeAll(despawned, denied);
     return despawned;
 }
 
@@ -351,55 +345,97 @@ std::vector<std::pair<DroppedItem, DroppedItem>> DroppedItemPhysics::mergeCandid
     return found;
 }
 
-void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,
-                                             std::vector<std::int32_t>& absorbed, const std::set<Pair>& denied) {
+namespace {
+
+[[nodiscard]] std::int64_t mergeCell(double x, double z, double size) {
+    const auto cellX = static_cast<std::int64_t>(std::floor(x / size));
+    const auto cellZ = static_cast<std::int64_t>(std::floor(z / size));
+    return (cellX << 32) ^ (cellZ & 0xFFFFFFFF);
+}
+
+} // namespace
+
+void DroppedItemPhysics::mergeAll(std::vector<std::int32_t>& despawned, const std::set<Pair>& denied) {
+    const auto due = [](const DroppedItem& item) {
+        const std::int32_t interval = item.crossedBlock ? kMergeMovingInterval : kMergeRestingInterval;
+        return item.age % interval == 0;
+    };
+    if (!std::ranges::any_of(droppedItems_, due)) {
+        return;
+    }
     const auto maxOf = [](const DroppedItem& item) {
         return registry::itemStacking::maxStackSize(item.item, item.components);
     };
-    // parity: `ItemEntity.isMergable`: a full stack takes nothing.
-    if (droppedItems_[index].count >= maxOf(droppedItems_[index])) {
-        return;
+    std::vector<std::pair<std::int64_t, std::uint32_t>> grid;
+    grid.reserve(droppedItems_.size());
+    for (std::size_t index = 0; index < droppedItems_.size(); ++index) {
+        grid.emplace_back(mergeCell(droppedItems_[index].x, droppedItems_[index].z, mergeRange_),
+                          static_cast<std::uint32_t>(index));
     }
-    for (std::size_t other = 0; other < droppedItems_.size();) {
-        if (other == index) {
-            ++other;
-            continue;
-        }
-        DroppedItem& candidate = droppedItems_[other];
+    std::ranges::sort(grid);
+    std::vector<char> gone(droppedItems_.size(), 0);
+    std::vector<std::uint32_t> around;
+    for (std::size_t index = 0; index < droppedItems_.size(); ++index) {
         DroppedItem& item = droppedItems_[index];
-        // parity: `ItemEntity.tryToMerge`: same item, same components, and the two counts have to.
-        if (std::abs(candidate.x - item.x) > mergeRange_ || std::abs(candidate.z - item.z) > mergeRange_ ||
-            std::abs(candidate.y - item.y) > kMergeHeight || candidate.count <= 0 || candidate.item != item.item ||
-            !sameComponents(candidate.components, item.components) || item.count + candidate.count > maxOf(candidate)) {
-            ++other;
+        // parity: `ItemEntity.isMergable`: a full stack takes nothing.
+        if (gone[index] != 0 || !due(item) || item.count >= maxOf(item)) {
             continue;
         }
-        if (denied.contains({item.entityId, candidate.entityId})) {
-            ++other;
-            continue;
+        around.clear();
+        const auto cellX = static_cast<std::int64_t>(std::floor(item.x / mergeRange_));
+        const auto cellZ = static_cast<std::int64_t>(std::floor(item.z / mergeRange_));
+        for (std::int64_t dx = -1; dx <= 1; ++dx) {
+            for (std::int64_t dz = -1; dz <= 1; ++dz) {
+                const std::int64_t key = ((cellX + dx) << 32) ^ ((cellZ + dz) & 0xFFFFFFFF);
+                for (auto at = std::ranges::lower_bound(grid, std::pair<std::int64_t, std::uint32_t>{key, 0});
+                     at != grid.end() && at->first == key; ++at) {
+                    around.push_back(at->second);
+                }
+            }
         }
-        const std::int32_t moved = std::min(std::min(maxOf(item), kMergeCap) - item.count, candidate.count);
-        item.count += moved;
-        item.countChanged = true;
-        // parity: the merged stack keeps the younger age and the longer pickup delay.
-        item.age = std::min(item.age, candidate.age);
-        item.pickupDelay = std::max(item.pickupDelay, candidate.pickupDelay);
-        if (moved < candidate.count) {
-            candidate.count -= moved;
-            candidate.countChanged = true;
-            ++other;
-            continue;
-        }
-        despawned.push_back(candidate.entityId);
-        absorbed.push_back(candidate.entityId);
-        droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(other));
-        if (other < index) {
-            --index;
-        }
-        if (droppedItems_[index].count >= maxOf(droppedItems_[index])) {
-            return;
+        std::ranges::sort(around);
+        for (const std::uint32_t other : around) {
+            DroppedItem& candidate = droppedItems_[other];
+            // parity: `ItemEntity.tryToMerge`: same item, same components, and the two counts have to.
+            if (other == index || gone[other] != 0 || std::abs(candidate.x - item.x) > mergeRange_ ||
+                std::abs(candidate.z - item.z) > mergeRange_ || std::abs(candidate.y - item.y) > kMergeHeight ||
+                candidate.count <= 0 || candidate.item != item.item ||
+                !sameComponents(candidate.components, item.components) ||
+                item.count + candidate.count > maxOf(candidate)) {
+                continue;
+            }
+            if (denied.contains({item.entityId, candidate.entityId})) {
+                continue;
+            }
+            const std::int32_t moved = std::min(std::min(maxOf(item), kMergeCap) - item.count, candidate.count);
+            item.count += moved;
+            item.countChanged = true;
+            // parity: the merged stack keeps the younger age and the longer pickup delay.
+            item.age = std::min(item.age, candidate.age);
+            item.pickupDelay = std::max(item.pickupDelay, candidate.pickupDelay);
+            if (moved < candidate.count) {
+                candidate.count -= moved;
+                candidate.countChanged = true;
+                continue;
+            }
+            despawned.push_back(candidate.entityId);
+            gone[other] = 1;
+            if (item.count >= maxOf(item)) {
+                break;
+            }
         }
     }
+    std::size_t kept = 0;
+    for (std::size_t index = 0; index < droppedItems_.size(); ++index) {
+        if (gone[index] != 0) {
+            continue;
+        }
+        if (kept != index) {
+            droppedItems_[kept] = std::move(droppedItems_[index]);
+        }
+        ++kept;
+    }
+    droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(kept), droppedItems_.end());
 }
 
 double DroppedItemPhysics::fluidHeight(const DroppedItem& item, FluidKind kind) const {

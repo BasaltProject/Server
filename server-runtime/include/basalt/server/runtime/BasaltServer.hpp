@@ -213,6 +213,8 @@ private:
 
     [[nodiscard]] bool reloadCommandConfig();
 
+    void rebuildCommands();
+
     [[nodiscard]] bool underSpawnProtection(const player::PlayerSession& who, const world::LoadedWorld& world,
                                             std::int32_t x, std::int32_t z);
 

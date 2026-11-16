@@ -166,6 +166,7 @@ void buddingAmethyst(WorldState& world, std::int32_t x, std::int32_t y, std::int
 }
 
 void turtleEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+               const std::function<void(const scheduledBlocks::Hatchling&)>& spawnHatchling,
                random::RandomSource& random, std::vector<BlockChange>& changes) {
     // parity: `TurtleEggBlock.shouldUpdateHatchLevel` over the `turtle_egg_hatch_chance` environment.
     if (random.nextFloat() >= world.gameplay().blocks.turtleEggHatchChance) {
@@ -193,6 +194,18 @@ void turtleEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
         return;
     }
     growthSupport::set(world, x, y, z, registry::blocks::air().stateId, changes);
+    // parity: `TurtleEggBlock.randomTick`, one baby per egg with the block as its home.
+    const std::int32_t eggs = numberOf(propertyOf(stateId, "eggs")).value_or(1);
+    for (std::int32_t index = 0; index < eggs && spawnHatchling; index++) {
+        spawnHatchling(scheduledBlocks::Hatchling{.type = wire::common::Identifier::vanilla("turtle"),
+                                                  .x = x + 0.3 + index * 0.2,
+                                                  .y = static_cast<double>(y),
+                                                  .z = z + 0.3,
+                                                  .yaw = 0.0F,
+                                                  .baby = true,
+                                                  .persistent = false,
+                                                  .home = std::array<std::int32_t, 3>{x, y, z}});
+    }
 }
 
 void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {

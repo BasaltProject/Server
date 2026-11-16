@@ -124,6 +124,9 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
                 }
                 const std::int32_t target =
                     mode == Mode::Hollow && !onEdge ? reg::blocks::air().stateId : block->stateId;
+                if (mode != Mode::Destroy && *existing == target) {
+                    continue;
+                }
                 if (writeOne(*editor, x, y, z, target, mode)) {
                     count++;
                 }

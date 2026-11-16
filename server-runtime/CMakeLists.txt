@@ -123,6 +123,7 @@ basalt_module(server-runtime-core
         src/command/commands/ItemCommand.cpp
         src/command/commands/ItemCommands.cpp
         src/command/commands/ItemSlots.cpp
+        src/command/commands/CustomMessageCommand.cpp
         src/command/commands/PlaceholderCommand.cpp
         src/command/commands/LocateCommand.cpp
         src/command/commands/LootCommand.cpp
@@ -246,6 +247,7 @@ basalt_module(server-runtime-core
         src/SessionPlayPackets.cpp
         src/SessionChat.cpp
         src/chat/ChatBroadcast.cpp
+        src/chat/ChatFormat.cpp
         src/chat/ChatMessage.cpp
         src/chat/LastSeenValidator.cpp
         src/chat/SecureChat.cpp
@@ -348,6 +350,7 @@ basalt_module(server-runtime-core
         src/MobActionVillager.cpp
         src/VillagerWorldSystem.cpp
         src/EntityVisibilityExtras.cpp
+        src/EntityVisibilityNameTags.cpp
         src/EntityVisibilityTracker.cpp
         src/EnvironmentTickSystem.cpp
         src/ExplosionSystem.cpp

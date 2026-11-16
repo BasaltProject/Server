@@ -56,11 +56,19 @@ constexpr float kMaxBurstChunks = 64.0F;
     ui::PlayerUi::Plugin plugin;
     plugin.holdsSidebar = surfaces.holdsSidebar;
     plugin.holdsBossBar = surfaces.holdsBossBar;
+    plugin.holdsTabList = surfaces.holdsTabList;
     if (surfaces.sidebar) {
         plugin.sidebar = [&session]() -> std::optional<ui::SurfaceContent> {
             const player::PlayerSession* player = session.playerSession();
             return player == nullptr ? std::nullopt
                                      : session.options().plugins.surfaces.sidebar(player->uuid().toString());
+        };
+    }
+    if (surfaces.tabList) {
+        plugin.tabList = [&session]() -> std::optional<ui::SurfaceContent> {
+            const player::PlayerSession* player = session.playerSession();
+            return player == nullptr ? std::nullopt
+                                     : session.options().plugins.surfaces.tabList(player->uuid().toString());
         };
     }
     if (surfaces.bossBar) {
@@ -313,6 +321,7 @@ void ClientSession::startOutboundLoop() {
                     {
                         const TaskTiming tracking{currentWorld_, "tick.tasks.player.tracking"};
                         entityTracker_->syncPlayers();
+                        entityTracker_->syncNameTags();
                         entityTracker_->syncNpcs();
                         entityTracker_->syncItemEntities();
                         entityTracker_->syncSummonedEntities();

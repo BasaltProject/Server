@@ -2,12 +2,17 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/TrialSpawners.hpp>
+#include <basalt/server/world/loot/LootContext.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
+#include <basalt/wire/protocol/play/HudPackets.hpp>
 
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <map>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace basalt::server::runtime::player {
@@ -55,6 +60,32 @@ private:
 
     void ejectReward(Turn& turn, const std::string& table);
 
+    /// A stack on its way down from an ominous item spawner; vanilla keeps this as an entity.
+    struct PendingItem {
+        std::array<std::int32_t, 3> spawner;
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        server::world::loot::ItemStack stack;
+        std::int64_t spawnAfterTicks = 0;
+        std::int64_t age = 0;
+    };
+
+    using Dispensing = std::vector<std::pair<server::world::loot::ItemStack, std::int32_t>>;
+
+    [[nodiscard]] const Dispensing& dispensingItems(Turn& turn);
+
+    void spawnOminousItemSpawner(Turn& turn);
+
+    [[nodiscard]] std::optional<std::array<double, 3>> positionToSpawnSpawner(Turn& turn);
+
+    void tickPendingItems(Turn& turn);
+
+    void dropPendingItem(Turn& turn, const PendingItem& item);
+
+    void soundAt(Turn& turn, const char* name, wire::protocol::play::SoundSource source, double x, double y, double z,
+                 float volume, float pitch) const;
+
     void setBlock(Turn& turn, const char* property, const std::string& value);
 
     void levelEvent(Turn& turn, std::int32_t type, const std::array<std::int32_t, 3>& at, std::int32_t data) const;
@@ -67,6 +98,8 @@ private:
     BlockChangeBroadcaster* broadcaster_;
     MobSpawnerSystem* mobs_;
     Options options_;
+    std::map<std::pair<std::string, std::array<std::int32_t, 3>>, Dispensing> dispensing_;
+    std::map<std::string, std::vector<PendingItem>> pending_;
 };
 
 } // namespace basalt::server::runtime

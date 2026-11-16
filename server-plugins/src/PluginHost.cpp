@@ -73,7 +73,11 @@ void PluginHost::announce(LoadedPlugin& plugin, const std::string& name, wire::l
 }
 
 std::int32_t PluginHost::emit(const std::string& name, const wire::lua::LuaRef& payload) {
-    return announcements_.emit(*this, name, payload);
+    return announcements_.emit(*this, name, [&payload](wire::lua::LuaArgs& lua) { payload.push(lua); });
+}
+
+std::int32_t PluginHost::emitText(const std::string& name, const std::string& text) {
+    return announcements_.emit(*this, name, [&text](wire::lua::LuaArgs& lua) { lua.pushString(text); });
 }
 
 void PluginHost::listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn) {

@@ -15,8 +15,10 @@ const PluginEventType& playerQuit() {
 }
 
 const PluginEventType& playerChat() {
-    static const PluginEventType type{
-        "player.chat", true, {"player_name", "player_uuid", "world", "message"}, {"message"}};
+    static const PluginEventType type{"player.chat",
+                                      true,
+                                      {"player_name", "player_uuid", "world", "message", "format", "recipients"},
+                                      {"message", "format", "recipients"}};
     return type;
 }
 
@@ -433,7 +435,10 @@ const PluginEventType& inventorySmelt() {
 }
 
 const PluginEventType& inventoryMoveItem() {
-    static const PluginEventType type{"inventory.move_item", true, {"world", "x", "y", "z", "kind"}};
+    static const PluginEventType type{
+        "inventory.move_item",
+        true,
+        {"world", "x", "y", "z", "kind", "from_x", "from_y", "from_z", "to_x", "to_y", "to_z", "item", "initiator"}};
     return type;
 }
 

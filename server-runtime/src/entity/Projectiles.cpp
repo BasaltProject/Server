@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 
 #include <algorithm>
 #include <array>
@@ -211,6 +212,28 @@ ServerEntity& spawn(world::WorldState& world, const Kind& kind, std::int32_t ent
         std::make_unique<ServerEntity>(entityId, wire::common::Uuid::random(), kind.type, protocolType, x, y, z);
     shoot(*entity, dirX, dirY, dirZ, power, uncertainty, random);
     return world.spawnEntity(std::move(entity));
+}
+
+void arm(ServerEntity& entity, const DispenseShot& config, const server::world::loot::ItemStack& stack) {
+    // parity: `ProjectileItem.asProjectile` hands the stack to the projectile.
+    if (config.carries) {
+        entity.heldItem = stack.item.path();
+        if (stack.item.path().ends_with("_potion")) {
+            entity.heldItemComponents = stack.components;
+        }
+    }
+    // parity: `ArrowItem.asProjectile`.
+    if (config.kind->sticks) {
+        entity.heldItem = stack.item.path();
+        entity.heldItemComponents = stack.components;
+        entity.arrowPickup = entity::ServerEntity::ArrowPickup::Allowed;
+        // parity: `ThrownTrident`'s `ID_FOIL`, the stack's glint.
+        const wire::nbt::NbtTag* glint = stack.components.find("minecraft:enchantment_glint_override");
+        const wire::nbt::NbtCompound* enchanted = stack.components.getCompound("minecraft:enchantments");
+        entity.tridentFoil = glint != nullptr && glint->get<std::int8_t>() != nullptr
+                                 ? *glint->get<std::int8_t>() != 0
+                                 : enchanted != nullptr && !enchanted->empty();
+    }
 }
 
 void shoot(ServerEntity& entity, double dirX, double dirY, double dirZ, float power, float uncertainty,

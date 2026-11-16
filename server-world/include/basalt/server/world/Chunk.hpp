@@ -14,6 +14,7 @@
 #include <mutex>
 #include <optional>
 #include <span>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -47,6 +48,8 @@ void useHeightmapBlockSets(const std::vector<bool>& blocksMotion, const std::vec
 
 /// Whether replacing one block state with another can move the light around it.
 [[nodiscard]] bool changesLight(std::int32_t before, std::int32_t after);
+
+using TickCells = std::unordered_map<std::uint32_t, std::vector<wire::common::Identifier>>;
 
 class Chunk {
 public:
@@ -329,9 +332,10 @@ private:
 
     void rebuildHeights() const;
 
-    void scheduleTick(std::vector<ChunkScheduledTick>& ticks, const ChunkScheduledTick& tick);
+    void scheduleTick(std::vector<ChunkScheduledTick>& ticks, TickCells& cells, const ChunkScheduledTick& tick);
 
-    static void advance(std::vector<ChunkScheduledTick>& pending, std::vector<ChunkScheduledTick>& due);
+    static void advance(std::vector<ChunkScheduledTick>& pending, TickCells& cells,
+                        std::vector<ChunkScheduledTick>& due);
 
     std::int32_t chunkX_;
     std::int32_t chunkZ_;
@@ -354,6 +358,9 @@ private:
     std::shared_ptr<blending::BlendingData> blending_;
     std::vector<ChunkScheduledTick> blockTicks_;
     std::vector<ChunkScheduledTick> fluidTicks_;
+    /// The types pending at each cell, so scheduling one does not scan the whole list.
+    TickCells blockTickCells_;
+    TickCells fluidTickCells_;
     structure::ChunkStructures structures_;
 
     std::vector<ChunkShapeUpdate> shapeUpdates_;

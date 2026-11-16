@@ -134,7 +134,8 @@ class PluginAnnouncements {
 public:
     void announce(PluginHost& host, LoadedPlugin& plugin, const std::string& name, wire::lua::LuaRef handler);
 
-    std::int32_t emit(PluginHost& host, const std::string& name, const wire::lua::LuaRef& payload);
+    std::int32_t emit(PluginHost& host, const std::string& name,
+                      const std::function<void(wire::lua::LuaArgs&)>& pushPayload);
 
 private:
     struct Listener {
@@ -253,6 +254,9 @@ public:
     void announce(LoadedPlugin& plugin, const std::string& name, wire::lua::LuaRef handler);
 
     [[nodiscard]] std::int32_t emit(const std::string& name, const wire::lua::LuaRef& payload);
+
+    /// For code outside a plugin: the listeners get `text` as a string.
+    [[nodiscard]] std::int32_t emitText(const std::string& name, const std::string& text);
 
     void listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn);
 

@@ -24,8 +24,10 @@ void ReloadCommand::build(const CommandNodeBuilder& root) const {
             if (onReloaded_) {
                 onReloaded_();
             }
-            context.environment().logger().info(
-                [] { return std::string{"Reloaded the configuration; server.toml and worlds.toml need a restart."}; });
+            context.environment().logger().info([] {
+                return std::string{
+                    "Reloaded the configuration, commands included; server.toml and worlds.toml need a restart."};
+            });
         }
         // parity: `discoverNewPacks`, then "Reloading!" before the load itself.
         const std::vector<std::string> selected =

@@ -80,6 +80,11 @@ inline constexpr int kCorners = 6;
 
 [[nodiscard]] bool isEmptyShape(std::int32_t stateId);
 
+// Six numbers per box in blocks, offset for the column as vanilla does for plants.
+[[nodiscard]] std::vector<double> outlineBoxes(std::int32_t stateId, std::int32_t x, std::int32_t z);
+
+[[nodiscard]] std::vector<double> visualBoxes(std::int32_t stateId);
+
 // parity: `BlockState.isFaceSturdy`.
 [[nodiscard]] bool isFaceSturdy(std::int32_t stateId, BlockFace face);
 

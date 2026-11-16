@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -79,6 +80,7 @@ struct Hatchling {
     bool baby = false;
     /// parity: a tadpole comes out `setPersistenceRequired`; the other two do not.
     bool persistent = false;
+    std::optional<std::array<std::int32_t, 3>> home;
 };
 
 /// parity: `DriedGhastBlock.tick`.

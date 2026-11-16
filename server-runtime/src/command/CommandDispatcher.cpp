@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
+#include <basalt/server/runtime/command/commands/CustomMessageCommand.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <algorithm>
@@ -220,7 +221,11 @@ CommandDispatcher::CommandDispatcher(const CommandEnvironment& environment)
     registerCustom();
 }
 
-void CommandDispatcher::registerCustom() {}
+void CommandDispatcher::registerCustom() {
+    for (const config::CustomCommand& declared : environment_->commands().custom()) {
+        static_cast<void>(registerBuilt(commands::CustomMessageCommand{declared}));
+    }
+}
 
 CommandNode* CommandDispatcher::registerCommand(std::shared_ptr<const Command> command) {
     const auto same = std::ranges::find_if(registered_, [&command](const std::shared_ptr<const Command>& held) {

@@ -10,6 +10,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace basalt::server::runtime::command {
@@ -58,6 +59,13 @@ private:
     /// parity: `Level.setBlock`.
     void createBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
+    /// True when the written block, what it replaced and all 26 around it are blocks no update reacts to.
+    [[nodiscard]] bool reactsToNothing(const std::array<std::int32_t, 3>& at);
+
+    [[nodiscard]] bool sectionAllInert(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ) const;
+
+    void prepareInertCells(const std::vector<std::array<std::int32_t, 3>>& positions);
+
     void notifyNeighbours();
 
     bool strict_ = false;
@@ -73,6 +81,19 @@ private:
     /// parity: `/setblock` and `/fill`.
     std::vector<std::array<std::int32_t, 3>> written_;
     std::vector<world::BlockChange> effects_;
+
+    struct SectionInertness {
+        const server::world::ChunkSection* section = nullptr;
+        std::uint64_t version = 0;
+        bool inert = false;
+    };
+
+    mutable std::unordered_map<std::int64_t, SectionInertness> sectionInertness_;
+    /// 0 unknown, 1 inert, 2 not, over the box a notify pass touches; dropped whenever a block changes.
+    std::vector<std::uint8_t> inertCells_;
+    std::array<std::int32_t, 3> inertCellsMin_{};
+    std::array<std::size_t, 3> inertCellsSize_{};
+    std::uint64_t inertCellsVersion_ = 0;
 };
 
 [[nodiscard]] std::expected<BlockEditor, CommandSyntaxError> blocksOf(const CommandContext& context);

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
 #include <basalt/server/runtime/chat/ChatBroadcast.hpp>
+#include <basalt/server/runtime/chat/ChatFormat.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/player/PlayerEntityData.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
@@ -777,6 +778,16 @@ void BedrockPlayer::say(std::string message) {
     // parity: a player with no chat session, whose line is unsigned chat like any other.
     if (context_.registry == nullptr) {
         return;
+    }
+    if (context_.chatFormat) {
+        if (std::optional<std::string> format = context_.chatFormat(*session_); format.has_value()) {
+            const wire::text::Component line = chat::formatLine(std::move(*format), session_->name(), message);
+            context_.logger.info([&line, this] { return wire::text::resolvePlainText(line, *context_.lang); });
+            for (const player::PlayerSession* each : context_.registry->snapshot()) {
+                each->sendSystemMessage(line);
+            }
+            return;
+        }
     }
     chat::broadcastChatMessage(
         context_.registry->snapshot(),

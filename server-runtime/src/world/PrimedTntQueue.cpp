@@ -4,9 +4,10 @@
 
 namespace basalt::server::runtime::world {
 
-void PrimedTntQueue::primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event) {
+void PrimedTntQueue::primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event,
+                              std::optional<std::int32_t> ownerId) {
     const WorldWriteLock lock{*mutex_};
-    primedTnt_.push_back(Primed{.x = x, .y = y, .z = z, .event = std::string{event}});
+    primedTnt_.push_back(Primed{.x = x, .y = y, .z = z, .event = std::string{event}, .ownerId = ownerId});
 }
 
 std::vector<PrimedTntQueue::Primed> PrimedTntQueue::takePrimedTnt() {

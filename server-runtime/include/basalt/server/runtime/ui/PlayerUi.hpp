@@ -29,6 +29,8 @@ public:
     struct Plugin {
         std::function<bool()> holdsSidebar;
         std::function<std::optional<SurfaceContent>()> sidebar;
+        std::function<bool()> holdsTabList;
+        std::function<std::optional<SurfaceContent>()> tabList;
         std::function<bool()> holdsBossBar;
         std::function<std::optional<SurfaceContent>()> bossBar;
     };

@@ -1,7 +1,9 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/entity/PrimedTnt.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -10,6 +12,7 @@
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -44,6 +47,17 @@ constexpr double kPopJitter = 0.25;
 constexpr double kPopSpread = 0.2;
 constexpr double kPopLift = 0.2;
 constexpr double kItemHalfHeight = 0.125;
+
+[[nodiscard]] bool isTnt(const std::int32_t stateId) {
+    static const Identifier kTnt = Identifier::vanilla("tnt");
+    if (const Identifier* owner = reg::blockStateDefinitions::blockOf(stateId); owner != nullptr) {
+        return *owner == kTnt;
+    }
+    const std::optional<reg::BlockState> state = reg::blocks::byStateId(stateId);
+    return state.has_value() && state->block == kTnt;
+}
+
+constexpr double kFullTurn = 6.283185307179586;
 
 [[nodiscard]] double playerHeightOf(const play::Pose pose) {
     switch (pose) {
@@ -264,6 +278,21 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         } else if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(block.stateId);
                    state.has_value()) {
             collectExplodedBlock(world, state->block, block.stateId, block.x, block.y, block.z, power, drops);
+        }
+        // parity: `TntBlock.wasExploded` chains the blast with a short fuse.
+        if (world.gameRules().get(world::gameRules::kTntExplodes) && isTnt(block.stateId)) {
+            if (const reg::EntityTypeEntry* tntType = reg::entityTypes::of(entity::primedTnt::type());
+                tntType != nullptr) {
+                const std::int32_t fuse = random.nextInt(std::max(1, entity::primedTnt::kDefaultFuse / 4)) +
+                                          entity::primedTnt::kDefaultFuse / 8;
+                entity::ServerEntity& chained =
+                    entity::primedTnt::prime(world.state(), block.x, block.y, block.z, players_->allocateEntityId(),
+                                             tntType->protocolId, random.nextDouble() * kFullTurn, fuse);
+                if (source != nullptr) {
+                    chained.ownerId = source->ownerId;
+                    chained.ownerUuid = source->ownerUuid;
+                }
+            }
         }
         if (block.hive.has_value() && hooks_.hiveBlown) {
             hooks_.hiveBlown(world, block.x, block.y, block.z, block.stateId, *block.hive, sourceEntityId);

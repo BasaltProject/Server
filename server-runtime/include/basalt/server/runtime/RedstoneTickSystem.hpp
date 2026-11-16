@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
+#include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RandomTicks.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
@@ -62,7 +63,9 @@ public:
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::int32_t stateId)>
             structureAllowed;
-        std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z)> allowHopperMove;
+        std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::string_view kind, const world::hoppers::Move& move)>
+            allowHopperMove;
         std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::string_view cooker, const server::world::loot::ItemStack& input,
                            server::world::loot::ItemStack& result, std::string_view recipe)>

@@ -226,7 +226,7 @@ void primeTntFor(const BreakContext& context, PlayerSession& player, world::Load
     }
     announceBlock(context, world.name(), x, y, z, reg::blocks::air().stateId);
     // parity: `TntBlock.prime` raises `PRIME_FUSE`, which is what a sculk sensor hears.
-    world.state().primeTnt(x, y, z, "prime_fuse");
+    world.state().primeTnt(x, y, z, "prime_fuse", player.entityId());
     notifyAround(context, world, x, y, z, std::nullopt);
     if (player.gamemode == Gamemode::Creative) {
         return;

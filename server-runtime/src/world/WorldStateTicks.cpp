@@ -124,6 +124,7 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
         });
     if (remember) {
         collectedBlockTicks_.clear();
+        collectedByPosition_.clear();
         collectedBlockTicks_.reserve(found.size());
     }
     std::vector<std::array<std::int32_t, 3>> positions;
@@ -133,6 +134,8 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
         if (remember) {
             collectedBlockTicks_.push_back(CollectedTick{
                 .x = one[0], .y = one[1], .z = one[2], .type = due[static_cast<std::size_t>(one[3])].type});
+            collectedByPosition_[packedTickPosition(one[0], one[1], one[2])].push_back(
+                collectedBlockTicks_.back().type);
         }
     }
     return positions;
@@ -179,9 +182,8 @@ std::vector<WorldState::DueTick> WorldState::dueBlockTicksTyped(const Ticking& t
 bool WorldState::willTickThisTick(std::int32_t x, std::int32_t y, std::int32_t z,
                                   const wire::common::Identifier& type) const {
     const WorldReadLock lock{mutex_};
-    return std::ranges::any_of(collectedBlockTicks_, [&](const CollectedTick& one) {
-        return one.x == x && one.y == y && one.z == z && one.type == type;
-    });
+    const auto waiting = collectedByPosition_.find(packedTickPosition(x, y, z));
+    return waiting != collectedByPosition_.end() && std::ranges::find(waiting->second, type) != waiting->second.end();
 }
 
 void WorldState::noteSlideStarted(std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -204,12 +206,12 @@ void WorldState::clearSlidesStarted() {
 void WorldState::endBlockTicks() {
     const WorldWriteLock lock{mutex_};
     collectedBlockTicks_.clear();
+    collectedByPosition_.clear();
 }
 
 void WorldState::beginBlockTick(std::int32_t x, std::int32_t y, std::int32_t z) {
     const WorldWriteLock lock{mutex_};
-    std::erase_if(collectedBlockTicks_,
-                  [&](const CollectedTick& one) { return one.x == x && one.y == y && one.z == z; });
+    collectedByPosition_.erase(packedTickPosition(x, y, z));
 }
 
 std::vector<GeneratedWorldEntity> WorldState::generatedEntities(const std::function<std::int32_t()>& allocateEntityId,
@@ -397,8 +399,9 @@ bool WorldState::tntMayPrime(std::int32_t x, std::int32_t y, std::int32_t z, std
                             });
 }
 
-void WorldState::primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event) {
-    primedTntQueue_.primeTnt(x, y, z, event);
+void WorldState::primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event,
+                          std::optional<std::int32_t> ownerId) {
+    primedTntQueue_.primeTnt(x, y, z, event, ownerId);
 }
 
 std::vector<PrimedTntQueue::Primed> WorldState::takePrimedTnt() { return primedTntQueue_.takePrimedTnt(); }

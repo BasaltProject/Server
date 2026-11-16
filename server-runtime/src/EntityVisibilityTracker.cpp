@@ -177,6 +177,7 @@ void EntityVisibilityTracker::forgetEverythingDrawn() {
     lastPlayerData_.clear();
     trackedNpcs_.clear();
     namelessTeamMade_ = false;
+    sentNameTags_.clear();
     lastNpcLook_.clear();
     trackedEquipment_.clear();
     lastEntityPositions_.clear();

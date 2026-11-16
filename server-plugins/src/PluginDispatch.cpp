@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <utility>
 
 namespace basalt::server::plugins {
@@ -15,6 +16,17 @@ using wire::lua::LuaArgs;
 template <typename T>
 [[nodiscard]] const T* fieldOf(const PluginEvent& event, std::string_view name) {
     return std::get_if<T>(&event.get(name));
+}
+
+[[nodiscard]] std::optional<double> numberOf(const PluginEvent& event, std::string_view name) {
+    const PluginEventValue& value = event.get(name);
+    if (const double* real = std::get_if<double>(&value)) {
+        return *real;
+    }
+    if (const std::int64_t* whole = std::get_if<std::int64_t>(&value)) {
+        return static_cast<double>(*whole);
+    }
+    return std::nullopt;
 }
 
 [[nodiscard]] PluginEventView::Objects objectsOf(PluginHost& host, LoadedPlugin& plugin, PluginEvent& event) {
@@ -55,10 +67,10 @@ template <typename T>
             return true;
         }
         if (name == "pos" && carries("x")) {
-            const double* x = fieldOf<double>(*fired, "x");
-            const double* y = fieldOf<double>(*fired, "y");
-            const double* z = fieldOf<double>(*fired, "z");
-            if (x == nullptr || y == nullptr || z == nullptr) {
+            const std::optional<double> x = numberOf(*fired, "x");
+            const std::optional<double> y = numberOf(*fired, "y");
+            const std::optional<double> z = numberOf(*fired, "z");
+            if (!x.has_value() || !y.has_value() || !z.has_value()) {
                 lua.pushNil();
                 return true;
             }
@@ -175,6 +187,29 @@ void PluginEventDispatch::registerEventHandler(LoadedPlugin& plugin, PluginInsta
             if (target->disabled) {
                 return;
             }
+            if (observer) {
+                // A watcher runs after the event is over, so it reads a copy taken now.
+                const auto frozen = std::make_shared<PluginEvent>(event);
+                const auto snapshot = std::make_shared<std::unique_ptr<PluginEventView>>();
+                static_cast<void>(host->services().tasks().after(0, [host, target, lane, held, frozen, snapshot,
+                                                                     typeName] {
+                    host->enter(*target, *lane, *held, "watch " + typeName, [&](wire::lua::LuaArgs& lua) {
+                        *snapshot = PluginEventView::create(
+                            *lane->sandbox, *frozen, [](std::optional<std::string>) {},
+                            objectsOf(*host, *target, *frozen),
+                            [target](std::string_view message) { return target->text.resolve(message, nullptr, 0); });
+                        if (*snapshot == nullptr) {
+                            lua.pushNil();
+                            return 1;
+                        }
+                        (*snapshot)->bind();
+                        (*snapshot)->push(lua);
+                        return 1;
+                    });
+                    snapshot->reset();
+                }));
+                return;
+            }
             if (*view == nullptr) {
                 *view = PluginEventView::create(
                     *lane->sandbox, event, [&event](std::optional<std::string> message) { event.cancel(message); },
@@ -184,30 +219,16 @@ void PluginEventDispatch::registerEventHandler(LoadedPlugin& plugin, PluginInsta
             if (*view == nullptr) {
                 return;
             }
-            self->dispatch(*host, *target, *lane, *held, **view, observer, typeName);
+            self->dispatch(*host, *target, *lane, *held, **view, typeName);
         });
     static_cast<void>(plugin.registrations.add((observer ? "watch(" : "on(") + typeName + ")",
                                                [moved = std::move(handle)]() mutable { moved.remove(); }));
 }
 
 void PluginEventDispatch::dispatch(PluginHost& host, LoadedPlugin& plugin, PluginInstance& instance,
-                                   const wire::lua::LuaRef& handler, PluginEventView& view, bool observer,
+                                   const wire::lua::LuaRef& handler, PluginEventView& view,
                                    const std::string& typeName) {
     view.bind();
-    if (observer) {
-        PluginHost* target = &host;
-        LoadedPlugin* owner = &plugin;
-        PluginInstance* lane = &instance;
-        const wire::lua::LuaRef* fn = &handler;
-        PluginEventView* bound = &view;
-        static_cast<void>(host.services().tasks().after(0, [target, owner, lane, fn, bound, typeName] {
-            target->enter(*owner, *lane, *fn, "watch " + typeName, [bound](wire::lua::LuaArgs& lua) {
-                bound->push(lua);
-                return 1;
-            });
-        }));
-        return;
-    }
     if (!host.onPluginThread()) {
         if (!warnedAboutThread_) {
             warnedAboutThread_ = true;

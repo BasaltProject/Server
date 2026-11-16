@@ -82,13 +82,27 @@ public:
         return {};
     }
 
+    /// The outline boxes of a block state at a column, six numbers each in blocks, offset as vanilla does for plants.
+    [[nodiscard]] virtual std::vector<double> outlineBoxes(std::int32_t stateId, std::int32_t x, std::int32_t z) const {
+        static_cast<void>(stateId);
+        static_cast<void>(x);
+        static_cast<void>(z);
+        return {};
+    }
+
+    /// The visual boxes of a block state, six numbers each in blocks.
+    [[nodiscard]] virtual std::vector<double> visualBoxes(std::int32_t stateId) const {
+        static_cast<void>(stateId);
+        return {};
+    }
+
     /// The collision boxes of a block state, six numbers each (min then max corner) in 32nds of a block.
     [[nodiscard]] virtual std::vector<std::int32_t> collisionBoxes(std::int32_t stateId) const {
         static_cast<void>(stateId);
         return {};
     }
 
-    /// Physical facts about one state: friction, speed, jump, push reaction, map colour 0xRRGGBB, fire odds.
+    /// Physical facts of a state; the last three are lava ignition, signal source and analog output as 0 or 1.
     [[nodiscard]] virtual std::vector<double> blockInfo(std::int32_t stateId) const {
         static_cast<void>(stateId);
         return {};

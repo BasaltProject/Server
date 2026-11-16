@@ -142,6 +142,12 @@ world::randomTicks::Context RedstoneTickSystem::randomContext(world::LoadedWorld
         .evaporates = !facts.hasSkylight,
         .spawnsPortalPiglins = facts.spawnsPortalPiglins,
         .allocateEntityId = [this] { return players_->allocateEntityId(); },
+        .spawnHatchling =
+            [this, &world](const world::scheduledBlocks::Hatchling& hatched) {
+                if (options_.spawnHatchling) {
+                    options_.spawnHatchling(world, hatched);
+                }
+            },
         .mayChange = hooks_.mayChange,
         .flowering =
             [tags = options_.blockTags](const wire::common::Identifier& block) {

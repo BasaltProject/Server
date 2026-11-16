@@ -54,6 +54,8 @@ public:
 
     void syncPlayers();
 
+    void syncNameTags();
+
     void syncNpcs();
 
     void syncItemEntities();
@@ -92,6 +94,14 @@ private:
     std::unordered_set<std::int32_t> trackedEntities_;
     std::map<std::int32_t, std::int32_t> trackedNpcs_;
     bool namelessTeamMade_ = false;
+
+    struct SentNameTag {
+        std::string team;
+        std::string prefix;
+        std::string suffix;
+    };
+
+    std::map<std::string, SentNameTag> sentNameTags_;
     std::map<std::int32_t, std::pair<float, float>> lastNpcLook_;
     std::unordered_map<std::int32_t, std::array<double, 5>> lastEntityPositions_;
     std::unordered_map<std::int32_t, entity::RuntimeEntityMetadata> lastRuntimeEntityMetadata_;

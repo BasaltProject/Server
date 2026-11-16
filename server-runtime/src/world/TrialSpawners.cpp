@@ -136,6 +136,8 @@ Config readConfig(const NbtCompound& data) {
     config.simultaneousMobsAddedPerPlayer =
         floatOr(data, "simultaneous_mobs_added_per_player", config.simultaneousMobsAddedPerPlayer);
     config.ticksBetweenSpawn = std::max(intOr(data, "ticks_between_spawn", config.ticksBetweenSpawn), 0);
+    config.ticksBetweenItemSpawners =
+        std::max(intOr(data, "ticks_between_item_spawners", config.ticksBetweenItemSpawners), 0);
     config.spawnPotentials.clear();
     if (const NbtList* list = data.getList("spawn_potentials"); list != nullptr) {
         for (const NbtTag& entry : *list) {

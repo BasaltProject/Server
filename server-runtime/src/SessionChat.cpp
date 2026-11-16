@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/chat/ChatBroadcast.hpp>
+#include <basalt/server/runtime/chat/ChatFormat.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -286,7 +287,26 @@ void ClientSession::broadcastChat(const chat::PlayerChatMessage& message) {
         return;
     }
     std::string spoken = message.body.content;
-    if (options_.plugins.chatAllowed && !options_.plugins.chatAllowed(*session, spoken)) {
+    PluginHooks::ChatRouting routing;
+    if (options_.plugins.chatAllowed && !options_.plugins.chatAllowed(*session, spoken, routing)) {
+        return;
+    }
+    std::optional<std::string> format;
+    if (!routing.format.empty()) {
+        format = std::move(routing.format);
+    } else if (options_.plugins.chatFormat && options_.playerRegistry != nullptr) {
+        format = options_.plugins.chatFormat(*session);
+    }
+    if (options_.playerRegistry != nullptr && (format.has_value() || routing.recipients.has_value())) {
+        const Component line = chat::formatLine(format.value_or("\\<{player}> {message}"), session->name(), spoken);
+        logger_.info([&line, this] { return wire::text::resolvePlainText(line, consoleLang()); });
+        for (const PlayerSession* each : options_.playerRegistry->snapshot()) {
+            if (!routing.recipients.has_value() ||
+                std::ranges::contains(*routing.recipients, each->uuid().toString())) {
+                each->sendSystemMessage(line);
+            }
+        }
+        detectSpam(chatSpam_);
         return;
     }
     const chat::PlayerChatMessage decorated = message.withUnsignedContent(Component::text(spoken));

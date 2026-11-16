@@ -59,8 +59,10 @@ PlayerUi::PlayerUi(std::function<config::UiConfigs()> configs,
 void PlayerUi::tick(std::int64_t tick, const PlaceholderContext& context) {
     const config::UiConfigs configs = configs_();
     const bool redraw = std::exchange(redrawPending_, false);
-    if (due(tick, configs.tabList.enabled, configs.tabList.updateIntervalTicks) ||
-        (redraw && configs.tabList.enabled)) {
+    const bool tabOn = configs.tabList.enabled || (plugin_.holdsTabList && plugin_.holdsTabList());
+    const std::int32_t tabEvery =
+        configs.tabList.enabled ? configs.tabList.updateIntervalTicks : kPluginSidebarInterval;
+    if (due(tick, tabOn, tabEvery) || (redraw && tabOn)) {
         updateTabList(context);
     }
     // A plugin holding the sidebar turns it on even where the operator's file left it off.
@@ -114,6 +116,25 @@ void PlayerUi::updateTabList(const PlaceholderContext& context) {
         held != nullptr && (held->extras.tabHeader.has_value() || held->extras.tabFooter.has_value())) {
         lastTabList_.reset();
         return;
+    }
+    if (plugin_.tabList) {
+        if (const std::optional<SurfaceContent> fromPlugin = plugin_.tabList(); fromPlugin.has_value()) {
+            std::string footer;
+            for (const std::string& line : fromPlugin->lines) {
+                footer += footer.empty() ? line : "\n" + line;
+            }
+            if (lastTabList_.has_value() && lastTabList_->first == fromPlugin->title &&
+                lastTabList_->second == footer) {
+                return;
+            }
+            const Component headerComponent = parseLines(!fromPlugin->title.empty(), fromPlugin->title);
+            const Component footerComponent = parseLines(!footer.empty(), footer);
+            lastTabList_ = std::pair{fromPlugin->title, std::move(footer)};
+            send_(TabListPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                TabListPacket{.header = headerComponent, .footer = footerComponent}.write(buffer);
+            });
+            return;
+        }
     }
     const config::UiConfigs configs = configs_();
     const config::TabListProfile profile =

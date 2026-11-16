@@ -15,9 +15,12 @@
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::command {
@@ -42,7 +45,174 @@ using wire::text::Component;
     return water.value_or(reg::blocks::air().stateId);
 }
 
+/// Blocks no neighbour update, shape update or tick booking ever reacts to, as a changed block or as a neighbour.
+[[nodiscard]] bool isInertBlock(std::string_view path) {
+    static constexpr std::array<std::string_view, 30> kExact{"air",
+                                                             "cave_air",
+                                                             "void_air",
+                                                             "stone",
+                                                             "granite",
+                                                             "polished_granite",
+                                                             "diorite",
+                                                             "polished_diorite",
+                                                             "andesite",
+                                                             "polished_andesite",
+                                                             "cobblestone",
+                                                             "mossy_cobblestone",
+                                                             "stone_bricks",
+                                                             "mossy_stone_bricks",
+                                                             "cracked_stone_bricks",
+                                                             "chiseled_stone_bricks",
+                                                             "smooth_stone",
+                                                             "bricks",
+                                                             "deepslate",
+                                                             "cobbled_deepslate",
+                                                             "polished_deepslate",
+                                                             "deepslate_bricks",
+                                                             "tuff",
+                                                             "dirt",
+                                                             "coarse_dirt",
+                                                             "netherrack",
+                                                             "terracotta",
+                                                             "sandstone",
+                                                             "red_sandstone",
+                                                             "bedrock"};
+    if (std::ranges::find(kExact, path) != kExact.end()) {
+        return true;
+    }
+    return path.ends_with("_planks") || path.ends_with("_wool") || path.ends_with("_concrete") ||
+           (path.ends_with("_terracotta") && !path.ends_with("_glazed_terracotta"));
+}
+
+[[nodiscard]] bool inertState(std::int32_t stateId) {
+    static const std::vector<std::uint8_t> table = [] {
+        std::vector<std::uint8_t> built(static_cast<std::size_t>(reg::blockStateDefinitions::stateIdBound()), 0);
+        for (std::size_t id = 0; id < built.size(); ++id) {
+            const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(static_cast<std::int32_t>(id));
+            built[id] = block != nullptr && isInertBlock(block->path()) ? 1 : 0;
+        }
+        return built;
+    }();
+    return stateId >= 0 && static_cast<std::size_t>(stateId) < table.size() && table[static_cast<std::size_t>(stateId)];
+}
+
 } // namespace
+
+bool BlockEditor::reactsToNothing(const std::array<std::int32_t, 3>& at) {
+    if (destroyed_.contains(at)) {
+        return false;
+    }
+    if (const auto named = written_properties_.find(at); named != written_properties_.end() && !named->second.empty()) {
+        return false;
+    }
+    const auto replaced = replaced_.find(at);
+    if (replaced == replaced_.end() || !replaced->second.has_value() || !inertState(*replaced->second)) {
+        return false;
+    }
+    bool sectionsAllInert = true;
+    for (std::int32_t chunkX = (at[0] - 1) >> 4; sectionsAllInert && chunkX <= (at[0] + 1) >> 4; ++chunkX) {
+        for (std::int32_t chunkZ = (at[2] - 1) >> 4; sectionsAllInert && chunkZ <= (at[2] + 1) >> 4; ++chunkZ) {
+            for (std::int32_t sectionY = (at[1] - 1) >> 4; sectionY <= (at[1] + 1) >> 4; ++sectionY) {
+                if (!sectionAllInert(chunkX, sectionY, chunkZ)) {
+                    sectionsAllInert = false;
+                    break;
+                }
+            }
+        }
+    }
+    if (sectionsAllInert) {
+        return true;
+    }
+    std::optional<world::WorldState::CachedBlockReader> reader;
+    const bool cached = !inertCells_.empty();
+    if (cached && inertCellsVersion_ != world_->state().blockVersion()) {
+        std::ranges::fill(inertCells_, std::uint8_t{0});
+        inertCellsVersion_ = world_->state().blockVersion();
+    }
+    for (std::int32_t dy = -1; dy <= 1; ++dy) {
+        for (std::int32_t dz = -1; dz <= 1; ++dz) {
+            for (std::int32_t dx = -1; dx <= 1; ++dx) {
+                const std::int32_t x = at[0] + dx;
+                const std::int32_t y = at[1] + dy;
+                const std::int32_t z = at[2] + dz;
+                std::uint8_t* cell = nullptr;
+                if (cached) {
+                    cell = &inertCells_[(static_cast<std::size_t>(y - inertCellsMin_[1]) * inertCellsSize_[2] +
+                                         static_cast<std::size_t>(z - inertCellsMin_[2])) *
+                                            inertCellsSize_[0] +
+                                        static_cast<std::size_t>(x - inertCellsMin_[0])];
+                }
+                if (cell == nullptr || *cell == 0) {
+                    if (!reader.has_value()) {
+                        reader.emplace(world_->state());
+                    }
+                    const std::optional<std::int32_t> around = reader->at(x, y, z);
+                    const bool inert = around.has_value() && inertState(*around);
+                    if (cell != nullptr) {
+                        *cell = inert ? 1 : 2;
+                    }
+                    if (!inert) {
+                        return false;
+                    }
+                } else if (*cell == 2) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+void BlockEditor::prepareInertCells(const std::vector<std::array<std::int32_t, 3>>& positions) {
+    inertCells_.clear();
+    if (positions.empty()) {
+        return;
+    }
+    std::array<std::int32_t, 3> low = positions.front();
+    std::array<std::int32_t, 3> high = positions.front();
+    for (const std::array<std::int32_t, 3>& at : positions) {
+        for (std::size_t axis = 0; axis < 3; ++axis) {
+            low[axis] = std::min(low[axis], at[axis]);
+            high[axis] = std::max(high[axis], at[axis]);
+        }
+    }
+    constexpr std::size_t kMaxCells = std::size_t{1} << 21;
+    std::size_t volume = 1;
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+        inertCellsMin_[axis] = low[axis] - 1;
+        inertCellsSize_[axis] = static_cast<std::size_t>(high[axis] - low[axis] + 3);
+        volume *= inertCellsSize_[axis];
+        if (volume > kMaxCells) {
+            return;
+        }
+    }
+    inertCells_.assign(volume, 0);
+    inertCellsVersion_ = world_->state().blockVersion();
+}
+
+bool BlockEditor::sectionAllInert(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ) const {
+    const std::int32_t index = sectionY - bounds_.minSection();
+    if (index < 0 || index >= bounds_.sectionCount()) {
+        return false;
+    }
+    const std::int64_t key = (static_cast<std::int64_t>(chunkX) << 40) ^
+                             ((static_cast<std::int64_t>(chunkZ) & 0xFFFFFFFF) << 8) ^ static_cast<std::int64_t>(index);
+    SectionInertness& entry = sectionInertness_[key];
+    if (entry.section == nullptr) {
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        if (chunk == nullptr) {
+            sectionInertness_.erase(key);
+            return false;
+        }
+        entry.section = &chunk->section(static_cast<std::size_t>(index));
+        entry.version = 0;
+    }
+    if (const std::uint64_t version = entry.section->contentVersion(); version != entry.version) {
+        entry.version = version;
+        entry.inert = !entry.section->mayContain([](std::int32_t id) { return !inertState(id); });
+    }
+    return entry.inert;
+}
 
 BlockEditor::BlockEditor(const CommandEnvironment& environment, world::LoadedWorld& world)
     : environment_(&environment), world_(&world),
@@ -153,6 +323,7 @@ void BlockEditor::notifyNeighbours() {
     }
     const std::vector<std::array<std::int32_t, 3>> positions = std::move(written_);
     written_.clear();
+    prepareInertCells(positions);
     random::RandomSource random = random::RandomSource::legacy(0);
     const config::DimensionFacts& facts = config::dimensionFacts(world_->declaration().dimension);
     const neighbourUpdates::Context context{
@@ -214,6 +385,10 @@ void BlockEditor::notifyNeighbours() {
         // parity: `/setblock` and `/fill` write with `2 | 256`, no `UPDATE_NEIGHBORS`.
         .railArrivalTells = false};
     for (const std::array<std::int32_t, 3>& at : positions) {
+        if (reactsToNothing(at)) {
+            written_properties_.erase(at);
+            continue;
+        }
         std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
         // parity: `BlockInput.place` settles the state before it writes it.
         if (written.has_value() && *written != reg::blocks::air().stateId) {

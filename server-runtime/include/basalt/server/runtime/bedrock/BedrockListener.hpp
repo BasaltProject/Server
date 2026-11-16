@@ -200,6 +200,9 @@ public:
         std::function<Spawn(const wire::common::Uuid&)> spawn;
         std::function<std::unique_ptr<Player>(const Joining&)> join;
 
+        /// Plain text the client is shown when the server will not let it in, or nothing to let it in.
+        std::function<std::optional<std::string>(const wire::common::Uuid&, const std::string& address)> refuse;
+
         std::function<std::vector<wire::bedrock::BedrockRecipe>()> recipes;
     };
 
