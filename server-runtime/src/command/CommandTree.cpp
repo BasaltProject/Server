@@ -113,6 +113,17 @@ void CommandNode::removeChild(const CommandNode* child) {
     std::erase_if(children_, [child](const std::unique_ptr<CommandNode>& held) { return held.get() == child; });
 }
 
+std::unique_ptr<CommandNode> CommandNode::takeChild(const CommandNode* child) {
+    const auto found = std::ranges::find_if(
+        children_, [child](const std::unique_ptr<CommandNode>& held) { return held.get() == child; });
+    if (found == children_.end()) {
+        return nullptr;
+    }
+    std::unique_ptr<CommandNode> taken = std::move(*found);
+    children_.erase(found);
+    return taken;
+}
+
 void CommandNode::clearChildren() { children_.clear(); }
 
 std::optional<std::string> CommandNode::suggestionId() const {

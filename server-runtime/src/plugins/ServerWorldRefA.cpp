@@ -30,11 +30,13 @@
 #include <basalt/server/runtime/plugins/ServerWorldEnv.hpp>
 #include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/runtime/world/maps/MapDecorationTypes.hpp>
@@ -407,6 +409,17 @@ std::int32_t LoadedWorldRef::settleBlocks(std::span<const std::int32_t> position
             continue;
         }
         reached += (effects & kUpdates) == 0 ? 1 : 0;
+        if ((effects & BlockEffects::kPoi) != 0 && at / 3 < previous.size()) {
+            const std::int32_t now =
+                world_->state().blockState(positions[at], positions[at + 1], positions[at + 2]).value_or(0);
+            world_->state().poi().noteBlockChange(
+                world::poi::BlockPos{positions[at], positions[at + 1], positions[at + 2]}, previous[at / 3], now);
+        }
+        if ((effects & BlockEffects::kOutputSignal) != 0) {
+            world::redstoneComponents::scheduleComparatorsAround(world_->state(), world_->name(), positions[at],
+                                                                 positions[at + 1], positions[at + 2],
+                                                                 world::comparatorReading::of(world_->state()));
+        }
         if ((effects & BlockEffects::kClients) != 0) {
             tell(positions[at], positions[at + 1], positions[at + 2],
                  world_->state().blockState(positions[at], positions[at + 1], positions[at + 2]).value_or(0));

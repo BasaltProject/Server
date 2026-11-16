@@ -35,6 +35,8 @@ constexpr std::size_t kMaxHistory = 100;
 
 constexpr std::chrono::milliseconds kPoll{25};
 
+constexpr std::chrono::milliseconds kIdleInputPoll{100};
+
 /// Long enough to cover a restart and a cold start; past it, something is wrong and saying so beats hanging.
 constexpr std::chrono::milliseconds kMaxWait{60000};
 
@@ -54,7 +56,7 @@ constexpr std::size_t kMaxPanelCommandLength = 80;
 
 [[nodiscard]] int readByteOrStop() {
     while (running.load()) {
-        if (wire::io::terminal::waitForInput(kPoll)) {
+        if (wire::io::terminal::waitForInput(kIdleInputPoll)) {
             return wire::io::terminal::readByte();
         }
     }

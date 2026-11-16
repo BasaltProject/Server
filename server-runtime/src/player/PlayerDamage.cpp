@@ -277,8 +277,24 @@ struct Blocked {
             still.has_value() && session.blockingSlot.has_value() ? blocksAttacks::of(*still) : std::nullopt;
         const float seconds = blocking.has_value() ? secondsToDisable(source->entityId, context) : 0.0F;
         const std::int32_t ticks = blocking.has_value() ? blocksAttacks::disableTicks(*blocking, seconds) : 0;
-        if (ticks > 0 && context.disableBlocking) {
-            context.disableBlocking(session, parsedItem(still->id), ticks);
+        std::int32_t disabled = ticks;
+        if (disabled > 0 && session.events != nullptr) {
+            const server::plugins::PluginEvent* answered = session.events->ask(
+                &server::plugins::pluginEventTypes::playerShieldDisable, [&](server::plugins::PluginEvent& event) {
+                    plugins::EventSink::player(event, session);
+                    event.set("damager_id", static_cast<std::int64_t>(source->entityId));
+                    event.set("ticks", static_cast<std::int64_t>(disabled));
+                });
+            if (answered != nullptr) {
+                disabled = answered->cancelled() ? 0 : disabled;
+                if (const auto* edited = std::get_if<std::int64_t>(&answered->get("ticks"));
+                    edited != nullptr && disabled > 0) {
+                    disabled = static_cast<std::int32_t>(*edited);
+                }
+            }
+        }
+        if (disabled > 0 && context.disableBlocking) {
+            context.disableBlocking(session, parsedItem(still->id), disabled);
             if (blocking->disableSound.has_value()) {
                 playAround(session, *blocking->disableSound, 0.8F, context);
             }

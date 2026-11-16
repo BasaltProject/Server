@@ -208,6 +208,7 @@ private:
     CommandFeedback feedback_;
     std::uint64_t generation_ = 0;
     std::vector<std::shared_ptr<const Command>> registered_;
+    std::vector<const CommandNode*> pluginRoots_;
 };
 
 } // namespace basalt::server::runtime::command

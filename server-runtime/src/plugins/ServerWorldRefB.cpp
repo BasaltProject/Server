@@ -126,7 +126,7 @@ std::int32_t LoadedWorldRef::applyChanges(std::span<const std::int32_t> position
         changed.insert(changed.end(), {x, y, z});
         before.push_back(was);
     }
-    static_cast<void>(settleBlocks(changed, before, effects));
+    static_cast<void>(settleBlocks(changed, before, effects & ~BlockEffects::kPoi));
     return static_cast<std::int32_t>(changed.size() / 3);
 }
 

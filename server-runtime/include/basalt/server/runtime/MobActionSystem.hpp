@@ -640,7 +640,8 @@ private:
                    float volume = 1.0F, float pitch = 1.0F,
                    wire::protocol::play::SoundSource source = wire::protocol::play::SoundSource::Hostile);
 
-    void eatGrassUnder(world::LoadedWorld& world, const entity::ServerEntity& mob);
+    void eatGrassUnder(world::LoadedWorld& world, entity::ServerEntity& mob);
+    void ate(world::LoadedWorld& world, entity::ServerEntity& mob);
 
     [[nodiscard]] random::RandomSource freshRandom() const;
 

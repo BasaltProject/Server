@@ -187,3 +187,15 @@ HOOK_EVENT(playerInput, "player.input", false,
            FIELDS("player_name", "player_uuid", "world", "forward", "backward", "left", "right", "jump", "sneak",
                   "sprint"),
            MUTABLE())
+HOOK_EVENT(playerItemCooldown, "player.item_cooldown", true,
+           FIELDS("player_name", "player_uuid", "world", "item", "group", "ticks"), MUTABLE("ticks"))
+HOOK_EVENT(playerShieldDisable, "player.shield_disable", true,
+           FIELDS("player_name", "player_uuid", "world", "damager_id", "ticks"), MUTABLE("ticks"))
+HOOK_EVENT(entityCreeperPower, "entity.creeper_power", true,
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "bolt_id"), MUTABLE())
+HOOK_EVENT(entitySheepRegrow, "entity.sheep_regrow", true,
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z"), MUTABLE())
+HOOK_EVENT(blockBellResonate, "block.bell_resonate", false, FIELDS("world", "x", "y", "z", "entities"),
+           MUTABLE("entities"))
+HOOK_EVENT(blockBellRevealRaider, "block.bell_reveal_raider", true,
+           FIELDS("world", "x", "y", "z", "entity_id", "entity_type"), MUTABLE())

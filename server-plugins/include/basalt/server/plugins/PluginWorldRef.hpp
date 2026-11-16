@@ -290,6 +290,8 @@ public:
         static constexpr std::uint32_t kPlace = 128;
         /// What the block that left sets off on its way out (`affectNeighborsAfterRemoval`).
         static constexpr std::uint32_t kDeparture = 256;
+        /// The comparators around read the block again (`Level.updateNeighbourForOutputSignal`).
+        static constexpr std::uint32_t kOutputSignal = 512;
     };
 
     /// Runs `effects` for blocks already written at (x, y, z) triples; returns how many positions were loaded.

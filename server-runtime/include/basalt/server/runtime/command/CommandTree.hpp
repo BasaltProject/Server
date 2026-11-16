@@ -170,6 +170,8 @@ public:
 
     void removeChild(const CommandNode* child);
 
+    [[nodiscard]] std::unique_ptr<CommandNode> takeChild(const CommandNode* child);
+
     void clearChildren();
 
     CommandExecutor executor;

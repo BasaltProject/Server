@@ -1,6 +1,8 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 
 #include <string>
 
@@ -27,9 +29,30 @@ void startCooldownFor(PlayerSession& session, const wire::common::Identifier& it
     if (ticks <= 0) {
         return;
     }
-    session.itemCooldowns[std::string{item.path()}] = gameTime + ticks;
+    std::int32_t length = ticks;
+    if (session.events != nullptr) {
+        const server::plugins::PluginEvent* answered = session.events->ask(
+            &server::plugins::pluginEventTypes::playerItemCooldown, [&](server::plugins::PluginEvent& event) {
+                plugins::EventSink::player(event, session);
+                event.set("item", item.toString());
+                event.set("group", item.toString());
+                event.set("ticks", static_cast<std::int64_t>(ticks));
+            });
+        if (answered != nullptr) {
+            if (answered->cancelled()) {
+                return;
+            }
+            if (const auto* edited = std::get_if<std::int64_t>(&answered->get("ticks")); edited != nullptr) {
+                length = static_cast<std::int32_t>(*edited);
+            }
+        }
+        if (length <= 0) {
+            return;
+        }
+    }
+    session.itemCooldowns[std::string{item.path()}] = gameTime + length;
     if (session.connection().startItemCooldown) {
-        session.connection().startItemCooldown(item, ticks);
+        session.connection().startItemCooldown(item, length);
     }
 }
 

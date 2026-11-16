@@ -446,7 +446,12 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
         golemStruckByLightning(mob, boltId);
     }
     // parity: `Creeper.thunderHit`, which charges it after the hit.
-    if (path == "creeper" && !mob.powered) {
+    if (path == "creeper" && !mob.powered &&
+        world.events().allowed(&server::plugins::pluginEventTypes::entityCreeperPower,
+                               [&](server::plugins::PluginEvent& event) {
+                                   plugins::hookEvents::entity(event, world.name(), mob);
+                                   event.set("bolt_id", static_cast<std::int64_t>(boltId));
+                               })) {
         mob.powered = true;
         send(watchers, SetEntityDataPacket{.entityId = mob.entityId(),
                                            .entries = {SetEntityDataPacket::Entry{

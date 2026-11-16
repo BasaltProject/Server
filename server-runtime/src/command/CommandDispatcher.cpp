@@ -277,6 +277,7 @@ CommandNode& CommandDispatcher::registerNode(std::string name,
                                              const std::function<void(const CommandNodeBuilder&)>& build) {
     CommandNode& added = root_.addChild(std::make_unique<CommandNode>(NodeKind::Literal, std::move(name)));
     build(CommandNodeBuilder{added, root_});
+    pluginRoots_.push_back(&added);
     return added;
 }
 
@@ -292,6 +293,9 @@ void CommandDispatcher::unregisterNode(const CommandNode* node) {
         root_.removeChild(alias);
     }
     root_.removeChild(node);
+    std::erase_if(pluginRoots_, [&](const CommandNode* held) {
+        return held == node || std::ranges::find(aliases, held) != aliases.end();
+    });
 }
 
 CommandNode& CommandDispatcher::registerAlias(std::string name, CommandNode& target) {
@@ -300,16 +304,29 @@ CommandNode& CommandDispatcher::registerAlias(std::string name, CommandNode& tar
     node->permission = target.permission;
     node->redirect = &target;
     node->executor = target.executor;
-    return root_.addChild(std::move(node));
+    CommandNode& added = root_.addChild(std::move(node));
+    if (std::ranges::find(pluginRoots_, &target) != pluginRoots_.end()) {
+        pluginRoots_.push_back(&added);
+    }
+    return added;
 }
 
 void CommandDispatcher::rebuild() {
     ++generation_;
+    std::vector<std::unique_ptr<CommandNode>> plugins;
+    for (const CommandNode* node : pluginRoots_) {
+        if (std::unique_ptr<CommandNode> taken = root_.takeChild(node); taken != nullptr) {
+            plugins.push_back(std::move(taken));
+        }
+    }
     root_.clearChildren();
     registerCustom();
     const std::vector<std::shared_ptr<const Command>> remembered = registered_;
     for (const std::shared_ptr<const Command>& command : remembered) {
         static_cast<void>(registerBuilt(*command));
+    }
+    for (std::unique_ptr<CommandNode>& node : plugins) {
+        static_cast<void>(root_.addChild(std::move(node)));
     }
 }
 

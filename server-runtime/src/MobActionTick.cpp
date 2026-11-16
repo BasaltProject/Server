@@ -666,21 +666,24 @@ void MobActionSystem::activateSkeletonTrap(world::LoadedWorld& world, ServerEnti
     static_cast<void>(spawning_->activateSkeletonTrap(world, horse, random));
 }
 
-void MobActionSystem::eatGrassUnder(world::LoadedWorld& world, const ServerEntity& mob) {
+void MobActionSystem::eatGrassUnder(world::LoadedWorld& world, ServerEntity& mob) {
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     const auto x = static_cast<std::int32_t>(std::floor(mob.x));
     const auto y = static_cast<std::int32_t>(std::floor(mob.y));
     const auto z = static_cast<std::int32_t>(std::floor(mob.z));
+    const bool griefing = entity::mobOverrides::griefing(mob, world.gameRules().get(world::gameRules::kMobGriefing));
     const std::optional<std::int32_t> here = world.state().blockState(x, y, z);
     const server::registry::BlockState* shortGrass = server::registry::blocks::named("short_grass");
     if (here.has_value() && shortGrass != nullptr && *here == shortGrass->stateId) {
-        if (plugins::hookEvents::changeBlockAllowed(world.events(), world.name(), mob, x, y, z, *here,
+        if (griefing &&
+            plugins::hookEvents::changeBlockAllowed(world.events(), world.name(), mob, x, y, z, *here,
                                                     server::registry::blocks::air().stateId, "eat") &&
             world.state().setBlockState(x, y, z, server::registry::blocks::air().stateId)) {
             broadcaster_->announceBlock(
                 watchers,
                 world::BlockChange{.x = x, .y = y, .z = z, .stateId = server::registry::blocks::air().stateId});
         }
+        ate(world, mob);
         return;
     }
     const std::optional<std::int32_t> below = world.state().blockState(x, y - 1, z);
@@ -689,10 +692,29 @@ void MobActionSystem::eatGrassUnder(world::LoadedWorld& world, const ServerEntit
     if (!below.has_value() || grassBlock == nullptr || dirt == nullptr || *below != grassBlock->stateId) {
         return;
     }
-    if (plugins::hookEvents::changeBlockAllowed(world.events(), world.name(), mob, x, y - 1, z, *below, dirt->stateId,
+    if (griefing &&
+        plugins::hookEvents::changeBlockAllowed(world.events(), world.name(), mob, x, y - 1, z, *below, dirt->stateId,
                                                 "eat") &&
         world.state().setBlockState(x, y - 1, z, dirt->stateId)) {
         broadcaster_->announceBlock(watchers, world::BlockChange{.x = x, .y = y - 1, .z = z, .stateId = dirt->stateId});
+    }
+    ate(world, mob);
+}
+
+void MobActionSystem::ate(world::LoadedWorld& world, ServerEntity& mob) {
+    // parity: `Sheep.ate`, the wool grows back and a lamb gains a minute of age.
+    if (mob.type().path() != "sheep") {
+        return;
+    }
+    if (mob.sourceNbt.has_value() && mob.sourceNbt->getBoolean("Sheared") &&
+        world.events().allowed(
+            &server::plugins::pluginEventTypes::entitySheepRegrow,
+            [&](server::plugins::PluginEvent& event) { plugins::hookEvents::entity(event, world.name(), mob); })) {
+        mob.sourceNbt->putBoolean("Sheared", false);
+        ++mob.sourceNbtVersion;
+    }
+    if (entity::breeding::canAgeUp(mob)) {
+        mob.age = std::min(0, mob.age + (60 * 20));
     }
 }
 

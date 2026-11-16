@@ -266,9 +266,12 @@ struct Spot {
             mask |= Effects::kPlace;
         } else if (name == "departure") {
             mask |= Effects::kDeparture;
+        } else if (name == "output_signal") {
+            mask |= Effects::kOutputSignal;
         } else {
             lua.raise("'" + name +
-                      "' is not an effect (neighbors, shapes, light, entities, poi, ticks, clients, place, departure)");
+                      "' is not an effect (neighbors, shapes, light, entities, poi, ticks, clients, place, departure, "
+                      "output_signal)");
         }
     }
     return mask;
