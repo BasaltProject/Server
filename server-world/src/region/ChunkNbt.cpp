@@ -3,6 +3,7 @@
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/world/blending/BlendingData.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
+#include <basalt/server/world/region/ChunkNbtParts.hpp>
 #include <basalt/wire/protocol/play/BitStorage.hpp>
 
 #include <algorithm>
@@ -49,17 +50,6 @@ constexpr std::array<std::string_view, 5> kBlockEntityMetadata = {"id", "x", "y"
 [[nodiscard]] int biomeDirectBits() {
     static const int bits = bitsFor(registry::biomes::registry().size());
     return bits;
-}
-
-[[nodiscard]] std::vector<std::int32_t> boxToArray(const structure::StructureBoundingBox& box) {
-    return {box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ};
-}
-
-[[nodiscard]] std::optional<structure::StructureBoundingBox> arrayToBox(std::span<const std::int32_t> values) {
-    if (values.size() != 6) {
-        return std::nullopt;
-    }
-    return structure::StructureBoundingBox{values[0], values[1], values[2], values[3], values[4], values[5]};
 }
 
 /// Reused across a chunk's sections and owned by one write.
@@ -181,78 +171,10 @@ template <typename ToNbt>
                          });
 }
 
-[[nodiscard]] NbtTag encodeTicks(const Chunk& chunk, std::span<const ChunkScheduledTick> ticks) {
-    std::vector<NbtTag> entries;
-    entries.reserve(ticks.size());
-    for (const ChunkScheduledTick& tick : ticks) {
-        NbtCompound tag;
-        tag.putString("i", tick.type.toString());
-        tag.putInt("x", chunk.chunkX() * 16 + tick.localX);
-        tag.putInt("y", tick.y);
-        tag.putInt("z", chunk.chunkZ() * 16 + tick.localZ);
-        tag.putInt("t", tick.delay);
-        tag.putInt("p", tick.priority);
-        entries.push_back(NbtTag::ofCompound(std::move(tag)));
-    }
-    const NbtType type = entries.empty() ? NbtType::End : NbtType::Compound;
-    return NbtTag::ofList(NbtList{type, std::move(entries)});
-}
-
-[[nodiscard]] NbtTag encodeGeneratedEntity(const ChunkGeneratedEntity& entity) {
-    NbtCompound tag;
-    tag.putString("id", entity.type.toString());
-    NbtList pos{NbtType::Double, {}};
-    pos.push(NbtTag::ofDouble(entity.x));
-    pos.push(NbtTag::ofDouble(entity.y));
-    pos.push(NbtTag::ofDouble(entity.z));
-    tag.set("Pos", NbtTag::ofList(std::move(pos)));
-    NbtList rotation{NbtType::Float, {}};
-    rotation.push(NbtTag::ofFloat(entity.yaw));
-    rotation.push(NbtTag::ofFloat(entity.pitch));
-    tag.set("Rotation", NbtTag::ofList(std::move(rotation)));
-    tag.set("BasaltData", NbtTag::ofCompound(entity.data));
-    if (!entity.passengers.empty()) {
-        std::vector<NbtTag> passengers;
-        passengers.reserve(entity.passengers.size());
-        for (const ChunkGeneratedEntity& passenger : entity.passengers) {
-            passengers.push_back(encodeGeneratedEntity(passenger));
-        }
-        tag.set("Passengers", NbtTag::ofList(NbtList{NbtType::Compound, std::move(passengers)}));
-    }
-    return NbtTag::ofCompound(std::move(tag));
-}
-
-[[nodiscard]] NbtCompound encodeStructures(const structure::ChunkStructures& structures) {
-    std::vector<NbtTag> starts;
-    for (const structure::StructureStartRecord& start : structures.starts()) {
-        NbtCompound startTag;
-        startTag.putString("id", Identifier::vanilla(start.structure).toString());
-        startTag.putInt("ChunkX", start.chunkX);
-        startTag.putInt("ChunkZ", start.chunkZ);
-        startTag.putIntArray("BB", boxToArray(start.fullBounds));
-        std::vector<NbtTag> children;
-        children.reserve(start.pieces.size());
-        for (const structure::StructureBoundingBox& piece : start.pieces) {
-            NbtCompound child;
-            child.putIntArray("BB", boxToArray(piece));
-            children.push_back(NbtTag::ofCompound(std::move(child)));
-        }
-        const NbtType childType = children.empty() ? NbtType::End : NbtType::Compound;
-        startTag.set("Children", NbtTag::ofList(NbtList{childType, std::move(children)}));
-        starts.push_back(NbtTag::ofCompound(std::move(startTag)));
-    }
-    NbtCompound out;
-    const NbtType type = starts.empty() ? NbtType::End : NbtType::Compound;
-    out.set("starts", NbtTag::ofList(NbtList{type, std::move(starts)}));
-    return out;
-}
-
 } // namespace
 
-namespace {
-
 /// parity: the `ChunkStatus` names.
-[[nodiscard]] std::string_view statusName(ChunkStage stage) {
+std::string_view statusName(ChunkStage stage) {
     switch (stage) {
     case ChunkStage::Terrain:
         return "minecraft:terrain";
@@ -263,6 +185,8 @@ namespace {
         return "minecraft:full";
     }
 }
+
+namespace {
 
 [[nodiscard]] std::optional<ChunkStage> stageOf(std::string_view status) {
     if (status.empty() || status == "minecraft:full" || status == "full") {
@@ -282,15 +206,9 @@ namespace {
 
 } // namespace
 
-NbtCompound write(const Chunk& chunk) {
-    NbtCompound tag;
-    tag.putInt("DataVersion", kDataVersion);
-    tag.putInt("xPos", chunk.chunkX());
-    tag.putInt("yPos", chunk.verticalBounds().minSection());
-    tag.putInt("zPos", chunk.chunkZ());
-    tag.putLong("LastUpdate", 0);
-    tag.putLong("InhabitedTime", chunk.inhabitedTime());
-    tag.putString("Status", std::string{statusName(chunk.stage())});
+namespace {
+
+void appendBlending(NbtCompound& tag, const Chunk& chunk) {
     if (const auto& blending = chunk.blendingData(); blending != nullptr) {
         NbtCompound packed;
         packed.putInt("min_section", blending->minSection());
@@ -304,20 +222,9 @@ NbtCompound write(const Chunk& chunk) {
         }
         tag.set("blending_data", NbtTag::ofCompound(std::move(packed)));
     }
+}
 
-    PaletteScratch scratch;
-    std::vector<NbtTag> sections;
-    sections.reserve(chunk.sectionCount());
-    for (std::size_t i = 0; i < chunk.sectionCount(); ++i) {
-        NbtCompound sectionTag;
-        sectionTag.putByte(
-            "Y", static_cast<std::int8_t>(chunk.verticalBounds().minSection() + static_cast<std::int32_t>(i)));
-        sectionTag.set("block_states", NbtTag::ofCompound(encodeBlockStates(chunk.section(i), scratch)));
-        sectionTag.set("biomes", NbtTag::ofCompound(encodeBiomes(chunk.section(i), scratch)));
-        sections.push_back(NbtTag::ofCompound(std::move(sectionTag)));
-    }
-    tag.set("sections", NbtTag::ofList(NbtList{NbtType::Compound, std::move(sections)}));
-
+void appendBody(NbtCompound& tag, const Chunk& chunk, bool omitEmpty) {
     std::vector<NbtTag> blockEntities;
     for (const ChunkBlockEntity& entity : chunk.blockEntities()) {
         NbtCompound entityTag;
@@ -331,9 +238,15 @@ NbtCompound write(const Chunk& chunk) {
         blockEntities.push_back(NbtTag::ofCompound(std::move(entityTag)));
     }
     const NbtType blockEntityType = blockEntities.empty() ? NbtType::End : NbtType::Compound;
-    tag.set("block_entities", NbtTag::ofList(NbtList{blockEntityType, std::move(blockEntities)}));
-    tag.set("block_ticks", encodeTicks(chunk, chunk.scheduledBlockTicks()));
-    tag.set("fluid_ticks", encodeTicks(chunk, chunk.scheduledFluidTicks()));
+    if (!omitEmpty || !blockEntities.empty()) {
+        tag.set("block_entities", NbtTag::ofList(NbtList{blockEntityType, std::move(blockEntities)}));
+    }
+    if (!omitEmpty || !chunk.scheduledBlockTicks().empty()) {
+        tag.set("block_ticks", encodeTicks(chunk, chunk.scheduledBlockTicks()));
+    }
+    if (!omitEmpty || !chunk.scheduledFluidTicks().empty()) {
+        tag.set("fluid_ticks", encodeTicks(chunk, chunk.scheduledFluidTicks()));
+    }
 
     if (chunk.stage() != ChunkStage::Full) {
         std::vector<std::vector<NbtTag>> perSection(chunk.sectionCount());
@@ -354,7 +267,10 @@ NbtCompound write(const Chunk& chunk) {
             const NbtType offsetType = offsets.empty() ? NbtType::End : NbtType::Short;
             post.push_back(NbtTag::ofList(NbtList{offsetType, std::move(offsets)}));
         }
-        tag.set("PostProcessing", NbtTag::ofList(NbtList{NbtType::List, std::move(post)}));
+        if (!omitEmpty ||
+            std::ranges::any_of(post, [](const NbtTag& offsets) { return !offsets.get<NbtList>()->empty(); })) {
+            tag.set("PostProcessing", NbtTag::ofList(NbtList{NbtType::List, std::move(post)}));
+        }
     }
 
     std::vector<NbtTag> generated;
@@ -363,7 +279,9 @@ NbtCompound write(const Chunk& chunk) {
         generated.push_back(encodeGeneratedEntity(entity));
     }
     const NbtType generatedType = generated.empty() ? NbtType::End : NbtType::Compound;
-    tag.set(kGeneratedEntitiesKey, NbtTag::ofList(NbtList{generatedType, std::move(generated)}));
+    if (!omitEmpty || !generated.empty()) {
+        tag.set(kGeneratedEntitiesKey, NbtTag::ofList(NbtList{generatedType, std::move(generated)}));
+    }
 
     std::vector<NbtTag> entities;
     entities.reserve(chunk.savedEntities().size());
@@ -371,7 +289,9 @@ NbtCompound write(const Chunk& chunk) {
         entities.push_back(NbtTag::ofCompound(entity));
     }
     const NbtType entityType = entities.empty() ? NbtType::End : NbtType::Compound;
-    tag.set(kEntitiesKey, NbtTag::ofList(NbtList{entityType, std::move(entities)}));
+    if (!omitEmpty || !entities.empty()) {
+        tag.set(kEntitiesKey, NbtTag::ofList(NbtList{entityType, std::move(entities)}));
+    }
 
     if (!chunk.structures().empty()) {
         tag.set("structures", NbtTag::ofCompound(encodeStructures(chunk.structures())));
@@ -379,6 +299,42 @@ NbtCompound write(const Chunk& chunk) {
     if (!chunk.pluginData().empty()) {
         tag.set(kPluginDataKey, NbtTag::ofCompound(chunk.pluginData()));
     }
+}
+
+} // namespace
+
+NbtCompound write(const Chunk& chunk) {
+    NbtCompound tag;
+    tag.putInt("DataVersion", kDataVersion);
+    tag.putInt("xPos", chunk.chunkX());
+    tag.putInt("yPos", chunk.verticalBounds().minSection());
+    tag.putInt("zPos", chunk.chunkZ());
+    tag.putLong("LastUpdate", 0);
+    tag.putLong("InhabitedTime", chunk.inhabitedTime());
+    tag.putString("Status", std::string{statusName(chunk.stage())});
+    appendBlending(tag, chunk);
+
+    PaletteScratch scratch;
+    std::vector<NbtTag> sections;
+    sections.reserve(chunk.sectionCount());
+    for (std::size_t i = 0; i < chunk.sectionCount(); ++i) {
+        NbtCompound sectionTag;
+        sectionTag.putByte(
+            "Y", static_cast<std::int8_t>(chunk.verticalBounds().minSection() + static_cast<std::int32_t>(i)));
+        sectionTag.set("block_states", NbtTag::ofCompound(encodeBlockStates(chunk.section(i), scratch)));
+        sectionTag.set("biomes", NbtTag::ofCompound(encodeBiomes(chunk.section(i), scratch)));
+        sections.push_back(NbtTag::ofCompound(std::move(sectionTag)));
+    }
+    tag.set("sections", NbtTag::ofList(NbtList{NbtType::Compound, std::move(sections)}));
+
+    appendBody(tag, chunk, false);
+    return tag;
+}
+
+NbtCompound writeRest(const Chunk& chunk) {
+    NbtCompound tag;
+    appendBlending(tag, chunk);
+    appendBody(tag, chunk, true);
     return tag;
 }
 
@@ -471,156 +427,11 @@ namespace {
                          kBiomeMaxIndirectBits, biomeDirectBits());
 }
 
-[[nodiscard]] std::expected<ChunkGeneratedEntity, ChunkNbtError> decodeGeneratedEntity(const NbtCompound& tag) {
-    const std::string_view type = tag.getString("id");
-    if (type.empty()) {
-        return std::unexpected(ChunkNbtError{"generated entity has no id"});
-    }
-    const NbtList* pos = tag.getList("Pos");
-    const NbtList* rotation = tag.getList("Rotation");
-    if (pos == nullptr || rotation == nullptr || pos->size() != 3 || rotation->size() != 2) {
-        return std::unexpected(ChunkNbtError{std::format("generated entity {} has invalid vectors", type)});
-    }
-    const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(type);
-    if (!id.has_value()) {
-        return std::unexpected(ChunkNbtError{std::format("invalid generated entity id {}", type)});
-    }
-    ChunkGeneratedEntity entity;
-    entity.type = *id;
-    const auto* x = (*pos)[0].get<double>();
-    const auto* y = (*pos)[1].get<double>();
-    const auto* z = (*pos)[2].get<double>();
-    const auto* yaw = (*rotation)[0].get<float>();
-    const auto* pitch = (*rotation)[1].get<float>();
-    if (x == nullptr || y == nullptr || z == nullptr || yaw == nullptr || pitch == nullptr) {
-        return std::unexpected(ChunkNbtError{std::format("generated entity {} has invalid vectors", type)});
-    }
-    entity.x = *x;
-    entity.y = *y;
-    entity.z = *z;
-    entity.yaw = *yaw;
-    entity.pitch = *pitch;
-    if (const NbtCompound* data = tag.getCompound("BasaltData")) {
-        entity.data = *data;
-    }
-    if (const NbtList* passengers = tag.getList("Passengers")) {
-        for (const NbtTag& passenger : *passengers) {
-            const NbtCompound* passengerTag = passenger.get<NbtCompound>();
-            if (passengerTag == nullptr) {
-                return std::unexpected(ChunkNbtError{std::format("generated passenger of {} is not a compound", type)});
-            }
-            const std::expected<ChunkGeneratedEntity, ChunkNbtError> decoded = decodeGeneratedEntity(*passengerTag);
-            if (!decoded.has_value()) {
-                return std::unexpected(decoded.error());
-            }
-            entity.passengers.push_back(*decoded);
-        }
-    }
-    return entity;
-}
-
-void decodeStructureStart(const NbtTag& entry, std::vector<structure::StructureStartRecord>& into) {
-    const NbtCompound* startTag = entry.get<NbtCompound>();
-    if (startTag == nullptr) {
-        return;
-    }
-    std::vector<structure::StructureBoundingBox> pieces;
-    if (const NbtList* children = startTag->getList("Children")) {
-        for (const NbtTag& child : *children) {
-            const NbtCompound* childTag = child.get<NbtCompound>();
-            if (childTag == nullptr) {
-                continue;
-            }
-            if (const std::optional<structure::StructureBoundingBox> piece = arrayToBox(childTag->getIntArray("BB"))) {
-                pieces.push_back(*piece);
-            }
-        }
-    }
-    std::optional<structure::StructureBoundingBox> bounds = arrayToBox(startTag->getIntArray("BB"));
-    if (!bounds.has_value()) {
-        // parity: `StructureStart.createTag` never writes the start's own box.
-        for (const structure::StructureBoundingBox& piece : pieces) {
-            bounds = bounds.has_value() ? bounds->encapsulating(piece) : piece;
-        }
-    }
-    if (!bounds.has_value()) {
-        return;
-    }
-    // parity: a start that found no place writes itself as `INVALID` rather than being left out.
-    if (startTag->getString("id") == "INVALID") {
-        return;
-    }
-    const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(startTag->getString("id"));
-    if (!id.has_value()) {
-        return;
-    }
-    into.push_back({id->path(), startTag->getInt("ChunkX"), startTag->getInt("ChunkZ"), *bounds, std::move(pieces)});
-}
-
-void decodeStructures(const NbtCompound* tag, structure::ChunkStructures& into) {
-    if (tag == nullptr) {
-        return;
-    }
-    std::vector<structure::StructureStartRecord> records;
-    if (const NbtList* starts = tag->getList("starts"); starts != nullptr) {
-        for (const NbtTag& entry : *starts) {
-            decodeStructureStart(entry, records);
-        }
-    } else if (const NbtCompound* byName = tag->getCompound("starts"); byName != nullptr) {
-        for (const NbtTag& entry : byName->values()) {
-            decodeStructureStart(entry, records);
-        }
-    }
-    into.restore(std::move(records));
-}
-
 } // namespace
 
-std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bounds) {
-    const std::int32_t saved = tag.getInt("DataVersion");
-    if (saved > kDataVersion) {
-        return std::unexpected(ChunkNbtError{std::format(
-            "saved by a newer version of the game (data version {}, this build reads up to {})", saved, kDataVersion)});
-    }
-    // parity: `NbtUtils.getDataVersion`, a chunk saved before data versions existed counts as the oldest one.
-    if (saved < kDataVersion && (saved > 0 || tag.getCompound("Level") != nullptr)) {
-        NbtCompound upgraded = tag;
-        metamorph::datafix::upgrade(metamorph::datafix::Domain::Chunk, upgraded, saved,
-                                    {.overworld = bounds.minY() == -64});
-        upgraded.putInt("DataVersion", kDataVersion);
-        return read(upgraded, bounds);
-    }
-    // parity: `ChunkHeightAndBiomeFix` saves an old full chunk as empty with `below_zero_retrogen`.
-    // generates only the layers under zero; the terrain above is the old one.
-    const bool retrogen =
-        tag.getString("Status") == "minecraft:empty" && tag.getCompound("below_zero_retrogen") != nullptr;
-    const std::optional<ChunkStage> stage =
-        retrogen ? std::optional{ChunkStage::Full} : stageOf(tag.getString("Status"));
-    if (!stage.has_value()) {
-        return std::unexpected(ChunkNbtError{"saved before it had terrain", false});
-    }
-    Chunk chunk{tag.getInt("xPos"), tag.getInt("zPos"), bounds};
-    chunk.setStage(*stage);
-    chunk.setNeedsRetrogen(retrogen && bounds.minY() == -64);
-    if (const NbtCompound* blending = tag.getCompound("blending_data");
-        blending != nullptr && blending->contains("min_section") && blending->contains("max_section")) {
-        std::optional<std::vector<float>> heights;
-        if (const NbtList* list = blending->getList("heights"); list != nullptr) {
-            std::vector<float> values;
-            for (const NbtTag& height : *list) {
-                values.push_back(height.get<float>() != nullptr ? *height.get<float>()
-                                                                : blending::BlendingData::kNoValue);
-            }
-            heights = std::move(values);
-        }
-        chunk.setBlendingData(std::make_shared<blending::BlendingData>(
-            blending->getInt("min_section"), blending->getInt("max_section"), std::move(heights)));
-    }
-    if (*stage == ChunkStage::Full) {
-        chunk.markLoadedComplete();
-    }
-    chunk.restoreInhabitedTime(tag.getLong("InhabitedTime"));
+namespace {
 
+std::expected<void, ChunkNbtError> fillSectionsFromNbt(const NbtCompound& tag, ChunkHeight bounds, Chunk& chunk) {
     const NbtList* sections = tag.getList("sections");
     if (sections == nullptr) {
         return std::unexpected(ChunkNbtError{"missing sections list"});
@@ -655,6 +466,63 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
             }
             chunk.section(static_cast<std::size_t>(index)).setBiomeIds(*ids);
         }
+    }
+    return {};
+}
+
+} // namespace
+
+std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bounds) {
+    const std::int32_t saved = tag.getInt("DataVersion");
+    if (saved > kDataVersion) {
+        return std::unexpected(ChunkNbtError{std::format(
+            "saved by a newer version of the game (data version {}, this build reads up to {})", saved, kDataVersion)});
+    }
+    // parity: `NbtUtils.getDataVersion`, a chunk saved before data versions existed counts as the oldest one.
+    if (saved < kDataVersion && (saved > 0 || tag.getCompound("Level") != nullptr)) {
+        NbtCompound upgraded = tag;
+        metamorph::datafix::upgrade(metamorph::datafix::Domain::Chunk, upgraded, saved,
+                                    {.overworld = bounds.minY() == -64});
+        upgraded.putInt("DataVersion", kDataVersion);
+        return read(upgraded, bounds);
+    }
+    return readCurrent(tag, bounds, [&](Chunk& chunk) { return fillSectionsFromNbt(tag, bounds, chunk); });
+}
+
+std::expected<Chunk, ChunkNbtError> readCurrent(const NbtCompound& tag, ChunkHeight bounds, const SectionFill& fill) {
+    // parity: `ChunkHeightAndBiomeFix` saves an old full chunk as empty with `below_zero_retrogen`.
+    // generates only the layers under zero; the terrain above is the old one.
+    const bool retrogen =
+        tag.getString("Status") == "minecraft:empty" && tag.getCompound("below_zero_retrogen") != nullptr;
+    const std::optional<ChunkStage> stage =
+        retrogen ? std::optional{ChunkStage::Full} : stageOf(tag.getString("Status"));
+    if (!stage.has_value()) {
+        return std::unexpected(ChunkNbtError{"saved before it had terrain", false});
+    }
+    Chunk chunk{tag.getInt("xPos"), tag.getInt("zPos"), bounds};
+    chunk.setStage(*stage);
+    chunk.setNeedsRetrogen(retrogen && bounds.minY() == -64);
+    if (const NbtCompound* blending = tag.getCompound("blending_data");
+        blending != nullptr && blending->contains("min_section") && blending->contains("max_section")) {
+        std::optional<std::vector<float>> heights;
+        if (const NbtList* list = blending->getList("heights"); list != nullptr) {
+            std::vector<float> values;
+            for (const NbtTag& height : *list) {
+                values.push_back(height.get<float>() != nullptr ? *height.get<float>()
+                                                                : blending::BlendingData::kNoValue);
+            }
+            heights = std::move(values);
+        }
+        chunk.setBlendingData(std::make_shared<blending::BlendingData>(
+            blending->getInt("min_section"), blending->getInt("max_section"), std::move(heights)));
+    }
+    if (*stage == ChunkStage::Full) {
+        chunk.markLoadedComplete();
+    }
+    chunk.restoreInhabitedTime(tag.getLong("InhabitedTime"));
+
+    if (const std::expected<void, ChunkNbtError> filled = fill(chunk); !filled.has_value()) {
+        return std::unexpected(filled.error());
     }
     // The sections were filled behind the chunk's back, so its heightmaps mean nothing yet.
     chunk.invalidateHeightmaps();

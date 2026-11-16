@@ -3,8 +3,10 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaBlocks.hpp>
 #include <basalt/server/runtime/command/BlockEditor.hpp>
+#include <basalt/server/runtime/command/DataPaths.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
+#include <basalt/server/runtime/world/BlockReactions.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
@@ -45,56 +47,7 @@ using wire::text::Component;
     return water.value_or(reg::blocks::air().stateId);
 }
 
-/// Blocks no neighbour update, shape update or tick booking ever reacts to, as a changed block or as a neighbour.
-[[nodiscard]] bool isInertBlock(std::string_view path) {
-    static constexpr std::array<std::string_view, 30> kExact{"air",
-                                                             "cave_air",
-                                                             "void_air",
-                                                             "stone",
-                                                             "granite",
-                                                             "polished_granite",
-                                                             "diorite",
-                                                             "polished_diorite",
-                                                             "andesite",
-                                                             "polished_andesite",
-                                                             "cobblestone",
-                                                             "mossy_cobblestone",
-                                                             "stone_bricks",
-                                                             "mossy_stone_bricks",
-                                                             "cracked_stone_bricks",
-                                                             "chiseled_stone_bricks",
-                                                             "smooth_stone",
-                                                             "bricks",
-                                                             "deepslate",
-                                                             "cobbled_deepslate",
-                                                             "polished_deepslate",
-                                                             "deepslate_bricks",
-                                                             "tuff",
-                                                             "dirt",
-                                                             "coarse_dirt",
-                                                             "netherrack",
-                                                             "terracotta",
-                                                             "sandstone",
-                                                             "red_sandstone",
-                                                             "bedrock"};
-    if (std::ranges::find(kExact, path) != kExact.end()) {
-        return true;
-    }
-    return path.ends_with("_planks") || path.ends_with("_wool") || path.ends_with("_concrete") ||
-           (path.ends_with("_terracotta") && !path.ends_with("_glazed_terracotta"));
-}
-
-[[nodiscard]] bool inertState(std::int32_t stateId) {
-    static const std::vector<std::uint8_t> table = [] {
-        std::vector<std::uint8_t> built(static_cast<std::size_t>(reg::blockStateDefinitions::stateIdBound()), 0);
-        for (std::size_t id = 0; id < built.size(); ++id) {
-            const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(static_cast<std::int32_t>(id));
-            built[id] = block != nullptr && isInertBlock(block->path()) ? 1 : 0;
-        }
-        return built;
-    }();
-    return stateId >= 0 && static_cast<std::size_t>(stateId) < table.size() && table[static_cast<std::size_t>(stateId)];
-}
+[[nodiscard]] bool inertState(std::int32_t stateId) { return runtime::world::blockReactions::isInert(stateId); }
 
 } // namespace
 
@@ -294,6 +247,32 @@ bool BlockEditor::destroy(std::int32_t x, std::int32_t y, std::int32_t z) {
     // parity: `SetBlockCommand` in `destroy` mode runs `level.destroyBlock(pos.
     destroyed_.insert({x, y, z});
     return write(x, y, z, leftBehindBy(*old), world::WorldState::SideEffects::kRun);
+}
+
+bool BlockEditor::mergeBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z, const wire::nbt::NbtCompound& nbt) {
+    server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+    const server::world::ChunkBlockEntity* existing =
+        chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+    if (existing == nullptr) {
+        return false;
+    }
+    wire::nbt::NbtCompound base = existing->data();
+    // parity: `TrialSpawner.load` applies absent fields as defaults instead of keeping the old ones.
+    if (const std::optional<std::int32_t> stateId = stateAt(x, y, z);
+        stateId.has_value() && existing->type() == wire::common::Identifier::vanilla("trial_spawner")) {
+        base = world::blockEntityDefaults::of(existing->type(), *stateId);
+    }
+    wire::nbt::NbtCompound merged = dataPaths::merge(base, nbt);
+    for (const char* metadata : {"id", "x", "y", "z"}) {
+        merged.remove(metadata);
+    }
+    if (merged == existing->data()) {
+        return false;
+    }
+    server::world::ChunkBlockEntity updated{existing->localX(), existing->y(), existing->localZ(), existing->type(),
+                                            std::move(merged)};
+    chunk->setBlockEntity(std::move(updated));
+    return true;
 }
 
 void BlockEditor::createBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {

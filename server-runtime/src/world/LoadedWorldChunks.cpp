@@ -227,8 +227,7 @@ std::vector<RegionStore::Snapshot> LoadedWorld::snapshotOf(const std::vector<Chu
     snapshots.resize(chunks.size());
     parallelFor(chunks.size(), regions_.batching(), [&](std::size_t at) {
         Chunk* chunk = chunks[at];
-        snapshots[at] =
-            RegionStore::Snapshot{chunk->chunkX(), chunk->chunkZ(), server::world::region::chunkNbt::write(*chunk)};
+        snapshots[at] = regions_.snapshotOf(*chunk);
         chunk->markClean();
     });
     return snapshots;
@@ -283,8 +282,10 @@ void LoadedWorld::writeSnapshots(std::vector<RegionStore::Snapshot> snapshots) {
                std::to_string(written) + " region(s) in " +
                std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()) + "ms (" +
                std::to_string(regions_.encodeMillis()) + "ms encoding, " + std::to_string(regions_.writeMillis()) +
-               "ms writing, " + std::to_string(regions_.cachedRegionCount()) + " regions cached, " +
-               std::to_string(state_.loadedChunkCount()) + " loaded).";
+               "ms writing, " + std::to_string(regions_.cachedRegionCount()) + " regions cached (" +
+               std::to_string(regions_.cachedRegionBytes() / 1024) + " KiB), " + std::to_string(regions_.loadCount()) +
+               " reads " + std::to_string(regions_.loadMicros()) + "us, " + std::to_string(state_.loadedChunkCount()) +
+               " loaded).";
     });
 }
 

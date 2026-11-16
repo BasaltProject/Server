@@ -56,6 +56,7 @@
 #include <basalt/server/runtime/world/Geysers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MiscGrowth.hpp>
+#include <basalt/server/runtime/world/MobBuckets.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/NetherPortals.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
@@ -238,6 +239,18 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
                 return;
             }
         }
+        // parity: `RespawnAnchorBlock.useWithoutItem`, which a charged anchor answers by setting the respawn point.
+        if (path == "respawn_anchor" && clickedState.has_value()) {
+            world::LoadedWorld* here = owner_->currentWorld();
+            const auto properties = reg::blockStateDefinitions::propertiesOf(*clickedState);
+            const auto charge = properties.find("charges");
+            if (here != nullptr && charge != properties.end() && charge->second != "0" &&
+                here->declaration().dimension == config::WorldDimension::Nether) {
+                setAnchorSpawn(*session, hit.pos);
+                blockUsed();
+                return;
+            }
+        }
         // parity: `DragonEggBlock.useWithoutItem`.
         if (path == "dragon_egg") {
             teleportDragonEgg(hit.pos);
@@ -246,6 +259,11 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         }
         // parity: `JukeboxBlock.useItemOn`.
         if (path == "jukebox" && useJukebox(*session, hit.pos)) {
+            blockUsed();
+            return;
+        }
+        // parity: `VaultBlock.useItemOn`.
+        if (path == "vault" && useVault(*session, hit.pos)) {
             blockUsed();
             return;
         }
@@ -258,6 +276,17 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (path == "composter" && useComposter(*session, hit.pos)) {
             blockUsed();
             return;
+        }
+        // parity: `SweetBerryBushBlock.useWithoutItem` and `CaveVines.use`.
+        if (path == "sweet_berry_bush" || path == "cave_vines" || path == "cave_vines_plant") {
+            world::LoadedWorld* world = owner_->currentWorld();
+            const bool boneMeal = held.has_value() && held->id == "minecraft:bone_meal";
+            if (!boneMeal && world != nullptr &&
+                player::harvestBerries(breakContext(), *session, *world, hit.pos.x, hit.pos.y, hit.pos.z,
+                                       hooks_.harvestAllowed)) {
+                blockUsed();
+                return;
+            }
         }
         // parity: `BeehiveBlock.useItemOn`, shears or a bottle on a full hive.
         if (world::beehives::isHive(path)) {
@@ -578,6 +607,15 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         return;
     }
     // The client sends `use_item` only when nothing is in the way, so a bucket aimed at a block needs this.
+    if (world::mobBuckets::ofItem(*heldBlock) != nullptr) {
+        if (world::LoadedWorld* bucketWorld = owner_->currentWorld(); bucketWorld != nullptr) {
+            static_cast<void>(player::useBucketOnFor(breakContext(), *session, *bucketWorld, *heldBlock, heldSlot,
+                                                     *held, hit.pos.x, hit.pos.y, hit.pos.z, hit.direction,
+                                                     hooks_.bucketAllowed));
+        }
+        ack();
+        return;
+    }
     if (world::buckets::isBucket(*heldBlock)) {
         useBucketOn(*session, *heldBlock, heldSlot, *held, hit);
         ack();

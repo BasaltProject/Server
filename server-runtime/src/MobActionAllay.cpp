@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -503,7 +504,7 @@ void MobActionSystem::allayThrows(world::LoadedWorld& world, ServerEntity& allay
     dropped.velocityZ = tz * scale * static_cast<double>(0.2F);
     dropped.pickupDelay = world::kSpawnedPickupDelay;
     dropped.thrower = allay.uuid();
-    world.state().spawnItem(std::move(dropped));
+    plugins::hookEvents::dropFor(world, allay, std::move(dropped));
     // parity: `AllayAi.throwItem` tells the liked player.
     const player::PlayerSession* liked = state.likedPlayer.has_value() ? players_->get(*state.likedPlayer) : nullptr;
     if (liked != nullptr && options_.advancementTriggers != nullptr && lootTables_ != nullptr &&
@@ -618,7 +619,7 @@ MobActionSystem::AllayUse MobActionSystem::useOnAllay(world::LoadedWorld& world,
                                        .components = state.inventory->components};
             dropped.pickupDelay = world::kSpawnedPickupDelay;
             dropped.thrower = allay.uuid();
-            world.state().spawnItem(std::move(dropped));
+            plugins::hookEvents::dropFor(world, allay, std::move(dropped));
             state.inventory.reset();
         }
         state.likedPlayer.reset();

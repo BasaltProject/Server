@@ -89,7 +89,27 @@ struct Dimensions {
     return particles;
 }
 
+/// parity: `Player.updatePlayerPose`.
+void updatePose(PlayerSession& session, const entity::entityCollision::BlockAt& blockAt, bool riding) {
+    if (session.extras.fixedPose >= 0) {
+        session.pose = static_cast<Pose>(session.extras.fixedPose);
+        return;
+    }
+    if (!fits(session, Pose::Swimming, blockAt)) {
+        return;
+    }
+    const Pose desired = desiredPose(session);
+    const bool spectator = session.gamemode == wire::protocol::play::Gamemode::Spectator;
+    if (spectator || riding || fits(session, desired, blockAt)) {
+        session.pose = desired;
+    } else {
+        session.pose = fits(session, Pose::Crouching, blockAt) ? Pose::Crouching : Pose::Swimming;
+    }
+}
+
 } // namespace
+
+double heightOf(const PlayerSession& session) { return dimensionsOf(session.dead ? Pose::Dying : session.pose).height; }
 
 std::optional<std::int32_t> parrotVariantOf(const std::optional<wire::nbt::NbtCompound>& tag) {
     if (!tag.has_value() || tag->getString("id") != "minecraft:parrot") {
@@ -264,20 +284,11 @@ void tickBody(PlayerSession& session, const entity::entityCollision::BlockAt& bl
                                  })) {
         session.swimming = wasSwimming;
     }
-    if (session.extras.fixedPose >= 0) {
-        session.pose = static_cast<Pose>(session.extras.fixedPose);
-        return;
-    }
-    // parity: `Player.updatePlayerPose`.
-    if (!fits(session, Pose::Swimming, blockAt)) {
-        return;
-    }
-    const Pose desired = desiredPose(session);
-    const bool spectator = session.gamemode == wire::protocol::play::Gamemode::Spectator;
-    if (spectator || riding || fits(session, desired, blockAt)) {
-        session.pose = desired;
-    } else {
-        session.pose = fits(session, Pose::Crouching, blockAt) ? Pose::Crouching : Pose::Swimming;
+    const Pose before = session.pose;
+    updatePose(session, blockAt, riding);
+    if (session.pose != before && session.events != nullptr) {
+        plugins::hookEvents::poseChange(*session.events, session.worldName, session.entityId(), "minecraft:player",
+                                        session.x, session.y, session.z, before, session.pose);
     }
 }
 

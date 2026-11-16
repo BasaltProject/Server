@@ -59,6 +59,7 @@ public:
     void setDoorOpen(entity::ServerEntity& mob, const entity::villager::BlockPos& pos, bool open) override;
     void ringBell(entity::ServerEntity& mob, const entity::villager::BlockPos& pos) override;
     std::vector<world::trades::Offer>* offers(entity::ServerEntity& mob) override;
+    bool replenishAllowed(entity::ServerEntity& mob, const world::trades::Offer& offer) override;
     std::optional<std::int32_t> composterAdd(entity::ServerEntity& mob, const entity::villager::BlockPos& pos,
                                              const wire::common::Identifier& item) override;
     void composterExtract(entity::ServerEntity& mob, const entity::villager::BlockPos& pos) override;

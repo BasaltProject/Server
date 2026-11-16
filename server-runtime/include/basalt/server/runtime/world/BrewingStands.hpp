@@ -48,7 +48,10 @@ void useRecipes(std::vector<server::world::crafting::Recipe> recipes, PotionTagM
 [[nodiscard]] bool isPotionInput(const wire::common::Identifier& item);
 
 /// One turn. Answers whether anything moved, so the caller writes it back only when it did.
-bool tick(State& state, const DropRemainder& drop = {});
+/// Asked before fuel is lit: it may change the power and whether the item is used; false skips the whole turn.
+using FuelGate = std::function<bool(const server::world::loot::ItemStack& fuel, std::int32_t& power, bool& consuming)>;
+
+bool tick(State& state, const DropRemainder& drop = {}, const FuelGate& fuelGate = {});
 
 [[nodiscard]] bool isBrewable(const State& state);
 

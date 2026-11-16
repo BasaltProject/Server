@@ -34,9 +34,9 @@ bool leafDistances::mayChangeNeighbours(const Chunk& chunk) {
     return false;
 }
 
-void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
+void leafDistances::settle(Chunk& chunk, const ChunkAt& chunkAt) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    // Only sections holding a leaf or a log are walked: a forest touches two of two dozen.
+    // Only sections holding a leaf are walked: a forest touches two of two dozen.
     std::int32_t lowSection = -1;
     std::int32_t highSection = -1;
     for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
@@ -57,26 +57,57 @@ void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
     const std::int32_t firstY = std::max(bounds.minY(), bounds.minY() + lowSection * 16 - kMargin);
     const std::int32_t lastY = std::min(bounds.maxY(), bounds.minY() + highSection * 16 + 15 + kMargin);
     const std::int32_t height = lastY - firstY + 1;
-    const std::int32_t baseX = chunk.chunkX() * 16;
-    const std::int32_t baseZ = chunk.chunkZ() * 16;
     const auto index = [height](std::int32_t x, std::int32_t y, std::int32_t z) {
         return ((x + kMargin) * kSpan + (z + kMargin)) * height + y;
     };
 
-    std::vector<std::uint8_t> kind(static_cast<std::size_t>(kSpan) * kSpan * static_cast<std::size_t>(height), 0);
+    thread_local std::vector<std::uint8_t> kind;
+    thread_local std::vector<std::int32_t> ids;
+    kind.assign(static_cast<std::size_t>(kSpan) * kSpan * static_cast<std::size_t>(height), 0);
+    ids.resize(ChunkSection::kBlocks);
     bool anyLeaf = false;
-    for (std::int32_t x = -kMargin; x < 16 + kMargin; ++x) {
-        for (std::int32_t z = -kMargin; z < 16 + kMargin; ++z) {
-            const bool inside = x >= 0 && x < 16 && z >= 0 && z < 16;
-            for (std::int32_t y = 0; y < height; ++y) {
-                const std::int32_t worldY = firstY + y;
-                const std::int32_t stateId =
-                    inside ? chunk.blockStateId(x, worldY, z) : blockAt(baseX + x, worldY, baseZ + z);
-                if (registry::blockStateFamilies::isLeavesState(stateId)) {
-                    kind[static_cast<std::size_t>(index(x, y, z))] = 1;
-                    anyLeaf = anyLeaf || inside;
-                } else if (treeBlockRules::isLogState(stateId)) {
-                    kind[static_cast<std::size_t>(index(x, y, z))] = 2;
+    for (std::int32_t chunkDx = -1; chunkDx <= 1; ++chunkDx) {
+        for (std::int32_t chunkDz = -1; chunkDz <= 1; ++chunkDz) {
+            const bool self = chunkDx == 0 && chunkDz == 0;
+            const Chunk* source = self ? &chunk : chunkAt(chunk.chunkX() + chunkDx, chunk.chunkZ() + chunkDz);
+            if (source == nullptr) {
+                continue;
+            }
+            const std::int32_t xFrom = std::max(chunkDx * 16, -kMargin);
+            const std::int32_t xTo = std::min(chunkDx * 16 + 16, 16 + kMargin);
+            const std::int32_t zFrom = std::max(chunkDz * 16, -kMargin);
+            const std::int32_t zTo = std::min(chunkDz * 16 + 16, 16 + kMargin);
+            if (xFrom >= xTo || zFrom >= zTo) {
+                continue;
+            }
+            const std::int32_t sourceMinY = source->verticalBounds().minY();
+            for (std::size_t sectionIndex = 0; sectionIndex < source->sectionCount(); ++sectionIndex) {
+                const ChunkSection& section = source->section(sectionIndex);
+                const std::int32_t sectionY = sourceMinY + static_cast<std::int32_t>(sectionIndex) * 16;
+                if (sectionY + 15 < firstY || sectionY > lastY || !section.mayContain([](std::int32_t stateId) {
+                        return registry::blockStateFamilies::isLeavesState(stateId) ||
+                               treeBlockRules::isLogState(stateId);
+                    })) {
+                    continue;
+                }
+                section.copyBlockStateIdsInto(ids);
+                const std::int32_t yFrom = std::max(sectionY, firstY);
+                const std::int32_t yTo = std::min(sectionY + 15, lastY);
+                for (std::int32_t x = xFrom; x < xTo; ++x) {
+                    const std::int32_t localX = x - (chunkDx * 16);
+                    for (std::int32_t z = zFrom; z < zTo; ++z) {
+                        const std::int32_t localZ = z - (chunkDz * 16);
+                        for (std::int32_t worldY = yFrom; worldY <= yTo; ++worldY) {
+                            const std::int32_t stateId =
+                                ids[static_cast<std::size_t>(((worldY - sectionY) << 8) | (localZ << 4) | localX)];
+                            if (registry::blockStateFamilies::isLeavesState(stateId)) {
+                                kind[static_cast<std::size_t>(index(x, worldY - firstY, z))] = 1;
+                                anyLeaf = anyLeaf || self;
+                            } else if (treeBlockRules::isLogState(stateId)) {
+                                kind[static_cast<std::size_t>(index(x, worldY - firstY, z))] = 2;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -85,8 +116,10 @@ void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
         return;
     }
 
-    std::vector<std::uint8_t> reached(kind.size(), kMaxLeafDistance);
-    std::deque<std::array<std::int32_t, 3>> pending;
+    thread_local std::vector<std::uint8_t> reached;
+    reached.assign(kind.size(), kMaxLeafDistance);
+    thread_local std::deque<std::array<std::int32_t, 3>> pending;
+    pending.clear();
     for (std::int32_t x = -kMargin; x < 16 + kMargin; ++x) {
         for (std::int32_t z = -kMargin; z < 16 + kMargin; ++z) {
             for (std::int32_t y = 0; y < height; ++y) {

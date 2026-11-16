@@ -45,6 +45,10 @@ public:
     /// Appends to `out`, which is not cleared, what `entitiesIn` would return.
     void entitiesIn(std::int32_t chunkX, std::int32_t chunkZ, std::vector<entity::ServerEntity*>& out) const;
 
+    /// Chunk by chunk (x outer, z inner), each in spawn order: what `entitiesIn` yields for every chunk of the range.
+    void entitiesInRange(std::int32_t minChunkX, std::int32_t maxChunkX, std::int32_t minChunkZ, std::int32_t maxChunkZ,
+                         std::vector<entity::ServerEntity*>& out) const;
+
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> chunksWithEntities() const;
 
     using Matches = std::shared_ptr<const std::vector<entity::ServerEntity*>>;
@@ -90,6 +94,13 @@ private:
     mutable std::unordered_map<std::int64_t, std::vector<Indexed>> index_;
     mutable bool indexValid_ = false;
     mutable std::vector<Indexed> candidates_;
+
+    struct RangeKey {
+        std::int64_t cell;
+        Indexed held;
+    };
+
+    mutable std::vector<RangeKey> rangeKeys_;
 
     mutable std::mutex snapshotMutex_;
     mutable const entity::ServerEntity* const* snapshotData_ = nullptr;

@@ -42,6 +42,28 @@
 namespace basalt::server::runtime::entity {
 using namespace presentation;
 
+namespace {
+
+[[nodiscard]] std::optional<wire::protocol::play::WireItemStack> wireStackOf(const wire::nbt::NbtCompound& item) {
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+        wire::common::Identifier::parse(std::string{item.getString("id")});
+    const server::registry::Item* type = id.has_value() ? server::registry::items::registry().byName(*id) : nullptr;
+    if (type == nullptr) {
+        return std::nullopt;
+    }
+    const wire::nbt::NbtCompound* components = item.getCompound("components");
+    return wire::protocol::play::WireItemStack{
+        .itemId = type->protocolId,
+        .count = item.getInt("count", 1),
+        .components = components == nullptr
+                          ? std::vector<wire::protocol::play::ItemComponent>{}
+                          : item::itemComponentCodecs::toWire(*components, [](const wire::common::Identifier&) {
+                                return std::optional<std::int32_t>{};
+                            })};
+}
+
+} // namespace
+
 std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadata* previous) const {
     Entries entries;
     if (vehicle.has_value()) {
@@ -55,6 +77,9 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
     if (fireworkAttached.has_value() && (previous == nullptr || previous->fireworkAttached != fireworkAttached) &&
         (previous != nullptr || fireworkAttached->has_value())) {
         entries.push_back(Entry{.index = 9, .value = SetEntityDataPacket::OptionalUnsignedIntValue{*fireworkAttached}});
+    }
+    if (ominousItem.has_value() && (previous == nullptr || previous->ominousItem != ominousItem)) {
+        entries.push_back(Entry{.index = 8, .value = SetEntityDataPacket::ItemValue{.stack = *ominousItem}});
     }
     if (arrows.has_value() && (previous == nullptr || previous->arrows != arrows) &&
         (previous != nullptr || *arrows != 0)) {
@@ -444,6 +469,7 @@ std::uint32_t computeTypeTraits(const wire::common::Identifier& type) {
     set(path == "wolf", traits::kWolf);
     set(path == "enderman", traits::kEnderman);
     set(areaEffectClouds::isCloud(type), traits::kCloud);
+    set(path == "ominous_item_spawner", traits::kOminousItemSpawner);
     set(path == "trident", traits::kTrident);
     set(creakings::isCreaking(type), traits::kCreaking);
     set(world::endCrystals::isCrystal(type), traits::kCrystal);
@@ -546,7 +572,6 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         live.effectsAmbient = !entity.effects.empty() && swirl.allAmbient;
     }
     if (has(traits::kWarden)) {
-        live.pose = wardenBrain::poseOf(entity);
         // parity: `AngerManagement.getActiveAnger`: the target's, or the only suspect's.
         if (entity.targetId.has_value()) {
             live.wardenAnger = wardens::angerAt(entity, *entity.targetId);
@@ -577,18 +602,6 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     if (entity.goat != nullptr) {
         live.goatLeftHorn = !entity.sourceNbt.has_value() || entity.sourceNbt->getBoolean("HasLeftHorn", true);
         live.goatRightHorn = !entity.sourceNbt.has_value() || entity.sourceNbt->getBoolean("HasRightHorn", true);
-        if (entity.goat->jump.midJump) {
-            live.pose = wire::protocol::play::Pose::LongJumping;
-        } else {
-            live.pose = wire::protocol::play::Pose::Standing;
-        }
-    }
-    if (entity.breeze != nullptr) {
-        static constexpr std::array<wire::protocol::play::Pose, 5> kBreezePoses{
-            wire::protocol::play::Pose::Standing, wire::protocol::play::Pose::Sliding,
-            wire::protocol::play::Pose::LongJumping, wire::protocol::play::Pose::Inhaling,
-            wire::protocol::play::Pose::Shooting};
-        live.pose = kBreezePoses[static_cast<std::size_t>(entity.breeze->pose)];
     }
     if (entity.armadillo != nullptr) {
         live.armadilloState = static_cast<std::int32_t>(entity.armadillo->state);
@@ -599,15 +612,9 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.camel != nullptr) {
         live.camelPoseTick = entity.camel->lastPoseTick;
-        live.pose =
-            camels::sitting(*entity.camel) ? wire::protocol::play::Pose::Sitting : wire::protocol::play::Pose::Standing;
     }
     if (entity.frog != nullptr) {
         live.frogTongue = entity.frog->tongueTarget;
-        static constexpr std::array<wire::protocol::play::Pose, 4> kFrogPoses{
-            wire::protocol::play::Pose::Standing, wire::protocol::play::Pose::Croaking,
-            wire::protocol::play::Pose::UsingTongue, wire::protocol::play::Pose::LongJumping};
-        live.pose = kFrogPoses[static_cast<std::size_t>(entity.frog->pose)];
     }
     if (entity.axolotl != nullptr) {
         live.axolotlPlayingDead = axolotls::playingDead(entity);
@@ -660,23 +667,16 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         live.endermanStaredAt = entity.neutral != nullptr && entity.neutral->staredAt;
     }
     if (entity.firework != nullptr) {
-        const wire::nbt::NbtCompound& item = entity.firework->item;
-        const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
-            wire::common::Identifier::parse(std::string{item.getString("id")});
-        const server::registry::Item* type = id.has_value() ? server::registry::items::registry().byName(*id) : nullptr;
-        if (type != nullptr) {
-            const wire::nbt::NbtCompound* components = item.getCompound("components");
-            live.fireworkItem = wire::protocol::play::WireItemStack{
-                .itemId = type->protocolId,
-                .count = item.getInt("count", 1),
-                .components = components == nullptr
-                                  ? std::vector<wire::protocol::play::ItemComponent>{}
-                                  : item::itemComponentCodecs::toWire(*components, [](const wire::common::Identifier&) {
-                                        return std::optional<std::int32_t>{};
-                                    })};
-        }
+        live.fireworkItem = wireStackOf(entity.firework->item);
         live.fireworkAttached = entity.firework->attachedTo;
         live.fireworkShotAtAngle = entity.firework->shotAtAngle;
+    }
+    if (has(traits::kOminousItemSpawner) && entity.sourceNbt.has_value()) {
+        const wire::nbt::NbtCompound* item = entity.sourceNbt->getCompound("item");
+        live.ominousItem = item == nullptr ? std::nullopt : wireStackOf(*item);
+        if (!live.ominousItem.has_value()) {
+            live.ominousItem = wire::protocol::play::WireItemStack{};
+        }
     }
     if (has(traits::kCloud)) {
         const areaEffectClouds::Cloud cloud = areaEffectClouds::read(entity);
@@ -727,18 +727,48 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     } else if (has(traits::kLiving)) {
         live.livingFlags = 0;
     }
-    if (entity.forcedPose >= 0) {
-        live.pose = static_cast<wire::protocol::play::Pose>(entity.forcedPose);
-    } else if ((entity.forcedFlags & 0x80) != 0) {
-        live.pose = wire::protocol::play::Pose::FallFlying;
-    } else if ((entity.forcedFlags & 0x10) != 0) {
-        live.pose = wire::protocol::play::Pose::Swimming;
-    } else if ((entity.forcedFlags & 0x02) != 0) {
-        live.pose = wire::protocol::play::Pose::Crouching;
-    } else if (entity.forcedPose == -2 && !live.pose.has_value()) {
-        live.pose = wire::protocol::play::Pose::Standing;
-    }
+    live.pose = entityPose(entity);
     return live;
+}
+
+std::optional<wire::protocol::play::Pose> entityPose(const ServerEntity& entity) {
+    using wire::protocol::play::Pose;
+    std::optional<Pose> pose;
+    if (entity.typeTraits() & traits::kWarden) {
+        pose = wardenBrain::poseOf(entity);
+    }
+    if (entity.goat != nullptr) {
+        pose = entity.goat->jump.midJump ? Pose::LongJumping : Pose::Standing;
+    }
+    if (entity.breeze != nullptr) {
+        static constexpr std::array<Pose, 5> kBreezePoses{Pose::Standing, Pose::Sliding, Pose::LongJumping,
+                                                          Pose::Inhaling, Pose::Shooting};
+        pose = kBreezePoses[static_cast<std::size_t>(entity.breeze->pose)];
+    }
+    if (entity.camel != nullptr) {
+        pose = camels::sitting(*entity.camel) ? Pose::Sitting : Pose::Standing;
+    }
+    if (entity.frog != nullptr) {
+        static constexpr std::array<Pose, 4> kFrogPoses{Pose::Standing, Pose::Croaking, Pose::UsingTongue,
+                                                        Pose::LongJumping};
+        pose = kFrogPoses[static_cast<std::size_t>(entity.frog->pose)];
+    }
+    if (entity.forcedPose >= 0) {
+        return static_cast<Pose>(entity.forcedPose);
+    }
+    if ((entity.forcedFlags & 0x80) != 0) {
+        return Pose::FallFlying;
+    }
+    if ((entity.forcedFlags & 0x10) != 0) {
+        return Pose::Swimming;
+    }
+    if ((entity.forcedFlags & 0x02) != 0) {
+        return Pose::Crouching;
+    }
+    if (entity.forcedPose == -2 && !pose.has_value()) {
+        return Pose::Standing;
+    }
+    return pose;
 }
 
 } // namespace basalt::server::runtime::entity

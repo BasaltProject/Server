@@ -1,3 +1,5 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
@@ -16,6 +18,8 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
+#include <basalt/server/runtime/plugins/TradeHookEvents.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
@@ -255,6 +259,17 @@ std::vector<world::trades::Offer>* VillagerWorldSystem::offers(ServerEntity& mob
         return nullptr;
     }
     return &entity::villagers::offersOf(*trades_, mob, *world_);
+}
+
+bool VillagerWorldSystem::replenishAllowed(ServerEntity& mob, const world::trades::Offer& offer) {
+    if (world_ == nullptr) {
+        return true;
+    }
+    return world_->state().events().allowed(&server::plugins::pluginEventTypes::entityVillagerReplenishTrade,
+                                            [&](server::plugins::PluginEvent& event) {
+                                                plugins::hookEvents::entity(event, world_->state().eventWorld(), mob);
+                                                plugins::tradeEvents::fill(event, offer);
+                                            });
 }
 
 std::optional<std::int32_t> VillagerWorldSystem::composterAdd(ServerEntity& /*mob*/, const BlockPos& pos,

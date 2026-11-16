@@ -52,15 +52,19 @@ using server::world::light::SectionLight;
             return world.chunkIfLoaded(chunkX, chunkZ);
         };
         if (sky) {
-            cached = std::make_shared<const Chunk::PackedLight>(chunk->skyLight([chunk, &neighbours] {
-                return packAll(server::world::light::skyLight::compute(LightWindow{*chunk, neighbours}));
-            }));
+            cached = chunk
+                         ->sharedSkyLight([chunk, &neighbours] {
+                             return packAll(server::world::light::skyLight::compute(LightWindow{*chunk, neighbours}));
+                         })
+                         .light;
         } else {
-            cached = std::make_shared<const Chunk::PackedLight>(chunk->blockLight([chunk, &neighbours] {
-                const std::optional<std::vector<SectionLight>> computed =
-                    server::world::light::blockLight::compute(LightWindow{*chunk, neighbours});
-                return computed.has_value() ? packAll(*computed) : Chunk::PackedLight{};
-            }));
+            cached = chunk
+                         ->sharedBlockLight([chunk, &neighbours] {
+                             const std::optional<std::vector<SectionLight>> computed =
+                                 server::world::light::blockLight::compute(LightWindow{*chunk, neighbours});
+                             return computed.has_value() ? packAll(*computed) : Chunk::PackedLight{};
+                         })
+                         .light;
         }
     }
 

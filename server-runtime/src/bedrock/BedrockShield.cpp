@@ -1,22 +1,20 @@
 #include <basalt/server/runtime/bedrock/BedrockShield.hpp>
+#include <basalt/server/runtime/player/PlayerBlocksAttacks.hpp>
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 
 #include <optional>
-#include <string_view>
 
 namespace basalt::server::runtime::bedrock::shield {
 namespace {
 
 using player::PlayerInventory;
 
-constexpr std::string_view kShield = "minecraft:shield";
-
 [[nodiscard]] bool holdsShield(const player::PlayerSession& player, std::int32_t slot) {
     const std::optional<storage::StoredItemStack>& held = player.inventory.at(slot);
-    return held.has_value() && held->id == kShield;
+    return held.has_value() && player::blocksAttacks::of(*held).has_value();
 }
 
 [[nodiscard]] std::optional<std::int32_t> shieldHand(const player::PlayerSession& player) {
@@ -28,6 +26,12 @@ constexpr std::string_view kShield = "minecraft:shield";
         return PlayerInventory::kOffhandSlot;
     }
     return std::nullopt;
+}
+
+[[nodiscard]] wire::common::Identifier cooldownKey(const player::PlayerSession& player, const std::int32_t slot) {
+    const std::optional<storage::StoredItemStack>& held = player.inventory.at(slot);
+    const auto parsed = wire::common::Identifier::parse(held->id);
+    return parsed.has_value() ? *parsed : wire::common::Identifier::vanilla("shield");
 }
 
 void raise(player::PlayerSession& player, const std::int64_t gameTime) {
@@ -44,7 +48,7 @@ void raise(player::PlayerSession& player, const std::int64_t gameTime) {
         return;
     }
     // parity: `ItemCooldowns.isOnCooldown`.
-    if (player::onCooldownFor(player, wire::common::Identifier::vanilla("shield"), gameTime)) {
+    if (player::onCooldownFor(player, cooldownKey(player, *hand), gameTime)) {
         return;
     }
     player.blockingSlot = *hand;

@@ -3,11 +3,13 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerConnection.hpp>
+#include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/PlayerEntityOps.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -17,6 +19,17 @@ namespace basalt::server::runtime::plugins {
 namespace {
 
 namespace reg = server::registry;
+
+void sendMotion(player::PlayerSession& session, double x, double y, double z) {
+    if (session.connection().pushBack) {
+        session.connection().pushBack(x, y, z, session.yaw);
+    } else if (session.connection().sendPlayPacket) {
+        const wire::protocol::play::SetEntityMotionPacket packet{
+            .entityId = session.entityId(), .velocityX = x, .velocityY = y, .velocityZ = z};
+        session.connection().sendPlayPacket(wire::protocol::play::SetEntityMotionPacket::kId,
+                                            [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    }
+}
 
 using server::plugins::PluginEntityRef;
 using server::plugins::PluginEntityValue;
@@ -399,9 +412,6 @@ public:
             return std::vector<std::string>{};
         }
         if (operation == "knockback") {
-            if (!player->connection().pushBack) {
-                return false;
-            }
             const double x = asReal(at(arguments, 1));
             const double z = asReal(at(arguments, 2));
             const double length = std::sqrt((x * x) + (z * z));
@@ -409,15 +419,22 @@ public:
                 return false;
             }
             const double strength = asReal(at(arguments, 0));
-            player->connection().pushBack(-x / length * strength, 0.4, -z / length * strength, player->yaw);
+            const std::array<double, 3> pushed{-x / length * strength, 0.4, -z / length * strength};
+            entity::entityCombat::Knock knock{
+                .cause = "damage", .power = strength, .towardsX = x, .towardsZ = z, .delta = pushed};
+            if (!player::knockAllowed(*player, knock)) {
+                return false;
+            }
+            const std::array<double, 3> edited = entity::entityCombat::scaledDelta(knock, strength);
+            auto& [dx, dy, dz] = player->deltaMovement;
+            dx += edited[0];
+            dy += edited[1];
+            dz += edited[2];
+            sendMotion(*player, dx, dy, dz);
             return true;
         }
         if (operation == "push") {
-            if (!player->connection().pushBack) {
-                return false;
-            }
-            player->connection().pushBack(asReal(at(arguments, 0)), asReal(at(arguments, 1)), asReal(at(arguments, 2)),
-                                          player->yaw);
+            sendMotion(*player, asReal(at(arguments, 0)), asReal(at(arguments, 1)), asReal(at(arguments, 2)));
             return true;
         }
         if (operation == "mount") {

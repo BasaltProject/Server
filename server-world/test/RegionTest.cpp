@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/region/ChunkBlob.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
 
 #include <doctest.h>
@@ -211,4 +212,39 @@ TEST_CASE("a palette entry reads in every spelling vanilla has written it") {
         full.push(NbtTag::ofCompound(std::move(entry)));
         CHECK(blockAt(sectionWith(std::move(full))) != basalt::server::registry::blocks::named("oak_log")->stateId);
     }
+}
+
+TEST_CASE("the binary blob keeps everything the NBT form keeps and refuses wide palettes") {
+    Chunk chunk{-2, 9};
+    chunk.setStage(ChunkStage::Decorated);
+    chunk.setBlockStateId(1, 64, 2, registry::blocks::stone().stateId);
+    chunk.setBlockStateId(1, 65, 2, registry::blocks::water().stateId);
+    chunk.setBiomeId(1, 5, 2, 7);
+    chunk.restoreInhabitedTime(99);
+    NbtCompound data;
+    data.putString("CustomName", "a chest");
+    chunk.setBlockEntity(ChunkBlockEntity{4, 70, 6, Identifier::vanilla("chest"), data});
+    chunk.scheduleBlockTick({Identifier::vanilla("water"), 2, 65, 3, 4, 1});
+    NbtCompound saved;
+    saved.putString("id", "minecraft:pig");
+    chunk.setSavedEntities({saved});
+    chunk.addStructureStart(*structure::StructureStartRecord::of("fortress", -2, 9, {{-32, 60, 144, -17, 70, 159}}));
+    chunk.markShapeUpdate(-31, 70, 150);
+
+    const auto blob = chunkBlob::write(chunk);
+    REQUIRE(blob.has_value());
+    const auto back = chunkBlob::read(*blob, kOverworldHeight);
+    REQUIRE(back.has_value());
+    CHECK(chunkNbt::write(*back) == chunkNbt::write(chunk));
+    CHECK(back->section(8).nonAirBlockCount() == chunk.section(8).nonAirBlockCount());
+    CHECK(back->section(8).nonEmptyFluidCount() == 1);
+
+    Chunk wide{0, 0};
+    std::int32_t next = 0;
+    for (std::int32_t x = 0; x < 16; ++x) {
+        for (std::int32_t z = 0; z < 16; ++z) {
+            wide.setBlockStateId(x, 64, z, (next++ % 300) + 1);
+        }
+    }
+    CHECK_FALSE(chunkBlob::write(wide).has_value());
 }

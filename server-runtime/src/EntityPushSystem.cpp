@@ -233,21 +233,16 @@ std::vector<EntityPushSystem::Body> EntityPushSystem::entitiesIn(world::LoadedWo
     thread_local std::vector<ServerEntity*> mobs;
     // parity: `EntitySectionStorage`.
     constexpr double kMargin = 2.0;
-    for (std::int32_t chunkX = mth::floor(box.minX - kMargin) >> 4; chunkX <= mth::floor(box.maxX + kMargin) >> 4;
-         ++chunkX) {
-        for (std::int32_t chunkZ = mth::floor(box.minZ - kMargin) >> 4; chunkZ <= mth::floor(box.maxZ + kMargin) >> 4;
-             ++chunkZ) {
-            mobs.clear();
-            world.state().entitiesIn(chunkX, chunkZ, mobs);
-            for (ServerEntity* mob : mobs) {
-                if (mob == self.mob || mob->removed) {
-                    continue;
-                }
-                const Body body{.mob = mob};
-                if (boxOf(body).intersects(box)) {
-                    found.push_back(body);
-                }
-            }
+    mobs.clear();
+    world.state().entitiesInRange(mth::floor(box.minX - kMargin) >> 4, mth::floor(box.maxX + kMargin) >> 4,
+                                  mth::floor(box.minZ - kMargin) >> 4, mth::floor(box.maxZ + kMargin) >> 4, mobs);
+    for (ServerEntity* mob : mobs) {
+        if (mob == self.mob || mob->removed) {
+            continue;
+        }
+        const Body body{.mob = mob};
+        if (boxOf(body).intersects(box)) {
+            found.push_back(body);
         }
     }
     const std::shared_ptr<const std::vector<PlayerSession*>> everyone = players_->view();

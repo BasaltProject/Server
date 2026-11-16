@@ -16,24 +16,25 @@
 namespace basalt::server::runtime {
 
 player::pvp::Context BasaltServer::meleeContext(const player::BreakContext& blocks) {
-    return player::pvp::Context{.registry = &playerRegistry_,
-                                .enchantments = &vanillaData_.enchantments,
-                                .entityTags = &vanillaData_.entityTags,
-                                .teams = &teams_,
-                                .blocks = &blocks,
-                                .sweptMob = {},
-                                .nextSeed = blocks.nextSeed,
-                                .explode = [this](world::LoadedWorld& world, const world::postAttack::Explosion& blast,
-                                                  double x, double y, double z) {
-                                    std::vector<player::PlayerSession*> watchers;
-                                    for (player::PlayerSession* player : playerRegistry_.snapshot()) {
-                                        if (player->worldName == world.name()) {
-                                            watchers.push_back(player);
-                                        }
-                                    }
-                                    combat_->gust(world, watchers, world.state().entities(),
-                                                  CombatSystem::gustOf(blast, x, y, z));
-                                }};
+    return player::pvp::Context{
+        .registry = &playerRegistry_,
+        .enchantments = &vanillaData_.enchantments,
+        .entityTags = &vanillaData_.entityTags,
+        .teams = &teams_,
+        .blocks = &blocks,
+        .sweptMob = {},
+        .nextSeed = blocks.nextSeed,
+        .explode =
+            [this](world::LoadedWorld& world, const world::postAttack::Explosion& blast, double x, double y, double z) {
+                std::vector<player::PlayerSession*> watchers;
+                for (player::PlayerSession* player : playerRegistry_.snapshot()) {
+                    if (player->worldName == world.name()) {
+                        watchers.push_back(player);
+                    }
+                }
+                combat_->gust(world, watchers, world.state().entities(), CombatSystem::gustOf(blast, x, y, z));
+            },
+        .combat = &mobCombatHooks_};
 }
 
 void BasaltServer::bedrockAttackPlayer(player::PlayerSession& session, player::PlayerSession& victim,

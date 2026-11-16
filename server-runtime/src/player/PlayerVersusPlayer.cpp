@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
+#include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerMace.hpp>
 #include <basalt/server/runtime/player/PlayerMovementStats.hpp>
@@ -127,14 +128,35 @@ void animate(const Context& context, std::string_view worldName, std::int32_t en
 }
 
 /// parity: `LivingEntity.knockback` on a player.
-void pushPlayer(const Context& context, PlayerSession& attacker, PlayerSession& victim, double power) {
+void pushPlayer(const Context& context, PlayerSession& attacker, PlayerSession& victim, double power,
+                std::string_view cause) {
     const std::array<double, 2> towards = facing(attacker);
     const double resistance =
         playerAttributes::valueOf(victim, "minecraft:knockback_resistance", definitionsOf(context));
-    sendMotion(victim,
-               combat::knockback(power, towards[0], towards[1], victim.deltaMovement[0], victim.deltaMovement[1],
-                                 victim.deltaMovement[2], victim.onGround, resistance),
-               angleFrom(attacker, victim));
+    const auto moved = [&](const entity::entityCombat::Knock& aimed) {
+        return combat::knockback(aimed.power, aimed.towardsX, aimed.towardsZ, victim.deltaMovement[0],
+                                 victim.deltaMovement[1], victim.deltaMovement[2], victim.onGround, resistance);
+    };
+    entity::entityCombat::Knock knock{.cause = cause,
+                                      .sourceId = attacker.entityId(),
+                                      .power = power,
+                                      .towardsX = towards[0],
+                                      .towardsZ = towards[1]};
+    std::array<double, 3> after = moved(knock);
+    for (std::size_t axis = 0; axis < after.size(); ++axis) {
+        knock.delta[axis] = after[axis] - victim.deltaMovement[axis];
+    }
+    if (!knockAllowed(victim, knock)) {
+        return;
+    }
+    if (knock.recompute) {
+        after = moved(knock);
+    } else {
+        for (std::size_t axis = 0; axis < after.size(); ++axis) {
+            after[axis] = victim.deltaMovement[axis] + knock.delta[axis];
+        }
+    }
+    sendMotion(victim, after, angleFrom(attacker, victim));
 }
 
 [[nodiscard]] std::vector<world::postAttack::Equipped> equipmentOf(const PlayerSession& player) {
@@ -244,12 +266,23 @@ void postAttack(const Context& context, world::LoadedWorld& world, PlayerSession
     using world::postAttack::Side;
     for (const world::postAttack::Ignite& ignite : outcome.ignites) {
         // parity: `igniteForTicks` only ever lengthens the fire.
-        if (ignite.target == Side::kAttacker) {
-            attacker.fireTicks = std::max(attacker.fireTicks, ignite.ticks);
-        } else if (victim != nullptr) {
-            victim->fireTicks = std::max(victim->fireTicks, ignite.ticks);
-        } else {
-            mob->fireTicks = std::max(mob->fireTicks, ignite.ticks);
+        std::int32_t& burning = ignite.target == Side::kAttacker ? attacker.fireTicks
+                                : victim != nullptr              ? victim->fireTicks
+                                                                 : mob->fireTicks;
+        if (ignite.ticks <= burning) {
+            continue;
+        }
+        const bool onAttacker = ignite.target == Side::kAttacker;
+        const std::int32_t burningId = onAttacker          ? attacker.entityId()
+                                       : victim != nullptr ? victim->entityId()
+                                                           : mob->entityId();
+        const std::string burningType = onAttacker || victim != nullptr ? "minecraft:player" : mob->type().toString();
+        const std::int32_t igniterId =
+            onAttacker ? (victim != nullptr ? victim->entityId() : mob->entityId()) : attacker.entityId();
+        std::int32_t ticks = ignite.ticks;
+        if (plugins::hookEvents::combustAllowed(world.events(), world.name(), burningId, burningType, ticks,
+                                                "enchantment", {.entityId = igniterId})) {
+            burning = std::max(burning, ticks);
         }
     }
     for (const world::postAttack::Damage& damage : outcome.damages) {
@@ -335,12 +368,18 @@ float knockbackOf(const Context& context, const PlayerSession& attacker,
            2.0F;
 }
 
-void knockMob(PlayerSession& attacker, ServerEntity& mob, float power) {
+void knockMob(PlayerSession& attacker, ServerEntity& mob, float power, const Context& context) {
     if (power <= 0.0F) {
         return;
     }
     const std::array<double, 2> towards = facing(attacker);
-    entity::entityCombat::knockback(mob, static_cast<double>(power), towards[0], towards[1]);
+    entity::entityCombat::knockback(mob,
+                                    {.cause = "entity_attack",
+                                     .sourceId = attacker.entityId(),
+                                     .power = static_cast<double>(power),
+                                     .towardsX = towards[0],
+                                     .towardsZ = towards[1]},
+                                    context.combat);
     attacker.sprinting = attacker.sprinting && attacker.keepSprintOnAttack;
 }
 
@@ -451,7 +490,7 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
     const float knockback =
         knockbackOf(context, attacker, swing.weapon) + (blow.knockbackAttack ? kSprintKnockback : 0.0F);
     if (knockback > 0.0F) {
-        pushPlayer(context, attacker, victim, static_cast<double>(knockback));
+        pushPlayer(context, attacker, victim, static_cast<double>(knockback), "entity_attack");
         attacker.sprinting = attacker.sprinting && attacker.keepSprintOnAttack;
     }
     victim.deltaMovement = oldMovement;
@@ -515,11 +554,18 @@ void sweep(PlayerSession& attacker, world::LoadedWorld& world, const Context& co
         const float damage = world::weaponDamage::of(weapon, sweepDamage, definitionOf, &facts) * strength;
         entity::entityCombat::blame(*nearby, attacker.entityId(), attacker.entityId(), playerType());
         const entity::entityCombat::Result result = entity::entityCombat::hurt(
-            *nearby, damage, attacker.x, attacker.z, {}, "attack", std::string{attacker.name()}, true);
+            *nearby, damage, attacker.x, attacker.z, entity::entityCombat::knockOnly(context.combat), "attack",
+            std::string{attacker.name()}, true);
         if (!result.landed) {
             continue;
         }
-        entity::entityCombat::knockback(*nearby, kSweepKnockback, towards[0], towards[1]);
+        entity::entityCombat::knockback(*nearby,
+                                        {.cause = "sweep_attack",
+                                         .sourceId = attacker.entityId(),
+                                         .power = kSweepKnockback,
+                                         .towardsX = towards[0],
+                                         .towardsZ = towards[1]},
+                                        context.combat);
         entity::entityCombat::rememberPlayer(*nearby, attacker.uuid());
         world::vibrations::emit(world.state(), "entity_damage", nearby->x, nearby->y, nearby->z, world.gameTime(),
                                 {.entity = nearby->uuid()});
@@ -557,7 +603,7 @@ void sweep(PlayerSession& attacker, world::LoadedWorld& world, const Context& co
         if (!nearby->lastHurtLanded) {
             continue;
         }
-        pushPlayer(context, attacker, *nearby, kSweepKnockback);
+        pushPlayer(context, attacker, *nearby, kSweepKnockback, "sweep_attack");
         nearby->deltaMovement = oldMovement;
         postAttack(context, world, attacker, nearby, nullptr, weapon, weaponSlot);
     }

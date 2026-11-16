@@ -109,6 +109,15 @@ std::vector<DroppedItem> DroppedItemPhysics::items() const {
     return droppedItems_;
 }
 
+void DroppedItemPhysics::itemPoses(std::vector<ItemPose>& out) const {
+    const WorldWriteLock lock{*mutex_};
+    out.clear();
+    for (const DroppedItem& item : droppedItems_) {
+        out.push_back(
+            {item.entityId, item.x, item.y, item.z, item.previousX, item.previousY, item.previousZ, item.onGround});
+    }
+}
+
 std::vector<DroppedItem> DroppedItemPhysics::itemsWithin(double x, double z, double radiusSquared) const {
     const WorldWriteLock lock{*mutex_};
     std::vector<DroppedItem> found;

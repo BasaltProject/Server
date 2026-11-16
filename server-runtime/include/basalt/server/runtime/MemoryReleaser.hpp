@@ -19,13 +19,14 @@ public:
     /// Caps the arenas and fixes the thresholds, once, before the worker threads start allocating.
     static void configureAllocator() noexcept;
 
-    /// Asks for a release soon, off the calling thread.
-    void request();
+    /// Asks for a release soon, off the calling thread; `idle` also drops the clean file pages nobody is reading.
+    void request(bool idle = false);
 
 private:
     std::mutex mutex_;
     std::condition_variable_any wake_;
     bool pending_ = false;
+    bool idle_ = false;
     std::jthread worker_;
 };
 

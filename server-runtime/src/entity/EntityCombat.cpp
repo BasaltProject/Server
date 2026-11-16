@@ -45,6 +45,62 @@ constexpr double kSulfurKnockback = 0.33;
                                        attributeOf(entity.type(), reg::entityAttributes::kArmorToughness), fractionAdd);
 }
 
+/// parity: the `minecraft:is_fire` damage type tag, under the cause names callers use.
+[[nodiscard]] bool isFireCause(std::string_view cause) {
+    static constexpr std::array<std::string_view, 9> kFire{
+        "fire",           "in_fire", "on_fire", "campfire", "lava", "hot_floor", "fireball", "unattributed_fireball",
+        "sulfur_cube_hot"};
+    return std::ranges::find(kFire, cause) != kFire.end();
+}
+
+/// parity: the `minecraft:no_knockback` damage type tag, under the cause names callers use ("fire" is on_fire).
+[[nodiscard]] bool isNoKnockbackCause(std::string_view cause) {
+    static constexpr std::array<std::string_view, 31> kNoKnockback{"explosion",
+                                                                   "player_explosion",
+                                                                   "bad_respawn_point",
+                                                                   "in_fire",
+                                                                   "lightning_bolt",
+                                                                   "on_fire",
+                                                                   "lava",
+                                                                   "hot_floor",
+                                                                   "sulfur_cube_hot",
+                                                                   "in_wall",
+                                                                   "cramming",
+                                                                   "drown",
+                                                                   "starve",
+                                                                   "cactus",
+                                                                   "fall",
+                                                                   "ender_pearl",
+                                                                   "fly_into_wall",
+                                                                   "out_of_world",
+                                                                   "generic",
+                                                                   "magic",
+                                                                   "wither",
+                                                                   "dragon_breath",
+                                                                   "dry_out",
+                                                                   "sweet_berry_bush",
+                                                                   "freeze",
+                                                                   "stalagmite",
+                                                                   "outside_border",
+                                                                   "generic_kill",
+                                                                   "campfire",
+                                                                   "spear",
+                                                                   "fire"};
+    constexpr std::string_view kVanillaPrefix = "minecraft:";
+    if (cause.starts_with(kVanillaPrefix)) {
+        cause.remove_prefix(kVanillaPrefix.size());
+    }
+    return std::ranges::find(kNoKnockback, cause) != kNoKnockback.end();
+}
+
+[[nodiscard]] std::array<double, 3> knockbackDelta(const ServerEntity& entity, double power, double towardsX,
+                                                   double towardsZ) {
+    const std::array<double, 3> moved = player::combat::knockback(
+        power, towardsX, towardsZ, entity.velocityX, entity.velocityY, entity.velocityZ, entity.onGround,
+        static_cast<double>(attributeOf(entity.type(), reg::entityAttributes::kKnockbackResistance)));
+    return {moved[0] - entity.velocityX, moved[1] - entity.velocityY, moved[2] - entity.velocityZ};
+}
+
 } // namespace
 
 void knockback(ServerEntity& entity, double power, double towardsX, double towardsZ) {
@@ -58,6 +114,53 @@ void knockback(ServerEntity& entity, double power, double towardsX, double towar
     entity.velocityX = moved[0];
     entity.velocityY = moved[1];
     entity.velocityZ = moved[2];
+}
+
+std::array<double, 3> scaledDelta(const Knock& knock, double powerBefore) {
+    if (!knock.recompute || powerBefore <= 0.0) {
+        return knock.delta;
+    }
+    const double ratio = knock.power / powerBefore;
+    return {knock.delta[0] * ratio, knock.delta[1] * ratio, knock.delta[2] * ratio};
+}
+
+void push(ServerEntity& entity, Knock knock, const Hooks* hooks) {
+    const double before = knock.power;
+    if (hooks != nullptr && hooks->knocked) {
+        if (!hooks->knocked(entity, knock)) {
+            return;
+        }
+        knock.delta = scaledDelta(knock, before);
+    }
+    entity.velocityX += knock.delta[0];
+    entity.velocityY += knock.delta[1];
+    entity.velocityZ += knock.delta[2];
+}
+
+void knockback(ServerEntity& entity, Knock knock, const Hooks* hooks) {
+    if (entity.creaking != nullptr && !entity.creaking->canMove) {
+        return;
+    }
+    knock.delta = knockbackDelta(entity, knock.power, knock.towardsX, knock.towardsZ);
+    if (hooks != nullptr && hooks->knocked) {
+        if (!hooks->knocked(entity, knock)) {
+            return;
+        }
+        if (knock.recompute) {
+            knock.delta = knockbackDelta(entity, knock.power, knock.towardsX, knock.towardsZ);
+        }
+    }
+    entity.velocityX += knock.delta[0];
+    entity.velocityY += knock.delta[1];
+    entity.velocityZ += knock.delta[2];
+}
+
+Hooks knockOnly(const Hooks* hooks) {
+    Hooks only;
+    if (hooks != nullptr) {
+        only.knocked = hooks->knocked;
+    }
+    return only;
 }
 
 void blame(ServerEntity& target, std::optional<std::int32_t> causingId, std::int32_t directId,
@@ -95,6 +198,11 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     // parity: `Entity.isInvulnerableTo`, which only the void and `/kill` get past.
     if (entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("Invulnerable") && cause != "out_of_world" &&
         cause != "generic_kill") {
+        return {};
+    }
+    // parity: `Entity.isInvulnerableTo` and `LivingEntity.hurtServer`: fire never hurts a fire-immune or resistant mob.
+    if (isFireCause(cause) && (reg::entityTypeShapes::isFireImmune(entity.type()) ||
+                               entity.effects.contains(wire::common::Identifier::vanilla("fire_resistance")))) {
         return {};
     }
     // parity: `Allay.hurtServer`, which the player it likes cannot hurt.
@@ -229,9 +337,14 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     // parity: `setDeltaMovement`.
     const bool planted =
         (entity.dragon != nullptr && enderDragon::isSitting(entity.dragon->phase)) || entity.shulker != nullptr;
-    if (!cooling && !planted) {
-        knockback(entity, kDefaultKnockback, sourceX.value_or(entity.x) - entity.x,
-                  sourceZ.value_or(entity.z) - entity.z);
+    if (!cooling && !planted && !isNoKnockbackCause(cause)) {
+        knockback(entity,
+                  Knock{.cause = blamed.directId.has_value() ? "entity_attack" : "damage",
+                        .sourceId = blamed.directId,
+                        .power = kDefaultKnockback,
+                        .towardsX = sourceX.value_or(entity.x) - entity.x,
+                        .towardsZ = sourceZ.value_or(entity.z) - entity.z},
+                  &hooks);
     }
     if (entity.horse != nullptr) {
         entity.horse->hurt = true;

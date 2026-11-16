@@ -35,6 +35,10 @@ class CombatSystem {
 public:
     using Hooks = entity::entityCombat::Hooks;
 
+    [[nodiscard]] const Hooks& mobHooks() const { return hooks_; }
+
+    void raiseKnockbackThrough(const Hooks& hooks) { hooks_.knocked = hooks.knocked; }
+
     struct Options {
         std::function<std::int32_t(std::int32_t bound)> nextInt;
         std::function<std::int64_t()> nextSeed;

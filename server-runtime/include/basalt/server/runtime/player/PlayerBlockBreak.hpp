@@ -19,6 +19,7 @@ struct StoredItemStack;
 
 namespace basalt::server::runtime {
 class BlockChangeBroadcaster;
+class VaultSystem;
 } // namespace basalt::server::runtime
 
 namespace basalt::server::runtime::world {
@@ -40,6 +41,7 @@ struct BreakContext {
     world::RealEnchantments* enchantments = nullptr;
     world::AdvancementTriggers* triggers = nullptr;
     const world::realItemTags::TagMembers* itemTags = nullptr;
+    VaultSystem* vaults = nullptr;
 
     std::function<bool()> minecartImprovements;
 
@@ -82,6 +84,15 @@ struct BreakContext {
     std::function<bool(const PlayerSession& player, std::string_view type, std::int32_t x, std::int32_t y,
                        std::int32_t z, std::string_view face)>
         hangingAllowed;
+    std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                       std::string_view reason, std::int32_t from, std::int32_t to)>
+        cauldronAllowed;
+    std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                       const std::string& item, bool placing)>
+        flowerPotAllowed;
+    std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                       const std::string& item)>
+        lecternInsertAllowed;
     std::function<std::optional<std::int32_t>(const PlayerSession& player, const std::string& item, std::int32_t now,
                                               std::int32_t before)>
         foodEaten;

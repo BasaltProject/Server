@@ -3,6 +3,8 @@
 #include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/commands/HudCommands.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/storage/AccessRepository.hpp>
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
@@ -239,26 +241,38 @@ namespace {
     }
     // parity: `BlockPosArgument.getSpawnablePos` reads the source.
     const std::array<std::int32_t, 3> at = blockAt(coordinates, context.source());
+    std::vector<const player::PlayerSession*> changed;
     for (const player::PlayerSession* target : targets) {
+        std::array<std::int32_t, 3> chosen = at;
+        // parity: `SetSpawnCommand` only counts the targets whose `setRespawnPosition` went through.
+        if (target->events != nullptr && !plugins::hookEvents::spawnChangeAllowed(*target->events, *target, chosen[0],
+                                                                                  chosen[1], chosen[2], "command")) {
+            continue;
+        }
+        changed.push_back(target);
         access->setSpawnPoint(
             storage::StoredSpawnPoint{.uuid = target->uuid().toString(),
                                       .world = target->worldName.empty() ? (*world)->name() : target->worldName,
                                       // The half block is the middle of it, which is where a respawn puts feet.
-                                      .x = at[0] + 0.5,
-                                      .y = static_cast<double>(at[1]),
-                                      .z = at[2] + 0.5,
-                                      .yaw = angle});
+                                      .x = chosen[0] + 0.5,
+                                      .y = static_cast<double>(chosen[1]),
+                                      .z = chosen[2] + 0.5,
+                                      .yaw = angle,
+                                      .forced = true});
+    }
+    if (changed.empty()) {
+        return static_cast<std::int32_t>(0);
     }
     std::vector<Component> args{Component::text(std::to_string(at[0])), Component::text(std::to_string(at[1])),
                                 Component::text(std::to_string(at[2])), Component::text(std::to_string(angle)),
                                 Component::text((*world)->name())};
-    args.push_back(targets.size() == 1 ? Component::text(targets.front()->name())
-                                       : Component::text(std::to_string(targets.size())));
-    context.success(Component::translatable(targets.size() == 1 ? "commands.spawnpoint.success.single"
+    args.push_back(changed.size() == 1 ? Component::text(changed.front()->name())
+                                       : Component::text(std::to_string(changed.size())));
+    context.success(Component::translatable(changed.size() == 1 ? "commands.spawnpoint.success.single"
                                                                 : "commands.spawnpoint.success.multiple",
                                             std::move(args)),
                     true);
-    return static_cast<std::int32_t>(targets.size());
+    return static_cast<std::int32_t>(changed.size());
 }
 
 } // namespace

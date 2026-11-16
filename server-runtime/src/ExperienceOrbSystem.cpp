@@ -17,6 +17,7 @@
 #include <array>
 #include <cmath>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 namespace basalt::server::runtime {
@@ -73,7 +74,9 @@ constexpr std::array<std::int32_t, 10> kSizes{2477, 1237, 617, 307, 149, 73, 37,
 }
 
 /// parity: `ExperienceOrb.repairPlayerItems`.
-std::int32_t repairWithXp(PlayerSession& player, std::int32_t amount, random::RandomSource& random, bool& repaired) {
+std::int32_t repairWithXp(PlayerSession& player, std::int32_t amount, random::RandomSource& random, bool& repaired,
+                          const ExperienceOrbSystem::Options& options, std::int32_t orbId,
+                          std::unique_lock<std::mutex>& guard) {
     // parity: `EquipmentSlot.VALUES`: main hand, off hand, then feet up to the head.
     const std::array<std::int32_t, 6> slots{player::PlayerInventory::kHotbarStart + player.inventory.heldSlot(),
                                             player::PlayerInventory::kOffhandSlot,
@@ -96,13 +99,25 @@ std::int32_t repairWithXp(PlayerSession& player, std::int32_t amount, random::Ra
         mendable[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(mendable.size())))];
     const storage::StoredItemStack stack = *player.inventory.at(slot);
     const auto toRepair = std::max(0, static_cast<std::int32_t>(static_cast<float>(amount) * kMendingFactor));
-    const std::int32_t repair = std::min(toRepair, item::itemWear::damage(stack));
-    player.inventory.set(slot, item::itemWear::withDamage(stack, item::itemWear::damage(stack) - repair));
+    std::int32_t repair = std::min(toRepair, item::itemWear::damage(stack));
+    if (options.mend) {
+        constexpr std::array<std::string_view, 6> kSlotNames{"hand", "off_hand", "feet", "legs", "chest", "head"};
+        const auto at = std::ranges::find(slots, slot);
+        const std::int32_t consumed = repair > 0 ? repair * amount / toRepair : 0;
+        guard.unlock();
+        const bool allowed =
+            options.mend(player, kSlotNames[static_cast<std::size_t>(at - slots.begin())], orbId, repair, consumed);
+        guard.lock();
+        if (!allowed) {
+            return amount;
+        }
+    }
+    player.inventory.set(slot, item::itemWear::withDamage(stack, std::max(0, item::itemWear::damage(stack) - repair)));
     repaired = true;
-    if (repair > 0) {
+    if (repair > 0 && toRepair > 0) {
         const std::int32_t remaining = amount - (repair * amount / toRepair);
         if (remaining > 0) {
-            return repairWithXp(player, remaining, random, repaired);
+            return repairWithXp(player, remaining, random, repaired, options, orbId, guard);
         }
     }
     return 0;
@@ -354,8 +369,8 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
         bool repaired = false;
         std::int32_t remaining = 0;
         {
-            const std::scoped_lock guard{lock_};
-            remaining = repairWithXp(*player, value, random_, repaired);
+            std::unique_lock<std::mutex> guard{lock_};
+            remaining = repairWithXp(*player, value, random_, repaired, options_, orb.entityId(), guard);
         }
         if (repaired && player->connection().sendInventoryAll) {
             player->connection().sendInventoryAll();

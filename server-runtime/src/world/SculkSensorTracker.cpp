@@ -44,6 +44,13 @@ void SculkSensorTracker::remember(std::int32_t x, std::int32_t y, std::int32_t z
     }
 }
 
+void SculkSensorTracker::noteChange(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t was,
+                                    std::int32_t stateId) {
+    if (isSensorState(stateId) || (!sculkSensors_.empty() && isSensorState(was))) {
+        remember(x, y, z, stateId);
+    }
+}
+
 void SculkSensorTracker::rememberChunk(const server::world::Chunk& chunk) {
     const std::int32_t baseX = chunk.chunkX() << 4;
     const std::int32_t baseZ = chunk.chunkZ() << 4;

@@ -22,6 +22,12 @@ struct Rule {
 
 [[nodiscard]] std::span<const Rule> rulesFor(const wire::common::Identifier& item);
 
+// parity: `MaceItem.createToolProperties` and `TridentItem.createToolProperties` carry a `tool` with no rules.
+[[nodiscard]] bool hasTool(const wire::common::Identifier& item);
+
+// parity: `Items.swordTool`, the mace and the trident cost two durability a block and cannot dig in creative.
+[[nodiscard]] bool isCombatTool(const wire::common::Identifier& item);
+
 [[nodiscard]] bool isCorrectForDrops(const wire::common::Identifier* item, const wire::common::Identifier& block,
                                      const TagContains& tagContains);
 

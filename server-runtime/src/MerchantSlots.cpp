@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -145,7 +146,24 @@ bool VillagerTradeController::mayTakeResult() const {
            satisfiedBy(offer, slots_[kPaymentB], slots_[kPaymentA]);
 }
 
-void VillagerTradeController::takeResult() {
+bool VillagerTradeController::askPurchase() {
+    rewardExp_ = true;
+    increaseUses_ = true;
+    if (!hooks_.purchaseAllowed || custom_ || !openTradingWith_.has_value() || !activeOffer_.has_value() ||
+        openOffers_ == nullptr || *activeOffer_ >= openOffers_->list.size()) {
+        return true;
+    }
+    return hooks_.purchaseAllowed(*openTradingWith_, openOffers_->list[*activeOffer_], rewardExp_, increaseUses_);
+}
+
+void VillagerTradeController::takeResult(const bool asked) {
+    // parity: `MerchantResultSlot.onTake` asks first and, when refused, empties the cursor and resends the offers.
+    if (!asked && !askPurchase()) {
+        owner_->menus().discardCarried();
+        owner_->sendInventory();
+        sendOffers();
+        return;
+    }
     const std::optional<StoredItemStack> made = slots_[kResult];
     slots_[kResult].reset();
     PlayerSession* session = owner_->playerSession();
@@ -180,7 +198,9 @@ void VillagerTradeController::takeResult() {
     }
     if (taken) {
         // parity: `AbstractVillager.notifyTrade`: a use, the experience, and the `TRADE` trigger.
-        world::trades::take(offer);
+        if (increaseUses_) {
+            world::trades::take(offer);
+        }
         player::statAwards::award(*session, "traded_with_villager");
         if (world::LoadedWorld* world = owner_->currentWorld();
             world != nullptr && owner_->options().mobs != nullptr && openTradingWith_.has_value()) {
@@ -188,8 +208,10 @@ void VillagerTradeController::takeResult() {
                 entity::villager::villagerBrain::noteTrade(*villager, world->gameTime());
                 random::RandomSource random =
                     random::RandomSource::legacy(owner_->options().nextSeed ? owner_->options().nextSeed() : 0);
-                const std::int32_t orb = entity::villager::villagerBrain::rewardTradeXp(
-                    *villager, owner_->options().mobs->villagersIn(*world), offer.experience, random);
+                const std::int32_t orb =
+                    !rewardExp_ ? 0
+                                : entity::villager::villagerBrain::rewardTradeXp(
+                                      *villager, owner_->options().mobs->villagersIn(*world), offer.experience, random);
                 if (orb > 0 && owner_->options().spawnOrb) {
                     owner_->options().spawnOrb(*world, villager->x, villager->y + 0.5, villager->z, orb);
                 }
@@ -215,10 +237,15 @@ void VillagerTradeController::quickMoveResult(PlayerSession& session) {
     // parity: `AbstractContainerMenu.doClick`'s quick move.
     while (slots_[kResult].has_value() && mayTakeResult()) {
         const StoredItemStack result = *slots_[kResult];
+        if (!askPurchase()) {
+            owner_->sendInventory();
+            sendOffers();
+            break;
+        }
         if (session.inventory.add(result) > 0) {
             break;
         }
-        takeResult();
+        takeResult(true);
         if (!slots_[kResult].has_value() || slots_[kResult]->id != result.id) {
             break;
         }

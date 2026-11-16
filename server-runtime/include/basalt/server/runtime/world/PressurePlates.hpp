@@ -20,6 +20,9 @@ inline constexpr std::int32_t kHeavyMaxWeight = 150;
 
 [[nodiscard]] bool isPlate(std::int32_t stateId);
 
+/// Whether the plate reads a signal; `entityInside` only asks entities while it does not.
+[[nodiscard]] bool isPressed(std::int32_t stateId);
+
 /// parity: `entityInside`.
 enum class Trigger : std::uint8_t {
     Touched,

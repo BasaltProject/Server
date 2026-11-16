@@ -11,9 +11,9 @@ namespace basalt::server::world::terrain::decoration::tree {
 namespace leafDistances {
 
 /// The world around the chunk, so a leaf is measured from a trunk next door, from logs only so order never matters.
-using BlockAt = std::function<std::int32_t(std::int32_t, std::int32_t, std::int32_t)>;
+using ChunkAt = std::function<const Chunk*(std::int32_t, std::int32_t)>;
 
-void settle(Chunk& chunk, const BlockAt& blockAt);
+void settle(Chunk& chunk, const ChunkAt& chunkAt);
 
 [[nodiscard]] bool mayChangeNeighbours(const Chunk& chunk);
 

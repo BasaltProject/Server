@@ -519,7 +519,9 @@ void actOnce(const randomTicks::Context& context, std::int32_t x, std::int32_t y
     } else if (path == "turtle_egg") {
         miscGrowth::turtleEgg(context.world, x, y, z, stateId, context.spawnHatchling, random, changes);
     } else if (path == "lava") {
-        lavaGrowth::lava(context.world, x, y, z, random, changes);
+        if (!context.canSpreadFire || context.canSpreadFire(x, y, z)) {
+            lavaGrowth::lava(context.world, x, y, z, random, changes);
+        }
     } else if (std::ranges::contains(kClimbingPlants, path)) {
         const bool upwards = path == "kelp" || path == "twisting_vines";
         const double chance = path == "kelp" ? kKelpChance : kVineChance;

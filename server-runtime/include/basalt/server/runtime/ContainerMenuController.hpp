@@ -207,6 +207,8 @@ public:
 
     void sendInventory();
 
+    void discardCarried() { carriedItem_.reset(); }
+
     void sendInventoryAll();
 
     void sendInventorySlot(std::int32_t slot);

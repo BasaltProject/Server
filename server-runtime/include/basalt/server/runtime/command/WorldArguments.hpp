@@ -11,12 +11,17 @@
 #include <set>
 #include <string>
 
+namespace basalt::server::runtime::world {
+class WorldState;
+}
+
 namespace basalt::server::runtime::command {
 
 struct BlockInput {
     wire::common::Identifier block;
     std::int32_t stateId = 0;
     std::map<std::string, std::string> properties;
+    std::optional<wire::nbt::NbtCompound> nbt;
 
     [[nodiscard]] bool isAir() const;
 
@@ -28,15 +33,21 @@ using TagMembers = std::function<std::optional<std::set<wire::common::Identifier
 class BlockPredicateInput {
 public:
     BlockPredicateInput(std::optional<wire::common::Identifier> block, std::optional<wire::common::Identifier> tag,
-                        std::map<std::string, std::string> properties, TagMembers tagMembers);
+                        std::map<std::string, std::string> properties, TagMembers tagMembers,
+                        std::optional<wire::nbt::NbtCompound> nbt = std::nullopt);
 
     [[nodiscard]] bool matches(std::int32_t stateId) const;
+
+    /// parity: `BlockInput.test`, whose NBT half reads the block entity at the position.
+    [[nodiscard]] bool matchesAt(const world::WorldState& state, std::int32_t x, std::int32_t y, std::int32_t z,
+                                 std::int32_t stateId) const;
 
 private:
     std::optional<wire::common::Identifier> block_;
     std::optional<wire::common::Identifier> tag_;
     std::map<std::string, std::string> properties_;
     TagMembers tagMembers_;
+    std::optional<wire::nbt::NbtCompound> nbt_;
 };
 
 class ItemPredicateInput {

@@ -33,6 +33,9 @@ public:
     struct Hooks {
         std::function<bool(std::int32_t containerId, std::int32_t index, const std::optional<std::string>& resultItem)>
             tradeAllowed;
+        /// Asked before a result is taken: false refuses the purchase, and the offer carries a listener's edits.
+        std::function<bool(std::int32_t villagerId, world::trades::Offer& offer, bool& rewardExp, bool& increaseUses)>
+            purchaseAllowed;
     };
 
     static constexpr std::int32_t kPaymentA = 0;
@@ -71,7 +74,8 @@ private:
     void sendOfferList(const entity::ServerEntity* villager);
     [[nodiscard]] std::vector<world::trades::Offer>* offers();
     void updateSellItem();
-    void takeResult();
+    void takeResult(bool asked = false);
+    [[nodiscard]] bool askPurchase();
     void moveFromInventory(player::PlayerSession& session, std::int32_t paymentSlot,
                            const server::world::loot::ItemStack& cost);
 
@@ -83,6 +87,8 @@ private:
     std::array<std::optional<storage::StoredItemStack>, 3> slots_;
     std::int32_t selectionHint_ = 0;
     std::optional<std::size_t> activeOffer_;
+    bool rewardExp_ = true;
+    bool increaseUses_ = true;
 };
 
 } // namespace basalt::server::runtime

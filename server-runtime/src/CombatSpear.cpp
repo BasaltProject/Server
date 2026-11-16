@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
+#include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -12,6 +13,7 @@
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
+#include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -330,9 +332,18 @@ bool CombatHandler::stab(PlayerSession& session, world::LoadedWorld& world, std:
         died = result.died;
     }
     if (dealsKnockback) {
-        entity::entityCombat::knockback(*mob, kStabKnockback, towardsX, towardsZ);
-        if (extra > 0.0F) {
-            entity::entityCombat::knockback(*mob, static_cast<double>(extra), towardsX, towardsZ);
+        const entity::entityCombat::Hooks* knocks =
+            owner_->options().combat == nullptr ? nullptr : &owner_->options().combat->mobHooks();
+        for (const double power : {kStabKnockback, static_cast<double>(extra)}) {
+            if (power > 0.0) {
+                entity::entityCombat::knockback(*mob,
+                                                {.cause = "entity_attack",
+                                                 .sourceId = session.entityId(),
+                                                 .power = power,
+                                                 .towardsX = towardsX,
+                                                 .towardsZ = towardsZ},
+                                                knocks);
+            }
         }
     }
     bool dismounted = false;
@@ -427,10 +438,21 @@ bool CombatHandler::stabPlayer(PlayerSession& session, PlayerSession& victim, st
             if (power <= 0.0) {
                 continue;
             }
-            player::pvp::sendMotion(victim,
-                                    player::combat::knockback(power, towardsX, towardsZ, oldMovement[0], oldMovement[1],
-                                                              oldMovement[2], victim.onGround, resistance),
-                                    fromYaw);
+            const std::array<double, 3> moved = player::combat::knockback(
+                power, towardsX, towardsZ, oldMovement[0], oldMovement[1], oldMovement[2], victim.onGround, resistance);
+            entity::entityCombat::Knock knock{
+                .cause = "entity_attack",
+                .sourceId = session.entityId(),
+                .power = power,
+                .towardsX = towardsX,
+                .towardsZ = towardsZ,
+                .delta = {moved[0] - oldMovement[0], moved[1] - oldMovement[1], moved[2] - oldMovement[2]}};
+            if (!player::knockAllowed(victim, knock)) {
+                continue;
+            }
+            const std::array<double, 3> change = entity::entityCombat::scaledDelta(knock, power);
+            player::pvp::sendMotion(
+                victim, {oldMovement[0] + change[0], oldMovement[1] + change[1], oldMovement[2] + change[2]}, fromYaw);
         }
         victim.deltaMovement = oldMovement;
         session.sprinting = false;

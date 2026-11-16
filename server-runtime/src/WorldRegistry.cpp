@@ -133,6 +133,7 @@ std::shared_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
                     ? std::nullopt
                     : std::optional{world::containerLoot::Opener{
                           .name = session->name(),
+                          .uuid = session->uuid().toString(),
                           .luck = session->luck(),
                           .mainhand = session->inventory.heldItem().has_value()
                                           ? wire::common::Identifier::parse(session->inventory.heldItem()->id)

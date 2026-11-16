@@ -12,6 +12,7 @@ basalt_module(server-registry
         src/CreativeTabItems.cpp
         src/Entities.cpp
         src/ItemFood.cpp
+        src/ItemProperties.cpp
         src/ItemTools.cpp
         src/Items.cpp
         src/MapColors.cpp

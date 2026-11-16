@@ -94,6 +94,8 @@ struct RuntimeEntityMetadata {
     /// parity: `FireworkRocketEntity`'s item.
     std::optional<wire::protocol::play::WireItemStack> fireworkItem;
     std::optional<std::optional<std::int32_t>> fireworkAttached;
+    /// parity: `OminousItemSpawner.DATA_ITEM`.
+    std::optional<wire::protocol::play::WireItemStack> ominousItem;
     /// parity: `LivingEntity.DATA_STINGER_COUNT_ID`.
     std::optional<std::int32_t> stingers;
     std::optional<std::int32_t> arrows;
@@ -161,6 +163,9 @@ struct RuntimeEntityMetadata {
 };
 
 [[nodiscard]] RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity);
+
+/// The pose a mob is shown in, if it has one of its own.
+[[nodiscard]] std::optional<wire::protocol::play::Pose> entityPose(const ServerEntity& entity);
 
 /// The `traits` bits that hold for this entity type.
 [[nodiscard]] std::uint32_t computeTypeTraits(const wire::common::Identifier& type);

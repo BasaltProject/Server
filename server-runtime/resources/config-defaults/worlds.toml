@@ -88,6 +88,11 @@ simulation-distance = 10
 # much. Vanilla's own interval. 0 disables it, leaving chunks to save when they
 # unload or on stop.
 save-interval-seconds = 300
+# Region file format: "bsw" (default, Basalt's own: one compressed blob per chunk, so far less memory and faster
+# chunk reads), "linear" or "anvil" (vanilla's .mca). A world in another format is converted on its next start,
+# verifying every chunk and keeping the old files in region.<format>-original. "auto" keeps what an existing world
+# has and gives a new one bsw. Not vanilla: this is a storage choice, the world itself is identical.
+region-format = "bsw"
 # NOT VANILLA. The End's exit portal only opens when the dragon dies. With this on, the portal in the
 # middle of the End is open from the moment the world is created.
 open-end-exit-portal = false

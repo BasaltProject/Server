@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
+#include <basalt/server/runtime/player/PlayerBerries.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
@@ -75,6 +76,19 @@ public:
             bedAllowed;
         std::function<void(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>
             bedLeft;
+        std::function<bool(const player::PlayerSession& player, std::int32_t& x, std::int32_t& y, std::int32_t& z,
+                           std::string_view cause)>
+            spawnChangeAllowed;
+        player::HarvestGate harvestAllowed;
+        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::string_view reason, std::int32_t from, std::int32_t to)>
+            cauldronAllowed;
+        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                           const std::string& item, bool placing)>
+            flowerPotAllowed;
+        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                           const std::string& item)>
+            lecternInsertAllowed;
         std::function<bool(const player::PlayerSession& player, std::string_view state, std::int32_t hookId,
                            std::int32_t& exp)>
             fishing;
@@ -222,6 +236,7 @@ private:
 
     void openLectern(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
+    [[nodiscard]] bool useVault(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
     [[nodiscard]] bool useJukebox(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
     [[nodiscard]] bool placeMinecart(player::PlayerSession& session, const wire::common::Identifier& item,
@@ -271,6 +286,8 @@ private:
     void useBed(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t state);
 
     void setSpawnPointAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& bed);
+
+    void setAnchorSpawn(player::PlayerSession& session, const wire::protocol::play::BlockPos& anchor);
 
     void broadcastSound(const wire::protocol::play::BlockPos& pos, const std::string& sound, float volume, float pitch);
 

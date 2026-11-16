@@ -73,6 +73,9 @@ public:
     /// A snapshot safe to iterate outside the lock.
     [[nodiscard]] std::vector<DroppedItem> items() const;
 
+    /// The same items and order as `items`, as bare poses into a reused buffer.
+    void itemPoses(std::vector<ItemPose>& out) const;
+
     /// The items within a horizontal distance, in the order `items` gives them.
     [[nodiscard]] std::vector<DroppedItem> itemsWithin(double x, double z, double radiusSquared) const;
 

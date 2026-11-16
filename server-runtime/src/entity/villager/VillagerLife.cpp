@@ -231,7 +231,9 @@ bool shouldRestock(Ctx& ctx) {
         if (offers != nullptr) {
             if (missed > 0) {
                 for (world::trades::Offer& offer : *offers) {
-                    offer.uses = 0;
+                    if (ctx.world.replenishAllowed(ctx.self, offer)) {
+                        offer.uses = 0;
+                    }
                 }
             }
             for (std::int32_t update = 0; update < missed; ++update) {
@@ -254,7 +256,9 @@ void restock(Ctx& ctx) {
             updateDemand(offer);
         }
         for (world::trades::Offer& offer : *offers) {
-            offer.uses = 0;
+            if (ctx.world.replenishAllowed(ctx.self, offer)) {
+                offer.uses = 0;
+            }
         }
     }
     ctx.state.lastRestock = ctx.now;

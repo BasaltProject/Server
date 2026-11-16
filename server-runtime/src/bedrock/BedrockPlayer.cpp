@@ -148,8 +148,21 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
     announceAndSay(Component::translatable("multiplayer.player.joined", {Component::text(session_->name())})
                        .color(wire::text::kYellow));
     if (context_.uiConfigs && context_.placeholders != nullptr) {
-        ui_ = std::make_unique<ui::PlayerUi>(context_.uiConfigs, *context_.placeholders,
-                                             [](std::int32_t, const std::function<void(wire::io::ByteBuffer&)>&) {});
+        const ui::PluginSurfaces& held = context_.pluginSurfaces;
+        ui::PlayerUi::Plugin plugin{
+            .holdsSidebar = held.holdsSidebar, .holdsTabList = held.holdsTabList, .holdsBossBar = held.holdsBossBar};
+        const auto bound = [this](const auto& surface) -> std::function<std::optional<ui::SurfaceContent>()> {
+            if (!surface) {
+                return {};
+            }
+            return [this, &surface] { return surface(session_->uuid().toString()); };
+        };
+        plugin.sidebar = bound(held.sidebar);
+        plugin.tabList = bound(held.tabList);
+        plugin.bossBar = bound(held.bossBar);
+        ui_ = std::make_unique<ui::PlayerUi>(
+            context_.uiConfigs, *context_.placeholders,
+            [](std::int32_t, const std::function<void(wire::io::ByteBuffer&)>&) {}, std::move(plugin));
         ui::PlayerUi::Surfaces surfaces;
         surfaces.scoreboard = [this](const std::string& title, const std::vector<std::string>& lines) {
             drawSidebar(title, lines);
@@ -256,11 +269,12 @@ void BedrockPlayer::chat(const std::string_view message) {
         return;
     }
     // A plugin may rewrite or stop the line, but only where plugins run, so it is handed over and comes back.
-    context_.chatFilter(*session_, std::string{message}, [this](const bool allowed, std::string spoken) {
-        if (allowed) {
-            say(std::move(spoken));
-        }
-    });
+    context_.chatFilter(*session_, std::string{message},
+                        [this](const bool allowed, std::string spoken, chat::ChatRouting routing) {
+                            if (allowed) {
+                                say(std::move(spoken), std::move(routing));
+                            }
+                        });
 }
 
 wire::bedrock::BedrockItemStack BedrockPlayer::stackFor(const std::optional<storage::StoredItemStack>& stack) const {
@@ -771,7 +785,7 @@ void BedrockPlayer::command(const std::string_view line) {
     context_.runCommand(*session_, std::string{line});
 }
 
-void BedrockPlayer::say(std::string message) {
+void BedrockPlayer::say(std::string message, chat::ChatRouting routing) {
     if (session_ == nullptr) {
         return;
     }
@@ -779,15 +793,23 @@ void BedrockPlayer::say(std::string message) {
     if (context_.registry == nullptr) {
         return;
     }
-    if (context_.chatFormat) {
-        if (std::optional<std::string> format = context_.chatFormat(*session_); format.has_value()) {
-            const wire::text::Component line = chat::formatLine(std::move(*format), session_->name(), message);
-            context_.logger.info([&line, this] { return wire::text::resolvePlainText(line, *context_.lang); });
-            for (const player::PlayerSession* each : context_.registry->snapshot()) {
+    std::optional<std::string> format;
+    if (!routing.format.empty()) {
+        format = std::move(routing.format);
+    } else if (context_.chatFormat) {
+        format = context_.chatFormat(*session_);
+    }
+    if (format.has_value() || routing.recipients.has_value()) {
+        const wire::text::Component line =
+            chat::formatLine(format.value_or("\\<{player}> {message}"), session_->name(), message);
+        context_.logger.info([&line, this] { return wire::text::resolvePlainText(line, *context_.lang); });
+        for (const player::PlayerSession* each : context_.registry->snapshot()) {
+            if (!routing.recipients.has_value() ||
+                std::ranges::contains(*routing.recipients, each->uuid().toString())) {
                 each->sendSystemMessage(line);
             }
-            return;
         }
+        return;
     }
     chat::broadcastChatMessage(
         context_.registry->snapshot(),
@@ -1586,6 +1608,24 @@ bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {
     return true;
 }
 
+// A vanilla team wins over a plugin's name tag, as on Java.
+std::string BedrockPlayer::pluginNameTag(const player::PlayerSession& other) const {
+    const ui::PluginSurfaces& surfaces = context_.pluginSurfaces;
+    if (!surfaces.holdsNameTag || !surfaces.nameTag || !surfaces.holdsNameTag() ||
+        (surfaces.inVanillaTeam && surfaces.inVanillaTeam(other.name()))) {
+        return {};
+    }
+    const std::optional<ui::SurfaceContent> drawn = surfaces.nameTag(other.uuid().toString());
+    if (!drawn.has_value()) {
+        return {};
+    }
+    const std::string suffix = drawn->lines.empty() ? std::string{} : drawn->lines.front();
+    return wire::text::toLegacyText(Component::empty()
+                                        .append(wire::text::miniMessage::parse(drawn->title))
+                                        .append(Component::text(other.name()))
+                                        .append(wire::text::miniMessage::parse(suffix)));
+}
+
 void BedrockPlayer::syncOthers() {
     if (session_ == nullptr || context_.registry == nullptr) {
         return;
@@ -1641,7 +1681,8 @@ void BedrockPlayer::syncOthers() {
                         other->pitch,
                         holding.has_value() ? holding->id : std::string{},
                         wornKey,
-                        flags};
+                        flags,
+                        pluginNameTag(*other)};
         present.emplace(other->uuid(), now);
 
         // Sent after the spawn on the first turn, because the client has nobody to put it in the hand of before.
@@ -1664,6 +1705,13 @@ void BedrockPlayer::syncOthers() {
         const auto drawFlags = [this, &post, &now] {
             wire::io::ByteBuffer body;
             wire::bedrock::writeEntityFlags(body, runtimeIdFor(now.entityId), now.flags, protocol_);
+            post(wire::bedrock::BedrockPacket::SetEntityData, body);
+        };
+
+        const auto drawTag = [this, &post, &now, &other] {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeNameTag(body, runtimeIdFor(now.entityId), now.tag.empty() ? other->name() : now.tag,
+                                        true, protocol_);
             post(wire::bedrock::BedrockPacket::SetEntityData, body);
         };
 
@@ -1707,6 +1755,9 @@ void BedrockPlayer::syncOthers() {
             if (now.flags != 0) {
                 drawFlags();
             }
+            if (!now.tag.empty()) {
+                drawTag();
+            }
             continue;
         }
 
@@ -1719,6 +1770,9 @@ void BedrockPlayer::syncOthers() {
         }
         if (before.flags != now.flags) {
             drawFlags();
+        }
+        if (before.tag != now.tag) {
+            drawTag();
         }
         const bool moved = std::abs(now.x - before.x) > kMoveEpsilon || std::abs(now.y - before.y) > kMoveEpsilon ||
                            std::abs(now.z - before.z) > kMoveEpsilon;

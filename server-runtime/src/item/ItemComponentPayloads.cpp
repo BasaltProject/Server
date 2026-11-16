@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/item/ItemComponentPayloads.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/MobBuckets.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
 #include <basalt/wire/protocol/ProtocolBuffer.hpp>
 #include <basalt/wire/protocol/VarInt.hpp>
@@ -36,6 +37,10 @@ constexpr std::int32_t kDefaultSwingDuration = 6;
 constexpr std::array<std::string_view, 16> kDyeColours{"white", "orange", "magenta",    "light_blue", "yellow", "lime",
                                                        "pink",  "gray",   "light_gray", "cyan",       "purple", "blue",
                                                        "brown", "green",  "red",        "black"};
+
+constexpr std::array<std::string_view, 5> kAxolotlVariants{"lucy", "wild", "gold", "cyan", "blue"};
+
+constexpr std::array<std::string_view, 3> kSalmonSizes{"small", "medium", "large"};
 
 constexpr std::array<std::string_view, 3> kSwingAnimations{"none", "whack", "stab"};
 
@@ -384,6 +389,22 @@ void writeStackTemplate(ByteBuffer& buffer, std::int32_t item, std::int32_t coun
         table.emplace("minecraft:dye", enumEncoder(kDyeColours));
         table.emplace("minecraft:base_color", enumEncoder(kDyeColours));
         table.emplace("minecraft:map_post_processing", enumEncoder(kMapPostProcessing));
+        table.emplace("minecraft:tropical_fish/base_color", enumEncoder(kDyeColours));
+        table.emplace("minecraft:tropical_fish/pattern_color", enumEncoder(kDyeColours));
+        table.emplace("minecraft:axolotl/variant", enumEncoder(kAxolotlVariants));
+        table.emplace("minecraft:salmon/size", enumEncoder(kSalmonSizes));
+        // parity: `TropicalFish.Pattern.STREAM_CODEC`, which writes the packed id and not the ordinal.
+        table.emplace("minecraft:tropical_fish/pattern", [](ByteBuffer& buffer, const NbtTag& value) {
+            const std::string* name = value.get<std::string>();
+            const std::optional<std::int32_t> packed =
+                name == nullptr ? std::nullopt : world::mobBuckets::tropicalPatternId(*name);
+            if (!packed.has_value()) {
+                return false;
+            }
+            wire::protocol::varInt::write(buffer, *packed);
+            return true;
+        });
+        table.emplace("minecraft:bucket_entity_data", nbtEncoder());
 
         // parity: `ByteBufCodecs.fromCodecWithRegistries`.
         for (const std::string_view name : kPersistentOnly) {

@@ -4,6 +4,7 @@
 #include <basalt/server/world/light/LightWindow.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace basalt::server::world {
@@ -34,6 +35,11 @@ struct LightData {
 [[nodiscard]] LightData encodeLight(Chunk& chunk, bool hasSkylight, const light::LightWindow& window);
 
 [[nodiscard]] LightData encodeLight(Chunk& chunk, bool hasSkylight = true);
+
+using LightBytes = std::shared_ptr<const std::vector<std::uint8_t>>;
+
+/// The wire form of `encodeLight` (a `LightData` write), shared across resends of unchanged light.
+[[nodiscard]] LightBytes encodeLightBytes(Chunk& chunk, bool hasSkylight, const light::LightWindow& window);
 
 } // namespace chunkDataCodec
 

@@ -652,8 +652,14 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
         return entity.path.has_value() && !entity::ai::navigation::isDone(entity);
     }
     if (operation == "knockback") {
-        entity::entityCombat::knockback(entity, asReal(at(arguments, 0)), asReal(at(arguments, 1)),
-                                        asReal(at(arguments, 2)));
+        const entity::entityCombat::Hooks combat =
+            hooks != nullptr && hooks->combatHooks ? hooks->combatHooks() : entity::entityCombat::Hooks{};
+        entity::entityCombat::knockback(entity,
+                                        entity::entityCombat::Knock{.cause = "damage",
+                                                                    .power = asReal(at(arguments, 0)),
+                                                                    .towardsX = asReal(at(arguments, 1)),
+                                                                    .towardsZ = asReal(at(arguments, 2))},
+                                        &combat);
         return true;
     }
     if (operation == "hook_own") {

@@ -30,7 +30,12 @@ struct State {
     std::array<bool, kSize> stopped{};
 };
 
-[[nodiscard]] std::vector<server::world::loot::ItemStack> tick(State& state, bool lit, const ResultFor& resultFor);
+/// Asked before a slot finishes; false leaves the food on the fire, as a cancelled Bukkit `BlockCookEvent` does.
+using Finish = std::function<bool(const server::world::loot::ItemStack& source, server::world::loot::ItemStack& result,
+                                  std::string_view recipe)>;
+
+[[nodiscard]] std::vector<server::world::loot::ItemStack> tick(State& state, bool lit, const ResultFor& resultFor,
+                                                               const Finish& finish = {});
 
 [[nodiscard]] bool placeFood(State& state, const server::world::loot::ItemStack& stack, const ResultFor& resultFor);
 

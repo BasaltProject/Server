@@ -21,7 +21,8 @@ const wire::common::Identifier& block() {
     return instance;
 }
 
-std::vector<server::world::loot::ItemStack> tick(State& state, bool lit, const ResultFor& resultFor) {
+std::vector<server::world::loot::ItemStack> tick(State& state, bool lit, const ResultFor& resultFor,
+                                                 const Finish& finish) {
     if (!lit) {
         for (std::int32_t slot = 0; slot < kSize; ++slot) {
             const auto index = static_cast<std::size_t>(slot);
@@ -42,7 +43,11 @@ std::vector<server::world::loot::ItemStack> tick(State& state, bool lit, const R
             continue;
         }
         const server::world::crafting::Recipe* recipe = resultFor ? resultFor(*state.items[index]) : nullptr;
-        done.push_back(recipe == nullptr ? *state.items[index] : recipe->result);
+        server::world::loot::ItemStack result = recipe == nullptr ? *state.items[index] : recipe->result;
+        if (finish && !finish(*state.items[index], result, recipe == nullptr ? std::string_view{} : recipe->id)) {
+            continue;
+        }
+        done.push_back(std::move(result));
         state.items[index].reset();
         state.progress[index] = 0;
         state.total[index] = 0;

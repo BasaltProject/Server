@@ -1,6 +1,9 @@
 #pragma once
 
+#include <basalt/metamorph/region/BswConvert.hpp>
 #include <basalt/metamorph/region/LinearRegion.hpp>
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
+#include <basalt/server/runtime/world/BswChunkStore.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
@@ -9,6 +12,7 @@
 #include <atomic>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <span>
@@ -31,7 +35,10 @@ public:
     /// Injectable so a test can reach the ceiling without writing a hundred megabytes.
     explicit RegionStore(std::string worldName, std::string worldsRoot = std::string{kWorldsRoot},
                          server::world::ChunkHeight verticalBounds = server::world::kOverworldHeight,
-                         std::size_t capacity = kCapacity, std::int64_t byteBudget = kByteBudget);
+                         std::size_t capacity = kCapacity, std::int64_t byteBudget = kByteBudget,
+                         config::RegionFormatSetting format = config::RegionFormatSetting::Linear);
+
+    ~RegionStore();
 
     RegionStore(const RegionStore&) = delete;
     RegionStore& operator=(const RegionStore&) = delete;
@@ -41,6 +48,10 @@ public:
 
     [[nodiscard]] std::string regionPath(std::int32_t regionX, std::int32_t regionZ) const;
 
+    [[nodiscard]] bool usesBsw() const noexcept { return bsw_ != nullptr; }
+
+    [[nodiscard]] bool usesAnvil() const noexcept { return anvil_; }
+
     [[nodiscard]] std::size_t cachedRegionCount() const;
 
     [[nodiscard]] std::int64_t cachedRegionBytes() const;
@@ -49,9 +60,14 @@ public:
 
     [[nodiscard]] std::int64_t writeMillis() const noexcept { return writeMillis_; }
 
+    /// Chunk reads since start and the microseconds they took, decoding included.
+    [[nodiscard]] std::int64_t loadCount() const noexcept { return loadCount_.load(std::memory_order_relaxed); }
+
+    [[nodiscard]] std::int64_t loadMicros() const noexcept { return loadMicros_.load(std::memory_order_relaxed); }
+
     [[nodiscard]] std::optional<server::world::Chunk> loadChunk(std::int32_t chunkX, std::int32_t chunkZ);
 
-    /// The chunk's stored NBT bytes as they sit in the region, without decoding them.
+    /// The chunk as NBT bytes, decoded from the stored form when that is binary.
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> rawChunk(std::int32_t chunkX, std::int32_t chunkZ);
 
     [[nodiscard]] bool hasChunk(std::int32_t chunkX, std::int32_t chunkZ);
@@ -70,12 +86,16 @@ public:
     /// Answers how many region files were rewritten: a region is recompressed whole however few of its chunks changed.
     std::size_t saveChunks(std::span<server::world::Chunk* const> chunks, std::int32_t timestamp);
 
-    /// A chunk as the owner thread saw it: the NBT is built there, and only the encoding and the writing are left.
+    /// A chunk as the owner thread saw it: the stored bytes (bsw) or the NBT (linear) are built there.
     struct Snapshot {
         std::int32_t chunkX = 0;
         std::int32_t chunkZ = 0;
         wire::nbt::NbtCompound nbt;
+        std::vector<std::uint8_t> stored;
     };
+
+    /// Encodes the chunk the way this store keeps it.
+    [[nodiscard]] Snapshot snapshotOf(const server::world::Chunk& chunk) const;
 
     /// `saveChunks` for snapshots; answers how many region files were rewritten.
     std::size_t saveSnapshots(std::vector<Snapshot> snapshots, std::int32_t timestamp);
@@ -128,6 +148,18 @@ private:
     /// Caller must hold `writeMutex_` and must not hold `mutex_`.
     std::size_t flushDirty();
 
+    /// Picks the world's format, converting its regions first when the setting asks for another one.
+    void chooseFormat(config::RegionFormatSetting setting);
+
+    void convertRegions(metamorph::region::RegionFormat from, metamorph::region::RegionFormat to);
+
+    [[nodiscard]] std::optional<server::world::Chunk> readChunk(std::int32_t chunkX, std::int32_t chunkZ);
+
+    [[nodiscard]] static Age classify(std::span<const std::uint8_t> blob);
+
+    /// Reads a chunk from bsw storage into `out`; false when absent or unreadable, which it records.
+    [[nodiscard]] bool readBsw(std::int32_t chunkX, std::int32_t chunkZ, std::vector<std::uint8_t>& out);
+
     std::string worldRoot_;
     server::world::ChunkHeight verticalBounds_;
     std::size_t capacity_;
@@ -150,7 +182,11 @@ private:
     std::unordered_set<std::int64_t> unreadableChunks_;
     std::unordered_set<std::int64_t> unreadableRegions_;
     wire::common::Logger logger_{"Regions"};
+    std::unique_ptr<BswChunkStore> bsw_;
+    bool anvil_ = false;
 
+    std::atomic<std::int64_t> loadCount_{0};
+    std::atomic<std::int64_t> loadMicros_{0};
     std::int64_t encodeMillis_ = 0;
     std::int64_t writeMillis_ = 0;
 };

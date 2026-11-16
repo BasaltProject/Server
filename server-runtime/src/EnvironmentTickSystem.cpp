@@ -414,15 +414,41 @@ void EnvironmentTickSystem::tickEntityPortals(world::LoadedWorld& world) {
         if (!exit.has_value()) {
             continue;
         }
+        double toX = exit->x;
+        double toY = exit->y;
+        double toZ = exit->z;
+        const server::plugins::PluginEvent* answered = world.events().ask(
+            &server::plugins::pluginEventTypes::entityPortal, [&](server::plugins::PluginEvent& event) {
+                plugins::hookEvents::entity(event, world.name(), *mob);
+                event.set("to_world", target->name());
+                event.set("to_x", toX);
+                event.set("to_y", toY);
+                event.set("to_z", toZ);
+            });
+        if (answered != nullptr) {
+            // parity: `Entity.handlePortal` rests the entity before it asks where to go.
+            if (answered->cancelled()) {
+                mob->portalCooldown = kEntityPortalCooldown;
+                continue;
+            }
+            const auto edited = [&answered](const char* name, double& value) {
+                if (const auto* number = std::get_if<double>(&answered->get(name)); number != nullptr) {
+                    value = *number;
+                }
+            };
+            edited("to_x", toX);
+            edited("to_y", toY);
+            edited("to_z", toZ);
+        }
         wire::nbt::NbtCompound saved = entity::entityNbt::encode(*mob);
         std::unique_ptr<entity::ServerEntity> moved =
             entity::entityNbt::decode(saved, players_->allocateEntityId(), mob->protocolType());
         if (moved == nullptr) {
             continue;
         }
-        moved->x = exit->x;
-        moved->y = exit->y;
-        moved->z = exit->z;
+        moved->x = toX;
+        moved->y = toY;
+        moved->z = toZ;
         moved->portalCooldown = kEntityPortalCooldown;
         moved->sourceNbt = std::move(saved);
         mob->removed = true;
@@ -448,6 +474,7 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
                     player->connection().hurt(amount, "freeze", world::damageTypes::kFreeze, std::nullopt);
                 }
             });
+        const std::int32_t fireBeforeContact = player->fireTicks;
         player::tickBlockContact(
             *player,
             [&world](std::int32_t x, std::int32_t y, std::int32_t z) { return world.state().blockState(x, y, z); },
@@ -459,6 +486,19 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
             },
             world.state().gameplay().blocks.magmaBlockDamageWhenSneaking,
             world.state().gameplay().blocks.stonecutterDamage);
+        if (player->fireTicks > fireBeforeContact && fireBeforeContact <= 0) {
+            std::int32_t ticks = player->fireTicks;
+            if (plugins::hookEvents::combustAllowed(world.events(), world.name(), player->entityId(),
+                                                    "minecraft:player", ticks, "fire",
+                                                    {.block = true,
+                                                     .x = static_cast<std::int32_t>(std::floor(player->x)),
+                                                     .y = static_cast<std::int32_t>(std::floor(player->y)),
+                                                     .z = static_cast<std::int32_t>(std::floor(player->z))})) {
+                player->fireTicks = ticks;
+            } else {
+                player->fireTicks = fireBeforeContact;
+            }
+        }
         const double eyeY = player->y + world::fluids::eyeHeight(player->sneaking);
         const auto blockX = static_cast<std::int32_t>(std::floor(player->x));
         const auto blockZ = static_cast<std::int32_t>(std::floor(player->z));
@@ -521,7 +561,20 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
             !player->invulnerable() && ((feet.has_value() && world::fluids::of(*feet) == world::Submersion::Lava) ||
                                         (eyes.has_value() && world::fluids::of(*eyes) == world::Submersion::Lava));
         if (inLava) {
-            player->fireTicks = world::fluids::kLavaFireTicks;
+            if (player->fireTicks <= 0) {
+                std::int32_t ticks = world::fluids::kLavaFireTicks;
+                const bool onFeet = feet.has_value() && world::fluids::of(*feet) == world::Submersion::Lava;
+                if (plugins::hookEvents::combustAllowed(
+                        world.events(), world.name(), player->entityId(), "minecraft:player", ticks, "lava",
+                        {.block = true,
+                         .x = blockX,
+                         .y = static_cast<std::int32_t>(std::floor(onFeet ? player->y : eyeY)),
+                         .z = blockZ})) {
+                    player->fireTicks = ticks;
+                }
+            } else {
+                player->fireTicks = std::max(player->fireTicks, world::fluids::kLavaFireTicks);
+            }
             if (world.gameTime() % kLavaDamageIntervalTicks == 0 && player->connection().hurt) {
                 player->connection().hurt(world::fluids::kLavaDamage, "lava", world::damageTypes::kLava, std::nullopt);
             }

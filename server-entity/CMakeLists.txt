@@ -9,7 +9,7 @@ basalt_module(server-entity
         src/MovementSystem.cpp
         src/Projectiles.cpp
         src/World.cpp
-    DEPENDS basalt::wire-common
+    DEPENDS basalt::wire-common basalt::server-random
 )
 
 basalt_test(server-entity-test

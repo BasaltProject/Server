@@ -54,6 +54,7 @@
 #include <basalt/server/runtime/world/Geysers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MiscGrowth.hpp>
+#include <basalt/server/runtime/world/MobBuckets.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/NetherPortals.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
@@ -299,7 +300,7 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
          owner_->options().fishing->useRod(breakContext(), *session, *world, heldSlot)) ||
         (owner_->options().maps != nullptr &&
          owner_->options().maps->useEmptyMap(breakContext(), *session, *world, heldSlot)) ||
-        !world::buckets::isBucket(*item)) {
+        (!world::buckets::isBucket(*item) && world::mobBuckets::ofItem(*item) == nullptr)) {
         return;
     }
     // parity: `BucketItem.use` asks `mayUseItemAt`, which an adventure player never may.

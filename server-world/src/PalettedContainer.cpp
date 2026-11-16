@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
 #include <stdexcept>
 
@@ -176,6 +177,61 @@ void PalettedContainer::setAll(std::span<const std::int32_t> values) {
             writeInto(words_, bits_, i, slot);
         }
     }
+}
+
+void PalettedContainer::exportPacked(std::vector<std::int32_t>& palette, int& bits,
+                                     std::vector<std::uint64_t>& words) const {
+    const std::shared_lock<std::shared_mutex> guard{lock_};
+    palette.assign(palette_.begin(), palette_.begin() + static_cast<std::ptrdiff_t>(paletteSize_));
+    bits = words_.empty() ? 0 : bits_;
+    words.assign(words_.begin(), words_.end());
+}
+
+bool PalettedContainer::assignPacked(std::span<const std::int32_t> palette, int bits,
+                                     std::span<const std::uint8_t> wordBytes, std::vector<std::uint32_t>& counts) {
+    if (palette.empty()) {
+        return false;
+    }
+    std::vector<std::uint64_t> words;
+    if (palette.size() > 1) {
+        if (bits < bitsFor(palette.size()) || bits > 32 ||
+            wordBytes.size() != ((size_ * static_cast<std::size_t>(bits) + 63) / 64) * sizeof(std::uint64_t)) {
+            return false;
+        }
+        words.resize(wordBytes.size() / sizeof(std::uint64_t));
+        std::memcpy(words.data(), wordBytes.data(), wordBytes.size());
+        counts.assign(palette.size(), 0);
+        const auto width = static_cast<unsigned>(bits);
+        const std::uint64_t mask = (std::uint64_t{1} << width) - 1;
+        unsigned __int128 buffer = 0;
+        unsigned buffered = 0;
+        std::size_t nextWord = 0;
+        for (std::size_t i = 0; i < size_; ++i) {
+            if (buffered < width) {
+                buffer |= static_cast<unsigned __int128>(words[nextWord++]) << buffered;
+                buffered += 64;
+            }
+            const auto index = static_cast<std::size_t>(static_cast<std::uint64_t>(buffer) & mask);
+            if (index >= palette.size()) {
+                return false;
+            }
+            ++counts[index];
+            buffer >>= width;
+            buffered -= width;
+        }
+    } else {
+        counts.assign(1, static_cast<std::uint32_t>(size_));
+        bits = 0;
+    }
+    const std::unique_lock<std::shared_mutex> guard{lock_};
+    palette_.assign(palette.begin(), palette.end());
+    if (palette_.size() < kInitialPaletteCapacity) {
+        palette_.resize(kInitialPaletteCapacity, 0);
+    }
+    paletteSize_ = palette.size();
+    bits_ = bits;
+    words_ = std::move(words);
+    return true;
 }
 
 std::size_t PalettedContainer::distinctValueCount() const {

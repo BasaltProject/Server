@@ -230,6 +230,22 @@ public:
     /// parity: `UseItemGoal`, the item put in the hand, drunk once the use time is up and taken out again.
     virtual void traderUsesItem(ServerEntity& /*trader*/, bool /*potion*/, UsePhase /*phase*/) {}
 
+    /// parity: `Level.destroyBlockProgress`, the cracks a mob draws on a block; ten takes them away.
+    virtual void blockProgress(ServerEntity& /*mob*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/,
+                               std::int32_t /*stage*/) {}
+
+    /// parity: `Level.levelEvent` at a block.
+    virtual void levelEvent(ServerEntity& /*mob*/, std::int32_t /*event*/, std::int32_t /*x*/, std::int32_t /*y*/,
+                            std::int32_t /*z*/, std::int32_t /*data*/) {}
+
+    /// parity: `BreakDoorGoal.tick`'s `removeBlock`, which false means a plugin refused.
+    virtual bool breakDoor(ServerEntity& /*mob*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/) {
+        return false;
+    }
+
+    /// parity: `Level.getDifficulty` is hard.
+    [[nodiscard]] virtual bool hardDifficulty(const ServerEntity& /*mob*/) { return false; }
+
     /// parity: `GameRules.MOB_GRIEFING`.
     [[nodiscard]] virtual bool mobGriefing(const ServerEntity& /*mob*/) { return true; }
 

@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerBlocksAttacks.hpp>
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -38,7 +39,6 @@ using wire::protocol::play::SoundSource;
 constexpr std::string_view kBow = "bow";
 constexpr std::string_view kCrossbow = "crossbow";
 
-constexpr std::string_view kShield = "shield";
 constexpr std::string_view kSpyglass = "spyglass";
 /// parity: `SpyglassItem.USE_DURATION`, a minute.
 constexpr std::int32_t kSpyglassUseTicks = 1200;
@@ -411,7 +411,8 @@ void ItemUseTimers::emitAt(std::string_view event) {
 }
 
 bool ItemUseTimers::startBlocking(PlayerSession& session, const Identifier& item, std::int32_t slot) {
-    if (item.path() != kShield) {
+    const std::optional<storage::StoredItemStack>& held = session.inventory.at(slot);
+    if (!held.has_value() || !player::blocksAttacks::of(*held).has_value()) {
         return false;
     }
     session.blockingSlot = slot;
@@ -438,7 +439,7 @@ void ItemUseTimers::tickBlocking(PlayerSession& session) {
     const std::optional<storage::StoredItemStack>& held = session.inventory.at(slot);
     const bool inHand =
         slot == PlayerInventory::kOffhandSlot || slot == PlayerInventory::kHotbarStart + session.inventory.heldSlot();
-    if (!held.has_value() || held->id != "minecraft:shield" || !inHand) {
+    if (!held.has_value() || !player::blocksAttacks::of(*held).has_value() || !inHand) {
         stopBlocking();
         return;
     }

@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RandomSequences.hpp>
@@ -40,14 +41,15 @@ void MobActionSystem::dropGift(entity::ServerEntity& mob, std::string_view table
         if (server::registry::items::registry().byName(stack.item) == nullptr) {
             continue;
         }
-        world->state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
-                                                    .uuid = wire::common::Uuid::random(),
-                                                    .item = stack.item,
-                                                    .count = stack.count,
-                                                    .x = x,
-                                                    .y = y,
-                                                    .z = z,
-                                                    .components = stack.components});
+        plugins::hookEvents::dropFor(*world, mob,
+                                     world::DroppedItem{.entityId = players_->allocateEntityId(),
+                                                        .uuid = wire::common::Uuid::random(),
+                                                        .item = stack.item,
+                                                        .count = stack.count,
+                                                        .x = x,
+                                                        .y = y,
+                                                        .z = z,
+                                                        .components = stack.components});
     }
 }
 

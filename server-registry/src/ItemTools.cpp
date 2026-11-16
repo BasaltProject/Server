@@ -24,6 +24,8 @@ using wire::common::Identifier;
     }
 }
 
+constexpr std::string_view kCobwebRule = "=minecraft:cobweb";
+constexpr float kCobwebSpeed = 15.0F;
 constexpr float kHastePerLevel = 0.2F;
 constexpr float kSubmergedMiningSpeed = 0.2F;
 constexpr float kInAirDivisor = 5.0F;
@@ -34,8 +36,12 @@ constexpr float kWrongToolDivisor = 100.0F;
     static const std::unordered_map<Identifier, std::vector<Rule>> built = [] {
         std::unordered_map<Identifier, std::vector<Rule>> table;
         for (const ToolRule& rule : itemToolsTable()) {
-            table[Identifier::vanilla(std::string{rule.item})].push_back(
-                {rule.blockTag, rule.correctForDrops, rule.speed});
+            std::vector<Rule>& rules = table[Identifier::vanilla(std::string{rule.item})];
+            // parity: `ToolMaterial.applySwordProperties` puts a direct cobweb rule ahead of the tags.
+            if (rule.blockTag == "minecraft:sword_instantly_mines" && rules.empty()) {
+                rules.push_back({kCobwebRule, true, kCobwebSpeed});
+            }
+            rules.push_back({rule.blockTag, rule.correctForDrops, rule.speed});
         }
         return table;
     }();
@@ -47,7 +53,10 @@ constexpr float kWrongToolDivisor = 100.0F;
         return nullptr;
     }
     const std::span<const Rule> rules = rulesFor(*item);
-    const auto found = std::ranges::find_if(rules, [&](const Rule& rule) { return tagContains(rule.blockTag, block); });
+    const auto found = std::ranges::find_if(rules, [&](const Rule& rule) {
+        return rule.blockTag.starts_with('=') ? block.toString() == rule.blockTag.substr(1)
+                                              : tagContains(rule.blockTag, block);
+    });
     return found == rules.end() ? nullptr : &*found;
 }
 } // namespace
@@ -55,6 +64,17 @@ constexpr float kWrongToolDivisor = 100.0F;
 std::span<const Rule> rulesFor(const Identifier& item) {
     const auto found = table().find(item);
     return found == table().end() ? std::span<const Rule>{} : std::span<const Rule>{found->second};
+}
+
+bool hasTool(const Identifier& item) {
+    return !rulesFor(item).empty() || item == Identifier::vanilla("mace") || item == Identifier::vanilla("trident");
+}
+
+bool isCombatTool(const Identifier& item) {
+    const std::span<const Rule> rules = rulesFor(item);
+    return std::ranges::any_of(rules,
+                               [](const Rule& rule) { return rule.blockTag == "minecraft:sword_instantly_mines"; }) ||
+           (rules.empty() && hasTool(item));
 }
 
 bool isCorrectForDrops(const Identifier* item, const Identifier& block, const TagContains& tagContains) {

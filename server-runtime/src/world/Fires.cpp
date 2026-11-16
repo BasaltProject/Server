@@ -257,6 +257,10 @@ bool isFire(std::int32_t stateId) {
     return block != nullptr && block->path() == "fire";
 }
 
+std::optional<std::int32_t> newFireAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    return fireFor(world, x, y, z, 0);
+}
+
 bool igniteOnImpact(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t delay) {
     const std::optional<std::int32_t> existing = world.blockState(x, y, z);
     if (!existing.has_value() || *existing != registry::blocks::air().stateId) {

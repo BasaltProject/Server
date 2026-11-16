@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -441,7 +442,7 @@ bool MobActionSystem::goatDropsHorn(world::LoadedWorld& world, ServerEntity& goa
     horn.velocityY = static_cast<double>((random.nextFloat() * 0.4F) + 0.3F);
     horn.velocityZ = static_cast<double>((random.nextFloat() * 0.4F) - 0.2F);
     horn.pickupDelay = world::kSpawnedPickupDelay;
-    world.state().spawnItem(std::move(horn));
+    plugins::hookEvents::dropFor(world, goat, std::move(horn));
     return true;
 }
 

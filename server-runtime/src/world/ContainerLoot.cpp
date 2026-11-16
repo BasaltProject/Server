@@ -1,4 +1,8 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/command/DataArguments.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
+#include <basalt/server/runtime/plugins/TradeHookEvents.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ContainerLoot.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -97,12 +101,16 @@ bool Lootable::canLoot(const wire::common::Uuid& player, const std::int64_t now,
 }
 
 bool Lootable::shouldRefill(const std::optional<wire::common::Uuid>& player, const std::int64_t now, const bool refill,
-                            const std::int32_t relootSeconds, const std::int32_t maxRefills) const {
+                            const std::int32_t relootSeconds, const std::int32_t maxRefills,
+                            const Decide& decide) const {
     if (lastFill == -1 || !refill) {
         return true;
     }
-    return player.has_value() && nextRefill != -1 && (maxRefills == -1 || numRefills < maxRefills) &&
-           nextRefill <= now && canLoot(*player, now, relootSeconds);
+    if (!player.has_value() || nextRefill == -1 || (maxRefills != -1 && numRefills >= maxRefills) || nextRefill > now) {
+        return false;
+    }
+    const bool mayLoot = canLoot(*player, now, relootSeconds);
+    return decide ? decide(mayLoot) : mayLoot;
 }
 
 void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, std::int64_t seed,
@@ -148,18 +156,50 @@ void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, st
     };
     // parity: `Vec3.atCenterOf(worldPosition)`.
     tables.prepareAt(context, world, at[0] + 0.5, at[1] + 0.5, at[2] + 0.5);
+    // parity: Paper's `LootGenerateEvent`, raised between the roll and the layout.
+    const server::world::loot::LootTable::Review review = [&](std::vector<server::world::loot::ItemStack>& stacks) {
+        const std::string before = plugins::tradeEvents::linesOf(stacks);
+        const server::plugins::PluginEvent* asked = world.state().events().ask(
+            &server::plugins::pluginEventTypes::blockLootGenerate, [&](server::plugins::PluginEvent& event) {
+                plugins::hookEvents::position(event, world.state().eventWorld(), at[0], at[1], at[2]);
+                if (byPlayer && opener.has_value()) {
+                    event.set("player_name", opener->name);
+                    event.set("player_uuid", opener->uuid);
+                }
+                event.set("table", std::string{table});
+                event.set("loot", before);
+            });
+        if (asked == nullptr) {
+            return true;
+        }
+        if (asked->cancelled()) {
+            return false;
+        }
+        const auto* edited = std::get_if<std::string>(&asked->get("loot"));
+        if (edited == nullptr || *edited == before) {
+            return true;
+        }
+        std::vector<server::world::loot::ItemStack> next = plugins::tradeEvents::stacksOf(*edited);
+        for (std::size_t index = 0; index < next.size() && index < stacks.size(); ++index) {
+            if (next[index].item == stacks[index].item) {
+                next[index].components = stacks[index].components;
+            }
+        }
+        stacks = std::move(next);
+        return true;
+    };
     // parity: `withOptionalRandomSeed`.
     if (seed != 0) {
         random::RandomSource random = random::RandomSource::legacy(seed);
-        rolled->fill(slots, random, context);
+        rolled->fill(slots, random, context, review);
         return;
     }
     if (rolled->randomSequence.has_value()) {
-        rolled->fill(slots, world.randomSequences().of(*rolled->randomSequence), context);
+        rolled->fill(slots, world.randomSequences().of(*rolled->randomSequence), context, review);
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
-    rolled->fill(slots, random, context);
+    rolled->fill(slots, random, context, review);
 }
 
 std::optional<wire::common::Identifier> unpack(LoadedWorld& world, RealLootTables& tables, std::int32_t x,
@@ -179,7 +219,24 @@ std::optional<wire::common::Identifier> unpack(LoadedWorld& world, RealLootTable
     const std::int64_t now = nowMillis();
     const bool refill = world.tunables().lootRefill;
     Lootable lootable = Lootable::read(entity->data());
-    if (!lootable.shouldRefill(player, now, refill, world.tunables().lootRelootSeconds, settings.lootMaxRefills)) {
+    // parity: Paper's `LootableInventoryReplenishEvent`, which starts cancelled when the player already looted it.
+    const Lootable::Decide decide = [&](const bool mayLoot) {
+        const server::plugins::PluginEvent* asked = world.state().events().ask(
+            &server::plugins::pluginEventTypes::playerLootReplenish, [&](server::plugins::PluginEvent& event) {
+                plugins::hookEvents::position(event, world.state().eventWorld(), x, y, z);
+                event.set("player_name", opener.has_value() ? opener->name : std::string{});
+                event.set("player_uuid", player->toString());
+                event.set("table", table);
+                event.set("can_loot", mayLoot);
+            });
+        if (asked == nullptr) {
+            return mayLoot;
+        }
+        const auto* flag = std::get_if<bool>(&asked->get("can_loot"));
+        return !asked->cancelled() && (flag == nullptr || *flag);
+    };
+    if (!lootable.shouldRefill(player, now, refill, world.tunables().lootRelootSeconds, settings.lootMaxRefills,
+                               decide)) {
         return std::nullopt;
     }
     const std::string path{entity->type().path()};

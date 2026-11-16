@@ -121,6 +121,16 @@ public:
 
     using SharedLight = std::shared_ptr<const PackedLight>;
 
+    struct VersionedLight {
+        SharedLight light;
+        std::uint64_t version = 0;
+    };
+
+    /// Like skyLight but shared, with a process-unique version that changes whenever the layer's content may have.
+    [[nodiscard]] VersionedLight sharedSkyLight(const std::function<PackedLight()>& compute);
+
+    [[nodiscard]] VersionedLight sharedBlockLight(const std::function<PackedLight()>& compute);
+
     /// The light as last computed, stale or not; null before the first computation.
     [[nodiscard]] SharedLight cachedSkyLight() const;
 
@@ -394,6 +404,8 @@ private:
         AtomicSharedLight block;
         std::atomic<bool> staleSky{false};
         std::atomic<bool> staleBlock{false};
+        std::uint64_t skyVersion = 0;
+        std::uint64_t blockVersion = 0;
     };
 
     std::unique_ptr<LightCache> light_ = std::make_unique<LightCache>();

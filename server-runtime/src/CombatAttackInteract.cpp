@@ -39,6 +39,7 @@
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerMace.hpp>
+#include <basalt/server/runtime/player/PlayerMobBuckets.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
@@ -139,6 +140,12 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             }
             return;
         }
+    }
+    // parity: `ArmorStand.interact`.
+    if (entity->type().path() == "armor_stand" && !entity->dying &&
+        useArmorStand(*session, *entity, interact.hand == wire::protocol::play::InteractPacket::kMainHand,
+                      static_cast<double>(interact.y)) == ArmorStandUse::Done) {
+        return;
     }
     // parity: `Entity.interact`'s leashes.
     if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr) {
@@ -365,6 +372,11 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             }
             return;
         }
+    }
+    // parity: `Bucketable.bucketMobPickup`.
+    if (player::pickUpMobFor(owner_->blockInteraction().breakContext(), owner_->options().mobs, *session, *world,
+                             *entity, interact.hand == wire::protocol::play::InteractPacket::kMainHand)) {
+        return;
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
     const std::optional<storage::StoredItemStack>& held = session->inventory.at(heldSlot);

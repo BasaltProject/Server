@@ -38,6 +38,9 @@ public:
     /// parity: `BlockInput.place`.
     void keepWritten(std::int32_t x, std::int32_t y, std::int32_t z, std::map<std::string, std::string> properties);
 
+    /// parity: `BlockInput.place`'s tail, which merges the NBT into the block entity; true when it changed.
+    bool mergeBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z, const wire::nbt::NbtCompound& nbt);
+
     void flush();
 
     /// parity: `/setblock ... strict` and `/fill ... strict`.

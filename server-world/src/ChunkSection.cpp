@@ -109,4 +109,24 @@ void ChunkSection::setBlockStateIds(std::span<const std::int32_t> ids) {
     version_.clear();
 }
 
+bool ChunkSection::restorePacked(const PackedContainer& blocks, const PackedContainer& biomes) {
+    thread_local std::vector<std::uint32_t> counts;
+    if (!blockStateIds_.assignPacked(blocks.palette, blocks.bits, blocks.wordBytes, counts)) {
+        return false;
+    }
+    nonAirBlockCount_ = 0;
+    nonEmptyFluidCount_ = 0;
+    for (std::size_t i = 0; i < blocks.palette.size(); ++i) {
+        if (!registry::blocks::isAir(blocks.palette[i])) {
+            nonAirBlockCount_ += static_cast<std::int32_t>(counts[i]);
+        }
+        if (registry::blockFluids::hasFluid(blocks.palette[i])) {
+            nonEmptyFluidCount_ += static_cast<std::int32_t>(counts[i]);
+        }
+    }
+    const bool restored = biomeIds_.assignPacked(biomes.palette, biomes.bits, biomes.wordBytes, counts);
+    version_.clear();
+    return restored;
+}
+
 } // namespace basalt::server::world

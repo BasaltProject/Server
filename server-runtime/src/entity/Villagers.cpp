@@ -1,4 +1,8 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
+#include <basalt/server/runtime/plugins/TradeHookEvents.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 
@@ -212,6 +216,21 @@ void rollTrades(world::RealVillagerTrades& trades, ServerEntity& villager, world
     for (world::trades::Offer& offer :
          rollOffers(trades, villager.profession, level, world, {villager.x, villager.y, villager.z}, variant,
                     fixedAmount, std::nullopt)) {
+        // parity: `AbstractVillager.tryAcquireTrade`, which lets a listener cancel or rewrite each rolled offer.
+        const server::plugins::PluginEvent* asked = world.state().events().ask(
+            &server::plugins::pluginEventTypes::entityVillagerAcquireTrade, [&](server::plugins::PluginEvent& event) {
+                plugins::hookEvents::entity(event, world.state().eventWorld(), villager);
+                plugins::tradeEvents::fill(event, offer);
+            });
+        if (asked != nullptr) {
+            if (asked->cancelled()) {
+                continue;
+            }
+            plugins::tradeEvents::apply(*asked, offer);
+            if (offer.costA.count <= 0) {
+                continue;
+            }
+        }
         offers.list.push_back(std::move(offer));
     }
 }

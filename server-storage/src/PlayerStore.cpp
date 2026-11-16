@@ -22,6 +22,13 @@ namespace {
     return expected;
 }
 
+void addMissingColumns(wire::sql::Database& database) {
+    const std::vector<std::string> spawnColumns = database.columns("spawn_point");
+    if (!spawnColumns.empty() && std::find(spawnColumns.begin(), spawnColumns.end(), "forced") == spawnColumns.end()) {
+        database.exec("ALTER TABLE spawn_point ADD COLUMN forced INTEGER NOT NULL DEFAULT 0");
+    }
+}
+
 [[nodiscard]] std::optional<PlayerDatabaseSchemaError> verifySchema(wire::sql::Database& database,
                                                                     const std::string& path) {
     for (const auto& [table, columns] : referenceColumns()) {
@@ -72,6 +79,7 @@ std::expected<std::unique_ptr<PlayerStore>, PlayerDatabaseSchemaError> PlayerSto
     if (database->tables().empty() && !database->exec(schema::ddl())) {
         return std::unexpected(PlayerDatabaseSchemaError{path + " could not be created: " + database->error()});
     }
+    addMissingColumns(*database);
     if (std::optional<PlayerDatabaseSchemaError> mismatch = verifySchema(*database, path); mismatch.has_value()) {
         return std::unexpected(*mismatch);
     }

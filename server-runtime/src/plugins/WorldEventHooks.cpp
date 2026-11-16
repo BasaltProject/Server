@@ -1,8 +1,10 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/EventHooks.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
 #include <basalt/server/runtime/plugins/WorldEventHooks.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -111,6 +113,18 @@ void redstone(RedstoneTickSystem::Hooks& hooks, const EventSink& sink) {
             event.set("to_z", static_cast<std::int64_t>(move.toZ));
             event.set("item", move.item.toString());
             event.set("initiator", std::string{move.pushing ? "source" : "destination"});
+        });
+    };
+    hooks.allowHopperPickup = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                                      const world::DroppedItem& item) {
+        return sink.allowed(&inventoryPickupItem, [&](PluginEvent& event) {
+            event.set("world", std::string{worldName});
+            event.set("x", static_cast<std::int64_t>(x));
+            event.set("y", static_cast<std::int64_t>(y));
+            event.set("z", static_cast<std::int64_t>(z));
+            event.set("item_id", static_cast<std::int64_t>(item.entityId));
+            event.set("item", item.item.toString());
+            event.set("count", static_cast<std::int64_t>(item.count));
         });
     };
     hooks.allowSmelt = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
@@ -480,13 +494,19 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
         });
     };
     hooks.combustAllowed = [&sink, worldOf](const world::LoadedWorld& world, const entity::ServerEntity& mob,
-                                            std::int32_t& fireTicks, std::string_view cause) {
+                                            std::int32_t& fireTicks, std::string_view cause, std::int32_t sourceId,
+                                            const std::array<std::int32_t, 3>* block) {
         const server::plugins::PluginEvent* event = sink.ask(&entityCombust, [&](PluginEvent& filled) {
             filled.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
             filled.set("entity_type", mob.type().toString());
             filled.set("world", world.name());
             filled.set("ticks", static_cast<std::int64_t>(fireTicks));
             filled.set("cause", std::string{cause});
+            filled.set("source_kind", std::string{block != nullptr ? "block" : sourceId >= 0 ? "entity" : ""});
+            filled.set("source_id", static_cast<std::int64_t>(sourceId));
+            filled.set("source_x", static_cast<std::int64_t>(block == nullptr ? 0 : (*block)[0]));
+            filled.set("source_y", static_cast<std::int64_t>(block == nullptr ? 0 : (*block)[1]));
+            filled.set("source_z", static_cast<std::int64_t>(block == nullptr ? 0 : (*block)[2]));
         });
         if (event == nullptr) {
             return true;
@@ -550,6 +570,15 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
         }
         const auto* edited = std::get_if<double>(&event->get("amount"));
         return edited == nullptr ? amount : static_cast<float>(*edited);
+    };
+    hooks.combat.knocked = [&sink, worldOf](const entity::ServerEntity& mob, entity::entityCombat::Knock& knock) {
+        const server::plugins::PluginEvent* event = sink.ask(&entityKnockback, [&](PluginEvent& filled) {
+            filled.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
+            filled.set("entity_type", mob.type().toString());
+            filled.set("world", worldOf ? worldOf(mob) : std::string{});
+            hookEvents::fillKnock(filled, knock);
+        });
+        return hookEvents::readKnock(event, knock);
     };
     hooks.combat.died = [&sink, worldOf](const entity::ServerEntity& mob, const std::optional<std::string>& killer,
                                          const std::optional<std::int32_t>& killerId) {

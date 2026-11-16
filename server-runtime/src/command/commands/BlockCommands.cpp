@@ -47,7 +47,11 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
         static_cast<void>(editor->destroy(at[0], at[1], at[2]));
     }
     editor->keepWritten(at[0], at[1], at[2], block->properties);
-    if (!editor->set(at[0], at[1], at[2], block->stateId) && mode != Mode::Destroy) {
+    bool affected = editor->set(at[0], at[1], at[2], block->stateId);
+    if (block->nbt.has_value()) {
+        affected = editor->mergeBlockEntity(at[0], at[1], at[2], *block->nbt) || affected;
+    }
+    if (!affected && mode != Mode::Destroy) {
         return std::unexpected{CommandSyntaxError{.component = Component::translatable("commands.setblock.failed")}};
     }
     editor->flush();
@@ -112,7 +116,7 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
                 if (!existing.has_value()) {
                     continue;
                 }
-                if (filter != nullptr && !filter->matches(*existing)) {
+                if (filter != nullptr && !filter->matchesAt(editor->world().state(), x, y, z, *existing)) {
                     continue;
                 }
                 if (onlyAir && *existing != reg::blocks::air().stateId) {
@@ -124,10 +128,14 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
                 }
                 const std::int32_t target =
                     mode == Mode::Hollow && !onEdge ? reg::blocks::air().stateId : block->stateId;
-                if (mode != Mode::Destroy && *existing == target) {
+                if (mode != Mode::Destroy && *existing == target && !block->nbt.has_value()) {
                     continue;
                 }
-                if (writeOne(*editor, x, y, z, target, mode)) {
+                bool affected = writeOne(*editor, x, y, z, target, mode);
+                if (block->nbt.has_value() && target == block->stateId) {
+                    affected = editor->mergeBlockEntity(x, y, z, *block->nbt) || affected;
+                }
+                if (affected) {
                     count++;
                 }
             }

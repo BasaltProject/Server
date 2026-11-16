@@ -182,6 +182,7 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.enchantments = owner_->options().enchantments;
     context.itemTags = owner_->options().itemTags;
     context.triggers = owner_->options().advancementTriggers;
+    context.vaults = owner_->options().vaults;
     context.nextDouble = options_.nextDouble;
     context.nextSeed = options_.nextSeed;
     context.minecartImprovements = [this] {
@@ -199,6 +200,9 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.fertilizeAllowed = hooks_.fertilizeAllowed;
     context.foodEaten = hooks_.foodEaten;
     context.hangingAllowed = hooks_.hangingAllowed;
+    context.cauldronAllowed = hooks_.cauldronAllowed;
+    context.flowerPotAllowed = hooks_.flowerPotAllowed;
+    context.lecternInsertAllowed = hooks_.lecternInsertAllowed;
     context.putBack = [this](const PlayerSession&, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                              const std::int32_t stateId) {
         owner_->sendPlayPacket(play::ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {

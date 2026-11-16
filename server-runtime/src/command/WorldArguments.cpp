@@ -3,8 +3,11 @@
 #include <basalt/server/registry/VanillaBlocks.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
+#include <basalt/server/runtime/command/DataPaths.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
+#include <basalt/server/runtime/world/WorldState.hpp>
+#include <basalt/server/world/Chunk.hpp>
 #include <basalt/wire/nbt/Snbt.hpp>
 
 #include <algorithm>
@@ -46,6 +49,7 @@ struct ParsedBlock {
     Identifier id;
     std::optional<Identifier> tag;
     std::map<std::string, std::string> properties;
+    std::optional<NbtCompound> nbt;
     std::int32_t start = 0;
 
     [[nodiscard]] Parsed<BlockInput> asState(StringReader& reader) const {
@@ -62,11 +66,11 @@ struct ParsedBlock {
                             : Component::translatable("argument.block.property.unknown",
                                                       {Component::text(id.toString()), Component::text(written)}))};
         }
-        return BlockInput{.block = id, .stateId = *stateId, .properties = properties};
+        return BlockInput{.block = id, .stateId = *stateId, .properties = properties, .nbt = nbt};
     }
 };
 
-/// parity: `BlockStateParser`, minus its NBT tail, which only block entities use.
+/// parity: `BlockStateParser`.
 [[nodiscard]] Parsed<ParsedBlock> parseBlock(StringReader& reader, bool allowTag) {
     const std::int32_t start = reader.cursor();
     const bool isTag = reader.canRead() && reader.peek() == '#';
@@ -110,9 +114,22 @@ struct ParsedBlock {
             return std::unexpected{closed.error()};
         }
     }
+    std::optional<NbtCompound> nbt;
+    if (reader.canRead() && reader.peek() == '{') {
+        const Parsed<NbtTag> tag = parseTag(reader);
+        if (!tag.has_value()) {
+            return std::unexpected{tag.error()};
+        }
+        const auto* compound = tag->get<NbtCompound>();
+        if (compound == nullptr) {
+            return std::unexpected{reader.syntaxError("Invalid NBT")};
+        }
+        nbt = *compound;
+    }
     return ParsedBlock{.id = *id,
                        .tag = isTag ? std::optional{*id} : std::nullopt,
                        .properties = std::move(properties),
+                       .nbt = std::move(nbt),
                        .start = start};
 }
 
@@ -206,7 +223,7 @@ public:
         }
         return ArgumentValue::of(BlockPredicateInput{parsed->tag.has_value() ? std::nullopt : std::optional{parsed->id},
                                                      parsed->tag, parsed->properties,
-                                                     environment.options().blockTagMembers});
+                                                     environment.options().blockTagMembers, parsed->nbt});
     }
 
     [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kBlockPredicate}; }
@@ -396,9 +413,32 @@ public:
 bool BlockInput::isAir() const { return stateId == reg::blocks::air().stateId; }
 
 BlockPredicateInput::BlockPredicateInput(std::optional<Identifier> block, std::optional<Identifier> tag,
-                                         std::map<std::string, std::string> properties, TagMembers tagMembers)
+                                         std::map<std::string, std::string> properties, TagMembers tagMembers,
+                                         std::optional<NbtCompound> nbt)
     : block_(std::move(block)), tag_(std::move(tag)), properties_(std::move(properties)),
-      tagMembers_(std::move(tagMembers)) {}
+      tagMembers_(std::move(tagMembers)), nbt_(std::move(nbt)) {}
+
+bool BlockPredicateInput::matchesAt(const world::WorldState& state, std::int32_t x, std::int32_t y, std::int32_t z,
+                                    std::int32_t stateId) const {
+    if (!matches(stateId)) {
+        return false;
+    }
+    if (!nbt_.has_value()) {
+        return true;
+    }
+    const server::world::Chunk* chunk = state.chunkIfLoaded(x >> 4, z >> 4);
+    const server::world::ChunkBlockEntity* entity =
+        chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+    if (entity == nullptr) {
+        return false;
+    }
+    NbtCompound full = entity->data();
+    full.putString("id", entity->type().toString());
+    full.putInt("x", x);
+    full.putInt("y", y);
+    full.putInt("z", z);
+    return dataPaths::compareNbt(NbtTag::ofCompound(*nbt_), NbtTag::ofCompound(std::move(full)));
+}
 
 bool BlockPredicateInput::matches(std::int32_t stateId) const {
     const std::optional<reg::BlockState> state = reg::blocks::byStateId(stateId);

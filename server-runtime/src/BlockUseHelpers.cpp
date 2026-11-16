@@ -52,6 +52,7 @@
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
+#include <cmath>
 #include <cstdint>
 #include <utility>
 
@@ -393,6 +394,16 @@ void BlockInteractionHandler::openLectern(PlayerSession& session, const BlockPos
     });
 }
 
+bool BlockInteractionHandler::useVault(PlayerSession& session, const BlockPos& pos) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr) {
+        return false;
+    }
+    const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
+    return player::useVaultFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot,
+                               session.inventory.at(heldSlot));
+}
+
 bool BlockInteractionHandler::useJukebox(PlayerSession& session, const BlockPos& pos) {
     world::LoadedWorld* world = owner_->currentWorld();
     if (world == nullptr) {
@@ -611,13 +622,48 @@ void BlockInteractionHandler::setSpawnPointAt(PlayerSession& session, const Bloc
     if (store == nullptr || !store->isOpen()) {
         return;
     }
+    std::int32_t x = bed.x;
+    std::int32_t y = bed.y;
+    std::int32_t z = bed.z;
+    if (hooks_.spawnChangeAllowed && !hooks_.spawnChangeAllowed(session, x, y, z, "bed")) {
+        return;
+    }
     store->access().setSpawnPoint(storage::StoredSpawnPoint{.uuid = session.uuid().toString(),
                                                             .world = session.worldName,
-                                                            .x = bed.x + 0.5,
-                                                            .y = static_cast<double>(bed.y),
-                                                            .z = bed.z + 0.5,
+                                                            .x = x + 0.5,
+                                                            .y = static_cast<double>(y),
+                                                            .z = z + 0.5,
                                                             .yaw = session.yaw});
     owner_->sendActionBar(wire::text::Component::translatable("block.minecraft.set_spawn"));
+}
+
+void BlockInteractionHandler::setAnchorSpawn(PlayerSession& session, const BlockPos& anchor) {
+    storage::PlayerStore* store = owner_->options().playerStore;
+    if (store == nullptr || !store->isOpen()) {
+        return;
+    }
+    // parity: `RespawnAnchorBlock.useWithoutItem` leaves a respawn point that is already this anchor alone.
+    const std::optional<storage::StoredSpawnPoint> current = store->access().spawnPointOf(session.uuid().toString());
+    if (current.has_value() && current->world == session.worldName &&
+        static_cast<std::int32_t>(std::floor(current->x)) == anchor.x &&
+        static_cast<std::int32_t>(std::floor(current->y)) == anchor.y &&
+        static_cast<std::int32_t>(std::floor(current->z)) == anchor.z) {
+        return;
+    }
+    std::int32_t x = anchor.x;
+    std::int32_t y = anchor.y;
+    std::int32_t z = anchor.z;
+    if (hooks_.spawnChangeAllowed && !hooks_.spawnChangeAllowed(session, x, y, z, "respawn_anchor")) {
+        return;
+    }
+    store->access().setSpawnPoint(storage::StoredSpawnPoint{.uuid = session.uuid().toString(),
+                                                            .world = session.worldName,
+                                                            .x = x + 0.5,
+                                                            .y = static_cast<double>(y),
+                                                            .z = z + 0.5,
+                                                            .yaw = 0.0F});
+    owner_->sendActionBar(wire::text::Component::translatable("block.minecraft.set_spawn"));
+    broadcastSound(anchor, "minecraft:block.respawn_anchor.set_spawn", 1.0F, 1.0F);
 }
 
 player::SleepContext BlockInteractionHandler::sleepContext() {

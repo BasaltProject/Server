@@ -6,6 +6,7 @@
 #include <basalt/wire/protocol/play/BitStorage.hpp>
 #include <basalt/wire/protocol/play/NibbleArray.hpp>
 #include <basalt/wire/protocol/play/PalettedContainer.hpp>
+#include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -185,20 +186,107 @@ std::vector<std::int64_t> encodeHeightmap(const Chunk& chunk) {
     return words;
 }
 
-LightData encodeLight(Chunk& chunk, bool hasSkylight, const light::LightWindow& window) {
-    std::optional<Chunk::PackedLight> sky;
-    if (hasSkylight) {
-        sky = chunk.skyLight([&window] { return packAll(light::skyLight::compute(window)); });
-    }
-    const Chunk::PackedLight block = chunk.blockLight([&window] {
+namespace {
+
+Chunk::VersionedLight skyOf(Chunk& chunk, const light::LightWindow& window) {
+    return chunk.sharedSkyLight([&window] { return packAll(light::skyLight::compute(window)); });
+}
+
+Chunk::VersionedLight blockOf(Chunk& chunk, const light::LightWindow& window) {
+    return chunk.sharedBlockLight([&window] {
         const std::optional<std::vector<light::SectionLight>> computed = light::blockLight::compute(window);
         return computed.has_value() ? packAll(*computed) : Chunk::PackedLight{};
     });
+}
 
+LightData lightDataOf(const Chunk::SharedLight& sky, const Chunk::SharedLight& block) {
     LightData data;
-    std::tie(data.skyLightMask, data.emptySkyLightMask, data.skyLight) = masked(sky.has_value() ? &*sky : nullptr);
-    std::tie(data.blockLightMask, data.emptyBlockLightMask, data.blockLight) = masked(&block);
+    std::tie(data.skyLightMask, data.emptySkyLightMask, data.skyLight) = masked(sky.get());
+    std::tie(data.blockLightMask, data.emptyBlockLightMask, data.blockLight) = masked(block.get());
     return data;
+}
+
+struct LightKey {
+    std::uint64_t sky;
+    std::uint64_t block;
+
+    friend bool operator==(const LightKey&, const LightKey&) = default;
+};
+
+struct LightKeyHash {
+    std::size_t operator()(const LightKey& key) const noexcept {
+        return static_cast<std::size_t>((key.sky * 0x9E3779B97F4A7C15ULL) ^ (key.block + 0x7F4A7C15ULL));
+    }
+};
+
+/// Wire light keyed by the process-unique versions of its two layers, so equal light is serialized once.
+class LightEncodings {
+public:
+    static constexpr std::size_t kBudgetBytes = 16UL * 1024UL * 1024UL;
+
+    [[nodiscard]] static LightEncodings& instance() {
+        static LightEncodings cache;
+        return cache;
+    }
+
+    [[nodiscard]] LightBytes find(const LightKey& key) {
+        const std::lock_guard<std::mutex> guard{mutex_};
+        const auto found = entries_.find(key);
+        return found == entries_.end() ? nullptr : found->second;
+    }
+
+    void insert(const LightKey& key, LightBytes encoded) {
+        const std::lock_guard<std::mutex> guard{mutex_};
+        if (!entries_.emplace(key, encoded).second) {
+            return;
+        }
+        order_.push_back(key);
+        bytes_ += encoded->size() + kEntryOverhead;
+        while (bytes_ > kBudgetBytes && !order_.empty()) {
+            const auto oldest = entries_.find(order_.front());
+            bytes_ -= oldest->second->size() + kEntryOverhead;
+            entries_.erase(oldest);
+            order_.pop_front();
+        }
+    }
+
+private:
+    static constexpr std::size_t kEntryOverhead = 96;
+
+    std::mutex mutex_;
+    std::unordered_map<LightKey, LightBytes, LightKeyHash> entries_;
+    std::deque<LightKey> order_;
+    std::size_t bytes_ = 0;
+};
+
+} // namespace
+
+LightData encodeLight(Chunk& chunk, bool hasSkylight, const light::LightWindow& window) {
+    const Chunk::VersionedLight sky = hasSkylight ? skyOf(chunk, window) : Chunk::VersionedLight{};
+    const Chunk::VersionedLight block = blockOf(chunk, window);
+    return lightDataOf(sky.light, block.light);
+}
+
+LightBytes encodeLightBytes(Chunk& chunk, bool hasSkylight, const light::LightWindow& window) {
+    const Chunk::VersionedLight sky = hasSkylight ? skyOf(chunk, window) : Chunk::VersionedLight{};
+    const Chunk::VersionedLight block = blockOf(chunk, window);
+    const LightKey key{sky.version, block.version};
+    LightEncodings& cache = LightEncodings::instance();
+    if (LightBytes hit = cache.find(key); hit != nullptr) {
+        return hit;
+    }
+    const LightData data = lightDataOf(sky.light, block.light);
+    const play::LightData wire{.skyLightMask = data.skyLightMask,
+                               .blockLightMask = data.blockLightMask,
+                               .emptySkyLightMask = data.emptySkyLightMask,
+                               .emptyBlockLightMask = data.emptyBlockLightMask,
+                               .skyLight = data.skyLight,
+                               .blockLight = data.blockLight};
+    wire::io::ByteBuffer buffer;
+    wire.write(buffer);
+    auto encoded = std::make_shared<const std::vector<std::uint8_t>>(buffer.toVector());
+    cache.insert(key, encoded);
+    return encoded;
 }
 
 LightData encodeLight(Chunk& chunk, bool hasSkylight) {

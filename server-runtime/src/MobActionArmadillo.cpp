@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
@@ -347,18 +348,19 @@ bool MobActionSystem::armadilloDrops(world::LoadedWorld& world, const ServerEnti
     bool dropped = false;
     for (const server::world::loot::ItemStack& stack : table->generate(roll, context.luck, std::nullopt, context)) {
         dropped = true;
-        world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
-                                                   .uuid = wire::common::Uuid::random(),
-                                                   .item = stack.item,
-                                                   .count = stack.count,
-                                                   .x = armadillo.x,
-                                                   .y = armadillo.y,
-                                                   .z = armadillo.z,
-                                                   .velocityX = (random.nextDouble() * 0.2) - 0.1,
-                                                   .velocityY = 0.2,
-                                                   .velocityZ = (random.nextDouble() * 0.2) - 0.1,
-                                                   .pickupDelay = world::kSpawnedPickupDelay,
-                                                   .components = stack.components});
+        plugins::hookEvents::dropFor(world, armadillo,
+                                     world::DroppedItem{.entityId = players_->allocateEntityId(),
+                                                        .uuid = wire::common::Uuid::random(),
+                                                        .item = stack.item,
+                                                        .count = stack.count,
+                                                        .x = armadillo.x,
+                                                        .y = armadillo.y,
+                                                        .z = armadillo.z,
+                                                        .velocityX = (random.nextDouble() * 0.2) - 0.1,
+                                                        .velocityY = 0.2,
+                                                        .velocityZ = (random.nextDouble() * 0.2) - 0.1,
+                                                        .pickupDelay = world::kSpawnedPickupDelay,
+                                                        .components = stack.components});
     }
     return dropped;
 }

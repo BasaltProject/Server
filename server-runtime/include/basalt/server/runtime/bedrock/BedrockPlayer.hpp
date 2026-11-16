@@ -3,6 +3,7 @@
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
 #include <basalt/server/runtime/bedrock/BedrockStackRequests.hpp>
+#include <basalt/server/runtime/chat/ChatFormat.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -77,7 +78,8 @@ public:
         std::function<void(const player::PlayerSession&)> joined;
         std::function<void(const player::PlayerSession&)> quit;
 
-        std::function<void(const player::PlayerSession&, std::string, std::function<void(bool, std::string)>)>
+        std::function<void(const player::PlayerSession&, std::string,
+                           std::function<void(bool, std::string, chat::ChatRouting)>)>
             chatFilter;
 
         std::function<void(const player::PlayerSession&, std::string)> runCommand;
@@ -111,6 +113,7 @@ public:
 
         std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z)> breakBlock;
         std::function<config::UiConfigs()> uiConfigs;
+        ui::PluginSurfaces pluginSurfaces;
         const wire::common::placeholder::PlaceholderRegistry* placeholders = nullptr;
 
         std::function<void(const player::PlayerSession&, std::function<void(std::vector<Seen>)>)> lookAround;
@@ -285,7 +288,10 @@ private:
         std::string held;
         std::string worn;
         std::uint64_t flags = 0;
+        std::string tag;
     };
+
+    [[nodiscard]] std::string pluginNameTag(const player::PlayerSession& other) const;
 
     void syncOthers();
 
@@ -301,7 +307,7 @@ private:
 
     bool sendColumnsAround(std::function<void()> done);
 
-    void say(std::string message);
+    void say(std::string message, chat::ChatRouting routing = {});
 
     void setCamera(std::int32_t entityId);
 

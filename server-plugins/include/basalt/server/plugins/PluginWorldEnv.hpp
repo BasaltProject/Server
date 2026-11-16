@@ -186,6 +186,29 @@ public:
         return false;
     }
 
+    /// "enter" stores a bee, "honey", "bee" and "emergency" release the bees; the count that moved, -1 without a hive.
+    [[nodiscard]] virtual std::int32_t hive(std::string_view action, std::int32_t x, std::int32_t y, std::int32_t z,
+                                            std::int32_t entityId, std::string_view player) {
+        static_cast<void>(action);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(entityId);
+        static_cast<void>(player);
+        return -1;
+    }
+
+    /// "tick" runs the vault once and "insert_key" puts the player's held key in; 1 when it did something.
+    [[nodiscard]] virtual std::int32_t vault(std::string_view action, std::int32_t x, std::int32_t y, std::int32_t z,
+                                             std::string_view player) {
+        static_cast<void>(action);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(player);
+        return 0;
+    }
+
     /// "spawn" answers the new creaking's uuid, "resin" answers the clump's "x,y,z"; empty when nothing happened.
     [[nodiscard]] virtual std::string creakingHeart(std::string_view action, std::int32_t x, std::int32_t y,
                                                     std::int32_t z) {
@@ -281,6 +304,25 @@ public:
         static_cast<void>(face);
         static_cast<void>(direct);
         return 0;
+    }
+
+    /// What the block itself gives toward `face`, without the signal a conductor takes from its neighbours.
+    [[nodiscard]] virtual std::int32_t ownSignalFrom(std::int32_t x, std::int32_t y, std::int32_t z,
+                                                     std::int32_t face) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(face);
+        return 0;
+    }
+
+    /// What a comparator reads from the block when it faces it from `face`, or -1 when the block has no analog output.
+    [[nodiscard]] virtual std::int32_t analogSignal(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(face);
+        return -1;
     }
 
     /// The pyramid levels under a beacon and the colour and height of each beam section above it.

@@ -277,6 +277,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.withers = withers_.get();
     options.fireworks = fireworks_.get();
     options.mobs = mobActions_.get();
+    options.vaults = vaults_.get();
     options.structureBlocks = structureBlocks_.get();
     options.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
         orbs_->award(world, x, y, z, amount);
@@ -435,17 +436,7 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
         }
         message = textOf(event->get(3), message);
         routing.format = textOf(event->get(4), "");
-        if (const std::string recipients = textOf(event->get(5), "*"); recipients != "*") {
-            std::vector<std::string>& named = routing.recipients.emplace();
-            for (std::size_t from = 0; from < recipients.size();) {
-                std::size_t comma = recipients.find(',', from);
-                comma = comma == std::string::npos ? recipients.size() : comma;
-                if (comma > from) {
-                    named.push_back(recipients.substr(from, comma - from));
-                }
-                from = comma + 1;
-            }
-        }
+        routing.recipients = chat::parseRecipients(textOf(event->get(5), "*"));
         return !event->cancelled();
     };
     hooks.commandAllowed = [bus](const player::PlayerSession& player, std::string& command) {

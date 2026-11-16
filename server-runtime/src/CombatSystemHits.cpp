@@ -284,9 +284,24 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
                     : 0.0;
             const std::array<double, 3> push = world::explosions::knockbackOf(x, y, z, entity->x, eyeY, entity->z,
                                                                               distance / reach, exposure, resistance);
-            entity->velocityX += push[0];
-            entity->velocityY += push[1];
-            entity->velocityZ += push[2];
+            if (living) {
+                const ServerEntity* source = sourceEntityId == 0 ? nullptr : world.state().entity(sourceEntityId);
+                const double before = std::sqrt((push[0] * push[0]) + (push[1] * push[1]) + (push[2] * push[2]));
+                entity::entityCombat::push(*entity,
+                                           {.cause = "explosion",
+                                            .sourceId = source == nullptr
+                                                            ? std::nullopt
+                                                            : std::optional{source->ownerId.value_or(sourceEntityId)},
+                                            .power = before,
+                                            .towardsX = -push[0],
+                                            .towardsZ = -push[2],
+                                            .delta = push},
+                                           &hooks_);
+            } else {
+                entity->velocityX += push[0];
+                entity->velocityY += push[1];
+                entity->velocityZ += push[2];
+            }
         }
         if (world::endCrystals::isCrystal(entity->type())) {
             hitCrystal(world, watchers, *entity, true);

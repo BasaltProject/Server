@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/Announcement.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
 #include <basalt/server/runtime/bedrock/BedrockCarry.hpp>
+#include <basalt/server/runtime/chat/ChatFormat.hpp>
 #include <basalt/server/runtime/chat/SecureChat.hpp>
 #include <basalt/server/runtime/config/LimitsConfig.hpp>
 #include <basalt/server/runtime/config/MessagesConfig.hpp>
@@ -127,6 +128,7 @@ class MapSystem;
 class FireworkSystem;
 class WitherSystem;
 class MobActionSystem;
+class VaultSystem;
 class StructureBlockSystem;
 class ExplosionSystem;
 class BlockInteractionHandler;
@@ -155,18 +157,7 @@ public:
         std::function<void(const std::string& uuid, const std::string& channel, std::span<const std::uint8_t> payload)>
             channelMessage;
 
-        struct Surfaces {
-            std::function<bool()> holdsSidebar;
-            std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> sidebar;
-            std::function<bool()> holdsTabList;
-            std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> tabList;
-            std::function<bool()> holdsBossBar;
-            std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> bossBar;
-            std::function<bool()> holdsNameTag;
-            /// The title is the prefix and the first line the suffix, both in MiniMessage.
-            std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> nameTag;
-            std::function<bool(const std::string& playerName)> inVanillaTeam;
-        };
+        using Surfaces = ui::PluginSurfaces;
 
         Surfaces surfaces;
         std::function<std::vector<NpcView>()> npcs;
@@ -178,11 +169,7 @@ public:
                            double toY, double toZ)>
             moveAllowed;
 
-        /// What a plugin decided about a chat line beyond its text: an empty format keeps vanilla's.
-        struct ChatRouting {
-            std::string format;
-            std::optional<std::vector<std::string>> recipients;
-        };
+        using ChatRouting = chat::ChatRouting;
 
         std::function<bool(const player::PlayerSession& player, std::string& message, ChatRouting& routing)>
             chatAllowed;
@@ -294,6 +281,7 @@ public:
         WitherSystem* withers = nullptr;
         FireworkSystem* fireworks = nullptr;
         MobActionSystem* mobs = nullptr;
+        VaultSystem* vaults = nullptr;
         StructureBlockSystem* structureBlocks = nullptr;
         BlockTests* blockTests = nullptr;
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>

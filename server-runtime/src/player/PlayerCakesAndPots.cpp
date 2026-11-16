@@ -191,6 +191,9 @@ bool useFlowerPotFor(const BreakContext& context, PlayerSession& player, world::
         if (!empty) {
             return true;
         }
+        if (context.flowerPotAllowed && !context.flowerPotAllowed(player, x, y, z, held->id, true)) {
+            return true;
+        }
         write(context, player, world, x, y, z, *reg::blocks::defaultStateIdOf(*potted), "block_change");
         statAwards::award(player, "pot_flower");
         spendOne(context, player, heldSlot, *held);
@@ -201,6 +204,9 @@ bool useFlowerPotFor(const BreakContext& context, PlayerSession& player, world::
         return true;
     }
     const storage::StoredItemStack plant{.id = plantOf(*block).toString(), .count = 1, .components = {}};
+    if (context.flowerPotAllowed && !context.flowerPotAllowed(player, x, y, z, plant.id, false)) {
+        return true;
+    }
     if (player.inventory.add(plant) > 0) {
         spawnDroppedItem(context, world, plantOf(*block), 1, player.x, player.y + 1.32, player.z, 0.0, 0.0, 0.0, 40,
                          wire::nbt::NbtCompound{});

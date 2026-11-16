@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/wire/protocol/play/BlockPos.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -24,6 +25,8 @@ using Gate = std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, 
 struct Result {
     std::vector<FluidChange> changes;
     std::optional<wire::common::Identifier> replacement;
+    /// Where the contents went, which a mob bucket spawns its mob at.
+    std::array<std::int32_t, 3> at{};
 };
 
 [[nodiscard]] std::optional<FluidKind> contentOf(const wire::common::Identifier& item);
@@ -37,6 +40,14 @@ struct Result {
 [[nodiscard]] std::optional<Result> useOn(const fluidFlow::Context& context, const wire::common::Identifier& item,
                                           std::int32_t x, std::int32_t y, std::int32_t z,
                                           wire::protocol::play::Direction face, bool creative, const Gate& gate = {});
+
+/// parity: `MobBucketItem`, whose water is poured as a bucket's and whose sulfur cube has no fluid at all.
+[[nodiscard]] std::optional<Result> useMob(const fluidFlow::Context& context, bool water, double eyeX, double eyeY,
+                                           double eyeZ, float yaw, float pitch, bool creative, const Gate& gate = {});
+
+[[nodiscard]] std::optional<Result> useMobOn(const fluidFlow::Context& context, bool water, std::int32_t x,
+                                             std::int32_t y, std::int32_t z, wire::protocol::play::Direction face,
+                                             bool creative, const Gate& gate = {});
 
 } // namespace buckets
 

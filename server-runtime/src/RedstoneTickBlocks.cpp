@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/TrialSpawnerSystem.hpp>
+#include <basalt/server/runtime/VaultSystem.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/BlockTriggers.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -176,6 +177,26 @@ world::randomTicks::Context RedstoneTickSystem::randomContext(world::LoadedWorld
                         player->connection().teleportTo(player->x, y + 1.0, player->z, player->yaw, player->pitch);
                     }
                 }
+            },
+        .precipitate = {},
+        .canSpreadFire =
+            [this, &world](std::int32_t x, std::int32_t y, std::int32_t z) {
+                const std::int32_t radius = world.gameRules().number(world::gameRules::kFireSpreadRadiusAroundPlayer);
+                if (radius == -1) {
+                    return true;
+                }
+                for (const PlayerSession* player : watchersOf(world)) {
+                    if (player->gamemode == wire::protocol::play::Gamemode::Spectator) {
+                        continue;
+                    }
+                    const double dx = player->x - x;
+                    const double dy = player->y - y;
+                    const double dz = player->z - z;
+                    if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) < static_cast<double>(radius)) {
+                        return true;
+                    }
+                }
+                return false;
             }};
 }
 
@@ -244,6 +265,7 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                                                            .z = done.z + 0.5});
             },
         .allowHopperMove = hooks_.allowHopperMove,
+        .allowHopperPickup = hooks_.allowHopperPickup,
         .allowSmelt = hooks_.allowSmelt,
         .furnaceBurn = hooks_.furnaceBurn,
         .furnaceStarted = hooks_.furnaceStarted,
@@ -382,6 +404,10 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         .trialSpawner =
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
                 return options_.trialSpawners != nullptr && options_.trialSpawners->tick(world, {x, y, z});
+            },
+        .vault =
+            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+                return options_.vaults != nullptr && options_.vaults->tick(world, {x, y, z});
             },
         .conduit =
             [this, &world](wire::nbt::NbtCompound& data, const std::int32_t x, const std::int32_t y,

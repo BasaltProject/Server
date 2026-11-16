@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
+#include <mutex>
 
 namespace basalt::server::plugins::datafix {
 namespace {
@@ -152,5 +154,66 @@ std::vector<Step> steps(std::string_view type) {
 }
 
 metamorph::datafix::LegacyBlockState legacyState(std::int32_t id) { return fixer::legacyBlockState(id); }
+
+metamorph::datafix::LegacyBlockState modernState(std::int32_t id) {
+    static std::mutex lock;
+    static std::map<std::int32_t, fixer::LegacyBlockState> cache;
+    const std::scoped_lock guard{lock};
+    if (const auto found = cache.find(id); found != cache.end()) {
+        return found->second;
+    }
+    using wire::nbt::NbtCompound;
+    using wire::nbt::NbtTag;
+    std::vector<std::int8_t> blocks(4096, 0);
+    std::vector<std::int8_t> data(2048, 0);
+    blocks[0] = static_cast<std::int8_t>((id >> 4) & 0xFF);
+    data[0] = static_cast<std::int8_t>(id & 0xF);
+    NbtCompound section;
+    section.putByte("Y", 0);
+    section.putByteArray("Blocks", std::move(blocks));
+    section.putByteArray("Data", std::move(data));
+    wire::nbt::NbtList sections{wire::nbt::NbtType::Compound};
+    sections.push(NbtTag::ofCompound(std::move(section)));
+    NbtCompound level;
+    level.putInt("xPos", 0);
+    level.putInt("zPos", 0);
+    level.set("Sections", NbtTag::ofList(std::move(sections)));
+    NbtCompound chunk;
+    chunk.putInt("DataVersion", 1343);
+    chunk.set("Level", NbtTag::ofCompound(std::move(level)));
+    fixer::LegacyBlockState state = fixer::legacyBlockState(id);
+    if (fixer::upgrade(fixer::Domain::Chunk, chunk, 1343).empty()) {
+        const wire::nbt::NbtList* list = chunk.getList("sections");
+        for (std::size_t at = 0; list != nullptr && at < list->size(); ++at) {
+            const NbtCompound* section = (*list)[at].get<NbtCompound>();
+            const NbtTag* y = section == nullptr ? nullptr : section->find("Y");
+            const bool origin = y != nullptr && ((y->get<std::int8_t>() != nullptr && *y->get<std::int8_t>() == 0) ||
+                                                 (y->get<std::int32_t>() != nullptr && *y->get<std::int32_t>() == 0));
+            if (!origin) {
+                continue;
+            }
+            const NbtCompound* states = section->getCompound("block_states");
+            const wire::nbt::NbtList* palette = states == nullptr ? nullptr : states->getList("palette");
+            for (std::size_t entryAt = 0; palette != nullptr && entryAt < palette->size(); ++entryAt) {
+                const NbtCompound* entry = (*palette)[entryAt].get<NbtCompound>();
+                if (entry == nullptr || (entryAt + 1 < palette->size() && entry->getString("id") == "minecraft:air")) {
+                    continue;
+                }
+                state.name = std::string{entry->getString("id")};
+                state.properties.clear();
+                const NbtCompound* properties = entry->getCompound("properties");
+                for (std::size_t index = 0; properties != nullptr && index < properties->size(); ++index) {
+                    if (const std::string* value = properties->values()[index].get<std::string>(); value != nullptr) {
+                        state.properties[properties->names()[index]] = *value;
+                    }
+                }
+                break;
+            }
+            break;
+        }
+    }
+    cache.emplace(id, state);
+    return state;
+}
 
 } // namespace basalt::server::plugins::datafix

@@ -145,6 +145,7 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
         float power = kDispenserPower;
         float uncertainty = kDispenserUncertainty;
         bool carries = true;
+        std::optional<std::int32_t> overrideEvent;
     };
 
     /// parity: `ThrowablePotionItem.createDispenseConfig`, a quarter harder and half as wide.
@@ -154,6 +155,9 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
     constexpr double kChargeReach = 1.0;
     constexpr float kChargePower = 1.0F;
     constexpr float kChargeUncertainty = 6.6666665F;
+    /// parity: `FireChargeItem` and `WindChargeItem`'s `overrideDispenseEvent`.
+    constexpr std::int32_t kFireChargeEvent = 1018;
+    constexpr std::int32_t kWindChargeEvent = 1051;
     static const std::array<Entry, 13> table{
         // parity: `TridentItem.asProjectile`, the default dispense config.
         Entry{.item = "trident", .kind = "trident"},
@@ -177,13 +181,15 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
               .lift = 0.0,
               .power = kChargePower,
               .uncertainty = kChargeUncertainty,
-              .carries = false},
+              .carries = false,
+              .overrideEvent = kWindChargeEvent},
         Entry{.item = "fire_charge",
               .kind = "small_fireball",
               .reach = kChargeReach,
               .lift = 0.0,
               .power = kChargePower,
-              .uncertainty = kChargeUncertainty}};
+              .uncertainty = kChargeUncertainty,
+              .overrideEvent = kFireChargeEvent}};
     const auto found = std::ranges::find_if(table, [&](const Entry& one) { return one.item == item.path(); });
     if (found == table.end()) {
         return std::nullopt;
@@ -197,11 +203,14 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
                         .lift = found->lift,
                         .power = found->power,
                         .uncertainty = found->uncertainty,
-                        .carries = found->carries};
+                        .carries = found->carries,
+                        .overrideEvent = found->overrideEvent};
 }
 
 const Kind* kindOf(const wire::common::Identifier& type) {
-    const auto found = std::ranges::find_if(all(), [&](const Kind& one) { return one.type == type; });
+    const std::string_view path = type.path();
+    const auto found = std::ranges::find_if(
+        all(), [&](const Kind& one) { return one.type.path().size() == path.size() && one.type == type; });
     return found == all().end() ? nullptr : &*found;
 }
 

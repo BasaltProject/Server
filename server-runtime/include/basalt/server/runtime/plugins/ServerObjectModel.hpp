@@ -86,6 +86,12 @@ struct ModelHooks {
     std::function<std::string(world::LoadedWorld& world, std::string_view action,
                               const std::array<std::int32_t, 3>& at)>
         creakingHeart;
+    std::function<std::int32_t(world::LoadedWorld& world, std::string_view action,
+                               const std::array<std::int32_t, 3>& at, std::string_view player)>
+        vault;
+    std::function<std::int32_t(world::LoadedWorld& world, std::string_view action,
+                               const std::array<std::int32_t, 3>& at, std::int32_t entityId, std::string_view player)>
+        hive;
     std::function<bool(world::LoadedWorld& world, std::int32_t id, std::string_view action, std::string_view text,
                        std::int32_t value)>
         raidBar;

@@ -239,6 +239,35 @@ NbtCompound merge(const NbtCompound& base, const NbtCompound& incoming) {
     return result;
 }
 
+bool compareNbt(const NbtTag& expected, const NbtTag& actual) {
+    if (expected.type() != actual.type()) {
+        return false;
+    }
+    if (const auto* wanted = expected.get<NbtCompound>(); wanted != nullptr) {
+        const auto* have = actual.get<NbtCompound>();
+        if (have->size() < wanted->size()) {
+            return false;
+        }
+        return std::ranges::all_of(wanted->names(), [&](const std::string& key) {
+            const NbtTag* found = have->find(key);
+            return found != nullptr && compareNbt(*wanted->find(key), *found);
+        });
+    }
+    if (const auto* wanted = expected.get<NbtList>(); wanted != nullptr) {
+        const auto* have = actual.get<NbtList>();
+        if (wanted->empty()) {
+            return have->empty();
+        }
+        if (have->size() < wanted->size()) {
+            return false;
+        }
+        return std::ranges::all_of(*wanted, [&](const NbtTag& element) {
+            return std::ranges::any_of(*have, [&](const NbtTag& other) { return compareNbt(element, other); });
+        });
+    }
+    return expected == actual;
+}
+
 std::optional<NbtTag> resolve(const NbtTag& root, std::string_view path) {
     const std::optional<std::vector<Step>> walk = steps(path);
     if (!walk.has_value()) {

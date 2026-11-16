@@ -11,7 +11,9 @@ namespace {
 /// parity: `RespawnAnchorBlock.canBeCharged`, which is `charges < 4`.
 constexpr std::int32_t kMaxCharges = 4;
 
-[[nodiscard]] std::int32_t chargesOf(std::int32_t stateId) {
+} // namespace
+
+std::int32_t chargesOf(std::int32_t stateId) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto found = properties.find("charges");
     if (found == properties.end()) {
@@ -22,8 +24,6 @@ constexpr std::int32_t kMaxCharges = 4;
     static_cast<void>(std::from_chars(first, first + found->second.size(), value));
     return value;
 }
-
-} // namespace
 
 bool isAnchor(const std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
@@ -46,6 +46,25 @@ std::optional<BlockChange> charge(WorldState& world, const std::int32_t x, const
         return std::nullopt;
     }
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *charged};
+}
+
+std::optional<BlockChange> discharge(WorldState& world, const std::int32_t x, const std::int32_t y,
+                                     const std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || !isAnchor(*stateId)) {
+        return std::nullopt;
+    }
+    const std::int32_t charges = chargesOf(*stateId);
+    if (charges <= 0) {
+        return std::nullopt;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    const std::optional<std::int32_t> next =
+        registry::blockStateDefinitions::stateIdOf(*block, {{"charges", std::to_string(charges - 1)}}, *stateId);
+    if (!next.has_value() || !world.setBlockState(x, y, z, *next)) {
+        return std::nullopt;
+    }
+    return BlockChange{.x = x, .y = y, .z = z, .stateId = *next};
 }
 
 } // namespace basalt::server::runtime::world::respawnAnchors

@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/ai/BeeGoals.hpp>
+#include <basalt/server/runtime/entity/ai/BreakDoorGoal.hpp>
 #include <basalt/server/runtime/entity/ai/CatGoals.hpp>
 #include <basalt/server/runtime/entity/ai/CopperGolemGoals.hpp>
 #include <basalt/server/runtime/entity/ai/DolphinGoals.hpp>
@@ -373,6 +374,9 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
     static const Names kZombies{"zombie", "husk", "drowned", "zombie_villager", "giant"};
     if (kZombies.contains(path)) {
         // parity: `Zombie.registerGoals`, the attack goal included.
+        if (path != "giant") {
+            add<BreakDoorGoal>(selector, 1);
+        }
         add<MeleeAttackGoal>(selector, 3, 1.0);
         monsterTail(selector);
         add<HurtByTargetGoal>(selector, 1);
@@ -383,6 +387,7 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
     }
     if (path == "zombified_piglin") {
         // parity: `ZombifiedPiglin.addBehaviourGoals`.
+        add<BreakDoorGoal>(selector, 1);
         add<MeleeAttackGoal>(selector, 2, 1.0);
         monsterTail(selector);
         add<HurtByTargetGoal>(selector, 1, HurtByTargetGoal::Types{}, true);

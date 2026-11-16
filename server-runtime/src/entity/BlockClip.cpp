@@ -237,10 +237,11 @@ bool clips(world::WorldState& world, double fromX, double fromY, double fromZ, d
     return clips(reader, fromX, fromY, fromZ, toX, toY, toZ, shape, viewer);
 }
 
-bool clips(world::WorldState::CachedBlockReader& reader, double fromX, double fromY, double fromZ, double toX,
-           double toY, double toZ, ClipShape shape, const ClipViewer& viewer) {
+std::optional<std::array<std::int32_t, 3>> firstClip(world::WorldState::CachedBlockReader& reader, double fromX,
+                                                     double fromY, double fromZ, double toX, double toY, double toZ,
+                                                     ClipShape shape, const ClipViewer& viewer) {
     if (fromX == toX && fromY == toY && fromZ == toZ) {
-        return false;
+        return std::nullopt;
     }
     const std::array<double, 3> from{fromX, fromY, fromZ};
     const std::array<double, 3> to{toX, toY, toZ};
@@ -259,7 +260,7 @@ bool clips(world::WorldState::CachedBlockReader& reader, double fromX, double fr
     auto blockY = static_cast<std::int32_t>(std::floor(startY));
     auto blockZ = static_cast<std::int32_t>(std::floor(startZ));
     if (hitsAt(blockX, blockY, blockZ)) {
-        return true;
+        return std::array<std::int32_t, 3>{blockX, blockY, blockZ};
     }
     const double dx = endX - startX;
     const double dy = endY - startY;
@@ -291,10 +292,15 @@ bool clips(world::WorldState::CachedBlockReader& reader, double fromX, double fr
             tZ += deltaZ;
         }
         if (hitsAt(blockX, blockY, blockZ)) {
-            return true;
+            return std::array<std::int32_t, 3>{blockX, blockY, blockZ};
         }
     }
-    return false;
+    return std::nullopt;
+}
+
+bool clips(world::WorldState::CachedBlockReader& reader, double fromX, double fromY, double fromZ, double toX,
+           double toY, double toZ, ClipShape shape, const ClipViewer& viewer) {
+    return firstClip(reader, fromX, fromY, fromZ, toX, toY, toZ, shape, viewer).has_value();
 }
 
 } // namespace basalt::server::runtime::entity::blockRay

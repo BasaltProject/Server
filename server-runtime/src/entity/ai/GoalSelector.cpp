@@ -7,7 +7,11 @@
 namespace basalt::server::runtime::entity::ai {
 
 WrappedGoal::WrappedGoal(std::int32_t priority, std::unique_ptr<Goal> goal, std::string name, bool plugin)
-    : priority_(priority), goal_(std::move(goal)), name_(std::move(name)), flags_(goal_->flags()), plugin_(plugin) {}
+    : priority_(priority), goal_(std::move(goal)), name_(std::move(name)), flags_(goal_->flags()), plugin_(plugin) {
+    for (const GoalFlag flag : flags_) {
+        flagMask_ = static_cast<std::uint8_t>(flagMask_ | (1U << static_cast<unsigned>(flag)));
+    }
+}
 
 bool WrappedGoal::canBeReplacedBy(const WrappedGoal& other) const {
     return goal_->isInterruptable() && other.priority_ < priority_;
@@ -92,7 +96,11 @@ void GoalSelector::sweep(MobContext& mob) {
             wrapped->stop(mob);
         }
     }
-    std::erase_if(lockedFlags_, [](const auto& entry) { return entry.second->retired(); });
+    for (WrappedGoal*& held : lockedFlags_) {
+        if (held != nullptr && held->retired()) {
+            held = nullptr;
+        }
+    }
     pluginGoals_ -= static_cast<std::size_t>(std::ranges::count_if(
         goals_, [](const std::unique_ptr<WrappedGoal>& wrapped) { return wrapped->retired() && wrapped->plugin(); }));
     std::erase_if(goals_, [](const std::unique_ptr<WrappedGoal>& wrapped) { return wrapped->retired(); });
@@ -105,9 +113,9 @@ bool GoalSelector::isRunning(const std::function<bool(const Goal&)>& predicate) 
 }
 
 bool GoalSelector::canTakeFlags(const WrappedGoal& wrapped) const {
-    for (const GoalFlag flag : wrapped.flags()) {
-        const auto held = lockedFlags_.find(flag);
-        if (held != lockedFlags_.end() && !held->second->canBeReplacedBy(wrapped)) {
+    for (std::size_t flag = 0; flag < lockedFlags_.size(); ++flag) {
+        const WrappedGoal* held = lockedFlags_[flag];
+        if (((wrapped.flagMask() >> flag) & 1U) != 0 && held != nullptr && !held->canBeReplacedBy(wrapped)) {
             return false;
         }
     }
@@ -136,7 +144,11 @@ void GoalSelector::tick(MobContext& mob) {
             }
         }
     }
-    std::erase_if(lockedFlags_, [](const auto& entry) { return !entry.second->running(); });
+    for (WrappedGoal*& held : lockedFlags_) {
+        if (held != nullptr && !held->running()) {
+            held = nullptr;
+        }
+    }
     for (const std::unique_ptr<WrappedGoal>& wrapped : goals_) {
         if (wrapped->running() || wrapped->retired()) {
             continue;
@@ -150,11 +162,15 @@ void GoalSelector::tick(MobContext& mob) {
         if (!usable) {
             continue;
         }
-        for (const GoalFlag flag : wrapped->flags()) {
-            if (const auto held = lockedFlags_.find(flag); held != lockedFlags_.end()) {
-                held->second->stop(mob);
+        for (std::size_t flag = 0; flag < lockedFlags_.size(); ++flag) {
+            if (((wrapped->flagMask() >> flag) & 1U) == 0) {
+                continue;
             }
-            lockedFlags_.insert_or_assign(flag, wrapped.get());
+            WrappedGoal*& held = lockedFlags_[flag];
+            if (held != nullptr) {
+                held->stop(mob);
+            }
+            held = wrapped.get();
         }
         wrapped->start(mob);
     }

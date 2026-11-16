@@ -44,6 +44,7 @@ inline constexpr std::uint32_t kCreaking = 1U << 19;
 inline constexpr std::uint32_t kCrystal = 1U << 20;
 inline constexpr std::uint32_t kDisplay = 1U << 21;
 inline constexpr std::uint32_t kPhantom = 1U << 22;
+inline constexpr std::uint32_t kOminousItemSpawner = 1U << 23;
 } // namespace basalt::server::runtime::entity::traits
 
 namespace basalt::server::runtime::entity::kinds {
@@ -640,6 +641,8 @@ public:
     float hurtDirection = 0.0F;
     bool collidable = true;
     std::int8_t forcedPose = -1;
+    /// The pose last raised to plugins, or -1 before the first look.
+    std::int8_t lastPose = -1;
 
     struct CombatRecord {
         std::string damageType;

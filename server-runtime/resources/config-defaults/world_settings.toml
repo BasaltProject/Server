@@ -5,6 +5,7 @@
 # difficulty = "easy"
 # view-distance = 10
 # save-interval-seconds = 300
+# region-format = "bsw"
 # open-end-exit-portal = false
 # hardcore = false
 # generate-structures = true

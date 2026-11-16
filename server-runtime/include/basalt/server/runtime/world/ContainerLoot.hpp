@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -26,6 +27,7 @@ inline constexpr std::string_view kSeedKey = "LootTableSeed";
 /// The player who opened it, as the roll sees them. parity: `THIS_ENTITY` and `withLuck`.
 struct Opener {
     std::string name;
+    std::string uuid;
     float luck = 0.0F;
     std::optional<wire::common::Identifier> mainhand;
 };
@@ -42,9 +44,13 @@ struct Lootable {
 
     [[nodiscard]] bool canLoot(const wire::common::Uuid& player, std::int64_t now, std::int32_t relootSeconds) const;
 
-    /// parity: Paper's `PaperLootableInventoryData.shouldReplenish`, with the event left out.
+    /// Final say on a due refill, given whether the player may loot again.
+    using Decide = std::function<bool(bool mayLoot)>;
+
+    /// parity: Paper's `PaperLootableInventoryData.shouldReplenish`.
     [[nodiscard]] bool shouldRefill(const std::optional<wire::common::Uuid>& player, std::int64_t now, bool refill,
-                                    std::int32_t relootSeconds, std::int32_t maxRefills) const;
+                                    std::int32_t relootSeconds, std::int32_t maxRefills,
+                                    const Decide& decide = {}) const;
 };
 
 /// A zero seed rolls on the table's own stream, as the jar does.

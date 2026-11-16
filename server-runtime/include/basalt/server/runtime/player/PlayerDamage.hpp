@@ -11,6 +11,10 @@
 
 namespace basalt::server::runtime::entity {
 struct DamageSource;
+
+namespace entityCombat {
+struct Knock;
+}
 } // namespace basalt::server::runtime::entity
 
 namespace basalt::server::runtime::scoreboard {
@@ -40,10 +44,14 @@ struct DamageContext {
         healed;
     std::function<bool(const PlayerSession& player, bool offhand)> resurrectAllowed;
     std::function<void(const PlayerSession& player, std::int32_t slot)> slotChanged;
-    std::function<void(PlayerSession& player, std::int32_t cooldownTicks)> disableBlocking;
+    std::function<void(PlayerSession& player, const wire::common::Identifier& item, std::int32_t cooldownTicks)>
+        disableBlocking;
     DeathContext death;
     world::AdvancementTriggers* triggers = nullptr;
 };
+
+/// Raises `entity.knockback` for a player: false when cancelled, else `knock` carries the plugins' edits.
+[[nodiscard]] bool knockAllowed(const PlayerSession& session, entity::entityCombat::Knock& knock);
 
 [[nodiscard]] bool shieldFaces(const PlayerSession& session, double fromX, double fromZ);
 

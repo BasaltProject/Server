@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
@@ -55,6 +56,7 @@
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 
@@ -68,6 +70,68 @@ using wire::protocol::play::SetEntityDataPacket;
 
 /// parity: `canSeeSky`, which here is the full fifteen of sky light above the mob.
 constexpr std::int32_t kSkyLightMax = 15;
+
+/// parity: `BaseFireBlock.fireIgnite`, eight seconds.
+constexpr std::int32_t kFireBlockTicks = 160;
+
+} // namespace
+
+namespace {
+
+struct FireContact {
+    bool lava = false;
+    bool fire = false;
+    bool water = false;
+    float fireDamage = 0.0F;
+    std::array<std::int32_t, 3> lavaAt{};
+    std::array<std::int32_t, 3> fireAt{};
+};
+
+/// parity: `Entity.checkInsideBlocks` for lava, fire and water, over every cell the deflated box touches.
+[[nodiscard]] FireContact fireContactOf(world::LoadedWorld& world, const ServerEntity& mob) {
+    constexpr double kDeflate = 1.0E-5;
+    FireContact contact;
+    const double half = (mob.width() / 2.0) - kDeflate;
+    const double minY = mob.y + kDeflate;
+    const double maxY = mob.y + mob.height() - kDeflate;
+    const auto cell = [](double value) { return static_cast<std::int32_t>(std::floor(value)); };
+    for (std::int32_t blockX = cell(mob.x - half); blockX <= cell(mob.x + half); ++blockX) {
+        for (std::int32_t blockZ = cell(mob.z - half); blockZ <= cell(mob.z + half); ++blockZ) {
+            for (std::int32_t blockY = cell(minY); blockY <= std::max(cell(minY), cell(maxY)); ++blockY) {
+                const std::int32_t state = world.state().blockState(blockX, blockY, blockZ).value_or(0);
+                if (state == 0) {
+                    continue;
+                }
+                const world::Submersion fluid = world::fluids::of(state);
+                const bool inFluid =
+                    fluid != world::Submersion::None &&
+                    minY < static_cast<double>(blockY) +
+                               static_cast<double>(world::fluidFlow::heightAt(world.state(), blockX, blockY, blockZ)) &&
+                    maxY > static_cast<double>(blockY);
+                if (inFluid && fluid == world::Submersion::Lava) {
+                    contact.lava = true;
+                    contact.lavaAt = {blockX, blockY, blockZ};
+                } else if (inFluid && fluid == world::Submersion::Water) {
+                    contact.water = true;
+                }
+                const Identifier* block = registry::blockStateDefinitions::blockOf(state);
+                if (block == nullptr) {
+                    continue;
+                }
+                const std::string_view path = block->path();
+                if (path == "lava_cauldron") {
+                    contact.lava = true;
+                    contact.lavaAt = {blockX, blockY, blockZ};
+                } else if (path == "fire" || path == "soul_fire") {
+                    contact.fire = true;
+                    contact.fireAt = {blockX, blockY, blockZ};
+                    contact.fireDamage = std::max(contact.fireDamage, path == "fire" ? 1.0F : 2.0F);
+                }
+            }
+        }
+    }
+    return contact;
+}
 
 } // namespace
 
@@ -86,10 +150,62 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
         const bool inWater = world::fluids::of(here.value_or(0)) == world::Submersion::Water;
         if (entity::sunBurn::shouldBurn(sensitive, day, light, openSky, inWater, random)) {
             std::int32_t fireTicks = entity::sunBurn::kFireTicks;
-            if (!hooks_.combustAllowed || hooks_.combustAllowed(world, mob, fireTicks, "sunlight")) {
-                mob.fireTicks = fireTicks;
+            if (wasBurning || !hooks_.combustAllowed ||
+                hooks_.combustAllowed(world, mob, fireTicks, "sunlight", -1, nullptr)) {
+                mob.fireTicks = std::max(mob.fireTicks, fireTicks);
             }
         }
+    }
+    // parity: `Entity.fireImmune`, the type's own flag.
+    const bool immune = registry::entityTypeShapes::isFireImmune(mob.type());
+    const FireContact contact = fireContactOf(world, mob);
+    // parity: `Entity.igniteForTicks`.
+    const auto ignite = [&mob](std::int32_t ticks) { mob.fireTicks = std::max(mob.fireTicks, ticks); };
+    // parity: `LivingEntity.hurtServer` answers false inside the cooldown for a hit that is no stronger.
+    const auto burn = [&](float amount, std::string_view cause, const Identifier& type) {
+        if (mob.hurtCooldown > mob.maxNoDamageTicks / 2 && amount <= mob.lastHurt) {
+            return;
+        }
+        const entity::entityCombat::Result result =
+            entity::entityCombat::hurt(mob, amount, std::nullopt, std::nullopt, hooks_.combat, cause);
+        if (result.landed) {
+            combat_->announceEntityHit(watchers, mob, type, -1, result.died);
+            world::vibrations::emit(world.state(), "entity_damage", mob.x, mob.y, mob.z, world.gameTime(),
+                                    {.entity = mob.uuid()});
+        }
+    };
+    if (contact.lava && !immune) {
+        // parity: `Entity.lavaIgnite`, asking the plugins only when the mob was not already burning.
+        std::int32_t ticks = world::fluids::kLavaFireTicks;
+        if (mob.fireTicks > 0 || !hooks_.combustAllowed ||
+            hooks_.combustAllowed(world, mob, ticks, "lava", -1, &contact.lavaAt)) {
+            ignite(ticks);
+        }
+        // parity: `Entity.lavaHurt`.
+        burn(world::fluids::kLavaDamage, "lava", world::damageTypes::kLava);
+    }
+    if (contact.fire && !immune) {
+        // parity: `BaseFireBlock.fireIgnite`.
+        if (mob.fireTicks < 0) {
+            ++mob.fireTicks;
+        }
+        if (mob.fireTicks >= 0) {
+            std::int32_t ticks = kFireBlockTicks;
+            if (mob.fireTicks > 0 || !hooks_.combustAllowed ||
+                hooks_.combustAllowed(world, mob, ticks, "fire", -1, &contact.fireAt)) {
+                ignite(ticks);
+            } else {
+                --mob.fireTicks;
+            }
+        }
+    }
+    if (contact.fire) {
+        burn(contact.fireDamage, "in_fire", Identifier::vanilla("in_fire"));
+    }
+    if (contact.water ||
+        (mob.fireTicks > 0 && world::precipitation::entityInRain(world, mob.x, mob.y, mob.z, mob.height()))) {
+        // parity: `InsideBlockEffectType.EXTINGUISH` and `Entity.move`'s rain.
+        mob.fireTicks = std::min(mob.fireTicks, 0);
     }
     // The enderman's own teleport goal already hurts it in water.
     if (mob.tuning != nullptr && mob.tuning->takesDamageFromWater == true && mob.type().path() != "enderman") {
@@ -103,18 +219,14 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
             }
         }
     }
-    if (mob.fireTicks > 0) {
-        mob.fireTicks--;
-        if (mob.fireTicks % entity::sunBurn::kDamageInterval == 0) {
-            const entity::entityCombat::Result result = entity::entityCombat::hurt(
-                mob, entity::sunBurn::kFireDamage, std::nullopt, std::nullopt, hooks_.combat, "fire");
-            if (result.landed) {
-                combat_->announceEntityHit(watchers, mob, world::damageTypes::kOnFire, -1, result.died);
-                // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
-                world::vibrations::emit(world.state(), "entity_damage", mob.x, mob.y, mob.z, world.gameTime(),
-                                        {.entity = mob.uuid()});
-            }
+    if (immune) {
+        mob.fireTicks = std::min(mob.fireTicks, 0);
+    } else if (mob.fireTicks > 0) {
+        // parity: `Entity.baseTick`, which hurts every twentieth tick but never while the lava does.
+        if (mob.fireTicks % entity::sunBurn::kDamageInterval == 0 && !contact.lava) {
+            burn(entity::sunBurn::kFireDamage, "fire", world::damageTypes::kOnFire);
         }
+        mob.fireTicks--;
     }
     const bool burning = mob.fireTicks > 0;
     if (burning == wasBurning) {

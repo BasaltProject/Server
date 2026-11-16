@@ -302,7 +302,7 @@ void wearHeldItemOnBreak(const BreakContext& context, PlayerSession& player, con
     // parity: `Item.mineBlock` answers true for anything with a `tool` component.
     if (const std::optional<storage::StoredItemStack>& tool = session->inventory.heldItem(); tool.has_value()) {
         if (const std::optional<Identifier> id = parsedOrNothing(tool->id);
-            id.has_value() && !reg::itemTools::rulesFor(*id).empty()) {
+            id.has_value() && reg::itemTools::hasTool(*id)) {
             statAwards::used(*session, tool->id);
         }
     }

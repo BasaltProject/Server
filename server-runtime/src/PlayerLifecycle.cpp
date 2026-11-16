@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
@@ -18,9 +19,11 @@
 #include <basalt/server/runtime/world/PlayerAdvancements.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/RespawnPoints.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
+#include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 #include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
@@ -29,6 +32,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -38,6 +42,8 @@ namespace {
 
 /// parity: `Avatar.DEFAULT_VEHICLE_ATTACHMENT`, where a player sits on what carries them.
 constexpr double kPlayerVehicleAttachment = 0.6;
+
+constexpr std::uint8_t kNoRespawnBlockAvailable = 0;
 
 using player::PlayerSession;
 using wire::protocol::play::Gamemode;
@@ -225,6 +231,46 @@ void PlayerLifecycle::checkAdvancements(PlayerSession& session) {
     triggers->onInventoryChanged(session.name(), session.uuid().toString(), session.inventory.snapshot().slots);
 }
 
+world::LoadedWorld* PlayerLifecycle::namedWorld(const std::string& name) {
+    if (owner_->options().worldsNow) {
+        const auto held = owner_->options().worldsNow();
+        const auto found = held.find(name);
+        return found == held.end() ? nullptr : found->second.get();
+    }
+    const auto found = owner_->options().worlds.find(name);
+    return found == owner_->options().worlds.end() ? nullptr : found->second;
+}
+
+void PlayerLifecycle::announceSpentCharge(world::LoadedWorld& where, const world::BlockChange& change) {
+    BlockChangeBroadcaster* blocks = owner_->options().blocks;
+    if (blocks == nullptr || owner_->options().playerRegistry == nullptr) {
+        return;
+    }
+    std::vector<PlayerSession*> watchers;
+    for (PlayerSession* other : owner_->options().playerRegistry->snapshot()) {
+        if (other->worldName == where.name() && other != owner_->playerSession()) {
+            watchers.push_back(other);
+        }
+    }
+    blocks->announceBlock(watchers, change);
+    blocks->notifyAround(where, watchers, change.x, change.y, change.z, std::nullopt);
+}
+
+void PlayerLifecycle::sendDepleteSound(const storage::StoredSpawnPoint& point) {
+    // parity: `PlayerList.respawn`, which tells the respawned player alone, at the block itself.
+    const wire::protocol::play::SoundPacket packet{.sound = "minecraft:block.respawn_anchor.deplete",
+                                                   .source = wire::protocol::play::SoundSource::Blocks,
+                                                   .x = std::floor(point.x),
+                                                   .y = std::floor(point.y),
+                                                   .z = std::floor(point.z),
+                                                   .volume = 1.0F,
+                                                   .pitch = 1.0F,
+                                                   .seed =
+                                                       owner_->options().nextSeed ? owner_->options().nextSeed() : 0};
+    owner_->sendPlayPacket(wire::protocol::play::SoundPacket::kId,
+                           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+}
+
 void PlayerLifecycle::respawn() {
     PlayerSession* session = owner_->playerSession();
     if (session == nullptr) {
@@ -245,16 +291,39 @@ void PlayerLifecycle::respawn() {
     }
     // parity: `ServerPlayer.findRespawnPositionAndUseSpawnBlock`.
     storage::PlayerStore* store = owner_->options().playerStore;
-    const std::optional<storage::StoredSpawnPoint> stored =
+    std::optional<storage::StoredSpawnPoint> stored =
         store != nullptr && store->isOpen() ? store->access().spawnPointOf(session->uuid().toString()) : std::nullopt;
     world::LoadedWorld* respawnWorld = owner_->currentWorld();
+    world::LoadedWorld* pointWorld = nullptr;
     if (stored.has_value()) {
-        const auto found = owner_->options().worlds.find(stored->world);
-        if (found != owner_->options().worlds.end()) {
-            respawnWorld = found->second;
-        }
+        pointWorld = namedWorld(stored->world);
     }
-    if (!stored.has_value() && owner_->options().respawnWorld) {
+    std::optional<world::respawnPoints::Spot> personal;
+    bool missingBlock = false;
+    bool depleteSound = false;
+    if (pointWorld != nullptr) {
+        const world::respawnPoints::Query query{.x = static_cast<std::int32_t>(std::floor(stored->x)),
+                                                .y = static_cast<std::int32_t>(std::floor(stored->y)),
+                                                .z = static_cast<std::int32_t>(std::floor(stored->z)),
+                                                .yaw = stored->yaw,
+                                                .forced = stored->forced};
+        const world::respawnPoints::Outcome outcome =
+            world::respawnPoints::find(*pointWorld, query, owner_->options().blockTags);
+        personal = outcome.spot;
+        missingBlock = !outcome.spot.has_value();
+        depleteSound = outcome.anchor && !missingBlock;
+        if (outcome.spent.has_value()) {
+            announceSpentCharge(*pointWorld, *outcome.spent);
+        }
+        if (missingBlock) {
+            store->access().clearSpawnPoint(session->uuid().toString());
+            if (hooks_.spawnReset) {
+                hooks_.spawnReset(*session, query.x, query.y, query.z);
+            }
+        }
+        respawnWorld = pointWorld;
+    }
+    if (!personal.has_value() && owner_->options().respawnWorld) {
         if (world::LoadedWorld* configured = owner_->options().respawnWorld(); configured != nullptr) {
             respawnWorld = configured;
         }
@@ -262,13 +331,17 @@ void PlayerLifecycle::respawn() {
     if (respawnWorld == nullptr) {
         return;
     }
-    double spawnX = stored.has_value() ? stored->x : respawnWorld->spawn()[0];
-    double spawnY = stored.has_value() ? stored->y : respawnWorld->spawn()[1];
-    double spawnZ = stored.has_value() ? stored->z : respawnWorld->spawn()[2];
+    double spawnX = personal.has_value() ? personal->x : respawnWorld->spawn()[0];
+    double spawnY = personal.has_value() ? personal->y : respawnWorld->spawn()[1];
+    double spawnZ = personal.has_value() ? personal->z : respawnWorld->spawn()[2];
     session->resetForRespawn();
     session->x = spawnX;
     session->y = spawnY;
     session->z = spawnZ;
+    if (personal.has_value()) {
+        session->yaw = personal->yaw;
+        session->pitch = personal->pitch;
+    }
     if (hooks_.respawned) {
         hooks_.respawned(*session, *respawnWorld, spawnX, spawnY, spawnZ);
         session->x = spawnX;
@@ -277,6 +350,11 @@ void PlayerLifecycle::respawn() {
     }
 
     owner_->entityTracker().forgetEverythingDrawn();
+    if (missingBlock) {
+        owner_->sendCompressed(wire::protocol::play::GameEventPacket::kId, [](wire::io::ByteBuffer& buffer) {
+            wire::protocol::play::GameEventPacket{.event = kNoRespawnBlockAvailable}.write(buffer);
+        });
+    }
     owner_->sendCompressed(wire::protocol::play::RespawnPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         wire::protocol::play::RespawnPacket{.spawnInfo = owner_->spawnInfo(session->gamemode), .dataToKeep = 0}.write(
             buffer);
@@ -296,11 +374,11 @@ void PlayerLifecycle::respawn() {
     owner_->sendCompressed(wire::protocol::play::SpawnPositionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         wire::protocol::play::SpawnPositionPacket{
             .globalPos =
-                wire::protocol::play::GlobalPos{.dimensionName = respawnWorld->levelKey(),
-                                                .location =
-                                                    wire::protocol::play::BlockPos{static_cast<std::int32_t>(spawnX),
-                                                                                   static_cast<std::int32_t>(spawnY),
-                                                                                   static_cast<std::int32_t>(spawnZ)}},
+                wire::protocol::play::GlobalPos{
+                    .dimensionName = respawnWorld->levelKey(),
+                    .location = wire::protocol::play::BlockPos{static_cast<std::int32_t>(respawnWorld->spawn()[0]),
+                                                               static_cast<std::int32_t>(respawnWorld->spawn()[1]),
+                                                               static_cast<std::int32_t>(respawnWorld->spawn()[2])}},
             .yaw = 0.0F,
             .pitch = 0.0F}
             .write(buffer);
@@ -310,6 +388,9 @@ void PlayerLifecycle::respawn() {
     owner_->uiState().sendCommandTree();
     owner_->uiState().syncHealth();
     owner_->uiState().syncExperience();
+    if (depleteSound) {
+        sendDepleteSound(*stored);
+    }
     // parity: `PlayerList.respawn` carries the post effects over and sends them again.
     owner_->sendPostEffects();
 

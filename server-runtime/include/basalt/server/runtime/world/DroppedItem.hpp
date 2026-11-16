@@ -27,6 +27,17 @@ struct ItemPoint {
     double z = 0.0;
 };
 
+struct ItemPose {
+    std::int32_t entityId = 0;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    double previousX = 0.0;
+    double previousY = 0.0;
+    double previousZ = 0.0;
+    bool onGround = false;
+};
+
 struct DroppedItem {
     std::int32_t entityId = 0;
     wire::common::Uuid uuid;

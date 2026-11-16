@@ -17,6 +17,7 @@ struct StoredSpawnPoint {
     double y = 0.0;
     double z = 0.0;
     float yaw = 0.0F;
+    bool forced = false;
 };
 
 enum class BanKind : std::uint8_t { Player, Ip };

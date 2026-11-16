@@ -54,6 +54,7 @@
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/AntiXray.hpp>
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
 #include <basalt/server/runtime/world/Beacons.hpp>
@@ -501,6 +502,7 @@ player::BreakContext BasaltServer::breakContext() {
     context.enchantments = &vanillaData_.enchantments;
     context.itemTags = &vanillaData_.itemTags;
     context.triggers = advancementTriggers_.get();
+    context.vaults = vaults_.get();
     context.nextDouble = [] { return std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()); };
     context.nextSeed = [] { return static_cast<std::int64_t>(scratchRandom()()); };
     context.bedLeft = [this](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -538,14 +540,14 @@ player::DamageContext BasaltServer::damageContext() {
             player.connection().sendInventoryAll();
         }
     };
-    context.disableBlocking = [this](player::PlayerSession& player, std::int32_t ticks) {
+    context.disableBlocking = [this](player::PlayerSession& player, const wire::common::Identifier& item,
+                                     std::int32_t ticks) {
         player.blockingSlot.reset();
         player.blockingTicks = 0;
         const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
         const auto found = worlds.find(player.worldName);
-        player::startCooldownFor(player, wire::common::Identifier::vanilla("shield"),
-                                 found == worlds.end() || found->second == nullptr ? 0 : found->second->gameTime(),
-                                 ticks);
+        player::startCooldownFor(
+            player, item, found == worlds.end() || found->second == nullptr ? 0 : found->second->gameTime(), ticks);
     };
     context.death.registry = &playerRegistry_;
     context.death.logger = logger_;
@@ -996,8 +998,9 @@ void BasaltServer::startBedrockListener() {
                 entity::entityCombat::blame(*target, session->entityId(), session->entityId(),
                                             wire::common::Identifier::vanilla("player"));
                 const entity::entityCombat::Result result = entity::entityCombat::hurt(
-                    *target, swing.damage, session->x, session->z, {}, smash ? "mace_smash" : "attack", session->name(),
-                    true, player::mace::armorFractionAdd(held, definitionOf));
+                    *target, swing.damage, session->x, session->z, entity::entityCombat::knockOnly(&mobCombatHooks_),
+                    smash ? "mace_smash" : "attack", session->name(), true,
+                    player::mace::armorFractionAdd(held, definitionOf));
                 if (!result.landed) {
                     return;
                 }
@@ -1009,9 +1012,9 @@ void BasaltServer::startBedrockListener() {
                 const player::BreakContext blocks = breakContext();
                 const player::pvp::Context melee = meleeContext(blocks);
                 // parity: `causeExtraKnockback`, the weapon's and the sprint's, along the facing.
-                player::pvp::knockMob(*session, *target,
-                                      player::pvp::knockbackOf(melee, *session, held) +
-                                          (swing.knockbackAttack ? 0.5F : 0.0F));
+                player::pvp::knockMob(
+                    *session, *target,
+                    player::pvp::knockbackOf(melee, *session, held) + (swing.knockbackAttack ? 0.5F : 0.0F), melee);
                 // parity: `isSweepAttack`.
                 if (swing.fullStrength && !swing.critical && !swing.knockbackAttack && session->onGround &&
                     weapon.has_value() && weapon->path().ends_with("_sword")) {
@@ -1703,9 +1706,13 @@ void BasaltServer::startBedrockListener() {
                             clickedState.has_value() && world::beds::isBed(*clickedState)) {
                             player::SleepContext sleeping;
                             sleeping.blocks = blocks;
-                            sleeping.setSpawn = [this](player::PlayerSession& who, const std::int32_t bedX,
-                                                       const std::int32_t bedY, const std::int32_t bedZ) {
+                            sleeping.setSpawn = [this](player::PlayerSession& who, std::int32_t bedX, std::int32_t bedY,
+                                                       std::int32_t bedZ) {
                                 if (playerStore_ == nullptr || !playerStore_->isOpen()) {
+                                    return;
+                                }
+                                if (who.events != nullptr && !plugins::hookEvents::spawnChangeAllowed(
+                                                                 *who.events, who, bedX, bedY, bedZ, "bed")) {
                                     return;
                                 }
                                 playerStore_->access().setSpawnPoint(
@@ -1821,6 +1828,10 @@ void BasaltServer::startBedrockListener() {
                         // parity: `JukeboxBlock`.
                         if (clicked->path() == "jukebox" &&
                             player::useJukeboxFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held)) {
+                            return;
+                        }
+                        if (clicked->path() == "vault" &&
+                            player::useVaultFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held)) {
                             return;
                         }
                         if (clicked->path() == "lectern" &&
@@ -2264,7 +2275,7 @@ void BasaltServer::startBedrockListener() {
             });
         };
         context.chatFilter = [this](const player::PlayerSession& player, std::string message,
-                                    std::function<void(bool, std::string)> answer) {
+                                    std::function<void(bool, std::string, chat::ChatRouting)> answer) {
             std::string name = player.name();
             std::string uuid = player.uuid().toString();
             std::string world = player.worldName;
@@ -2278,21 +2289,31 @@ void BasaltServer::startBedrockListener() {
                                               filled.set(1, uuid);
                                               filled.set(2, world);
                                               filled.set(3, message);
+                                              filled.set(4, std::string{});
+                                              filled.set(5, std::string{"*"});
                                           });
                 if (event == nullptr) {
-                    answer(true, std::move(message));
+                    answer(true, std::move(message), {});
                     return;
                 }
                 if (const std::string* edited = std::get_if<std::string>(&event->get(3)); edited != nullptr) {
                     message = *edited;
                 }
-                answer(!event->cancelled(), std::move(message));
+                chat::ChatRouting routing;
+                if (const std::string* format = std::get_if<std::string>(&event->get(4)); format != nullptr) {
+                    routing.format = *format;
+                }
+                if (const std::string* recipients = std::get_if<std::string>(&event->get(5)); recipients != nullptr) {
+                    routing.recipients = chat::parseRecipients(*recipients);
+                }
+                answer(!event->cancelled(), std::move(message), std::move(routing));
             });
         };
         context.lang = sharedLang;
         context.logger = logger_;
         context.uiConfigs = [this] { return live_->current()->ui; };
         context.placeholders = &placeholders_;
+        context.pluginSurfaces = pluginHooks().surfaces;
         if (worldRegistry_ != nullptr) {
             const world::LoadedWorld& world = worldRegistry_->defaultWorld();
             const std::array<double, 3>& spawn = world.spawn();

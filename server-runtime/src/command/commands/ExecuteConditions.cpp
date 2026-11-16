@@ -131,8 +131,10 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
                     const std::array<std::int32_t, 3> at = blockPosOf(context, "pos");
                     const std::optional<std::int32_t> state =
                         world == nullptr ? std::nullopt : world->state().blockState(at[0], at[1], at[2]);
-                    return state.has_value() && predicate != nullptr && predicate->matches(*state) ? std::optional{1}
-                                                                                                   : std::nullopt;
+                    return state.has_value() && predicate != nullptr &&
+                                   predicate->matchesAt(world->state(), at[0], at[1], at[2], *state)
+                               ? std::optional{1}
+                               : std::nullopt;
                 });
             });
         });

@@ -247,6 +247,8 @@ DroppedItem& WorldState::restoreItem(DroppedItem dropped) {
 
 std::vector<DroppedItem> WorldState::items() const { return itemPhysics_.items(); }
 
+void WorldState::itemPoses(std::vector<ItemPose>& out) const { itemPhysics_.itemPoses(out); }
+
 std::vector<DroppedItem> WorldState::itemsWithin(double x, double z, double radiusSquared) const {
     return itemPhysics_.itemsWithin(x, z, radiusSquared);
 }
@@ -339,6 +341,11 @@ std::vector<entity::ServerEntity*> WorldState::entitiesIn(std::int32_t chunkX, s
 
 void WorldState::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ, std::vector<entity::ServerEntity*>& out) const {
     entityRegistry_.entitiesIn(chunkX, chunkZ, out);
+}
+
+void WorldState::entitiesInRange(std::int32_t minChunkX, std::int32_t maxChunkX, std::int32_t minChunkZ,
+                                 std::int32_t maxChunkZ, std::vector<entity::ServerEntity*>& out) const {
+    entityRegistry_.entitiesInRange(minChunkX, maxChunkX, minChunkZ, maxChunkZ, out);
 }
 
 std::vector<std::pair<std::int32_t, std::int32_t>> WorldState::chunksWithEntities() const {

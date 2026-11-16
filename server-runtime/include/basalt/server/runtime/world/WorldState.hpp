@@ -391,6 +391,8 @@ public:
 
     [[nodiscard]] std::vector<DroppedItem> items() const;
 
+    void itemPoses(std::vector<ItemPose>& out) const;
+
     [[nodiscard]] std::vector<DroppedItem> itemsWithin(double x, double z, double radiusSquared) const;
 
     template <typename Predicate>
@@ -432,6 +434,9 @@ public:
     [[nodiscard]] std::vector<entity::ServerEntity*> entitiesIn(std::int32_t chunkX, std::int32_t chunkZ) const;
 
     void entitiesIn(std::int32_t chunkX, std::int32_t chunkZ, std::vector<entity::ServerEntity*>& out) const;
+
+    void entitiesInRange(std::int32_t minChunkX, std::int32_t maxChunkX, std::int32_t minChunkZ, std::int32_t maxChunkZ,
+                         std::vector<entity::ServerEntity*>& out) const;
 
     void beginEntitySnapshot() { entityRegistry_.beginSnapshot(); }
 

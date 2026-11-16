@@ -236,9 +236,9 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         target->dragon->hitPart = dragonPart;
     }
     entity::entityCombat::blame(*target, session->entityId(), session->entityId(), Identifier::vanilla("player"));
-    const entity::entityCombat::Result result =
-        entity::entityCombat::hurt(*target, damage, session->x, session->z, {}, smash ? "mace_smash" : "attack",
-                                   session->name(), true, player::mace::armorFractionAdd(heldStack, definitionOf));
+    const entity::entityCombat::Result result = entity::entityCombat::hurt(
+        *target, damage, session->x, session->z, mobKnocks(), smash ? "mace_smash" : "attack", session->name(), true,
+        player::mace::armorFractionAdd(heldStack, definitionOf));
     if (!result.landed) {
         owner_->broadcastSound(kSoundAttackNoDamage, session->x, session->y, session->z, SoundSource::Players);
         return;
@@ -254,7 +254,8 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     // parity: `causeExtraKnockback`.
     player::pvp::knockMob(*session, *target,
                           player::pvp::knockbackOf(melee, *session, heldStack) +
-                              (knockbackAttack ? static_cast<float>(kSprintKnockback) : 0.0F));
+                              (knockbackAttack ? static_cast<float>(kSprintKnockback) : 0.0F),
+                          melee);
     // parity: `isSweepAttack`.
     const bool sweep = fullStrength && !critical && !knockbackAttack && session->onGround &&
                        owner_->lastStepSquared < kSweepSpeedLimit * kSweepSpeedLimit && weapon.has_value() &&
@@ -317,6 +318,11 @@ void CombatHandler::sweepAround(PlayerSession& session, const ServerEntity& targ
                        strength, weapon);
 }
 
+entity::entityCombat::Hooks CombatHandler::mobKnocks() const {
+    const CombatSystem* combat = owner_->options().combat;
+    return entity::entityCombat::knockOnly(combat == nullptr ? nullptr : &combat->mobHooks());
+}
+
 player::pvp::Context CombatHandler::meleeContext(const player::BreakContext& blocks) {
     const ClientSession::Options& options = owner_->options();
     return player::pvp::Context{
@@ -349,7 +355,8 @@ player::pvp::Context CombatHandler::meleeContext(const player::BreakContext& blo
                     combat->gust(world, owner_->playersInSameWorld(), world.state().entities(),
                                  CombatSystem::gustOf(blast, x, y, z));
                 }
-            }};
+            },
+        .combat = owner_->options().combat == nullptr ? nullptr : &owner_->options().combat->mobHooks()};
 }
 
 void CombatHandler::attackPlayer(PlayerSession& session, PlayerSession& victim, world::LoadedWorld& world) {

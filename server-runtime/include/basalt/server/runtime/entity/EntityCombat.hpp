@@ -30,6 +30,17 @@ struct Result {
     float damage = 0.0F;
 };
 
+/// A push a plugin may veto or rewrite before it lands; `delta` is the change in velocity.
+struct Knock {
+    std::string_view cause = "damage";
+    std::optional<std::int32_t> sourceId;
+    double power = 0.0;
+    double towardsX = 0.0;
+    double towardsZ = 0.0;
+    std::array<double, 3> delta{};
+    bool recompute = false;
+};
+
 struct Hooks {
     std::function<std::optional<float>(const ServerEntity& entity, float amount, std::string_view cause,
                                        const std::optional<std::string>& attackerName,
@@ -39,6 +50,7 @@ struct Hooks {
     std::function<void(const ServerEntity& entity, const std::optional<std::string>& attackerName,
                        const std::optional<std::int32_t>& killerId)>
         died;
+    std::function<bool(const ServerEntity& entity, Knock& knock)> knocked;
 };
 
 [[nodiscard]] std::int64_t nextRaidBarStamp();
@@ -54,6 +66,18 @@ void blame(ServerEntity& target, std::optional<std::int32_t> causingId, std::int
 
 /// parity: `LivingEntity.knockback`.
 void knockback(ServerEntity& entity, double power, double towardsX, double towardsZ);
+
+/// parity: `LivingEntity.knockback` with the plugin event, whose cause and attacker `knock` carries.
+void knockback(ServerEntity& entity, Knock knock, const Hooks* hooks);
+
+/// The change a push ends with once a plugin rescaled its power from `powerBefore`.
+[[nodiscard]] std::array<double, 3> scaledDelta(const Knock& knock, double powerBefore);
+
+/// parity: `Entity.push`, applying a velocity change `knock.delta` the plugins may veto or rewrite.
+void push(ServerEntity& entity, Knock knock, const Hooks* hooks);
+
+/// Keeps only the knockback hook, for callers that never raised the damage events themselves.
+[[nodiscard]] Hooks knockOnly(const Hooks* hooks);
 
 /// parity: `Attributes.ATTACK_DAMAGE`, zero for anything harmless.
 [[nodiscard]] float attackDamageOf(const ServerEntity& entity);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/Announcement.hpp>
+#include <basalt/server/storage/AccessRepository.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 
@@ -17,6 +18,7 @@ class PlayerSession;
 }
 
 namespace basalt::server::runtime::world {
+struct BlockChange;
 class AdvancementTriggers;
 class LoadedWorld;
 } // namespace basalt::server::runtime::world
@@ -41,6 +43,8 @@ public:
                            std::string_view cause)>
             teleportAllowed;
         std::function<Announcement(const player::PlayerSession& player, const std::optional<std::string>& world)> quit;
+        std::function<void(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>
+            spawnReset;
     };
 
     explicit PlayerLifecycle(ClientSession& owner, Hooks hooks = {});
@@ -67,6 +71,12 @@ public:
     [[nodiscard]] std::optional<storage::StoredPlayer> storedSnapshot() const;
 
 private:
+    [[nodiscard]] world::LoadedWorld* namedWorld(const std::string& name);
+
+    void announceSpentCharge(world::LoadedWorld& where, const world::BlockChange& change);
+
+    void sendDepleteSound(const storage::StoredSpawnPoint& point);
+
     void checkAdvancements(player::PlayerSession& session);
 
     void checkEquipment(player::PlayerSession& session);

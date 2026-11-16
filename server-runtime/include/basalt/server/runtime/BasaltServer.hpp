@@ -26,6 +26,7 @@
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
+#include <basalt/server/runtime/OminousItemSpawnerSystem.hpp>
 #include <basalt/server/runtime/PersistenceCoordinator.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
@@ -40,6 +41,7 @@
 #include <basalt/server/runtime/TickLoop.hpp>
 #include <basalt/server/runtime/TrialSpawnerSystem.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
+#include <basalt/server/runtime/VaultSystem.hpp>
 #include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/WitherSystem.hpp>
 #include <basalt/server/runtime/WorldRegistry.hpp>
@@ -150,6 +152,7 @@ private:
     void startBukkit();
     void enableBukkit();
     [[nodiscard]] std::vector<std::string> javaProfile() const;
+    void collectJavaGarbage() const;
 
     void tickEntities(world::LoadedWorld& world, const sched::Region& region);
 
@@ -341,6 +344,7 @@ private:
     plugins::MiscServices miscServices_;
     plugins::ServerSettings settings_;
     bool pausedLogged_ = false;
+    int idleSweeps_ = 0;
     std::atomic<bool> anyOperator_{false};
     std::atomic<std::int64_t> operatorsCheckedAt_{-100};
     std::unique_ptr<plugins::ServerPluginServices> pluginServices_;
@@ -354,7 +358,9 @@ private:
     std::optional<bedrock::BedrockRecipeList> bedrockRecipes_;
     std::unique_ptr<NaturalSpawningSystem> spawning_;
     std::unique_ptr<MobSpawnerSystem> mobSpawners_;
+    std::unique_ptr<OminousItemSpawnerSystem> ominousItems_;
     std::unique_ptr<TrialSpawnerSystem> trialSpawners_;
+    std::unique_ptr<VaultSystem> vaults_;
     std::unique_ptr<ExperienceOrbSystem> orbs_;
     std::unique_ptr<FishingSystem> fishing_;
     world::maps::MapStorage mapStorage_;

@@ -178,7 +178,9 @@ bool MobActionSystem::pluginRestock(ServerEntity& villager) {
         offer.demand = offer.demand + offer.uses - (offer.maxUses - offer.uses);
     }
     for (world::trades::Offer& offer : offers) {
-        offer.uses = 0;
+        if (villagersIn(*world).replenishAllowed(villager, offer)) {
+            offer.uses = 0;
+        }
     }
     entity::villager::VillagerState& state = entity::villager::villagerBrain::stateOf(villager);
     state.lastRestock = world->gameTime();

@@ -56,6 +56,9 @@ struct PlayerEntityData {
 
 [[nodiscard]] std::optional<std::int32_t> parrotVariantOf(const std::optional<wire::nbt::NbtCompound>& tag);
 
+/// parity: `Avatar.POSES`, the height of the pose the player is in.
+[[nodiscard]] double heightOf(const PlayerSession& session);
+
 void tickBody(PlayerSession& session, const entity::entityCollision::BlockAt& blockAt);
 
 } // namespace basalt::server::runtime::player

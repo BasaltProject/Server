@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/world/ChunkDataCodec.hpp>
 #include <basalt/server/world/light/LightWindow.hpp>
+#include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
@@ -233,18 +234,17 @@ bool ChunkStreamer::bypassesAntiXray(const world::AntiXray& antiXray) const {
 void ChunkStreamer::sendChunk(Chunk& chunk) {
     world::LoadedWorld* world = owner_->currentWorld();
     const bool hasSkylight = world == nullptr || config::dimensionFacts(world->declaration().dimension).hasSkylight;
-    const server::world::chunkDataCodec::LightData light = server::world::chunkDataCodec::encodeLight(
+    const server::world::chunkDataCodec::LightBytes lightBytes = server::world::chunkDataCodec::encodeLightBytes(
         chunk, hasSkylight,
         server::world::light::LightWindow{chunk, [world](std::int32_t chunkX, std::int32_t chunkZ) -> const Chunk* {
                                               return world == nullptr ? nullptr
                                                                       : world->state().chunkIfLoaded(chunkX, chunkZ);
                                           }});
-    const wire::protocol::play::LightData wireLight{.skyLightMask = light.skyLightMask,
-                                                    .blockLightMask = light.blockLightMask,
-                                                    .emptySkyLightMask = light.emptySkyLightMask,
-                                                    .emptyBlockLightMask = light.emptyBlockLightMask,
-                                                    .skyLight = light.skyLight,
-                                                    .blockLight = light.blockLight};
+    static const std::size_t kEmptyLightBytes = [] {
+        wire::io::ByteBuffer empty;
+        wire::protocol::play::LightData{}.write(empty);
+        return empty.readableBytes();
+    }();
     std::vector<std::vector<std::int32_t>> obfuscated;
     if (const world::AntiXray* antiXray = world == nullptr ? nullptr : world->antiXray();
         antiXray != nullptr && !bypassesAntiXray(*antiXray)) {
@@ -293,12 +293,15 @@ void ChunkStreamer::sendChunk(Chunk& chunk) {
                        .heightmaps = {wire::protocol::play::Heightmap{
                            .type = wire::protocol::play::HeightmapType::MotionBlocking, .data = heightmap}},
                        .chunkData = chunkData,
-                       .blockEntities = blockEntities,
-                       .light = wireLight}
+                       .blockEntities = blockEntities}
             .write(buffer);
+        buffer.trimTail(kEmptyLightBytes);
+        buffer.writeBytes(*lightBytes);
     });
     owner_->sendDeduplicated(UpdateLightPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        UpdateLightPacket{.chunkX = chunk.chunkX(), .chunkZ = chunk.chunkZ(), .light = wireLight}.write(buffer);
+        wire::protocol::varInt::write(buffer, chunk.chunkX());
+        wire::protocol::varInt::write(buffer, chunk.chunkZ());
+        buffer.writeBytes(*lightBytes);
     });
 }
 

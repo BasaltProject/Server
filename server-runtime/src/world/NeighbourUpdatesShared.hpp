@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/BlockReactions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
@@ -347,6 +348,20 @@ inline void bookLiquidTurn(const Context& context, const std::int32_t x, const s
 
 inline void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std::int32_t y, std::int32_t z,
                   BlockFace towards) {
+    const std::optional<std::int32_t> standing = walk.context.world.blockState(x, y, z);
+    if (standing.has_value()) {
+        const blockReactions::Kind kind = blockReactions::kindOf(*standing);
+        if (kind != blockReactions::Kind::kFull) {
+            if (kind == blockReactions::Kind::kFalling) {
+                fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z, fallingBlocks::Asked::updateShape);
+            } else if (kind == blockReactions::Kind::kLiquid) {
+                bookLiquidTurn(walk.context, x, y, z, towards);
+            }
+            // parity: `reshape` draws one long for the coral that may die, whatever block stands there.
+            static_cast<void>(walk.context.random.nextLong());
+            return;
+        }
+    }
     fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z, fallingBlocks::Asked::updateShape);
     bookLiquidTurn(walk.context, x, y, z, towards);
     bool changed = false;

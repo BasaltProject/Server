@@ -225,7 +225,12 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         if (target->mob != nullptr) {
-            target->mob->fireTicks = kSmallFireballFireTicks;
+            std::int32_t burn = kSmallFireballFireTicks;
+            if (plugins::hookEvents::combustAllowed(world.events(), world.name(), target->mob->entityId(),
+                                                    target->mob->type().toString(), burn, "fireball",
+                                                    {.entityId = entity.entityId()})) {
+                target->mob->fireTicks = burn;
+            }
             entity::entityCombat::blame(*target->mob, entity.ownerId, entity.entityId(), entity.type());
             const entity::entityCombat::Result result =
                 entity::entityCombat::hurt(*target->mob, kSmallFireballDamage, fromX, fromZ, hooks_, "fireball");

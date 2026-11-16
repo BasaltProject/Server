@@ -40,6 +40,11 @@ bool useJukeboxFor(const BreakContext& context, PlayerSession& player, world::Lo
                    std::int32_t y, std::int32_t z, std::int32_t heldSlot,
                    const std::optional<storage::StoredItemStack>& held);
 
+/// parity: `VaultBlock.useItemOn`; true while the vault is active, whether or not the key fitted.
+bool useVaultFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, std::int32_t x,
+                 std::int32_t y, std::int32_t z, std::int32_t heldSlot,
+                 const std::optional<storage::StoredItemStack>& held);
+
 bool placeBookOnLecternFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                            std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t heldSlot,
                            const std::optional<storage::StoredItemStack>& held);

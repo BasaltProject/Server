@@ -551,8 +551,11 @@ const PluginEventType& entityPotionEffect() {
 }
 
 const PluginEventType& entityCombust() {
-    static const PluginEventType type{
-        "entity.combust", true, {"entity_id", "entity_type", "world", "ticks", "cause"}, {"ticks"}};
+    static const PluginEventType type{"entity.combust",
+                                      true,
+                                      {"entity_id", "entity_type", "world", "ticks", "cause", "source_kind",
+                                       "source_id", "source_x", "source_y", "source_z"},
+                                      {"ticks"}};
     return type;
 }
 

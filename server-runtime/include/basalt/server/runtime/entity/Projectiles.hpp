@@ -38,6 +38,7 @@ struct DispenseShot {
     float power = kDispenserPower;
     float uncertainty = kDispenserUncertainty;
     bool carries = true;
+    std::optional<std::int32_t> overrideEvent;
 };
 
 [[nodiscard]] const Kind& arrow();

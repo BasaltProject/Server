@@ -220,26 +220,45 @@ void Chunk::removeBlockEntityAt(std::int32_t x, std::int32_t y, std::int32_t z) 
     }
 }
 
-Chunk::PackedLight Chunk::skyLight(const std::function<PackedLight()>& compute) {
+namespace {
+
+std::uint64_t nextLightVersion() {
+    static std::atomic<std::uint64_t> counter{0};
+    return counter.fetch_add(1) + 1;
+}
+
+} // namespace
+
+Chunk::VersionedLight Chunk::sharedSkyLight(const std::function<PackedLight()>& compute) {
     const std::lock_guard<std::mutex> guard{light_->lock};
     SharedLight held = light_->sky.load();
     if (held == nullptr || light_->staleSky.load()) {
         light_->staleSky.store(false);
         held = std::make_shared<const PackedLight>(compute());
         light_->sky.store(held);
+        light_->skyVersion = nextLightVersion();
     }
-    return *held;
+    return {std::move(held), light_->skyVersion};
 }
 
-Chunk::PackedLight Chunk::blockLight(const std::function<PackedLight()>& compute) {
+Chunk::VersionedLight Chunk::sharedBlockLight(const std::function<PackedLight()>& compute) {
     const std::lock_guard<std::mutex> guard{light_->lock};
     SharedLight held = light_->block.load();
     if (held == nullptr || light_->staleBlock.load()) {
         light_->staleBlock.store(false);
         held = std::make_shared<const PackedLight>(compute());
         light_->block.store(held);
+        light_->blockVersion = nextLightVersion();
     }
-    return *held;
+    return {std::move(held), light_->blockVersion};
+}
+
+Chunk::PackedLight Chunk::skyLight(const std::function<PackedLight()>& compute) {
+    return *sharedSkyLight(compute).light;
+}
+
+Chunk::PackedLight Chunk::blockLight(const std::function<PackedLight()>& compute) {
+    return *sharedBlockLight(compute).light;
 }
 
 Chunk::SharedLight Chunk::cachedSkyLight() const { return light_->sky.load(); }
@@ -264,6 +283,7 @@ bool Chunk::storeLightSection(bool sky, std::size_t section, std::span<const std
     auto replaced = std::make_shared<PackedLight>(held->empty() ? PackedLight(sectionCount()) : *held);
     (*replaced)[section].assign(bytes.begin(), bytes.end());
     layer.store(std::move(replaced));
+    (sky ? light_->skyVersion : light_->blockVersion) = nextLightVersion();
     return true;
 }
 
@@ -273,6 +293,8 @@ void Chunk::invalidateLight() {
     light_->block.store(nullptr);
     light_->staleSky.store(false);
     light_->staleBlock.store(false);
+    light_->skyVersion = 0;
+    light_->blockVersion = 0;
 }
 
 void Chunk::increaseInhabitedTime(std::int64_t delta) {

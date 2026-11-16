@@ -1,7 +1,9 @@
 #include <basalt/metamorph/datafix/DataFixer.hpp>
 #include <basalt/metamorph/region/AnvilRegion.hpp>
+#include <basalt/metamorph/region/ChunkBlob.hpp>
 #include <basalt/server/runtime/world/ParallelFor.hpp>
 #include <basalt/server/runtime/world/RegionStore.hpp>
+#include <basalt/server/world/region/ChunkBlob.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
@@ -10,6 +12,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <map>
 #include <span>
 #include <string_view>
@@ -26,6 +29,16 @@ using server::world::Chunk;
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 }
 
+[[nodiscard]] bool writeFileAtomically(const std::string& path, const std::vector<std::uint8_t>& bytes) {
+    const std::string temporary = path + ".tmp";
+    if (!wire::io::fileIO::writeBytes(temporary, bytes)) {
+        return false;
+    }
+    std::error_code error;
+    std::filesystem::rename(temporary, path, error);
+    return !error;
+}
+
 [[nodiscard]] std::string parentOf(const std::string& path) {
     const std::size_t at = path.find_last_of('/');
     return at == std::string::npos ? std::string{"."} : path.substr(0, at);
@@ -34,9 +47,13 @@ using server::world::Chunk;
 } // namespace
 
 RegionStore::RegionStore(std::string worldName, std::string worldsRoot, server::world::ChunkHeight verticalBounds,
-                         std::size_t capacity, std::int64_t byteBudget)
+                         std::size_t capacity, std::int64_t byteBudget, config::RegionFormatSetting format)
     : worldRoot_(std::move(worldsRoot) + "/" + std::move(worldName)), verticalBounds_(verticalBounds),
-      capacity_(capacity), byteBudget_(byteBudget) {}
+      capacity_(capacity), byteBudget_(byteBudget) {
+    chooseFormat(format);
+}
+
+RegionStore::~RegionStore() = default;
 
 std::int64_t RegionStore::key(std::int32_t regionX, std::int32_t regionZ) {
     return (static_cast<std::int64_t>(regionX) & 0xFFFFFFFFLL) | (static_cast<std::int64_t>(regionZ) << 32);
@@ -47,15 +64,22 @@ std::int32_t RegionStore::regionXOf(std::int64_t regionKey) { return static_cast
 std::int32_t RegionStore::regionZOf(std::int64_t regionKey) { return static_cast<std::int32_t>(regionKey >> 32); }
 
 std::string RegionStore::regionPath(std::int32_t regionX, std::int32_t regionZ) const {
-    return worldRoot_ + "/region/r." + std::to_string(regionX) + "." + std::to_string(regionZ) + ".linear";
+    return worldRoot_ + "/region/r." + std::to_string(regionX) + "." + std::to_string(regionZ) +
+           (anvil_ ? ".mca" : ".linear");
 }
 
 std::size_t RegionStore::cachedRegionCount() const {
+    if (bsw_ != nullptr) {
+        return bsw_->openRegions();
+    }
     const std::lock_guard<std::mutex> lock{mutex_};
     return cached_.size();
 }
 
 std::int64_t RegionStore::cachedRegionBytes() const {
+    if (bsw_ != nullptr) {
+        return bsw_->residentBytes();
+    }
     const std::lock_guard<std::mutex> lock{mutex_};
     return cachedBytesLocked();
 }
@@ -131,7 +155,7 @@ void RegionStore::mergeVanillaEntities(LinearRegion& region, std::int32_t region
 
 RegionStore::RegionRead RegionStore::readRegionFile(std::int32_t regionX, std::int32_t regionZ) const {
     if (const std::optional<std::vector<std::uint8_t>> bytes =
-            wire::io::fileIO::readBytes(regionPath(regionX, regionZ));
+            anvil_ ? std::nullopt : wire::io::fileIO::readBytes(regionPath(regionX, regionZ));
         bytes.has_value()) {
         std::expected<LinearRegion, metamorph::region::LinearError> read = LinearRegion::read(*bytes);
         return read.has_value() ? RegionRead{std::move(*read), false} : RegionRead{std::nullopt, true};
@@ -172,6 +196,9 @@ namespace {
 
 [[nodiscard]] std::int32_t peekDataVersion(std::span<const std::uint8_t> blob) {
     const auto u16 = [&blob](std::size_t at) { return (blob[at] << 8) | blob[at + 1]; };
+    if (const std::int32_t binary = server::world::region::chunkBlob::dataVersionOf(blob); binary != 0) {
+        return binary;
+    }
     if (blob.size() < 5 || blob[0] != 10) {
         return 0;
     }
@@ -222,18 +249,7 @@ bool RegionStore::ensureLoaded(std::int32_t regionX, std::int32_t regionZ) {
     return true;
 }
 
-RegionStore::Age RegionStore::ageOf(std::int32_t chunkX, std::int32_t chunkZ) {
-    const std::int32_t regionX = chunkX >> 5;
-    const std::int32_t regionZ = chunkZ >> 5;
-    if (!ensureLoaded(regionX, regionZ)) {
-        return Age::Absent;
-    }
-    const std::lock_guard<std::mutex> lock{mutex_};
-    LinearRegion* held = touch(key(regionX, regionZ));
-    if (held == nullptr) {
-        return Age::Absent;
-    }
-    const std::span<const std::uint8_t> blob = held->chunkAt(chunkX & 31, chunkZ & 31);
+RegionStore::Age RegionStore::classify(std::span<const std::uint8_t> blob) {
     if (blob.empty()) {
         return Age::Absent;
     }
@@ -246,7 +262,61 @@ RegionStore::Age RegionStore::ageOf(std::int32_t chunkX, std::int32_t chunkZ) {
     return peekDataVersion(blob) < metamorph::datafix::kCurrentVersion ? Age::MaybeOld : Age::Current;
 }
 
+bool RegionStore::readBsw(std::int32_t chunkX, std::int32_t chunkZ, std::vector<std::uint8_t>& out) {
+    {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        if (closed_) {
+            return false;
+        }
+    }
+    const BswChunkStore::Read read = bsw_->read(chunkX, chunkZ, out);
+    if (read == BswChunkStore::Read::Ok) {
+        return true;
+    }
+    if (read != BswChunkStore::Read::Absent) {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        const bool fresh = read == BswChunkStore::Read::Corrupt
+                               ? unreadableChunks_.insert(key(chunkX, chunkZ)).second
+                               : unreadableRegions_.insert(key(chunkX >> 5, chunkZ >> 5)).second;
+        if (fresh) {
+            logger_.error([&] {
+                return "Chunk " + std::to_string(chunkX) + ", " + std::to_string(chunkZ) +
+                       (read == BswChunkStore::Read::Corrupt ? " failed its checksum (corrupt region data)"
+                                                             : " sits in a region file that cannot be opened") +
+                       " and will not be overwritten.";
+            });
+        }
+    }
+    return false;
+}
+
+RegionStore::Age RegionStore::ageOf(std::int32_t chunkX, std::int32_t chunkZ) {
+    if (bsw_ != nullptr) {
+        thread_local std::vector<std::uint8_t> blob;
+        return readBsw(chunkX, chunkZ, blob) ? classify(blob) : Age::Absent;
+    }
+    const std::int32_t regionX = chunkX >> 5;
+    const std::int32_t regionZ = chunkZ >> 5;
+    if (!ensureLoaded(regionX, regionZ)) {
+        return Age::Absent;
+    }
+    const std::lock_guard<std::mutex> lock{mutex_};
+    LinearRegion* held = touch(key(regionX, regionZ));
+    if (held == nullptr) {
+        return Age::Absent;
+    }
+    return classify(held->chunkAt(chunkX & 31, chunkZ & 31));
+}
+
 std::optional<std::vector<std::uint8_t>> RegionStore::rawChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+    if (bsw_ != nullptr) {
+        std::vector<std::uint8_t> bytes;
+        if (!readBsw(chunkX, chunkZ, bytes)) {
+            return std::nullopt;
+        }
+        bytes = metamorph::region::chunkBlob::decode(bytes);
+        return bytes.empty() ? std::nullopt : std::optional{std::move(bytes)};
+    }
     const std::int32_t regionX = chunkX >> 5;
     const std::int32_t regionZ = chunkZ >> 5;
     if (!ensureLoaded(regionX, regionZ)) {
@@ -265,6 +335,9 @@ std::optional<std::vector<std::uint8_t>> RegionStore::rawChunk(std::int32_t chun
 }
 
 bool RegionStore::hasChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+    if (bsw_ != nullptr) {
+        return bsw_->has(chunkX, chunkZ);
+    }
     const std::int32_t regionX = chunkX >> 5;
     const std::int32_t regionZ = chunkZ >> 5;
     if (!ensureLoaded(regionX, regionZ)) {
@@ -288,6 +361,13 @@ bool RegionStore::writeRawChunk(std::int32_t chunkX, std::int32_t chunkZ, std::s
     if (closed_) {
         return false;
     }
+    if (bsw_ != nullptr) {
+        bsw_->stage(chunkX, chunkZ,
+                    nbt.empty() ? std::vector<std::uint8_t>{}
+                                : metamorph::region::chunkBlob::encode(nbt, metamorph::datafix::kCurrentVersion),
+                    timestamp);
+        return flushDirty() > 0;
+    }
     const std::int64_t regionKey = key(chunkX >> 5, chunkZ >> 5);
     {
         const std::lock_guard<std::mutex> lock{mutex_};
@@ -306,6 +386,9 @@ bool RegionStore::writeRawChunk(std::int32_t chunkX, std::int32_t chunkZ, std::s
 }
 
 std::vector<std::int32_t> RegionStore::storedChunks(std::int32_t regionX, std::int32_t regionZ) {
+    if (bsw_ != nullptr) {
+        return bsw_->stored(regionX, regionZ);
+    }
     std::vector<std::int32_t> found;
     if (!ensureLoaded(regionX, regionZ)) {
         return found;
@@ -327,15 +410,32 @@ std::vector<std::int32_t> RegionStore::storedChunks(std::int32_t regionX, std::i
 }
 
 std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+    std::optional<Chunk> loaded = readChunk(chunkX, chunkZ);
+    if (loaded.has_value()) {
+        loadCount_.fetch_add(1, std::memory_order_relaxed);
+        loadMicros_.fetch_add(
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - began).count(),
+            std::memory_order_relaxed);
+    }
+    return loaded;
+}
+
+std::optional<Chunk> RegionStore::readChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     const std::int32_t regionX = chunkX >> 5;
     const std::int32_t regionZ = chunkZ >> 5;
     const std::int64_t regionKey = key(regionX, regionZ);
-    if (!ensureLoaded(regionX, regionZ)) {
+    thread_local std::vector<std::uint8_t> reused;
+    std::vector<std::uint8_t> owned;
+    std::vector<std::uint8_t>& chunkBytes = bsw_ != nullptr ? reused : owned;
+    if (bsw_ != nullptr) {
+        if (!readBsw(chunkX, chunkZ, chunkBytes)) {
+            return std::nullopt;
+        }
+    } else if (!ensureLoaded(regionX, regionZ)) {
         return std::nullopt;
     }
-
-    std::vector<std::uint8_t> chunkBytes;
-    {
+    if (bsw_ == nullptr) {
         const std::lock_guard<std::mutex> lock{mutex_};
         LinearRegion* held = touch(regionKey);
         if (held == nullptr) {
@@ -349,20 +449,25 @@ std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t ch
     }
 
     // Decoding happens outside the lock: it is the expensive half, and it touches nothing shared.
-    const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> tag = wire::nbt::nbtIO::read(chunkBytes);
-    const wire::nbt::NbtCompound* root = tag.has_value() ? tag->tag.get<wire::nbt::NbtCompound>() : nullptr;
-    if (root == nullptr) {
-        const std::lock_guard<std::mutex> lock{mutex_};
-        if (unreadableChunks_.insert(key(chunkX, chunkZ)).second) {
-            logger_.error([&] {
-                return "Chunk " + std::to_string(chunkX) + ", " + std::to_string(chunkZ) +
-                       " is not valid NBT and will not be overwritten.";
-            });
-        }
-        return std::nullopt;
-    }
     std::expected<Chunk, server::world::region::ChunkNbtError> chunk =
-        server::world::region::chunkNbt::read(*root, verticalBounds_);
+        std::unexpected(server::world::region::ChunkNbtError{"not valid NBT"});
+    if (metamorph::region::chunkBlob::isBlob(chunkBytes)) {
+        chunk = server::world::region::chunkBlob::read(chunkBytes, verticalBounds_);
+    } else {
+        const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> tag = wire::nbt::nbtIO::read(chunkBytes);
+        const wire::nbt::NbtCompound* root = tag.has_value() ? tag->tag.get<wire::nbt::NbtCompound>() : nullptr;
+        if (root == nullptr) {
+            const std::lock_guard<std::mutex> lock{mutex_};
+            if (unreadableChunks_.insert(key(chunkX, chunkZ)).second) {
+                logger_.error([&] {
+                    return "Chunk " + std::to_string(chunkX) + ", " + std::to_string(chunkZ) +
+                           " is not valid NBT and will not be overwritten.";
+                });
+            }
+            return std::nullopt;
+        }
+        chunk = server::world::region::chunkNbt::read(*root, verticalBounds_);
+    }
     if (!chunk.has_value()) {
         if (chunk.error().incompatible) {
             const std::lock_guard<std::mutex> lock{mutex_};
@@ -376,6 +481,21 @@ std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t ch
         return std::nullopt;
     }
     return std::move(*chunk);
+}
+
+RegionStore::Snapshot RegionStore::snapshotOf(const Chunk& chunk) const {
+    Snapshot snapshot{chunk.chunkX(), chunk.chunkZ(), {}, {}};
+    if (bsw_ != nullptr) {
+        if (std::optional<std::vector<std::uint8_t>> blob = server::world::region::chunkBlob::write(chunk)) {
+            snapshot.stored = *std::move(blob);
+            return snapshot;
+        }
+        snapshot.stored =
+            wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(server::world::region::chunkNbt::write(chunk)));
+        return snapshot;
+    }
+    snapshot.nbt = server::world::region::chunkNbt::write(chunk);
+    return snapshot;
 }
 
 std::size_t RegionStore::saveChunks(std::span<Chunk* const> allChunks, std::int32_t timestamp) {
@@ -413,11 +533,19 @@ std::size_t RegionStore::saveChunks(std::span<Chunk* const> allChunks, std::int3
         std::vector<std::pair<Chunk*, std::vector<std::uint8_t>>> encoded(regionChunks.size());
         parallelFor(regionChunks.size(), batching_.load(), [&](std::size_t at) {
             Chunk* chunk = regionChunks[at];
-            encoded[at] = {chunk, wire::nbt::nbtIO::write(
-                                      wire::nbt::NbtTag::ofCompound(server::world::region::chunkNbt::write(*chunk)))};
+            Snapshot snapshot = snapshotOf(*chunk);
+            encoded[at] = {chunk, snapshot.stored.empty()
+                                      ? wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(snapshot.nbt))
+                                      : std::move(snapshot.stored)};
         });
         encodeTotal += millisSince(encodeStart);
 
+        if (bsw_ != nullptr) {
+            for (auto& [chunk, bytes] : encoded) {
+                bsw_->stage(chunk->chunkX(), chunk->chunkZ(), std::move(bytes), timestamp);
+            }
+            continue;
+        }
         const std::lock_guard<std::mutex> lock{mutex_};
         LinearRegion* target = region(regionXOf(regionKey), regionZOf(regionKey));
         if (target == nullptr) {
@@ -463,10 +591,18 @@ std::size_t RegionStore::saveSnapshots(std::vector<Snapshot> snapshots, std::int
         std::vector<std::pair<const Snapshot*, std::vector<std::uint8_t>>> encoded(regionSnapshots.size());
         parallelFor(regionSnapshots.size(), batching_.load(), [&](std::size_t at) {
             const Snapshot* snapshot = regionSnapshots[at];
-            encoded[at] = {snapshot, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(snapshot->nbt))};
+            encoded[at] = {snapshot, snapshot->stored.empty()
+                                         ? wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(snapshot->nbt))
+                                         : snapshot->stored};
         });
         encodeTotal += millisSince(encodeStart);
 
+        if (bsw_ != nullptr) {
+            for (auto& [snapshot, bytes] : encoded) {
+                bsw_->stage(snapshot->chunkX, snapshot->chunkZ, std::move(bytes), timestamp);
+            }
+            continue;
+        }
         const std::lock_guard<std::mutex> lock{mutex_};
         LinearRegion* target = region(regionXOf(regionKey), regionZOf(regionKey));
         if (target == nullptr) {
@@ -496,12 +632,20 @@ void RegionStore::close() {
     const std::lock_guard<std::mutex> writeLock{writeMutex_};
     const std::lock_guard<std::mutex> lock{mutex_};
     closed_ = true;
+    if (bsw_ != nullptr) {
+        bsw_->stop();
+    }
     dirtyRegions_.clear();
     byKey_.clear();
     cached_.clear();
 }
 
 std::size_t RegionStore::flushDirty() {
+    if (bsw_ != nullptr) {
+        const std::size_t written = bsw_->flush(batching_.load());
+        batching_.store(false);
+        return written;
+    }
     std::vector<std::pair<std::int64_t, LinearRegion*>> toWrite;
     {
         const std::lock_guard<std::mutex> lock{mutex_};
@@ -519,7 +663,12 @@ std::size_t RegionStore::flushDirty() {
         const auto& [regionKey, held] = toWrite[at];
         const std::string path = regionPath(regionXOf(regionKey), regionZOf(regionKey));
         wire::io::fileIO::createDirectories(parentOf(path));
-        if (held->writeTo(path)) {
+        if (anvil_) {
+            const auto bytes = metamorph::region::anvilRegion::write(*held);
+            if (bytes.has_value() && writeFileAtomically(path, *bytes)) {
+                ++written;
+            }
+        } else if (held->writeTo(path)) {
             ++written;
         }
         const std::lock_guard<std::mutex> lock{mutex_};

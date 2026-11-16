@@ -97,7 +97,8 @@ CREATE TABLE IF NOT EXISTS spawn_point (
     x REAL NOT NULL,
     y REAL NOT NULL,
     z REAL NOT NULL,
-    yaw REAL NOT NULL
+    yaw REAL NOT NULL,
+    forced INTEGER NOT NULL DEFAULT 0
 );
 
 -- What a player has been granted and taught. Vanilla keeps advancement progress in

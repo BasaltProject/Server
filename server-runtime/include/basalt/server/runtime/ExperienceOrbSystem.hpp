@@ -7,6 +7,7 @@
 #include <functional>
 #include <mutex>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -63,6 +64,10 @@ public:
 
     struct Options {
         std::function<std::int64_t()> nextSeed;
+        /// Asked before an item is mended; false leaves it alone, and a listener may change the repair.
+        std::function<bool(const player::PlayerSession& player, std::string_view slot, std::int32_t orbId,
+                           std::int32_t& repair, std::int32_t consumed)>
+            mend;
         /// Answers the points a player is really given for an orb; a listener may change them.
         std::function<std::int32_t(const player::PlayerSession& player, std::int32_t amount, std::int32_t orbId)>
             gained;

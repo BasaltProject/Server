@@ -36,6 +36,8 @@ struct Hooks {
     std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view kind,
                        const hoppers::Move& move)>
         allowHopperMove;
+    std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, const DroppedItem& item)>
+        allowHopperPickup;
     std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view cooker,
                        const server::world::loot::ItemStack& input, server::world::loot::ItemStack& result,
                        std::string_view recipe)>
@@ -65,6 +67,7 @@ struct Hooks {
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> sculkCatalyst;
     std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> bell;
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> trialSpawner;
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> vault;
     std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> conduit;
     WorldState::Ticking ticking;
     std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> spawnerTick;

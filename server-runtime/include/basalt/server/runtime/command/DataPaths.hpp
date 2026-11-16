@@ -23,6 +23,9 @@ struct Step {
 
 [[nodiscard]] wire::nbt::NbtCompound merge(const wire::nbt::NbtCompound& base, const wire::nbt::NbtCompound& incoming);
 
+/// parity: `NbtUtils.compareNbt` with partial list matches.
+[[nodiscard]] bool compareNbt(const wire::nbt::NbtTag& expected, const wire::nbt::NbtTag& actual);
+
 [[nodiscard]] std::optional<wire::nbt::NbtTag> resolve(const wire::nbt::NbtTag& root, std::string_view path);
 
 [[nodiscard]] std::optional<wire::nbt::NbtCompound> set(const wire::nbt::NbtCompound& root, std::string_view path,

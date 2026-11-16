@@ -257,9 +257,15 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         emitVibration(world, "entity_damage", mob.x, mob.y, mob.z, mob.uuid());
         if (const std::array<double, 2> push = punchPush(arrow); push[0] != 0.0 || push[1] != 0.0) {
             const double kept = std::max(0.0, 1.0 - mob.attributeWithModifiers("minecraft:knockback_resistance"));
-            mob.velocityX += push[0] * kept;
-            mob.velocityY += kPunchLift;
-            mob.velocityZ += push[1] * kept;
+            // parity: `AbstractArrow.doKnockback` pushes through `Entity.push`, which raises the pushed-by event.
+            entity::entityCombat::push(mob,
+                                       {.cause = "push",
+                                        .sourceId = arrow.entityId(),
+                                        .power = std::hypot(push[0], push[1]) * kept,
+                                        .towardsX = -push[0],
+                                        .towardsZ = -push[1],
+                                        .delta = {push[0] * kept, kPunchLift, push[1] * kept}},
+                                       &hooks_);
         }
         // parity: `AbstractArrow.onHitEntity` leaves a non-piercing arrow stuck in it.
         if (!piercing) {
@@ -292,7 +298,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         return piercing ? ArrowHit::Pierced : ArrowHit::Stopped;
     }
     // parity: a raised shield makes `hurtServer` answer false and the arrow turns back.
-    const bool shielded = !piercing && player::shieldFaces(*target->player, fromX, fromZ);
+    const bool shieldRaised = !piercing && player::shieldFaces(*target->player, fromX, fromZ);
     if (target->player->connection().hurt) {
         target->player->connection().hurt(static_cast<float>(damage), kDeathArrow, world::damageTypes::kArrow,
                                           entity::DamageSource{.entityId = arrow.entityId(),
@@ -303,7 +309,8 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
                                                                .piercing = piercing,
                                                                .punch = punchPush(arrow)});
     }
-    if (shielded) {
+    // parity: a partial block leaves `hurtServer` answering true, so only a hit that did not land turns the arrow.
+    if (shieldRaised && !target->player->lastHurtLanded) {
         deflectArrow(arrow);
         return ArrowHit::Stopped;
     }

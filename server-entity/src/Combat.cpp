@@ -1,9 +1,11 @@
 #include <basalt/server/entity/Combat.hpp>
+#include <basalt/server/random/RandomSource.hpp>
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <random>
 
 namespace basalt::server::entity::combat {
 namespace {
@@ -22,7 +24,7 @@ constexpr double kSwingHalfTick = 0.5;
 constexpr double kTicksPerSecond = 20.0;
 constexpr float kMinChargeDamage = 0.2F;
 
-constexpr double kKnockbackEpsilon = 1.0E-5;
+constexpr double kKnockbackEpsilon = static_cast<double>(1.0E-5F);
 constexpr double kMaxKnockbackLift = 0.4;
 
 } // namespace
@@ -74,10 +76,15 @@ std::array<double, 3> knockback(double power, double towardsX, double towardsZ, 
     if (strength <= 0.0) {
         return unchanged;
     }
-    const double length = std::sqrt((towardsX * towardsX) + (towardsZ * towardsZ));
-    if (length < kKnockbackEpsilon) {
-        return unchanged;
+    if ((towardsX * towardsX) + (towardsZ * towardsZ) < kKnockbackEpsilon) {
+        thread_local random::RandomSource source =
+            random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+        while ((towardsX * towardsX) + (towardsZ * towardsZ) < kKnockbackEpsilon) {
+            towardsX = (source.nextDouble() - source.nextDouble()) * 0.01;
+            towardsZ = (source.nextDouble() - source.nextDouble()) * 0.01;
+        }
     }
+    const double length = std::sqrt((towardsX * towardsX) + (towardsZ * towardsZ));
     const double pushX = towardsX / length * strength;
     const double pushZ = towardsZ / length * strength;
     return {(velocityX / 2.0) - pushX, onGround ? std::min(kMaxKnockbackLift, (velocityY / 2.0) + strength) : velocityY,

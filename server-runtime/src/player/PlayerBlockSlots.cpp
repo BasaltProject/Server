@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
+#include <basalt/server/runtime/VaultSystem.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBlockSlots.hpp>
 #include <basalt/server/runtime/player/PlayerFaces.hpp>
@@ -255,6 +256,28 @@ bool useJukeboxFor(const BreakContext& context, PlayerSession& player, world::Lo
     return true;
 }
 
+bool useVaultFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, const std::int32_t x,
+                 const std::int32_t y, const std::int32_t z, const std::int32_t heldSlot,
+                 const std::optional<storage::StoredItemStack>& held) {
+    const std::optional<wire::common::Identifier> item =
+        held.has_value() ? parsedOrNothing(held->id) : std::optional<wire::common::Identifier>{};
+    if (context.vaults == nullptr || !item.has_value() || !context.vaults->isActive(world, {x, y, z})) {
+        return false;
+    }
+    const std::int32_t spent = context.vaults->tryInsertKey(
+        world, player, {x, y, z},
+        server::world::loot::ItemStack{.item = *item, .count = held->count, .components = held->components});
+    if (spent > 0 && player.gamemode != Gamemode::Creative) {
+        storage::StoredItemStack left = *held;
+        left.count = held->count - spent;
+        player.inventory.set(heldSlot, left.count <= 0 ? std::nullopt : std::optional{left});
+        if (context.slotChanged) {
+            context.slotChanged(player, heldSlot);
+        }
+    }
+    return true;
+}
+
 bool placeBookOnLecternFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                            const std::int32_t x, const std::int32_t y, const std::int32_t z,
                            const std::int32_t heldSlot, const std::optional<storage::StoredItemStack>& held) {
@@ -266,6 +289,9 @@ bool placeBookOnLecternFor(const BreakContext& context, PlayerSession& player, w
     }
     if (server::registry::blockStateDefinitions::propertiesOf(*stateId)["has_book"] == "true") {
         return false;
+    }
+    if (context.lecternInsertAllowed && !context.lecternInsertAllowed(player, x, y, z, held->id)) {
+        return true;
     }
     // parity: `tryPlaceBook` takes one off the stack.
     const std::optional<world::BlockChange> change = world::lecterns::placeBook(

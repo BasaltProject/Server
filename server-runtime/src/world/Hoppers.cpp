@@ -519,12 +519,16 @@ void noteChange(const Around& around, const BlockChange& change) {
 }
 
 [[nodiscard]] bool suckInBox(WorldState& world, double minX, double minY, double minZ, double maxX, double maxY,
-                             double maxZ, Slots& slots) {
+                             double maxZ, Slots& slots, const Around* around = nullptr, std::int32_t hopperX = 0,
+                             std::int32_t hopperY = 0, std::int32_t hopperZ = 0) {
     bool took = false;
     const auto reached = [&](const DroppedItem& item) {
         return item.count > 0 && itemCrosses(item, minX, minY, minZ, maxX, maxY, maxZ);
     };
     for (const DroppedItem& item : world.itemsMatching(reached)) {
+        if (around != nullptr && around->allowPickup && !around->allowPickup(hopperX, hopperY, hopperZ, item)) {
+            continue;
+        }
         // parity: what a dropped stack carries goes into the hopper with it.
         const ItemStack picked{.item = item.item, .count = 1, .components = item.components};
         std::int32_t left = item.count;
@@ -558,7 +562,7 @@ void noteChange(const Around& around, const BlockChange& change) {
         }
     }
     return suckInBox(world, x, static_cast<double>(y) + kSuckBottom, z, static_cast<double>(x) + 1.0,
-                     static_cast<double>(y) + kSuckTop, static_cast<double>(z) + 1.0, slots);
+                     static_cast<double>(y) + kSuckTop, static_cast<double>(z) + 1.0, slots, &around, x, y, z);
 }
 
 } // namespace
@@ -659,10 +663,17 @@ bool tickCart(WorldState& world, entity::ServerEntity& cart, const std::int64_t 
     // parity: `getLevelY` is half a block over the cart.
     const double levelY = cart.y + kCartLevelRise;
     const std::optional<Container> above = containerAtPoint(world, cart.x, levelY + 1.0, cart.z);
+    const Around around{};
+    const std::int32_t aboveX = wire::common::mth::floor(cart.x);
+    const std::int32_t aboveY = wire::common::mth::floor(levelY + 1.0);
+    const std::int32_t aboveZ = wire::common::mth::floor(cart.z);
     // parity: a cart's `isGridAligned` is false.
-    bool took = above.has_value() ? pullFrom(world, *above, slots, Around{}, gameTime)
-                                  : suckInBox(world, cart.x - 0.5, levelY - 0.5 + kSuckBottom, cart.z - 0.5,
-                                              cart.x + 0.5, levelY - 0.5 + kSuckTop, cart.z + 0.5, slots);
+    bool took = takeCompost(world, aboveX, aboveY, aboveZ, slots, gameTime) ||
+                takeDisc(world, aboveX, aboveY, aboveZ, slots, around) ||
+                unshelveBook(world, aboveX, aboveY, aboveZ, slots, around) ||
+                (above.has_value() ? pullFrom(world, *above, slots, around, gameTime)
+                                   : suckInBox(world, cart.x - 0.5, levelY - 0.5 + kSuckBottom, cart.z - 0.5,
+                                               cart.x + 0.5, levelY - 0.5 + kSuckTop, cart.z + 0.5, slots));
     if (!took) {
         // parity: `MinecartHopper.suckInItems`' own half.
         constexpr double kSide = detectorRails::kCartHalfWidth + kCartReach;

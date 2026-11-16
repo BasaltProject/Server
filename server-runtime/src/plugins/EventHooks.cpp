@@ -1,8 +1,12 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/plugins/EventHooks.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
+#include <basalt/server/runtime/plugins/TradeHookEvents.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <array>
@@ -14,7 +18,29 @@ namespace basalt::server::runtime::plugins::eventHooks {
 namespace {
 
 using server::plugins::PluginEvent;
+
+[[nodiscard]] std::int32_t cauldronLevel(const std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr || block->path() == "cauldron") {
+        return 0;
+    }
+    const auto properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto level = properties.find("level");
+    return level == properties.end() ? 3 : std::stoi(level->second);
+}
+
+[[nodiscard]] std::string cauldronBlockData(const std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    std::string text = "minecraft:" + std::string{block == nullptr ? "cauldron" : block->path()};
+    const auto properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    if (const auto level = properties.find("level"); level != properties.end()) {
+        text += "[level=" + level->second + "]";
+    }
+    return text;
+}
+
 using server::plugins::pluginEventTypes::blockBreak;
+using server::plugins::pluginEventTypes::blockCauldronLevel;
 using server::plugins::pluginEventTypes::blockDamage;
 using server::plugins::pluginEventTypes::blockDrops;
 using server::plugins::pluginEventTypes::blockFertilize;
@@ -42,20 +68,25 @@ using server::plugins::pluginEventTypes::playerBucket;
 using server::plugins::pluginEventTypes::playerDeath;
 using server::plugins::pluginEventTypes::playerEffect;
 using server::plugins::pluginEventTypes::playerFish;
+using server::plugins::pluginEventTypes::playerFlowerPot;
 using server::plugins::pluginEventTypes::playerFoodChange;
 using server::plugins::pluginEventTypes::playerGamemodeChange;
+using server::plugins::pluginEventTypes::playerHarvestBlock;
 using server::plugins::pluginEventTypes::playerInteract;
 using server::plugins::pluginEventTypes::playerInteractAir;
 using server::plugins::pluginEventTypes::playerInteractEntity;
 using server::plugins::pluginEventTypes::playerItemConsume;
 using server::plugins::pluginEventTypes::playerItemDamage;
 using server::plugins::pluginEventTypes::playerItemDrop;
+using server::plugins::pluginEventTypes::playerLecternInsert;
 using server::plugins::pluginEventTypes::playerLevelChange;
 using server::plugins::pluginEventTypes::playerPickItem;
 using server::plugins::pluginEventTypes::playerQuit;
 using server::plugins::pluginEventTypes::playerRespawn;
 using server::plugins::pluginEventTypes::playerSignChange;
+using server::plugins::pluginEventTypes::playerSpawnChange;
 using server::plugins::pluginEventTypes::playerTeleport;
+using server::plugins::pluginEventTypes::playerTrade;
 using server::plugins::pluginEventTypes::playerWorldChange;
 
 constexpr std::string_view kPlayerType = "minecraft:player";
@@ -271,6 +302,59 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
             event.set("entering", true);
         });
     };
+    hooks.spawnChangeAllowed = [&sink](const player::PlayerSession& who, std::int32_t& x, std::int32_t& y,
+                                       std::int32_t& z, std::string_view cause) {
+        return hookEvents::spawnChangeAllowed(sink, who, x, y, z, cause);
+    };
+    hooks.cauldronAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
+                                    std::string_view reason, std::int32_t from, std::int32_t to) {
+        return sink.allowed(&blockCauldronLevel, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            position(event, x, y, z);
+            event.set("reason", std::string{reason});
+            event.set("old_level", static_cast<std::int64_t>(cauldronLevel(from)));
+            event.set("new_level", static_cast<std::int64_t>(cauldronLevel(to)));
+            event.set("new_block", cauldronBlockData(to));
+        });
+    };
+    hooks.flowerPotAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
+                                     const std::string& item, bool placing) {
+        return sink.allowed(&playerFlowerPot, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            position(event, x, y, z);
+            event.set("item", item);
+            event.set("placing", placing);
+        });
+    };
+    hooks.lecternInsertAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y,
+                                         std::int32_t z, const std::string& item) {
+        return sink.allowed(&playerLecternInsert, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            position(event, x, y, z);
+            event.set("item", item);
+        });
+    };
+    hooks.harvestAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
+                                   std::string_view block, std::string_view item, std::int32_t& count) {
+        const server::plugins::PluginEvent* event = sink.ask(&playerHarvestBlock, [&](PluginEvent& filled) {
+            EventSink::player(filled, who);
+            position(filled, x, y, z);
+            filled.set("block", "minecraft:" + std::string{block});
+            filled.set("hand", std::string{"hand"});
+            filled.set("item", "minecraft:" + std::string{item});
+            filled.set("count", static_cast<std::int64_t>(count));
+        });
+        if (event == nullptr) {
+            return true;
+        }
+        if (event->cancelled()) {
+            return false;
+        }
+        if (const auto* edited = std::get_if<std::int64_t>(&event->get("count")); edited != nullptr) {
+            count = static_cast<std::int32_t>(std::max<std::int64_t>(0, *edited));
+        }
+        return true;
+    };
     hooks.fishing = [&sink](const player::PlayerSession& who, std::string_view state, std::int32_t hookId,
                             std::int32_t& exp) {
         const server::plugins::PluginEvent* event = sink.ask(&playerFish, [&](PluginEvent& filled) {
@@ -334,6 +418,9 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
 
 PlayerLifecycle::Hooks lifecycle(ClientSession& owner, const EventSink& sink) {
     PlayerLifecycle::Hooks hooks;
+    hooks.spawnReset = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(hookEvents::spawnChangeAllowed(sink, who, x, y, z, "reset"));
+    };
     hooks.respawned = [&sink](const player::PlayerSession& who, const world::LoadedWorld&, double& x, double& y,
                               double& z) {
         const server::plugins::PluginEvent* event = sink.ask(&playerRespawn, [&](PluginEvent& filled) {
@@ -617,6 +704,34 @@ VillagerTradeController::Hooks villagerTrade(ClientSession& owner, const EventSi
             event.set("index", static_cast<std::int64_t>(index));
             event.set("result", resultItem.value_or(std::string{}));
         });
+    };
+    hooks.purchaseAllowed = [&owner, &sink](std::int32_t villagerId, world::trades::Offer& offer, bool& rewardExp,
+                                            bool& increaseUses) {
+        const player::PlayerSession* who = owner.playerSession();
+        if (who == nullptr) {
+            return true;
+        }
+        const server::plugins::PluginEvent* event = sink.ask(&playerTrade, [&](PluginEvent& filled) {
+            EventSink::player(filled, *who);
+            filled.set("villager_id", static_cast<std::int64_t>(villagerId));
+            tradeEvents::fill(filled, offer);
+            filled.set("reward_exp", true);
+            filled.set("increase_uses", true);
+        });
+        if (event == nullptr) {
+            return true;
+        }
+        if (event->cancelled()) {
+            return false;
+        }
+        tradeEvents::apply(*event, offer);
+        if (const auto* flag = std::get_if<bool>(&event->get("reward_exp")); flag != nullptr) {
+            rewardExp = *flag;
+        }
+        if (const auto* flag = std::get_if<bool>(&event->get("increase_uses")); flag != nullptr) {
+            increaseUses = *flag;
+        }
+        return true;
     };
     return hooks;
 }

@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <expected>
+#include <functional>
 #include <string>
 
 namespace basalt::server::world::region {
@@ -26,7 +27,18 @@ inline constexpr std::string_view kEntitiesKey = "basalt_entities";
 inline constexpr std::string_view kPluginDataKey = "ChunkBukkitValues";
 inline constexpr std::string_view kGeneratedEntitiesKey = "basalt_generated_entities";
 
+[[nodiscard]] std::string_view statusName(ChunkStage stage);
+
 [[nodiscard]] wire::nbt::NbtCompound write(const Chunk& chunk);
+
+/// The keys `write` adds beyond the header fields and the sections, with the empty lists left out.
+[[nodiscard]] wire::nbt::NbtCompound writeRest(const Chunk& chunk);
+
+using SectionFill = std::function<std::expected<void, ChunkNbtError>(Chunk&)>;
+
+/// `read` for a tag already at the current data version, with the sections supplied by the caller.
+[[nodiscard]] std::expected<Chunk, ChunkNbtError> readCurrent(const wire::nbt::NbtCompound& tag, ChunkHeight bounds,
+                                                              const SectionFill& fill);
 
 [[nodiscard]] std::expected<Chunk, ChunkNbtError> read(const wire::nbt::NbtCompound& tag,
                                                        ChunkHeight bounds = kOverworldHeight);

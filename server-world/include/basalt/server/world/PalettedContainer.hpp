@@ -29,6 +29,13 @@ public:
 
     void setAll(std::span<const std::int32_t> values);
 
+    /// The palette, the entry width and the words as held; a single value has no words.
+    void exportPacked(std::vector<std::int32_t>& palette, int& bits, std::vector<std::uint64_t>& words) const;
+
+    /// False when the words do not fit or an index is out of range; `counts` gets the cells per palette entry.
+    [[nodiscard]] bool assignPacked(std::span<const std::int32_t> palette, int bits,
+                                    std::span<const std::uint8_t> wordBytes, std::vector<std::uint32_t>& counts);
+
     [[nodiscard]] std::size_t distinctValueCount() const;
 
     template <typename Predicate>

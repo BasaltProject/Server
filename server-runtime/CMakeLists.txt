@@ -176,9 +176,11 @@ basalt_module(server-runtime-core
         src/BlockUseOnBlocks.cpp
         src/permission/ServerPermissions.cpp
         src/plugins/EventHooks.cpp
+        src/plugins/VaultHooks.cpp
         src/plugins/EventHooksContainer.cpp
         src/plugins/EventSink.cpp
         src/plugins/HookEvents.cpp
+        src/plugins/TradeHookEvents.cpp
         src/plugins/PlayerHookEvents.cpp
         src/plugins/WorldEventHooks.cpp
         src/plugins/PacketNames.cpp
@@ -338,6 +340,7 @@ basalt_module(server-runtime-core
         src/MobSpawnerSystem.cpp
         src/MobSpawnerSpawn.cpp
         src/TrialSpawnerSystem.cpp
+        src/VaultSystem.cpp
         src/SpawnerBlockTick.cpp
         src/world/BaseSpawnerData.cpp
         src/world/EquipmentTables.cpp
@@ -365,6 +368,7 @@ basalt_module(server-runtime-core
         src/EndFightBar.cpp
         src/EndFightRespawn.cpp
         src/AreaEffectCloudSystem.cpp
+        src/OminousItemSpawnerSystem.cpp
         src/Favicon.cpp
         src/PersistenceCoordinator.cpp
         src/ServerListStatus.cpp
@@ -416,6 +420,7 @@ basalt_module(server-runtime-core
         src/player/PlayerCombatMessage.cpp
         src/player/PlayerDeath.cpp
         src/player/PlayerBeehives.cpp
+        src/player/PlayerBerries.cpp
         src/player/PlayerBlockBreak.cpp
         src/player/PlayerBlockItemUse.cpp
         src/player/PlayerBlockSlots.cpp
@@ -426,6 +431,7 @@ basalt_module(server-runtime-core
         src/player/PlayerPick.cpp
         src/player/PlayerBlockToggle.cpp
         src/player/PlayerBuckets.cpp
+        src/player/PlayerMobBuckets.cpp
         src/player/PlayerDigSpeed.cpp
         src/player/PlayerEating.cpp
         src/player/PlayerItemPickup.cpp
@@ -548,6 +554,7 @@ basalt_module(server-runtime-core
         src/world/PlacementVariants.cpp
         src/world/PistonSlide.cpp
         src/world/Pistons.cpp
+        src/world/BlockReactions.cpp
         src/world/NeighbourUpdates.cpp
         src/world/NeighbourUpdatesChange.cpp
         src/world/RealVillagerTrades.cpp
@@ -557,6 +564,7 @@ basalt_module(server-runtime-core
         src/world/Bells.cpp
         src/world/RealTrialSpawnerConfigs.cpp
         src/world/TrialSpawners.cpp
+        src/world/Vaults.cpp
         src/world/Campfires.cpp
         src/world/BlockEntityTicks.cpp
         src/world/PotionEffects.cpp
@@ -592,10 +600,12 @@ basalt_module(server-runtime-core
         src/world/AdvancementTriggers.cpp
         src/world/TriggerFacts.cpp
         src/world/BlockPickData.cpp
+        src/player/PlayerBlocksAttacks.cpp
         src/player/PlayerTotem.cpp
         src/player/PlayerAttributes.cpp
         src/CombatVehicles.cpp
         src/CombatMounts.cpp
+        src/CombatArmorStands.cpp
         src/CombatShearing.cpp
         src/CombatSpear.cpp
         src/CombatSpin.cpp
@@ -640,6 +650,7 @@ basalt_module(server-runtime-core
         src/world/BlockSurvival.cpp
         src/world/BrewingStands.cpp
         src/world/Buckets.cpp
+        src/world/MobBuckets.cpp
         src/world/ChiseledBookshelves.cpp
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
@@ -678,6 +689,7 @@ basalt_module(server-runtime-core
         src/world/PressurePlates.cpp
         src/world/Rails.cpp
         src/world/RespawnAnchors.cpp
+        src/world/RespawnPoints.cpp
         src/world/RandomSequences.cpp
         src/world/SavedDataFiles.cpp
         src/world/RandomTicks.cpp
@@ -699,7 +711,9 @@ basalt_module(server-runtime-core
         src/world/WorldBorder.cpp
         src/world/WorldLight.cpp
         src/world/WorldClock.cpp
+        src/world/BswChunkStore.cpp
         src/world/RegionStore.cpp
+        src/world/RegionStoreBsw.cpp
         src/world/OldTerrainBlending.cpp
         src/world/WorldMetadata.cpp
         src/world/WorldMetadataVanilla.cpp
@@ -739,6 +753,7 @@ basalt_module(server-runtime-core
         src/entity/Piglins.cpp
         src/entity/MobMisc.cpp
         src/entity/ai/FishGoals.cpp
+        src/MobActionDoors.cpp
         src/MobActionPluginMore.cpp
         src/MobActionSulfurCube.cpp
         src/entity/ai/TurtleGoals.cpp
@@ -807,6 +822,7 @@ basalt_module(server-runtime-core
         src/entity/MobSteps.cpp
         src/entity/Leashes.cpp
         src/MobActionLeash.cpp
+        src/entity/ai/BreakDoorGoal.cpp
         src/entity/ai/DoorInteraction.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
@@ -1137,5 +1153,21 @@ endif()
 
 basalt_test(server-runtime-player-persistence-test
     SOURCES test/PlayerPersistenceTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-region-store-bsw-test
+    SOURCES
+        test/RegionStoreBswTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-region-store-bsw-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_bench(server-runtime-region-load-bench
+    SOURCES
+        bench/RegionLoadBench.cpp
     DEPENDS basalt::server-runtime-core
 )

@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/entity/ai/Goal.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -39,6 +40,9 @@ public:
 
     [[nodiscard]] const std::set<GoalFlag>& flags() const noexcept { return flags_; }
 
+    /// The flags as a bit per `GoalFlag`, lowest first, for the hot path.
+    [[nodiscard]] std::uint8_t flagMask() const noexcept { return flagMask_; }
+
     [[nodiscard]] bool canBeReplacedBy(const WrappedGoal& other) const;
 
     void start(MobContext& mob);
@@ -50,6 +54,7 @@ private:
     std::unique_ptr<Goal> goal_;
     std::string name_;
     std::set<GoalFlag> flags_;
+    std::uint8_t flagMask_ = 0;
     bool plugin_ = false;
     bool retired_ = false;
     bool running_ = false;
@@ -103,7 +108,7 @@ private:
     std::size_t pluginGoals_ = 0;
     bool ticking_ = false;
     bool dirty_ = false;
-    std::map<GoalFlag, WrappedGoal*> lockedFlags_;
+    std::array<WrappedGoal*, 4> lockedFlags_{};
 };
 
 } // namespace basalt::server::runtime::entity::ai

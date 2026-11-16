@@ -67,7 +67,7 @@ void shuffleAndSplit(std::vector<ItemStack>& result, std::size_t availableSlots,
 } // namespace
 
 void LootTable::fill(std::vector<std::optional<ItemStack>>& slots, random::RandomSource& random,
-                     const LootContext& context) const {
+                     const LootContext& context, const Review& review) const {
     std::vector<ItemStack> stacks;
     // parity: `createStackSplitter`, which cuts anything past the item's own stack size.
     generateRaw(
@@ -87,6 +87,9 @@ void LootTable::fill(std::vector<std::optional<ItemStack>>& slots, random::Rando
             }
         },
         context);
+    if (review && !review(stacks)) {
+        return;
+    }
     std::vector<std::size_t> available;
     for (std::size_t index = 0; index < slots.size(); ++index) {
         if (!slots[index].has_value() || slots[index]->count <= 0) {

@@ -79,8 +79,11 @@ pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, d
         return route->nodes;
     }
     const std::string_view kind = mob.type().path();
-    const bool opensDoors = mob.navigationOpensDoors.value_or(kind == "villager" || kind == "copper_golem") &&
-                            mob.navigationPassesDoors.value_or(true);
+    // parity: `Zombie.setCanBreakDoors` gives the navigation `setCanOpenDoors`.
+    const bool breaksDoors = mob.sourceNbt.has_value() && mob.sourceNbt->getBoolean("CanBreakDoors");
+    const bool opensDoors =
+        mob.navigationOpensDoors.value_or(kind == "villager" || kind == "copper_golem" || breaksDoors) &&
+        mob.navigationPassesDoors.value_or(true);
     const bool floats = mob.navigationFloats.value_or(false);
     if (opensDoors || floats) {
         const double range = mob.attributeWithModifiers("minecraft:follow_range");

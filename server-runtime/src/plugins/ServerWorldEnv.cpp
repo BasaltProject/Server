@@ -16,6 +16,7 @@
 #include <basalt/server/runtime/world/Bells.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NaturalSpawner.hpp>
@@ -245,6 +246,16 @@ std::string ServerWorldEnv::creakingHeart(const std::string_view action, const s
     return hooks_->creakingHeart ? hooks_->creakingHeart(*world_, action, {x, y, z}) : std::string{};
 }
 
+std::int32_t ServerWorldEnv::vault(const std::string_view action, const std::int32_t x, const std::int32_t y,
+                                   const std::int32_t z, const std::string_view player) {
+    return hooks_->vault ? hooks_->vault(*world_, action, {x, y, z}, player) : 0;
+}
+
+std::int32_t ServerWorldEnv::hive(const std::string_view action, const std::int32_t x, const std::int32_t y,
+                                  const std::int32_t z, const std::int32_t entityId, const std::string_view player) {
+    return hooks_->hive ? hooks_->hive(*world_, action, {x, y, z}, entityId, player) : -1;
+}
+
 PluginBorder ServerWorldEnv::border() {
     const world::WorldBorder& border = world_->border();
     return PluginBorder{.centerX = border.centerX(),
@@ -413,6 +424,25 @@ std::int32_t ServerWorldEnv::signalFrom(const std::int32_t x, const std::int32_t
     }
     return world::redstone::signalFrom(world_->state(), world_->name(), x, y, z,
                                        kFaces[static_cast<std::size_t>(face)]);
+}
+
+std::int32_t ServerWorldEnv::ownSignalFrom(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                           const std::int32_t face) {
+    if (face < 0 || face > 5 || !world_->state().isLoaded(x >> 4, z >> 4)) {
+        return 0;
+    }
+    return world::redstone::ownSignalFrom(world_->state(), world_->name(), x, y, z,
+                                          kFaces[static_cast<std::size_t>(face)]);
+}
+
+std::int32_t ServerWorldEnv::analogSignal(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                          const std::int32_t face) {
+    constexpr std::array<std::string_view, 6> kFaceNames{"down", "up", "north", "south", "west", "east"};
+    if (face < 0 || face > 5 || !world_->state().isLoaded(x >> 4, z >> 4)) {
+        return -1;
+    }
+    return world::comparatorReading::at(world_->state(), x, y, z, kFaceNames[static_cast<std::size_t>(face)])
+        .value_or(-1);
 }
 
 double ServerWorldEnv::temperature(const std::int32_t x, const std::int32_t y, const std::int32_t z) {

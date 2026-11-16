@@ -48,7 +48,7 @@ namespace crafting = server::world::crafting;
 
 /// Whether the loop in `tick` does anything for this block entity type.
 [[nodiscard]] bool hasTicker(std::string_view path) {
-    static constexpr std::array<std::string_view, 18> kTicking{"sculk_sensor",   "calibrated_sculk_sensor",
+    static constexpr std::array<std::string_view, 19> kTicking{"sculk_sensor",   "calibrated_sculk_sensor",
                                                                "sculk_shrieker", "potent_sulfur",
                                                                "jukebox",        "beehive",
                                                                "sculk_catalyst", "trial_spawner",
@@ -56,7 +56,8 @@ namespace crafting = server::world::crafting;
                                                                "hopper",         "end_gateway",
                                                                "conduit",        "mob_spawner",
                                                                "beacon",         "crafter",
-                                                               "brewing_stand",  "campfire"};
+                                                               "brewing_stand",  "campfire",
+                                                               "vault"};
     return std::ranges::find(kTicking, path) != kTicking.end() || path == "soul_campfire" ||
            furnaces::cookerFor(path).has_value();
 }
@@ -259,6 +260,12 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
+            if (path == "vault") {
+                if (hooks.vault && hooks.vault(x, y, z)) {
+                    chunk->markDirty();
+                }
+                continue;
+            }
             if (path == "bell") {
                 server::world::ChunkBlockEntity* bellEntity = chunk->blockEntityAt(stored.localX, y, stored.localZ);
                 if (bellEntity != nullptr && bells::ringing(bellEntity->data()) && hooks.bell &&
@@ -285,6 +292,15 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                                            return hooks.allowHopperMove(worldName, x, y, z, "hopper", move);
                                        }}
                                      : std::function<bool(const hoppers::Move&)>{},
+                    .allowPickup =
+                        hooks.allowHopperPickup
+                            ? std::function<bool(std::int32_t, std::int32_t, std::int32_t,
+                                                 const DroppedItem&)>{[&hooks, worldName](
+                                                                          std::int32_t hx, std::int32_t hy,
+                                                                          std::int32_t hz, const DroppedItem& item) {
+                                  return hooks.allowHopperPickup(worldName, hx, hy, hz, item);
+                              }}
+                            : std::function<bool(std::int32_t, std::int32_t, std::int32_t, const DroppedItem&)>{},
                     .isBookshelfBook = hooks.isBookshelfBook,
                     .doesNotBlockHoppers = hooks.doesNotBlockHoppers,
                     .recipeFor = hooks.recipeFor,
@@ -350,10 +366,18 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 for (std::size_t slot = 0; slot < fire.items.size(); ++slot) {
                     moved = moved || (lit ? fire.items[slot].has_value() : fire.progress[slot] > 0);
                 }
-                const std::vector<server::world::loot::ItemStack> done =
-                    campfires::tick(fire, lit, [&hooks](const server::world::loot::ItemStack& stack) {
+                const std::vector<server::world::loot::ItemStack> done = campfires::tick(
+                    fire, lit,
+                    [&hooks](const server::world::loot::ItemStack& stack) {
                         return hooks.recipeFor ? hooks.recipeFor(crafting::Cooker::Campfire, stack) : nullptr;
-                    });
+                    },
+                    hooks.allowSmelt
+                        ? campfires::Finish{[&hooks, &worldName, x, y, z](const server::world::loot::ItemStack& source,
+                                                                          server::world::loot::ItemStack& result,
+                                                                          std::string_view recipe) {
+                              return hooks.allowSmelt(worldName, x, y, z, "campfire", source, result, recipe);
+                          }}
+                        : campfires::Finish{});
                 campfires::write(fire, entity->data());
                 // parity: `cookTick` and `cooldownTick` both only call `setChanged` when a slot.
                 if (moved) {
@@ -433,11 +457,34 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     before = stand;
                 }
                 const bool finishedBrew = stand.brewTime == 1 && brewingStands::isBrewable(stand);
-                if (brewingStands::tick(stand, [&hooks, x, y, z](const server::world::loot::ItemStack& remainder) {
-                        if (hooks.onDropped) {
-                            hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = remainder});
-                        }
-                    })) {
+                const brewingStands::FuelGate fuelGate = [&](const server::world::loot::ItemStack& fuel,
+                                                             std::int32_t& power, bool& consuming) {
+                    const server::plugins::PluginEvent* asked = world.events().ask(
+                        &server::plugins::pluginEventTypes::blockBrewingFuel, [&](server::plugins::PluginEvent& event) {
+                            plugins::hookEvents::position(event, world.eventWorld(), x, y, z);
+                            event.set("item", fuel.item.toString());
+                            event.set("fuel_power", static_cast<std::int64_t>(power));
+                            event.set("consuming", true);
+                        });
+                    if (asked == nullptr) {
+                        return true;
+                    }
+                    if (const auto* edited = std::get_if<std::int64_t>(&asked->get("fuel_power")); edited != nullptr) {
+                        power = static_cast<std::int32_t>(std::max<std::int64_t>(0, *edited));
+                    }
+                    if (const auto* flag = std::get_if<bool>(&asked->get("consuming")); flag != nullptr) {
+                        consuming = *flag;
+                    }
+                    return !asked->cancelled();
+                };
+                if (brewingStands::tick(
+                        stand,
+                        [&hooks, x, y, z](const server::world::loot::ItemStack& remainder) {
+                            if (hooks.onDropped) {
+                                hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = remainder});
+                            }
+                        },
+                        fuelGate)) {
                     if (before.has_value()) {
                         announceBrewing(world, x, y, z, *before, stand);
                     }

@@ -21,6 +21,11 @@ class PlayerSession;
 using BucketGate = std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
                                       const std::string& item, bool filling, std::string_view face)>;
 
+/// parity: `ItemUtils.createFilledResult`.
+void fillResult(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, std::int32_t slot,
+                const storage::StoredItemStack& held, const storage::StoredItemStack& result,
+                bool limitCreative = true);
+
 bool useBucketFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                   const wire::common::Identifier& item, std::int32_t heldSlot, const storage::StoredItemStack& held,
                   float yaw, float pitch, const BucketGate& allowed);

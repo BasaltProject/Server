@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/BlockReactions.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/Dripleaves.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
@@ -266,7 +267,7 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
            std::int64_t gameTime, bool tntExplodes, std::vector<BlockChange>& changes, random::RandomSource& random,
            std::optional<std::int32_t> told = std::nullopt) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    if (!stateId.has_value()) {
+    if (!stateId.has_value() || blockReactions::kindOf(*stateId) != blockReactions::Kind::kFull) {
         return;
     }
     const std::string path = pathOf(*stateId);

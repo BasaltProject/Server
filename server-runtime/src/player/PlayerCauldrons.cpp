@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
+#include <basalt/server/runtime/player/PlayerBuckets.hpp>
 #include <basalt/server/runtime/player/PlayerCauldrons.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -56,44 +57,6 @@ enum class Contents : std::uint8_t { Empty, Water, Lava, PowderSnow };
     return potion;
 }
 
-[[nodiscard]] bool carries(const PlayerSession& player, const StoredItemStack& stack) {
-    for (std::int32_t slot = 0; slot <= PlayerInventory::kOffhandSlot; ++slot) {
-        const std::optional<StoredItemStack>& held = player.inventory.at(slot);
-        if (held.has_value() && held->id == stack.id && held->components == stack.components) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/// parity: `ItemUtils.createFilledResult`.
-void fillResult(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, std::int32_t slot,
-                const StoredItemStack& held, const StoredItemStack& result, bool limitCreative = true) {
-    const bool creative = player.gamemode == Gamemode::Creative;
-    if (creative && limitCreative) {
-        if (!carries(player, result)) {
-            static_cast<void>(player.inventory.add(result));
-        }
-    } else if (!creative && held.count <= 1) {
-        player.inventory.set(slot, result);
-    } else {
-        if (!creative) {
-            StoredItemStack left = held;
-            left.count -= 1;
-            player.inventory.set(slot, left);
-        }
-        if (const std::int32_t leftover = player.inventory.add(result); leftover > 0) {
-            if (const auto id = Identifier::parse(result.id); id.has_value()) {
-                spawnDroppedItem(context, world, *id, leftover, player.x, player.y + 1.32, player.z, 0.0, 0.0, 0.0, 40,
-                                 result.components);
-            }
-        }
-    }
-    if (player.connection().sendInventoryAll) {
-        player.connection().sendInventoryAll();
-    }
-}
-
 void setCauldron(const BreakContext& context, world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::int32_t stateId, std::string_view event) {
     if (!world.state().setBlockState(x, y, z, stateId)) {
@@ -122,10 +85,27 @@ void playSound(const BreakContext& context, world::LoadedWorld& world, std::int3
 }
 
 /// parity: `LayeredCauldronBlock.lowerFillLevel`, down one, and empty at nothing.
+[[nodiscard]] std::int32_t loweredState(std::string_view block, std::int32_t level) {
+    return level <= 1 ? stateOf("cauldron") : stateOf(block, level - 1);
+}
+
 void lowerFillLevel(const BreakContext& context, world::LoadedWorld& world, std::int32_t x, std::int32_t y,
                     std::int32_t z, std::string_view block, std::int32_t level) {
-    setCauldron(context, world, x, y, z, level <= 1 ? stateOf("cauldron") : stateOf(block, level - 1), "block_change");
+    setCauldron(context, world, x, y, z, loweredState(block, level), "block_change");
 }
+
+struct Gate {
+    const BreakContext& context;
+    const PlayerSession& player;
+    std::int32_t x;
+    std::int32_t y;
+    std::int32_t z;
+    std::int32_t from;
+
+    [[nodiscard]] bool operator()(std::string_view reason, std::int32_t to) const {
+        return !context.cauldronAllowed || context.cauldronAllowed(player, x, y, z, reason, from, to);
+    }
+};
 
 /// parity: `CauldronInteractions.isUnderWater`.
 [[nodiscard]] bool underWater(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -169,8 +149,12 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
     const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(*stateId);
     const std::int32_t level = properties.contains("level") ? std::stoi(properties.at("level")) : 0;
     const std::string& item = held->id;
+    const Gate gate{context, player, x, y, z, *stateId};
     // parity: `addDefaultInteractions`, which every kind of cauldron has.
     if (item == "minecraft:water_bucket") {
+        if (!gate("BUCKET_EMPTY", stateOf("water_cauldron", kFullLevel))) {
+            return true;
+        }
         emptyBucket(context, player, world, x, y, z, heldSlot, *held, stateOf("water_cauldron", kFullLevel),
                     "item.bucket.empty");
         return true;
@@ -179,6 +163,9 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
         // parity: lava and powder snow answer `CONSUME` under water and do nothing.
         if (!underWater(world, x, y, z)) {
             const bool lava = item == "minecraft:lava_bucket";
+            if (!gate("BUCKET_EMPTY", lava ? stateOf("lava_cauldron") : stateOf("powder_snow_cauldron", kFullLevel))) {
+                return true;
+            }
             emptyBucket(context, player, world, x, y, z, heldSlot, *held,
                         lava ? stateOf("lava_cauldron") : stateOf("powder_snow_cauldron", kFullLevel),
                         lava ? "item.bucket.empty_lava" : "item.bucket.empty_powder_snow");
@@ -188,11 +175,14 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
     switch (*contents) {
     case Contents::Empty:
         if (isWaterPotion(*held)) {
+            const std::int32_t water = stateOf("water_cauldron");
+            if (!gate("BOTTLE_EMPTY", water)) {
+                return true;
+            }
             fillResult(context, player, world, heldSlot, *held,
                        StoredItemStack{.id = "minecraft:glass_bottle", .count = 1});
             statAwards::award(player, "use_cauldron");
             statAwards::used(player, item);
-            const std::int32_t water = stateOf("water_cauldron");
             setCauldron(context, world, x, y, z, water, "fluid_place");
             playSound(context, world, x, y, z, water, "item.bottle.empty");
             return true;
@@ -200,6 +190,9 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
         return false;
     case Contents::Lava:
         if (item == "minecraft:bucket") {
+            if (!gate("BUCKET_FILL", stateOf("cauldron"))) {
+                return true;
+            }
             fillBucket(context, player, world, x, y, z, heldSlot, *held, "minecraft:lava_bucket",
                        "item.bucket.fill_lava");
             return true;
@@ -207,6 +200,9 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
         return false;
     case Contents::PowderSnow:
         if (item == "minecraft:bucket" && level == kFullLevel) {
+            if (!gate("BUCKET_FILL", stateOf("cauldron"))) {
+                return true;
+            }
             fillBucket(context, player, world, x, y, z, heldSlot, *held, "minecraft:powder_snow_bucket",
                        "item.bucket.fill_powder_snow");
             return true;
@@ -219,10 +215,16 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
         if (level != kFullLevel) {
             return false;
         }
+        if (!gate("BUCKET_FILL", stateOf("cauldron"))) {
+            return true;
+        }
         fillBucket(context, player, world, x, y, z, heldSlot, *held, "minecraft:water_bucket", "item.bucket.fill");
         return true;
     }
     if (item == "minecraft:glass_bottle") {
+        if (!gate("BOTTLE_FILL", loweredState("water_cauldron", level))) {
+            return true;
+        }
         fillResult(context, player, world, heldSlot, *held, waterPotion());
         statAwards::award(player, "use_cauldron");
         statAwards::used(player, item);
@@ -235,11 +237,14 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
         if (level == kFullLevel) {
             return false;
         }
+        const std::int32_t higher = stateOf("water_cauldron", level + 1);
+        if (!gate("BOTTLE_EMPTY", higher)) {
+            return true;
+        }
         fillResult(context, player, world, heldSlot, *held,
                    StoredItemStack{.id = "minecraft:glass_bottle", .count = 1});
         statAwards::award(player, "use_cauldron");
         statAwards::used(player, item);
-        const std::int32_t higher = stateOf("water_cauldron", level + 1);
         setCauldron(context, world, x, y, z, higher, "fluid_place");
         playSound(context, world, x, y, z, higher, "item.bottle.empty");
         return true;
@@ -253,6 +258,9 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
         world::realItemTags::contains(*context.itemTags, "minecraft:cauldron_can_remove_dye", *id)) {
         if (!held->components.contains("minecraft:dyed_color")) {
             return false;
+        }
+        if (!gate("ARMOR_WASH", loweredState("water_cauldron", level))) {
+            return true;
         }
         StoredItemStack washed = *held;
         static_cast<void>(washed.components.remove("minecraft:dyed_color"));
@@ -270,6 +278,9 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
         if (layers == nullptr || layers->empty()) {
             return false;
         }
+        if (!gate("BANNER_WASH", loweredState("water_cauldron", level))) {
+            return true;
+        }
         StoredItemStack washed = *held;
         washed.count = 1;
         std::vector<wire::nbt::NbtTag> kept{layers->begin(), layers->end() - 1};
@@ -286,6 +297,9 @@ bool useCauldronFor(const BreakContext& context, PlayerSession& player, world::L
     }
     // parity: `shulkerBoxInteraction`.
     if (id->path().ends_with("_shulker_box")) {
+        if (!gate("SHULKER_WASH", loweredState("water_cauldron", level))) {
+            return true;
+        }
         StoredItemStack washed = *held;
         washed.id = "minecraft:shulker_box";
         washed.count = 1;

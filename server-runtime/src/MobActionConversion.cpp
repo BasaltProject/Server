@@ -428,7 +428,14 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
         return;
     }
     // parity: `Entity.thunderHit`.
-    mob.fireTicks = mob.fireTicks <= 0 ? kLightningFireTicks : mob.fireTicks + 1;
+    if (mob.fireTicks > 0) {
+        mob.fireTicks += 1;
+    } else {
+        std::int32_t ticks = kLightningFireTicks;
+        if (!hooks_.combustAllowed || hooks_.combustAllowed(world, mob, ticks, "lightning", boltId, nullptr)) {
+            mob.fireTicks = ticks;
+        }
+    }
     const float damage = path == "turtle" ? std::numeric_limits<float>::max() : kLightningDamage;
     const entity::entityCombat::Result result =
         entity::entityCombat::hurt(mob, damage, std::nullopt, std::nullopt, hooks_.combat, "lightning_bolt");

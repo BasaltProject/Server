@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -55,6 +56,12 @@ struct ClipViewer {
 /// parity: `BlockGetter.clip`.
 [[nodiscard]] bool clips(world::WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY,
                          double toZ, ClipShape shape, const ClipViewer& viewer);
+
+/// parity: `BlockGetter.clip`, the first block the line enters whose shape it touches.
+[[nodiscard]] std::optional<std::array<std::int32_t, 3>> firstClip(world::WorldState::CachedBlockReader& reader,
+                                                                   double fromX, double fromY, double fromZ, double toX,
+                                                                   double toY, double toZ, ClipShape shape,
+                                                                   const ClipViewer& viewer);
 
 /// The same, reading through a reader the caller holds across several rays.
 [[nodiscard]] bool clips(world::WorldState::CachedBlockReader& reader, double fromX, double fromY, double fromZ,

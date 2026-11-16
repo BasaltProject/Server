@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/Aabb.hpp>
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/world/PostAttackEffects.hpp>
 #include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
@@ -55,6 +56,7 @@ struct Context {
     std::function<void(world::LoadedWorld& world, const world::postAttack::Explosion& blast, double x, double y,
                        double z)>
         explode;
+    const entity::entityCombat::Hooks* combat = nullptr;
 };
 
 struct Swing {
@@ -81,7 +83,7 @@ void itemAttackInteraction(const Context& context, world::LoadedWorld& world, Pl
 [[nodiscard]] float knockbackOf(const Context& context, const PlayerSession& attacker,
                                 const std::optional<storage::StoredItemStack>& weapon);
 
-void knockMob(PlayerSession& attacker, entity::ServerEntity& mob, float power);
+void knockMob(PlayerSession& attacker, entity::ServerEntity& mob, float power, const Context& context);
 
 void sweep(PlayerSession& attacker, world::LoadedWorld& world, const Context& context, std::int32_t targetId,
            const entity::Aabb& targetBox, float baseDamage, float strength,

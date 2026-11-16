@@ -70,6 +70,14 @@ void BasaltServer::startBukkit() {
 #endif
 }
 
+void BasaltServer::collectJavaGarbage() const {
+#ifdef BASALT_WITH_BUKKIT
+    if (bukkit_ != nullptr) {
+        static_cast<const stratum::bukkit::BukkitHost*>(bukkit_.get())->collectGarbage();
+    }
+#endif
+}
+
 std::vector<std::string> BasaltServer::javaProfile() const {
 #ifdef BASALT_WITH_BUKKIT
     if (bukkit_ != nullptr) {

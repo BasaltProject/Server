@@ -12,7 +12,7 @@
 namespace basalt::server::runtime::plugins {
 namespace {
 
-constexpr std::array<std::string_view, 40> kKeys{"motd",
+constexpr std::array<std::string_view, 43> kKeys{"motd",
                                                  "max_players",
                                                  "port",
                                                  "bind",
@@ -51,7 +51,10 @@ constexpr std::array<std::string_view, 40> kKeys{"motd",
                                                  "status_replies",
                                                  "entity_broadcast_range",
                                                  "status_heartbeat_interval",
-                                                 "operator_user_permission_level"};
+                                                 "operator_user_permission_level",
+                                                 "max_world_size",
+                                                 "max_chained_neighbor_updates",
+                                                 "generate_structures"};
 
 [[nodiscard]] std::string joined(const std::vector<std::string>& values) {
     std::string out;
@@ -250,6 +253,17 @@ std::optional<std::string> ServerSettings::get(const std::string_view key) const
             hooks_.worlds ? hooks_.worlds() : std::vector<world::LoadedWorld*>{};
         return "minecraft:" + std::string{config::worldTypeName(worlds.empty() ? config::WorldType::Normal
                                                                                : worlds.front()->declaration().type)};
+    }
+    if (key == "max_world_size") {
+        return std::to_string(config.tuning.maxWorldSize);
+    }
+    if (key == "max_chained_neighbor_updates") {
+        return std::to_string(config.tuning.maxChainedNeighborUpdates);
+    }
+    if (key == "generate_structures") {
+        const std::vector<world::LoadedWorld*> worlds =
+            hooks_.worlds ? hooks_.worlds() : std::vector<world::LoadedWorld*>{};
+        return boolText(worlds.empty() || worlds.front()->settings().rules.generateStructures);
     }
     if (key == "initial_enabled_packs") {
         return joined(config.initialEnabledPacks);

@@ -27,6 +27,10 @@ public:
                std::int32_t sourceY, std::int32_t sourceZ, std::int32_t value, std::string_view player) override;
     [[nodiscard]] std::string creakingHeart(std::string_view action, std::int32_t x, std::int32_t y,
                                             std::int32_t z) override;
+    [[nodiscard]] std::int32_t vault(std::string_view action, std::int32_t x, std::int32_t y, std::int32_t z,
+                                     std::string_view player) override;
+    std::int32_t hive(std::string_view action, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t entityId,
+                      std::string_view player) override;
     bool raidBar(std::int32_t id, std::string_view action, std::string_view text, std::int32_t value) override;
     std::int32_t raidControl(std::int32_t id, std::string_view action, const std::array<std::int32_t, 4>& arguments,
                              std::int32_t value) override;
@@ -44,6 +48,9 @@ public:
     bool boneMeal(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::int32_t signalFrom(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face,
                                           bool direct) override;
+    [[nodiscard]] std::int32_t ownSignalFrom(std::int32_t x, std::int32_t y, std::int32_t z,
+                                             std::int32_t face) override;
+    [[nodiscard]] std::int32_t analogSignal(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face) override;
     [[nodiscard]] double temperature(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] double humidity(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::optional<std::array<std::int64_t, 6>> climateAtQuart(std::int32_t quartX, std::int32_t quartY,

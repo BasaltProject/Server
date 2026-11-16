@@ -189,9 +189,12 @@ struct LootTable {
     void generateRaw(random::RandomSource& random, float luck, std::optional<float> explosionRadius,
                      const LootPool::Output& output, const LootContext& context = {}) const;
 
+    /// Sees the rolled stacks before they are laid out; it may rewrite them, and false leaves the container alone.
+    using Review = std::function<bool(std::vector<ItemStack>& rolled)>;
+
     /// parity: `LootTable.fill`.
     void fill(std::vector<std::optional<ItemStack>>& slots, random::RandomSource& random,
-              const LootContext& context = {}) const;
+              const LootContext& context = {}, const Review& review = {}) const;
 
     /// parity: `LootTable.getRandomItems`.
     [[nodiscard]] std::vector<ItemStack> generate(random::RandomSource& random, float luck = 0.0F,

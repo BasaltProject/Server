@@ -22,6 +22,19 @@ struct SurfaceContent {
     std::vector<std::string> lines;
 };
 
+struct PluginSurfaces {
+    std::function<bool()> holdsSidebar;
+    std::function<std::optional<SurfaceContent>(const std::string& playerUuid)> sidebar;
+    std::function<bool()> holdsTabList;
+    std::function<std::optional<SurfaceContent>(const std::string& playerUuid)> tabList;
+    std::function<bool()> holdsBossBar;
+    std::function<std::optional<SurfaceContent>(const std::string& playerUuid)> bossBar;
+    std::function<bool()> holdsNameTag;
+    /// The title is the prefix and the first line the suffix, both in MiniMessage.
+    std::function<std::optional<SurfaceContent>(const std::string& playerUuid)> nameTag;
+    std::function<bool(const std::string& playerName)> inVanillaTeam;
+};
+
 class PlayerUi {
 public:
     using Send = std::function<void(std::int32_t packetId, const std::function<void(wire::io::ByteBuffer&)>& write)>;

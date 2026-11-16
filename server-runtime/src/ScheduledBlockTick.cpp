@@ -53,9 +53,16 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <span>
 
 namespace basalt::server::runtime {
 namespace {
+
+std::span<const world::ItemPose> scheduledItems(world::LoadedWorld& world) {
+    thread_local std::vector<world::ItemPose> poses;
+    world.state().itemPoses(poses);
+    return poses;
+}
 
 using player::PlayerSession;
 using wire::protocol::play::BlockPos;
@@ -216,7 +223,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         if (world::pressurePlates::isPlate(here)) {
             if (const std::optional<world::BlockChange> plate =
                     world::pressurePlates::update(world.state(), x, y, z, world::pressurePlates::Trigger::Scheduled,
-                                                  standingOn(world, x, y, z, watchers, world.state().items(),
+                                                  standingOn(world, x, y, z, watchers, scheduledItems(world),
                                                              std::numeric_limits<std::size_t>::max()),
                                                   world.gameTime());
                 plate.has_value()) {
@@ -242,7 +249,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 }
             }
             if (!stillOn) {
-                for (const world::DroppedItem& item : world.state().items()) {
+                for (const world::ItemPose& item : scheduledItems(world)) {
                     if (world::tripwires::crosses(x, y, z, here, item.x, item.y, item.z, itemHalf, itemHeight)) {
                         stillOn = true;
                         break;

@@ -126,6 +126,60 @@ void EntityRegistry::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ,
     }
 }
 
+void EntityRegistry::entitiesInRange(std::int32_t minChunkX, std::int32_t maxChunkX, std::int32_t minChunkZ,
+                                     std::int32_t maxChunkZ, std::vector<entity::ServerEntity*>& out) const {
+    const WorldWriteLock lock{*mutex_};
+    if (!indexValid_) {
+        index_.clear();
+        for (std::size_t order = 0; order < entities_.size(); ++order) {
+            entity::ServerEntity* entity = entities_[order].get();
+            const std::int64_t bucket =
+                (static_cast<std::int64_t>(chunkOf(entity->x)) << 32) | static_cast<std::uint32_t>(chunkOf(entity->z));
+            index_[bucket].push_back({entity, order});
+        }
+        indexValid_ = true;
+    }
+    const auto width = static_cast<std::int64_t>(maxChunkZ) - minChunkZ + 1;
+    const auto isIn = [](double coordinate, std::int32_t low, std::int32_t high) {
+        constexpr double kExactBound = 1.0e9;
+        if (std::abs(coordinate) < kExactBound) {
+            return coordinate >= static_cast<double>(low) * 16.0 &&
+                   coordinate < (static_cast<double>(high) * 16.0) + 16.0;
+        }
+        const std::int32_t chunk = chunkOf(coordinate);
+        return chunk >= low && chunk <= high;
+    };
+    rangeKeys_.clear();
+    candidates_.clear();
+    for (std::int32_t bucketX = minChunkX - 1; bucketX <= maxChunkX + 1; ++bucketX) {
+        for (std::int32_t bucketZ = minChunkZ - 1; bucketZ <= maxChunkZ + 1; ++bucketZ) {
+            const auto bucket =
+                index_.find((static_cast<std::int64_t>(bucketX) << 32) | static_cast<std::uint32_t>(bucketZ));
+            if (bucket == index_.end()) {
+                continue;
+            }
+            for (const Indexed& held : bucket->second) {
+                if (held.entity->removed || !isIn(held.entity->x, minChunkX, maxChunkX) ||
+                    !isIn(held.entity->z, minChunkZ, maxChunkZ)) {
+                    continue;
+                }
+                const std::int64_t cell = ((static_cast<std::int64_t>(chunkOf(held.entity->x)) - minChunkX) * width) +
+                                          (chunkOf(held.entity->z) - minChunkZ);
+                rangeKeys_.push_back({cell, held});
+            }
+        }
+    }
+    const auto before = [](const RangeKey& a, const RangeKey& b) {
+        return a.cell != b.cell ? a.cell < b.cell : a.held.order < b.held.order;
+    };
+    if (!std::ranges::is_sorted(rangeKeys_, before)) {
+        std::ranges::sort(rangeKeys_, before);
+    }
+    for (const RangeKey& key : rangeKeys_) {
+        out.push_back(key.held.entity);
+    }
+}
+
 std::vector<std::pair<std::int32_t, std::int32_t>> EntityRegistry::chunksWithEntities() const {
     const WorldWriteLock lock{*mutex_};
     std::vector<std::pair<std::int32_t, std::int32_t>> chunks;

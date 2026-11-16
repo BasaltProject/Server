@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
+#include <basalt/server/runtime/player/PlayerBlocksAttacks.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
@@ -298,7 +299,7 @@ bool transformBlockFor(const BreakContext& context, PlayerSession& player, world
                        const storage::StoredItemStack& held) {
     // parity: `playerHasBlockingItemUseIntent`.
     const std::optional<storage::StoredItemStack>& offhand = player.inventory.at(PlayerInventory::kOffhandSlot);
-    if (offhand.has_value() && offhand->id == "minecraft:shield" && !player.sneaking) {
+    if (offhand.has_value() && blocksAttacks::of(*offhand).has_value() && !player.sneaking) {
         return false;
     }
     const world::RealBlockTransformers::Tagged tagged = [&context](std::string_view tag,

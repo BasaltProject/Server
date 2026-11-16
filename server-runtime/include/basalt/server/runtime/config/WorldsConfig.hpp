@@ -30,11 +30,16 @@ struct GameplayHandle {
     friend bool operator==(const GameplayHandle&, const GameplayHandle&);
 };
 
+/// `auto` keeps the format a world already has and makes a new one bsw.
+enum class RegionFormatSetting : std::uint8_t { Auto, Bsw, Linear, Anvil };
+
 struct WorldSettings {
     std::string difficulty = "easy";
     std::int32_t viewDistance = 10;
     std::int32_t simulationDistance = 10;
     std::int32_t saveIntervalSeconds = 300;
+
+    RegionFormatSetting regionFormat = RegionFormatSetting::Bsw;
 
     bool openEndExitPortal = false;
     bool hardcore = false;

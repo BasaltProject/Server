@@ -391,6 +391,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         if (!ticking(entity->x, entity->z)) {
             continue;
         }
+        plugins::hookEvents::watchPose(world.events(), world.name(), *entity);
         // parity: `Entity.checkBelowWorld`, sixty-four blocks under the floor of the world.
         if (entity->y <
             static_cast<double>(config::dimensionFacts(world.declaration().dimension).chunkHeight.minY() - 64)) {
@@ -437,6 +438,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         if (entity::areaEffectClouds::isCloud(entity->type())) {
             clouds_->tick(world, watchers, living, *entity);
+            continue;
+        }
+        if (OminousItemSpawnerSystem::isSpawner(*entity)) {
+            ominousItems_->tick(world, *entity, random);
             continue;
         }
         if (WitherSystem::isWither(*entity) && !entity->dying) {

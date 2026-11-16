@@ -16,9 +16,12 @@
 #include <basalt/server/runtime/placeholder/AnimationPlaceholders.hpp>
 #include <basalt/server/runtime/placeholder/PlayerPlaceholders.hpp>
 #include <basalt/server/runtime/placeholder/ServerPlaceholders.hpp>
+#include <basalt/server/runtime/player/PlayerBlockSlots.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/plugins/PluginsCommand.hpp>
+#include <basalt/server/runtime/plugins/VaultHooks.hpp>
 #include <basalt/server/runtime/plugins/WorldEventHooks.hpp>
 #include <basalt/server/runtime/sched/OnOwner.hpp>
 #include <basalt/server/runtime/world/BiomeTagLoader.hpp>
@@ -47,6 +50,8 @@
 
 namespace basalt::server::runtime {
 namespace {
+
+constexpr int kJavaGcIdleSweeps = 2;
 
 // Beyond the view distance, so a requested chunk is still there when its session gets round to sending it.
 
@@ -359,7 +364,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         .onUnloadInterval =
             [this] {
                 persistence_->unloadUnreachableChunks();
-                memoryReleaser_.request();
+                const bool idle = playerRegistry_.count() == 0;
+                idleSweeps_ = idle ? idleSweeps_ + 1 : 0;
+                const bool becameIdle = idleSweeps_ == 1;
+                if (idleSweeps_ == kJavaGcIdleSweeps && playerRegistry_.count() == 0) {
+                    collectJavaGarbage();
+                }
+                memoryReleaser_.request(becameIdle);
             },
         .pauseWhenEmptySeconds = [this] { return settings_.pauseAllowed() ? settings_.pauseWhenEmptySeconds() : 0; },
         .hasPlayers = [this] { return playerRegistry_.count() > 0; },
@@ -802,6 +813,31 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                  const std::array<std::int32_t, 3>& at) {
         return mobActions_ != nullptr ? mobActions_->heartCommand(world, at, action) : std::string{};
     };
+    model.vault = [this](world::LoadedWorld& world, std::string_view action, const std::array<std::int32_t, 3>& at,
+                         std::string_view player) {
+        if (vaults_ == nullptr) {
+            return 0;
+        }
+        if (action == "tick") {
+            return vaults_->tick(world, at) ? 1 : 0;
+        }
+        const std::optional<wire::common::Uuid> id = wire::common::Uuid::parse(player);
+        player::PlayerSession* session = id.has_value() ? playerRegistry_.get(*id) : nullptr;
+        if (action != "insert_key" || session == nullptr) {
+            return 0;
+        }
+        const std::int32_t slot = player::PlayerInventory::kHotbarStart + session->inventory.heldSlot();
+        return player::useVaultFor(breakContext(), *session, world, at[0], at[1], at[2], slot,
+                                   session->inventory.at(slot))
+                   ? 1
+                   : 0;
+    };
+    model.hive = [this](world::LoadedWorld& world, std::string_view action, const std::array<std::int32_t, 3>& at,
+                        std::int32_t entityId, std::string_view player) {
+        const std::optional<wire::common::Uuid> id = wire::common::Uuid::parse(player);
+        const player::PlayerSession* session = id.has_value() ? playerRegistry_.get(*id) : nullptr;
+        return mobActions_ != nullptr ? mobActions_->hiveCommand(world, at, action, entityId, session) : -1;
+    };
     model.raidBar = [this](world::LoadedWorld& world, std::int32_t id, std::string_view action, std::string_view text,
                            std::int32_t value) {
         return raids_ != nullptr && raids_->controlBar(world, id, action, text, value);
@@ -1112,6 +1148,25 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         playerRegistry_,
         ExperienceOrbSystem::Options{
             .nextSeed = [] { return scratchSeed(); },
+            .mend =
+                [this](const player::PlayerSession& who, std::string_view slot, std::int32_t orbId,
+                       std::int32_t& repair, std::int32_t consumed) {
+                    const server::plugins::PluginEvent* event = eventSink_.ask(
+                        &server::plugins::pluginEventTypes::playerItemMend, [&](server::plugins::PluginEvent& filled) {
+                            plugins::EventSink::player(filled, who);
+                            filled.set("slot", std::string{slot});
+                            filled.set("orb_id", static_cast<std::int64_t>(orbId));
+                            filled.set("repair", static_cast<std::int64_t>(repair));
+                            filled.set("consumed", static_cast<std::int64_t>(consumed));
+                        });
+                    if (event == nullptr) {
+                        return true;
+                    }
+                    if (const auto* edited = std::get_if<std::int64_t>(&event->get("repair")); edited != nullptr) {
+                        repair = static_cast<std::int32_t>(std::max<std::int64_t>(0, *edited));
+                    }
+                    return !event->cancelled();
+                },
             .gained =
                 [this](const player::PlayerSession& who, std::int32_t amount, std::int32_t orbId) {
                     const server::plugins::PluginEvent* event = eventSink_.ask(
@@ -1186,11 +1241,16 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                               return false;
                           }},
             .lootTables = &vanillaData_.lootTables});
+    ominousItems_ = std::make_unique<OminousItemSpawnerSystem>(
+        playerRegistry_, OminousItemSpawnerSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     trialSpawners_ =
-        std::make_unique<TrialSpawnerSystem>(playerRegistry_, *broadcaster_, *mobSpawners_,
+        std::make_unique<TrialSpawnerSystem>(playerRegistry_, *broadcaster_, *mobSpawners_, *ominousItems_,
                                              TrialSpawnerSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                                                          .configs = &vanillaData_.trialSpawnerConfigs,
                                                                          .lootTables = &vanillaData_.lootTables});
+    vaults_ = std::make_unique<VaultSystem>(
+        playerRegistry_, *broadcaster_, plugins::vaultHooks(eventSink_),
+        VaultSystem::Options{.nextSeed = [] { return scratchSeed(); }, .lootTables = &vanillaData_.lootTables});
     combat_ = std::make_unique<CombatSystem>(
         *broadcaster_, *explosions_, CombatSystem::Hooks{},
         CombatSystem::Options{
@@ -1435,7 +1495,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     return mobActions_ != nullptr && mobActions_->brushArmadillo(world, armadillo);
                 },
             .mobSpawners = mobSpawners_.get(),
-            .trialSpawners = trialSpawners_.get()});
+            .trialSpawners = trialSpawners_.get(),
+            .vaults = vaults_.get()});
     // parity: `Raid.absorbRaidOmen` and `Raid.tick`'s victory.
     RaidSystem::Hooks raidHooks;
     raidHooks.raidFinished = [this](const world::LoadedWorld& world, const entity::Raid& raid, bool won) {
@@ -1504,6 +1565,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                              mobActions_->addMobEffect(world, watchers, mob, effect);
                                   }});
     mobCombatHooks_ = mobHooks.combat;
+    combat_->raiseKnockbackThrough(mobHooks.combat);
     // parity: `ContainerOpenersCounter` over a chest a copper golem works.
     mobHooks.openersChanged = [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                      std::int32_t openers) {

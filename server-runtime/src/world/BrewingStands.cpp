@@ -189,15 +189,22 @@ const wire::common::Identifier& block() {
     return instance;
 }
 
-bool tick(State& state, const DropRemainder& drop) {
+bool tick(State& state, const DropRemainder& drop, const FuelGate& fuelGate) {
     bool moved = false;
     const std::optional<ItemStack>& fuelStack = state.items[static_cast<std::size_t>(kFuelSlot)];
     // parity: the `minecraft:brewing_fuel` component.
     if (state.fuel <= 0 && fuelStack.has_value() && fuelStack->item == registry::brewing::fuel()) {
-        state.fuel = registry::brewing::kFuelUses;
+        std::int32_t power = registry::brewing::kFuelUses;
+        bool consuming = true;
+        if (fuelGate && !fuelGate(*fuelStack, power, consuming)) {
+            return false;
+        }
+        state.fuel = power;
         state.totalFuel = state.fuel;
         state.speedMultiplier = 1.0F;
-        state.items[static_cast<std::size_t>(kFuelSlot)] = spend(*fuelStack, drop);
+        if (state.fuel > 0 && consuming) {
+            state.items[static_cast<std::size_t>(kFuelSlot)] = spend(*fuelStack, drop);
+        }
         moved = true;
     }
     const bool brewable = isBrewable(state);

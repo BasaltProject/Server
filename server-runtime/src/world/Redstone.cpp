@@ -377,18 +377,27 @@ namespace {
 
 } // namespace
 
+std::int32_t ownSignalFrom(const WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
+                           std::int32_t z, BlockFace from, bool mutedWire) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return 0;
+    }
+    // parity: `RedStoneWireBlock.getSignal` works the connection out from the world with.
+    return isWire(*stateId)
+               ? (mutedWire ? 0 : wireSignal(redstoneWire::connectionsFor(world, x, y, z, *stateId), *stateId, from))
+               : signalOf(*stateId, from, containerOpeners::count(worldName, x, y, z),
+                          comparatorOutputAt(world, x, y, z), mutedWire, jukeboxPlayingAt(world, x, y, z),
+                          testBlockPoweredAt(world, x, y, z));
+}
+
 std::int32_t signalFrom(const WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                         std::int32_t z, BlockFace from, bool mutedWire) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return 0;
     }
-    // parity: `RedStoneWireBlock.getSignal` works the connection out from the world with.
-    const std::int32_t own =
-        isWire(*stateId)
-            ? (mutedWire ? 0 : wireSignal(redstoneWire::connectionsFor(world, x, y, z, *stateId), *stateId, from))
-            : signalOf(*stateId, from, containerOpeners::count(worldName, x, y, z), comparatorOutputAt(world, x, y, z),
-                       mutedWire, jukeboxPlayingAt(world, x, y, z), testBlockPoweredAt(world, x, y, z));
+    const std::int32_t own = ownSignalFrom(world, worldName, x, y, z, from, mutedWire);
     if (!registry::blockSupport::conductsRedstone(*stateId)) {
         return own;
     }
@@ -523,16 +532,23 @@ std::vector<BlockChange> settle(WorldState& world, std::string_view worldName, s
     std::vector<std::array<std::int32_t, 3>> queue;
     // parity: `updateNeighboursOnBlockSet` leaves the square itself alone.
     const std::array<std::int32_t, 3> here{x, y, z};
-    const auto open = [&queue, asked, &here](const std::array<std::int32_t, 3>& position) {
+    // A square that is not dust now never becomes dust here, so only dust is queued.
+    const auto open = [&queue, &world, asked, &here](const std::array<std::int32_t, 3>& position) {
         if (asked == Asked::NeighboursOnly && position == here) {
             return;
         }
-        queue.push_back(position);
+        if (const std::optional<std::int32_t> state = world.blockState(position[0], position[1], position[2]);
+            state.has_value() && isWire(*state)) {
+            queue.push_back(position);
+        }
     };
-    for (const std::array<std::int32_t, 3>& position : reachOf(world, x, y, z)) {
-        open(position);
-        open({position[0], position[1] + 1, position[2]});
-        open({position[0], position[1] - 1, position[2]});
+    {
+        const WorldState::BlockReadScope reading{world};
+        for (const std::array<std::int32_t, 3>& position : reachOf(world, x, y, z)) {
+            open(position);
+            open({position[0], position[1] + 1, position[2]});
+            open({position[0], position[1] - 1, position[2]});
+        }
     }
 
     for (std::int32_t round = 0; round < kMaxRounds && !queue.empty(); ++round) {

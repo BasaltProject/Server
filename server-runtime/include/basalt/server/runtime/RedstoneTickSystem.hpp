@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -43,6 +44,7 @@ class BlockChangeBroadcaster;
 class ChunkSimulationView;
 class MobSpawnerSystem;
 class TrialSpawnerSystem;
+class VaultSystem;
 
 class RedstoneTickSystem {
 public:
@@ -66,6 +68,9 @@ public:
         std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::string_view kind, const world::hoppers::Move& move)>
             allowHopperMove;
+        std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           const world::DroppedItem& item)>
+            allowHopperPickup;
         std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::string_view cooker, const server::world::loot::ItemStack& input,
                            server::world::loot::ItemStack& result, std::string_view recipe)>
@@ -121,6 +126,7 @@ public:
         std::function<bool(world::LoadedWorld& world, entity::ServerEntity& armadillo)> brushArmadillo;
         MobSpawnerSystem* mobSpawners = nullptr;
         TrialSpawnerSystem* trialSpawners = nullptr;
+        VaultSystem* vaults = nullptr;
     };
 
     RedstoneTickSystem(player::PlayerRegistry& players, world::RealRecipes& recipes,
@@ -182,8 +188,7 @@ private:
 
     [[nodiscard]] static std::int32_t standingOn(world::LoadedWorld& world, std::int32_t x, std::int32_t y,
                                                  std::int32_t z, const std::vector<player::PlayerSession*>& watchers,
-                                                 const std::vector<world::DroppedItem>& items,
-                                                 std::size_t movedThrough);
+                                                 std::span<const world::ItemPose> items, std::size_t movedThrough);
 
     [[nodiscard]] random::RandomSource freshRandom() const;
 

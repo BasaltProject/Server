@@ -36,7 +36,9 @@ basalt_module(server-world
         src/light/Light.cpp
         src/light/LightSpread.cpp
         src/light/LightWindow.cpp
+        src/region/ChunkBlob.cpp
         src/region/ChunkNbt.cpp
+        src/region/ChunkNbtParts.cpp
         src/structure/StrongholdBrush.cpp
     src/structure/StrongholdCorridors.cpp
     src/structure/StrongholdLayout.cpp
@@ -285,5 +287,17 @@ basalt_test(server-world-chunk-test
 basalt_bench(server-world-noise-bench
     SOURCES
         bench/NoiseBench.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_bench(server-world-chunk-io-bench
+    SOURCES
+        bench/ChunkIoBench.cpp
+    DEPENDS basalt::server-world basalt::zstd
+)
+
+basalt_bench(server-world-light-leaf-bench
+    SOURCES
+        bench/LightLeafBench.cpp
     DEPENDS basalt::server-world
 )

@@ -24,7 +24,7 @@ std::string_view storedNameOf(BanKind kind) { return kind == BanKind::Player ? "
 
 std::optional<StoredSpawnPoint> AccessRepository::spawnPointOf(std::string_view uuid) {
     wire::sql::Statement statement =
-        database_->prepare("SELECT uuid, world, x, y, z, yaw FROM spawn_point WHERE uuid = ?");
+        database_->prepare("SELECT uuid, world, x, y, z, yaw, forced FROM spawn_point WHERE uuid = ?");
     statement.bind(1, uuid);
     if (!statement.step()) {
         return std::nullopt;
@@ -34,18 +34,20 @@ std::optional<StoredSpawnPoint> AccessRepository::spawnPointOf(std::string_view 
                             .x = statement.real(2),
                             .y = statement.real(3),
                             .z = statement.real(4),
-                            .yaw = static_cast<float>(statement.real(5))};
+                            .yaw = static_cast<float>(statement.real(5)),
+                            .forced = statement.integer(6) != 0};
 }
 
 void AccessRepository::setSpawnPoint(const StoredSpawnPoint& point) {
-    wire::sql::Statement statement =
-        database_->prepare("INSERT OR REPLACE INTO spawn_point(uuid, world, x, y, z, yaw) VALUES (?, ?, ?, ?, ?, ?)");
+    wire::sql::Statement statement = database_->prepare(
+        "INSERT OR REPLACE INTO spawn_point(uuid, world, x, y, z, yaw, forced) VALUES (?, ?, ?, ?, ?, ?, ?)");
     statement.bind(1, point.uuid);
     statement.bind(2, point.world);
     statement.bind(3, point.x);
     statement.bind(4, point.y);
     statement.bind(5, point.z);
     statement.bind(6, static_cast<double>(point.yaw));
+    statement.bind(7, static_cast<std::int64_t>(point.forced ? 1 : 0));
     statement.execute();
 }
 

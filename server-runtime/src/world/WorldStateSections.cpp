@@ -135,32 +135,21 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     }
     // parity: a debug world places its grid without updates, so nothing is settled after it.
     if (settlesGeneration_) {
-        // Most reads fall in the one chunk the last one did, so that chunk is kept rather than found again.
-        const server::world::terrain::decoration::tree::leafDistances::BlockAt worldBlockAt =
-            [this, cachedKey = std::int64_t{0}, cached = static_cast<Chunk*>(nullptr),
-             cachedValid = false](std::int32_t x, std::int32_t y, std::int32_t z) mutable -> std::int32_t {
-            const std::int64_t wanted = key(x >> 4, z >> 4);
-            if (!cachedValid || cachedKey != wanted) {
-                cached = chunkAtLocked(wanted);
-                cachedKey = wanted;
-                cachedValid = true;
-            }
-            if (cached == nullptr || y < cached->verticalBounds().minY() || y > cached->verticalBounds().maxY()) {
-                return 0;
-            }
-            return cached->blockStateId(x & 15, y, z & 15);
+        const server::world::terrain::decoration::tree::leafDistances::ChunkAt worldChunkAt =
+            [&chunkAtPos](std::int32_t otherX, std::int32_t otherZ) -> const Chunk* {
+            return chunkAtPos(otherX, otherZ);
         };
         const bool touchesNeighbours =
             server::world::terrain::decoration::tree::leafDistances::mayChangeNeighbours(installed);
         if (!installed.loadedComplete()) {
-            server::world::terrain::decoration::tree::leafDistances::settle(installed, worldBlockAt);
+            server::world::terrain::decoration::tree::leafDistances::settle(installed, worldChunkAt);
         }
         // All eight: a diagonal neighbour's leaves are within six blocks of this chunk's logs too.
         for (std::int32_t dx = -1; dx <= 1 && touchesNeighbours; ++dx) {
             for (std::int32_t dz = -1; dz <= 1; ++dz) {
                 if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz);
                     neighbour != nullptr && (dx != 0 || dz != 0) && !neighbour->loadedComplete()) {
-                    server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldBlockAt);
+                    server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldChunkAt);
                 }
             }
         }
@@ -319,7 +308,9 @@ void WorldState::installPass(sched::Owner* target) {
 
 namespace {
 thread_local const WorldState* tlReadScope = nullptr;
-}
+thread_local std::int64_t tlScopeChunkKey = 0;
+thread_local const server::world::Chunk* tlScopeChunk = nullptr;
+} // namespace
 
 WorldState::BlockReadScope::BlockReadScope(const WorldState& world) {
     if (tlReadScope == &world) {
@@ -328,17 +319,28 @@ WorldState::BlockReadScope::BlockReadScope(const WorldState& world) {
     lock_ = WorldReadLock{world.mutex_};
     previous_ = tlReadScope;
     tlReadScope = &world;
+    tlScopeChunk = nullptr;
 }
 
 WorldState::BlockReadScope::~BlockReadScope() {
     if (lock_.owns_lock()) {
         tlReadScope = previous_;
+        tlScopeChunk = nullptr;
     }
 }
 
 std::optional<std::int32_t> WorldState::blockState(std::int32_t x, std::int32_t y, std::int32_t z) const {
     if (tlReadScope == this) {
-        return blockStateLocked(x, y, z);
+        const std::int64_t chunkKey = key(x >> 4, z >> 4);
+        if (tlScopeChunk == nullptr || tlScopeChunkKey != chunkKey) {
+            tlScopeChunk = chunkAtLocked(chunkKey);
+            tlScopeChunkKey = chunkKey;
+        }
+        const Chunk* chunk = tlScopeChunk;
+        if (chunk == nullptr || y < chunk->verticalBounds().minY() || y > chunk->verticalBounds().maxY()) {
+            return std::nullopt;
+        }
+        return chunk->blockStateId(x & 15, y, z & 15);
     }
     const WorldReadLock lock{mutex_};
     return blockStateLocked(x, y, z);
@@ -466,7 +468,7 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
             }
         }
     }
-    sculkSensors_.remember(x, y, z, stateId);
+    sculkSensors_.noteChange(x, y, z, was, stateId);
     return true;
 }
 
@@ -555,7 +557,7 @@ std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectio
         bool shapeChanged = false;
         bool lightChanged = false;
         bool poiChanged = false;
-        bool knownBefore = false;
+        bool wasSensor = false;
     };
 
     constexpr std::size_t kMemo = 16;
@@ -585,7 +587,11 @@ std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectio
                                     moving(was) || moving(stateId),
                     .lightChanged = server::world::changesLight(was, stateId),
                     .poiChanged = poi::poiTypes::forState(was) != poi::poiTypes::forState(stateId),
-                    .knownBefore = registry::blockStateDefinitions::blockOf(was) != nullptr};
+                    .wasSensor = [](std::int32_t previous) {
+                        const wire::common::Identifier* before = registry::blockStateDefinitions::blockOf(previous);
+                        return before != nullptr &&
+                               (before->path() == "sculk_sensor" || before->path() == "calibrated_sculk_sensor");
+                    }(was)};
         }
         // parity: `LevelChunk.setBlockState` gives a state that owns a block entity one whenever.
         if (state.ownsBlockEntity && chunk->blockEntityAt(x & 15, y, z & 15) == nullptr) {
@@ -598,7 +604,7 @@ std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectio
         }
         shapes += pair.shapeChanged ? 1 : 0;
         lightChanged = lightChanged || pair.lightChanged;
-        if ((state.sensor || pair.knownBefore) && (state.sensor || sculkSensors_.anyTracked())) {
+        if (state.sensor || (pair.wasSensor && sculkSensors_.anyTracked())) {
             sculkSensors_.remember(x, y, z, stateId);
         }
     }

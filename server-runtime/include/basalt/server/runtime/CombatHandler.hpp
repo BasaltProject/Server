@@ -166,6 +166,8 @@ private:
 
     [[nodiscard]] player::pvp::Context meleeContext(const player::BreakContext& blocks);
 
+    [[nodiscard]] entity::entityCombat::Hooks mobKnocks() const;
+
     /// parity: `Player.attack` on another player, who is no entity of the world's.
     void attackPlayer(player::PlayerSession& session, player::PlayerSession& victim, world::LoadedWorld& world);
 
@@ -174,6 +176,12 @@ private:
 
     /// parity: `ItemFrame.interact`.
     bool useItemFrame(player::PlayerSession& session, entity::ServerEntity& frame);
+
+    enum class ArmorStandUse : std::uint8_t { Pass, Done };
+
+    /// parity: `ArmorStand.interact`, the slot a click swaps with the hand.
+    ArmorStandUse useArmorStand(player::PlayerSession& session, entity::ServerEntity& armorStand, bool mainHand,
+                                double clickY);
 
     /// parity: `ItemFrame.hurtServer`.
     void breakFrame(player::PlayerSession& session, entity::ServerEntity& frame);

@@ -4,10 +4,12 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
+#include <basalt/server/runtime/OminousItemSpawnerSystem.hpp>
 #include <basalt/server/runtime/TrialSpawnerSystem.hpp>
 #include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerEntityData.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
@@ -50,11 +52,6 @@ constexpr std::int64_t kShutterDelay = 40;
 constexpr std::int64_t kEjectionInterval = 30;
 /// parity: `TrialSpawnerStateData.TRIAL_OMEN_PER_BAD_OMEN_LEVEL`.
 constexpr std::int32_t kTrialOmenPerBadOmenLevel = 18000;
-/// parity: `OminousItemSpawner.SPAWN_ITEM_DELAY_MIN`, `SPAWN_ITEM_DELAY_MAX` and `TICKS_BEFORE_ABOUT_TO_SPAWN_SOUND`.
-constexpr std::int32_t kItemDelayMin = 60;
-constexpr std::int32_t kItemDelayMax = 120;
-constexpr std::int64_t kTicksBeforeAboutToSpawn = 36;
-constexpr std::int32_t kItemSpawnedEvent = 3021;
 /// parity: `ServerLevel.levelEvent`, heard by the players within sixty-four blocks.
 constexpr double kLevelEventRange = 64.0;
 constexpr std::int32_t kDetectedPlayerEvent = 3013;
@@ -124,8 +121,9 @@ struct TrialSpawnerSystem::Turn {
 };
 
 TrialSpawnerSystem::TrialSpawnerSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster,
-                                       MobSpawnerSystem& mobs, Options options)
-    : players_(&players), broadcaster_(&broadcaster), mobs_(&mobs), options_(std::move(options)) {}
+                                       MobSpawnerSystem& mobs, OminousItemSpawnerSystem& ominousItems, Options options)
+    : players_(&players), broadcaster_(&broadcaster), mobs_(&mobs), ominousItems_(&ominousItems),
+      options_(std::move(options)) {}
 
 bool TrialSpawnerSystem::tick(world::LoadedWorld& world, const std::array<std::int32_t, 3>& pos) {
     const std::optional<std::int32_t> stateId = world.state().blockState(pos[0], pos[1], pos[2]);
@@ -169,7 +167,6 @@ bool TrialSpawnerSystem::tick(world::LoadedWorld& world, const std::array<std::i
         }
     }
     const ts::State next = step(turn, *current);
-    tickPendingItems(turn);
     if (next != *current) {
         setBlock(turn, kStateProperty, std::string{ts::nameOf(next)});
     }
@@ -549,13 +546,9 @@ void TrialSpawnerSystem::spawnOminousItemSpawner(Turn& turn) {
     if (!at.has_value()) {
         return;
     }
-    pending_[turn.world.name()].push_back(
-        PendingItem{.spawner = turn.pos,
-                    .x = (*at)[0],
-                    .y = (*at)[1],
-                    .z = (*at)[2],
-                    .stack = *chosen,
-                    .spawnAfterTicks = turn.random.nextIntBetweenInclusive(kItemDelayMin, kItemDelayMax)});
+    if (ominousItems_->spawn(turn.world, *chosen, (*at)[0], (*at)[1], (*at)[2], turn.random) == nullptr) {
+        return;
+    }
     const float pitch = ((turn.random.nextFloat() - turn.random.nextFloat()) * 0.2F) + 1.0F;
     soundAt(turn, "block.trial_spawner.spawn_item_begin", wire::protocol::play::SoundSource::Blocks,
             std::floor((*at)[0]) + 0.5, std::floor((*at)[1]) + 0.5, std::floor((*at)[2]) + 0.5, 1.0F, pitch);
@@ -564,7 +557,7 @@ void TrialSpawnerSystem::spawnOminousItemSpawner(Turn& turn) {
 
 std::optional<std::array<double, 3>> TrialSpawnerSystem::positionToSpawnSpawner(Turn& turn) {
     // parity: `TrialSpawnerState.calculatePositionToSpawnSpawner`, `selectEntityToSpawnItemAbove`,
-    // `calculatePositionAbove`.
+    // `calculatePositionAbove`, whose ray is VISUAL.
     struct Candidate {
         double x;
         double y;
@@ -588,7 +581,7 @@ std::optional<std::array<double, 3>> TrialSpawnerSystem::positionToSpawnSpawner(
             !near(player->x, player->y, player->z)) {
             continue;
         }
-        players.push_back({player->x, player->y, player->z, player->sneaking ? 1.5F : 1.8F});
+        players.push_back({player->x, player->y, player->z, static_cast<float>(player::heightOf(*player))});
     }
     if (players.empty()) {
         return std::nullopt;
@@ -623,10 +616,13 @@ std::optional<std::array<double, 3>> TrialSpawnerSystem::positionToSpawnSpawner(
     std::array<std::int32_t, 3> block{static_cast<std::int32_t>(std::floor(target.x)),
                                       static_cast<std::int32_t>(std::floor(aboveY)),
                                       static_cast<std::int32_t>(std::floor(target.z))};
-    if (const std::optional<entity::BlockHit> hit =
-            entity::blockRay::cast(turn.world.state(), target.x, target.y, target.z, target.x, aboveY, target.z);
+    world::WorldState::CachedBlockReader reader{turn.world.state()};
+    const entity::blockRay::ClipViewer viewer{.feetY = std::numeric_limits<double>::lowest()};
+    if (const std::optional<std::array<std::int32_t, 3>> hit =
+            entity::blockRay::firstClip(reader, target.x, target.y, target.z, target.x, aboveY, target.z,
+                                        entity::blockRay::ClipShape::Visual, viewer);
         hit.has_value()) {
-        block = {hit->blockX, hit->blockY, hit->blockZ};
+        block = *hit;
     }
     const std::array<double, 3> down{block[0] + 0.5, block[1] + 0.5 - 1.0, block[2] + 0.5};
     const std::optional<std::int32_t> below =
@@ -637,71 +633,16 @@ std::optional<std::array<double, 3>> TrialSpawnerSystem::positionToSpawnSpawner(
     return down;
 }
 
-void TrialSpawnerSystem::tickPendingItems(Turn& turn) {
-    // parity: `OminousItemSpawner.tickServer`; kept as a list here because the entity itself does not exist yet.
-    const auto list = pending_.find(turn.world.name());
-    if (list == pending_.end()) {
-        return;
-    }
-    std::vector<PendingItem> due;
-    std::erase_if(list->second, [&](PendingItem& item) {
-        if (item.spawner != turn.pos) {
-            return false;
-        }
-        ++item.age;
-        if (item.age == item.spawnAfterTicks - kTicksBeforeAboutToSpawn) {
-            soundAt(turn, "block.trial_spawner.about_to_spawn_item", wire::protocol::play::SoundSource::Neutral,
-                    std::floor(item.x) + 0.5, std::floor(item.y) + 0.5, std::floor(item.z) + 0.5, 1.0F, 1.0F);
-        }
-        if (item.age >= item.spawnAfterTicks) {
-            due.push_back(item);
-            return true;
-        }
-        return false;
-    });
-    for (const PendingItem& item : due) {
-        dropPendingItem(turn, item);
-    }
-}
-
-void TrialSpawnerSystem::dropPendingItem(Turn& turn, const PendingItem& item) {
-    // parity: `OminousItemSpawner.spawnItem`; the projectile is not owned by the spawner, which is no entity here.
-    const std::optional<entity::projectiles::DispenseShot> shot = entity::projectiles::dispensed(item.stack.item);
-    const std::array<std::int32_t, 3> at{static_cast<std::int32_t>(std::floor(item.x)),
-                                         static_cast<std::int32_t>(std::floor(item.y)),
-                                         static_cast<std::int32_t>(std::floor(item.z))};
-    if (shot.has_value()) {
-        const reg::EntityTypeEntry* type = reg::entityTypes::of(shot->kind->type);
-        if (type == nullptr) {
-            return;
-        }
-        entity::ServerEntity& launched = entity::projectiles::spawn(
-            turn.world.state(), *shot->kind, players_->allocateEntityId(), type->protocolId, item.x, item.y, item.z,
-            0.0, -1.0, 0.0, shot->power, shot->uncertainty, turn.random);
-        entity::projectiles::arm(launched, *shot, item.stack);
-    } else {
-        world::DroppedItem dropped{.entityId = players_->allocateEntityId(),
-                                   .uuid = Uuid::random(),
-                                   .item = item.stack.item,
-                                   .count = item.stack.count,
-                                   .x = item.x,
-                                   .y = item.y,
-                                   .z = item.z};
-        dropped.components = item.stack.components;
-        dropped.velocityX = (turn.random.nextDouble() * 0.2) - 0.1;
-        dropped.velocityY = 0.2;
-        dropped.velocityZ = (turn.random.nextDouble() * 0.2) - 0.1;
-        static_cast<void>(turn.world.state().spawnItem(std::move(dropped)));
-    }
-    levelEvent(turn, kItemSpawnedEvent, at, 1);
-}
-
 void TrialSpawnerSystem::soundAt(Turn& turn, const char* name, const wire::protocol::play::SoundSource source,
                                  const double x, const double y, const double z, const float volume,
                                  const float pitch) const {
     const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
+    const double range = static_cast<double>(std::max(volume, 1.0F)) * 16.0;
     for (const PlayerSession* player : players_->snapshot()) {
-        if (player->worldName == turn.world.name()) {
+        const double dx = x - player->x;
+        const double dy = y - player->y;
+        const double dz = z - player->z;
+        if (player->worldName == turn.world.name() && (dx * dx) + (dy * dy) + (dz * dz) < range * range) {
             player::playSoundFor(*player, name, source, x, y, z, volume, pitch, seed);
         }
     }

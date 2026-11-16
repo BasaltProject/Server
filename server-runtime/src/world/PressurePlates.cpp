@@ -75,6 +75,12 @@ constexpr std::int32_t kMaxSignal = 15;
 
 bool isPlate(std::int32_t stateId) { return plateAt(stateId) != nullptr; }
 
+bool isPressed(std::int32_t stateId) {
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto powered = properties.find("powered");
+    return number(properties, "power", powered != properties.end() && powered->second == "true" ? kMaxSignal : 0) > 0;
+}
+
 std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Trigger from,
                                   std::int32_t standing, const std::int64_t gameTime) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);

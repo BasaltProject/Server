@@ -15,6 +15,9 @@ public:
 
     void remember(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
+    /// Same as `remember`, but skips the lookup unless a sensor is placed or removed.
+    void noteChange(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t was, std::int32_t stateId);
+
     void rememberChunk(const server::world::Chunk& chunk);
 
     void forgetChunk(std::int32_t chunkX, std::int32_t chunkZ);

@@ -82,6 +82,23 @@ public:
 
     void setBlockStateIds(std::span<const std::int32_t> ids);
 
+    struct PackedContainer {
+        std::span<const std::int32_t> palette;
+        int bits = 0;
+        std::span<const std::uint8_t> wordBytes;
+    };
+
+    /// False on bad data, which may leave the section half filled.
+    [[nodiscard]] bool restorePacked(const PackedContainer& blocks, const PackedContainer& biomes);
+
+    void exportBlocks(std::vector<std::int32_t>& palette, int& bits, std::vector<std::uint64_t>& words) const {
+        blockStateIds_.exportPacked(palette, bits, words);
+    }
+
+    void exportBiomes(std::vector<std::int32_t>& palette, int& bits, std::vector<std::uint64_t>& words) const {
+        biomeIds_.exportPacked(palette, bits, words);
+    }
+
     /// Never zero; equal values mean equal blocks, biomes and counts.
     [[nodiscard]] std::uint64_t contentVersion() const noexcept { return version_.get(); }
 

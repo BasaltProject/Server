@@ -3,9 +3,11 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/PrimedTnt.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
+#include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -220,15 +222,29 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
                                                    .speed = 1.0F}},
         .playSound = !silent};
     const double doubleRadius = static_cast<double>(power) * 2.0;
+    std::optional<std::int32_t> blamed;
+    if (source != nullptr) {
+        blamed = source->ownerId.value_or(source->entityId());
+    }
     for (player::PlayerSession* player : watchers) {
         play::ExplodePacket own = explode;
         const double distance = std::sqrt((player->x - x) * (player->x - x) + (player->y - y) * (player->y - y) +
                                           (player->z - z) * (player->z - z)) /
                                 doubleRadius;
         if (distance <= 1.0 && !world.settings().rules.environment.disableExplosionKnockback) {
-            const std::array<double, 3> push = world::explosions::knockbackOf(
+            std::array<double, 3> push = world::explosions::knockbackOf(
                 x, y, z, player->x, player->y + eyeHeightOf(*player), player->z, distance,
                 world::explosions::exposureOf(player->entityId()), blastResistance(*player));
+            // parity: `ServerExplosion.interactWithEntities`, which lets a plugin cancel or rewrite the blast's push.
+            const double before = std::sqrt((push[0] * push[0]) + (push[1] * push[1]) + (push[2] * push[2]));
+            entity::entityCombat::Knock knock{.cause = "explosion",
+                                              .sourceId = blamed,
+                                              .power = before,
+                                              .towardsX = -push[0],
+                                              .towardsZ = -push[2],
+                                              .delta = push};
+            push = player::knockAllowed(*player, knock) ? entity::entityCombat::scaledDelta(knock, before)
+                                                        : std::array<double, 3>{0.0, 0.0, 0.0};
             player->deltaMovement[0] += push[0];
             player->deltaMovement[1] += push[1];
             player->deltaMovement[2] += push[2];

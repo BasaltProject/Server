@@ -38,6 +38,8 @@ struct Move {
 struct Around {
     /// parity: the Bukkit `InventoryMoveItemEvent`, asked once per item before it leaves or enters the hopper.
     std::function<bool(const Move& move)> allowMove;
+    /// parity: the Bukkit `InventoryPickupItemEvent`, asked per lying stack before the hopper at `x y z` takes it.
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, const DroppedItem& item)> allowPickup;
     /// parity: `ChiseledBookShelfBlockEntity.acceptsItemType`.
     std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
     /// parity: `does_not_block_hoppers`.

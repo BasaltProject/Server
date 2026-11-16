@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
@@ -119,9 +120,20 @@ void RedstoneTickSystem::tickFluids(world::LoadedWorld& world, const sched::Regi
 void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sched::Region& region) {
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     // parity: `entityInside`.
-    const std::vector<world::DroppedItem> items = world.state().items();
+    thread_local std::vector<world::ItemPose> itemBuffer;
+    world.state().itemPoses(itemBuffer);
+    const std::vector<world::ItemPose>& items = itemBuffer;
+
+    // Not a player: the entity (or lying item) the plugins hear about before it can press a plate.
+    struct Toucher {
+        std::int32_t id = -1;
+        std::string type;
+        bool living = false;
+    };
+
     const auto touch = [this, &world, &region, &watchers, &items](double atX, double atY, double atZ, double halfWidth,
-                                                                  double height, std::size_t movedThrough) {
+                                                                  double height, std::size_t movedThrough,
+                                                                  const Toucher& toucher = {}) {
         // `y` is a range: the jar's box test counts a plate the body reaches upwards too.
         for (std::int32_t x = wire::common::mth::floor(atX - halfWidth); x <= wire::common::mth::floor(atX + halfWidth);
              ++x) {
@@ -134,6 +146,23 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
                     const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
                     if (!stateId.has_value() || !world::pressurePlates::isPlate(*stateId) ||
                         !world::pressurePlates::touches(x, y, z, atX, atY, atZ, halfWidth, height)) {
+                        continue;
+                    }
+                    // parity: `PressurePlateBlock.getSignalStrength` counts only mobs on stone plates.
+                    const wire::common::Identifier* plate = server::registry::blockStateDefinitions::blockOf(*stateId);
+                    const bool livingOnly = plate != nullptr && (plate->path() == "stone_pressure_plate" ||
+                                                                 plate->path() == "polished_blackstone_pressure_plate");
+                    if (toucher.id >= 0 && !(livingOnly && !toucher.living) &&
+                        !world::pressurePlates::isPressed(*stateId) &&
+                        !world.events().allowed(&server::plugins::pluginEventTypes::entityInteract,
+                                                [&](server::plugins::PluginEvent& event) {
+                                                    plugins::hookEvents::entity(event, world.name(), toucher.id,
+                                                                                toucher.type, atX, atY, atZ);
+                                                    event.set("block_x", static_cast<std::int64_t>(x));
+                                                    event.set("block_y", static_cast<std::int64_t>(y));
+                                                    event.set("block_z", static_cast<std::int64_t>(z));
+                                                    event.set("block", plugins::hookEvents::blockName(*stateId));
+                                                })) {
                         continue;
                     }
                     if (const std::optional<world::BlockChange> change = world::pressurePlates::update(
@@ -161,11 +190,13 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
     for (const entity::ServerEntity* standing : world.state().entities()) {
         if (!standing->removed && !entity::blockTriggers::ignored(standing->type())) {
             const auto [half, height] = halfAndHeightOf(*standing);
-            touch(standing->x, standing->y, standing->z, half, height, items.size());
+            touch(standing->x, standing->y, standing->z, half, height, items.size(),
+                  Toucher{standing->entityId(), standing->type().toString(), standing->livingType()});
         }
     }
     for (std::size_t index = 0; index < items.size(); ++index) {
-        touch(items[index].x, items[index].y, items[index].z, itemHalf, itemHeight, index + 1);
+        touch(items[index].x, items[index].y, items[index].z, itemHalf, itemHeight, index + 1,
+              Toucher{items[index].entityId, "minecraft:item"});
     }
 
     // parity: `BigDripleafBlock.entityInside`.
@@ -199,7 +230,7 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
             stand(player->x, player->y, player->z, player->onGround, player->sneaking);
         }
     }
-    for (const world::DroppedItem& item : items) {
+    for (const world::ItemPose& item : items) {
         // parity: `canEntityTilt`.
         stand(item.x, item.y, item.z, item.onGround);
     }
@@ -379,7 +410,9 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
         }
         crossingsOf(world, player->x, player->y, player->z, playerHalf, playerHeight, crossed);
     }
-    for (const world::DroppedItem& item : world.state().items()) {
+    thread_local std::vector<world::ItemPose> items;
+    world.state().itemPoses(items);
+    for (const world::ItemPose& item : items) {
         if (region.ownsPosition(item.x, item.z)) {
             crossingsOf(world, item.x, item.y, item.z, itemHalf, itemHeight, crossed);
         }
@@ -404,7 +437,7 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
 
 std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                             const std::vector<PlayerSession*>& watchers,
-                                            const std::vector<world::DroppedItem>& items, std::size_t movedThrough) {
+                                            std::span<const world::ItemPose> items, std::size_t movedThrough) {
     std::int32_t count = 0;
     // parity: `getEntityCount(level, TOUCH_AABB.move(pos), ...)`.
     const auto sizeOf = [](const wire::common::Identifier& type) {
@@ -439,7 +472,7 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
     }
     if (!livingOnly) {
         for (std::size_t index = 0; index < items.size(); ++index) {
-            const world::DroppedItem& item = items[index];
+            const world::ItemPose& item = items[index];
             const bool taken = index < movedThrough;
             if (world::pressurePlates::touches(x, y, z, taken ? item.x : item.previousX,
                                                taken ? item.y : item.previousY, taken ? item.z : item.previousZ,

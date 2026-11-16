@@ -97,6 +97,16 @@ public:
 
     void poseChanged(entity::ServerEntity& mob) override;
 
+    void blockProgress(entity::ServerEntity& mob, std::int32_t x, std::int32_t y, std::int32_t z,
+                       std::int32_t stage) override;
+
+    void levelEvent(entity::ServerEntity& mob, std::int32_t event, std::int32_t x, std::int32_t y, std::int32_t z,
+                    std::int32_t data) override;
+
+    bool breakDoor(entity::ServerEntity& mob, std::int32_t x, std::int32_t y, std::int32_t z) override;
+
+    bool hardDifficulty(const entity::ServerEntity& mob) override;
+
     bool pluginGoal(entity::ServerEntity& mob, std::string_view key, entity::ai::PluginGoalPhase phase) override;
     bool pluginBehavior(entity::ServerEntity& mob, std::string_view key, entity::ai::PluginGoalPhase phase) override;
 
@@ -177,6 +187,11 @@ public:
     /// "spawn" puts a protector at the heart and answers its uuid; "resin" spreads a clump and answers "x,y,z".
     [[nodiscard]] std::string heartCommand(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
                                            std::string_view action);
+
+    /// "enter" stores the bee `entityId` and answers 1 when it went in; "honey", "bee" and "emergency" release the
+    /// bees and answer how many left. -1 when there is no hive.
+    std::int32_t hiveCommand(world::LoadedWorld& world, const std::array<std::int32_t, 3>& hive,
+                             std::string_view action, std::int32_t entityId, const player::PlayerSession* player);
 
     bool tickBell(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                   wire::nbt::NbtCompound& data);

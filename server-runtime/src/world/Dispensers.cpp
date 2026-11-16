@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/entity/DragonNavigation.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
@@ -19,6 +20,7 @@
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
+#include <basalt/server/runtime/world/MobBuckets.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -132,23 +134,6 @@ constexpr std::int32_t kGrowthSparkles = 15;
 [[nodiscard]] const wire::common::Identifier& armorStand() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("armor_stand");
     return instance;
-}
-
-/// parity: the ten `MobBucketItem` registrations.
-[[nodiscard]] std::optional<std::pair<std::string_view, bool>> caughtIn(std::string_view path) {
-    static constexpr std::array<std::pair<std::string_view, std::string_view>, 7> kBuckets{
-        {{"cod_bucket", "cod"},
-         {"salmon_bucket", "salmon"},
-         {"pufferfish_bucket", "pufferfish"},
-         {"tropical_fish_bucket", "tropical_fish"},
-         {"axolotl_bucket", "axolotl"},
-         {"tadpole_bucket", "tadpole"},
-         {"sulfur_cube_bucket", "sulfur_cube"}}};
-    const auto found = std::ranges::find_if(kBuckets, [path](const auto& one) { return one.first == path; });
-    if (found == kBuckets.end()) {
-        return std::nullopt;
-    }
-    return std::pair{found->second, found->first != "sulfur_cube_bucket"};
 }
 
 /// parity: the sixteen `BoatDispenseItemBehavior` entries.
@@ -543,9 +528,8 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
         return Special{.handled = true, .left = minusOne(stack)};
     }
     // parity: `MobBucketItem`.
-    if (const std::optional<std::pair<std::string_view, bool>> caught = caughtIn(stack.item.path());
-        caught.has_value()) {
-        if (caught->second) {
+    if (const mobBuckets::Kind* caught = mobBuckets::ofItem(stack.item); caught != nullptr) {
+        if (caught->water) {
             const std::optional<buckets::Result> poured =
                 buckets::useOn(context, buckets::waterBucket(), tx, ty, tz, directionOf(out), false);
             if (!poured.has_value()) {
@@ -553,14 +537,16 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
             }
             heard(context.world, "fluid_place", tx, ty, tz, hooks.gameTime);
         }
-        const wire::common::Identifier animal = wire::common::Identifier::vanilla(std::string{caught->first});
+        const wire::common::Identifier animal = wire::common::Identifier::vanilla(std::string{caught->entity});
         const std::optional<std::int32_t> protocolType = protocolTypeOf(hooks, animal);
         if (protocolType.has_value()) {
             // parity: `EntityType.create(..., shouldOffsetY = true)` drops it a block onto whatever is.
-            auto spawned =
-                std::make_unique<entity::ServerEntity>(nextEntityId(hooks), wire::common::Uuid::random(), animal,
-                                                       *protocolType, tx + 0.5, static_cast<double>(ty), tz + 0.5);
-            static_cast<void>(context.world.spawnEntity(std::move(spawned)));
+            auto spawned = mobBuckets::spawnFrom(*caught, stack.components, nextEntityId(hooks), *protocolType,
+                                                 tx + 0.5, static_cast<double>(ty), tz + 0.5,
+                                                 entity::enderDragon::wrapDegrees(context.random.nextFloat() * 360.0F));
+            if (spawned != nullptr) {
+                static_cast<void>(context.world.spawnEntity(std::move(spawned)));
+            }
             heard(context.world, "entity_place", tx, ty, tz, hooks.gameTime);
         }
         const std::optional<ItemStack> left = minusOne(stack);

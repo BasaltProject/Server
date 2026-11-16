@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -26,6 +27,10 @@ inline constexpr std::int32_t kMaxAge = 15;
 [[nodiscard]] std::int32_t tickDelay(const WorldState& world, random::RandomSource& random);
 
 [[nodiscard]] bool isFire(std::int32_t stateId);
+
+/// parity: `BaseFireBlock.getState`, the fire a block takes when it is laid at (x, y, z).
+[[nodiscard]] std::optional<std::int32_t> newFireAt(const WorldState& world, std::int32_t x, std::int32_t y,
+                                                    std::int32_t z);
 
 /// parity: `FlintAndSteelDispenseItemBehavior`.
 bool ignite(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,

@@ -107,7 +107,8 @@ enum class CloneMode : std::uint8_t { Normal, Force, Move };
                 if (!state.has_value() || (skipAir && *state == reg::blocks::air().stateId)) {
                     continue;
                 }
-                if (filter != nullptr && !filter->matches(*state)) {
+                if (filter != nullptr &&
+                    !filter->matchesAt(editor.world().state(), minX + x, minY + y, minZ + z, *state)) {
                     continue;
                 }
                 copied.push_back({.x = x, .y = y, .z = z, .stateId = *state});

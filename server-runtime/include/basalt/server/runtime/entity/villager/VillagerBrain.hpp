@@ -129,6 +129,9 @@ public:
 
     virtual std::vector<world::trades::Offer>* offers(ServerEntity& mob) = 0;
 
+    /// Asked once per offer before a restock resets its uses; false keeps them.
+    virtual bool replenishAllowed(ServerEntity& /*mob*/, const world::trades::Offer& /*offer*/) { return true; }
+
     virtual std::optional<std::int32_t> composterAdd(ServerEntity& mob, const BlockPos& pos,
                                                      const wire::common::Identifier& item) = 0;
 

@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/plugins/PlayerOps.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -23,6 +24,7 @@
 #include <basalt/wire/text/MiniMessage.hpp>
 
 #include <algorithm>
+#include <cmath>
 
 namespace basalt::server::runtime::plugins::playerOps {
 namespace {
@@ -313,12 +315,27 @@ std::optional<Value> misc(Context& context, const Verb verb, const std::string_v
             store->access().clearSpawnPoint(uuid);
             return true;
         }
-        store->access().setSpawnPoint(storage::StoredSpawnPoint{.uuid = uuid,
-                                                                .world = asText(first),
-                                                                .x = asReal(arg(args, 1)),
-                                                                .y = asReal(arg(args, 2)),
-                                                                .z = asReal(arg(args, 3)),
-                                                                .yaw = static_cast<float>(asReal(arg(args, 4)))});
+        storage::StoredSpawnPoint point{.uuid = uuid,
+                                        .world = asText(first),
+                                        .x = asReal(arg(args, 1)),
+                                        .y = asReal(arg(args, 2)),
+                                        .z = asReal(arg(args, 3)),
+                                        .yaw = static_cast<float>(asReal(arg(args, 4)))};
+        if (session.events != nullptr) {
+            auto blockX = static_cast<std::int32_t>(std::floor(point.x));
+            auto blockY = static_cast<std::int32_t>(std::floor(point.y));
+            auto blockZ = static_cast<std::int32_t>(std::floor(point.z));
+            const std::int32_t askedX = blockX;
+            const std::int32_t askedY = blockY;
+            const std::int32_t askedZ = blockZ;
+            if (!hookEvents::spawnChangeAllowed(*session.events, session, blockX, blockY, blockZ, "plugin")) {
+                return false;
+            }
+            point.x += blockX - askedX;
+            point.y += blockY - askedY;
+            point.z += blockZ - askedZ;
+        }
+        store->access().setSpawnPoint(point);
         return true;
     }
     if (name == "last_death") {

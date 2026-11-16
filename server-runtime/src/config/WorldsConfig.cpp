@@ -76,6 +76,20 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
     settings.simulationDistance = ruleErrors::whole(*table, "simulation-distance", inherited.simulationDistance, 2, 32);
     settings.saveIntervalSeconds = static_cast<std::int32_t>(
         std::max<std::int64_t>(table->integer("save-interval-seconds").value_or(inherited.saveIntervalSeconds), 0));
+    if (table->find("region-format") != nullptr) {
+        const std::optional<std::string_view> named = table->string("region-format");
+        if (named == "auto") {
+            settings.regionFormat = RegionFormatSetting::Auto;
+        } else if (named == "bsw") {
+            settings.regionFormat = RegionFormatSetting::Bsw;
+        } else if (named == "linear") {
+            settings.regionFormat = RegionFormatSetting::Linear;
+        } else if (named == "anvil") {
+            settings.regionFormat = RegionFormatSetting::Anvil;
+        } else {
+            ruleErrors::report("region-format", "must be \"bsw\", \"linear\", \"anvil\" or \"auto\"");
+        }
+    }
     settings.openEndExitPortal = table->boolean("open-end-exit-portal").value_or(inherited.openEndExitPortal);
     settings.hardcore = ruleErrors::flag(*table, "hardcore", inherited.hardcore);
     settings.lootRefill = ruleErrors::flag(*table, "loot-refill", inherited.lootRefill);

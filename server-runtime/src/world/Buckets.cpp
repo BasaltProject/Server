@@ -110,6 +110,8 @@ struct Hit {
             return std::nullopt;
         }
         Result hissed;
+        const Hit hissedAt = holdsWaterInside(*clicked) ? hit : hit.offset();
+        hissed.at = {hissedAt.x, hissedAt.y, hissedAt.z};
         if (!creative) {
             hissed.replacement = emptyBucket();
         }
@@ -121,6 +123,7 @@ struct Hit {
             return std::nullopt;
         }
         Result soakedResult;
+        soakedResult.at = {hit.x, hit.y, hit.z};
         // parity: `canPlaceLiquid` only asks whether the fluid is water, not whether the block is.
         if (const std::optional<std::int32_t> soaked = waterloggedTo(*clicked, true); soaked.has_value()) {
             if (!context.world.setBlockState(hit.x, hit.y, hit.z, *soaked)) {
@@ -154,11 +157,26 @@ struct Hit {
         return std::nullopt;
     }
     Result result;
+    result.at = {target.x, target.y, target.z};
     result.changes.push_back(
         FluidChange{.x = target.x, .y = target.y, .z = target.z, .stateId = source, .washedAway = *existing});
     for (const FluidChange& change : fluidFlow::onBlockChanged(context, target.x, target.y, target.z)) {
         result.changes.push_back(change);
     }
+    if (!creative) {
+        result.replacement = emptyBucket();
+    }
+    return result;
+}
+
+/// parity: `MobBucketItem.emptyContents` with no fluid, which only plays its sound.
+[[nodiscard]] std::optional<Result> emptyDry(const Hit& hit, bool creative, const Gate& gate) {
+    const Hit target = hit.offset();
+    if (!permitted(gate, target)) {
+        return std::nullopt;
+    }
+    Result result;
+    result.at = {target.x, target.y, target.z};
     if (!creative) {
         result.replacement = emptyBucket();
     }
@@ -239,6 +257,33 @@ std::optional<Result> use(const fluidFlow::Context& context, const wire::common:
         return std::nullopt;
     }
     return content.has_value() ? pour(context, *hit, *content, creative, gate) : fill(context, *hit, gate);
+}
+
+std::optional<Result> useMob(const fluidFlow::Context& context, bool water, double eyeX, double eyeY, double eyeZ,
+                             float yaw, float pitch, bool creative, const Gate& gate) {
+    const std::optional<Hit> hit =
+        trace(context.world, eyeX, eyeY, eyeZ, yaw, pitch, creative ? kCreativeReach : kReach, false);
+    if (!hit.has_value()) {
+        return std::nullopt;
+    }
+    if (water) {
+        return pour(context, *hit, FluidKind::Water, creative, gate);
+    }
+    return emptyDry(*hit, creative, gate);
+}
+
+std::optional<Result> useMobOn(const fluidFlow::Context& context, bool water, std::int32_t x, std::int32_t y,
+                               std::int32_t z, wire::protocol::play::Direction face, bool creative, const Gate& gate) {
+    const Hit hit{.x = x,
+                  .y = y,
+                  .z = z,
+                  .faceX = wire::protocol::play::normalX(face),
+                  .faceY = wire::protocol::play::normalY(face),
+                  .faceZ = wire::protocol::play::normalZ(face)};
+    if (water) {
+        return pour(context, hit, FluidKind::Water, creative, gate);
+    }
+    return emptyDry(hit, creative, gate);
 }
 
 std::optional<Result> useOn(const fluidFlow::Context& context, const wire::common::Identifier& item, std::int32_t x,

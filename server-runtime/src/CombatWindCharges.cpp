@@ -6,8 +6,10 @@
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/BlockRay.hpp>
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerImpulse.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
@@ -142,6 +144,11 @@ void CombatSystem::gust(world::LoadedWorld& world, const std::vector<PlayerSessi
     const double z = blast.z;
     const float radius = blast.radius;
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    std::optional<std::int32_t> blamed;
+    if (blast.sourceId.has_value()) {
+        const ServerEntity* source = world.state().entity(*blast.sourceId);
+        blamed = source != nullptr ? source->ownerId.value_or(*blast.sourceId) : *blast.sourceId;
+    }
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
     // parity: `hurtEntities` runs before the blocks.
     for (ServerEntity* mob : living) {
@@ -154,9 +161,16 @@ void CombatSystem::gust(world::LoadedWorld& world, const std::vector<PlayerSessi
                 entity::Aabb::of(mob->x, mob->y, mob->z, mob->width(), mob->height()), blast.knockbackMultiplier,
                 mob->attributeWithModifiers("minecraft:explosion_knockback_resistance"));
             push.has_value()) {
-            mob->velocityX += (*push)[0];
-            mob->velocityY += (*push)[1];
-            mob->velocityZ += (*push)[2];
+            const double before =
+                std::sqrt(((*push)[0] * (*push)[0]) + ((*push)[1] * (*push)[1]) + ((*push)[2] * (*push)[2]));
+            entity::entityCombat::push(*mob,
+                                       {.cause = "explosion",
+                                        .sourceId = blamed,
+                                        .power = before,
+                                        .towardsX = -(*push)[0],
+                                        .towardsZ = -(*push)[2],
+                                        .delta = *push},
+                                       &hooks_);
         }
     }
     std::vector<world::BlockChange> knocked;
@@ -215,9 +229,20 @@ void CombatSystem::gust(world::LoadedWorld& world, const std::vector<PlayerSessi
                     world.state(), x, y, z, radius, {player->x, player->y, player->z}, player->y + kPlayerEyes,
                     entity::Aabb::of(player->x, player->y, player->z, kPlayerWidth, kPlayerHeight), multiplier, 0.0);
                 push.has_value()) {
-                packet.knockbackX = (*push)[0];
-                packet.knockbackY = (*push)[1];
-                packet.knockbackZ = (*push)[2];
+                const double before =
+                    std::sqrt(((*push)[0] * (*push)[0]) + ((*push)[1] * (*push)[1]) + ((*push)[2] * (*push)[2]));
+                entity::entityCombat::Knock knock{.cause = "explosion",
+                                                  .sourceId = blamed,
+                                                  .power = before,
+                                                  .towardsX = -(*push)[0],
+                                                  .towardsZ = -(*push)[2],
+                                                  .delta = *push};
+                if (player::knockAllowed(*player, knock)) {
+                    const std::array<double, 3> edited = entity::entityCombat::scaledDelta(knock, before);
+                    packet.knockbackX = edited[0];
+                    packet.knockbackY = edited[1];
+                    packet.knockbackZ = edited[2];
+                }
             }
         }
         if (player->connection().sendPlayPacket) {

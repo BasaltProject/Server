@@ -1,4 +1,5 @@
 #include <basalt/server/registry/ItemFood.hpp>
+#include <basalt/server/registry/ItemProperties.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
@@ -7,6 +8,7 @@
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
 #include <basalt/server/runtime/world/Anvils.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
+#include <basalt/server/runtime/world/ItemEnchantability.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/PotionEffects.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
@@ -93,25 +95,35 @@ std::optional<std::vector<std::uint8_t>> ServerInventories::itemData(std::string
         stats.putDouble("attack_speed", weapon->attackSpeed);
         data.set("weapon", NbtTag::ofCompound(std::move(stats)));
     }
-    if (const std::span<const reg::itemTools::Rule> rules = reg::itemTools::rulesFor(*item); !rules.empty()) {
+    if (reg::itemTools::hasTool(*item)) {
         NbtCompound tool;
         std::vector<NbtTag> entries;
-        bool sword = false;
-        for (const reg::itemTools::Rule& rule : rules) {
+        for (const reg::itemTools::Rule& rule : reg::itemTools::rulesFor(*item)) {
             NbtCompound entry;
-            entry.putString("blocks", "#" + std::string{rule.blockTag});
+            const bool direct = rule.blockTag.starts_with('=');
+            entry.putString("blocks", direct ? std::string{rule.blockTag.substr(1)} : "#" + std::string{rule.blockTag});
             if (rule.speed.has_value()) {
                 entry.putFloat("speed", *rule.speed);
             }
             entry.putBoolean("correct_for_drops", rule.correctForDrops);
-            sword = sword || rule.blockTag == "minecraft:sword_instantly_mines";
             entries.push_back(NbtTag::ofCompound(std::move(entry)));
         }
         tool.set("rules", NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, std::move(entries)}));
-        // parity: `Items.swordTool` and the mace cost two durability a block and cannot dig in creative.
-        tool.putInt("damage_per_block", sword ? 2 : 1);
-        tool.putBoolean("can_destroy_blocks_in_creative", !sword);
+        const bool combat = reg::itemTools::isCombatTool(*item);
+        tool.putInt("damage_per_block", combat ? 2 : 1);
+        tool.putBoolean("can_destroy_blocks_in_creative", !combat);
         data.set("tool", NbtTag::ofCompound(std::move(tool)));
+    }
+    if (const std::string_view rarity = reg::itemProperties::rarityOf(*item); rarity != "common") {
+        data.putString("rarity", std::string{rarity});
+    }
+    if (const std::optional<std::int32_t> value = world::itemEnchantability::valueOf(item->toString());
+        value.has_value()) {
+        data.putInt("enchantable", *value);
+    }
+    if (const std::optional<reg::itemProperties::Repair> repair = reg::itemProperties::repairableOf(*item);
+        repair.has_value()) {
+        data.putString("repairable", (repair->isTag ? "#" : "") + repair->target);
     }
     if (const std::optional<std::int32_t> chance = world::composters::chanceOf(*item); chance.has_value()) {
         data.putInt("composter_chance", *chance);

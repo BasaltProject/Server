@@ -390,6 +390,11 @@ bool MobActionSystem::releaseOccupant(world::LoadedWorld& world, const Pos& hive
     }
     wire::nbt::NbtCompound tag = *stored;
     entity::bees::stripHiveTags(tag);
+    wire::nbt::NbtList at{wire::nbt::NbtType::Double};
+    for (const std::int32_t axis : hive) {
+        at.push(wire::nbt::NbtTag::ofDouble(axis + 0.5));
+    }
+    tag.set("Pos", wire::nbt::NbtTag::ofList(std::move(at)));
     const std::expected<wire::common::Identifier, wire::common::IdentifierError> type =
         wire::common::Identifier::parse(std::string{tag.getString("id")});
     const reg::EntityTypeEntry* entry = type.has_value() ? reg::entityTypes::of(*type) : nullptr;
@@ -515,6 +520,32 @@ void MobActionSystem::emptyHive(world::LoadedWorld& world, const Pos& hive, std:
     if (entity != nullptr && releaseAll(world, hive, stateId, entity->data(), player, release)) {
         markDirty(world, hive);
     }
+}
+
+std::int32_t MobActionSystem::hiveCommand(world::LoadedWorld& world, const Pos& hive, const std::string_view action,
+                                          const std::int32_t entityId, const PlayerSession* player) {
+    server::world::ChunkBlockEntity* entity = hiveEntity(world, hive);
+    const std::optional<std::int32_t> stateId = world.state().blockState(hive[0], hive[1], hive[2]);
+    if (entity == nullptr || !stateId.has_value() || !isHiveState(*stateId)) {
+        return -1;
+    }
+    const std::size_t before = beehives::occupantCount(entity->data());
+    if (action == "enter") {
+        ServerEntity* bee = world.state().entity(entityId);
+        if (bee == nullptr) {
+            return 0;
+        }
+        enterHive(*bee, hive);
+        return beehives::occupantCount(entity->data()) > before ? 1 : 0;
+    }
+    if (action != "honey" && action != "bee" && action != "emergency") {
+        return -1;
+    }
+    const beehives::Release release = action == "honey" ? beehives::Release::HoneyDelivered
+                                      : action == "bee" ? beehives::Release::BeeReleased
+                                                        : beehives::Release::Emergency;
+    emptyHive(world, hive, *stateId, player, release);
+    return static_cast<std::int32_t>(before - beehives::occupantCount(entity->data()));
 }
 
 void MobActionSystem::hiveBroken(world::LoadedWorld& world, const PlayerSession& player, const Pos& hive,

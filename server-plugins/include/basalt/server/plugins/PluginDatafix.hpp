@@ -42,6 +42,9 @@ struct Step {
 /// The 1.13 name and properties of a pre-1.13 `block << 4 | data` id (air when unmapped).
 [[nodiscard]] metamorph::datafix::LegacyBlockState legacyState(std::int32_t id);
 
+/// The current name and properties of a pre-1.13 id, run through the whole chunk fixer like a legacy chunk would be.
+[[nodiscard]] metamorph::datafix::LegacyBlockState modernState(std::int32_t id);
+
 [[nodiscard]] std::vector<std::string> types();
 
 } // namespace basalt::server::plugins::datafix

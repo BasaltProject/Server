@@ -13,7 +13,12 @@ namespace respawnAnchors {
 
 [[nodiscard]] bool isAnchor(std::int32_t stateId);
 
+[[nodiscard]] std::int32_t chargesOf(std::int32_t stateId);
+
 [[nodiscard]] std::optional<BlockChange> charge(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// parity: the charge `findRespawnAndUseSpawnBlock` spends.
+[[nodiscard]] std::optional<BlockChange> discharge(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 } // namespace respawnAnchors
 

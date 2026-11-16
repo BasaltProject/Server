@@ -31,6 +31,11 @@ inline constexpr std::string_view kComparatorOutputKey = "OutputSignal";
 [[nodiscard]] std::int32_t directSignalOf(std::int32_t stateId, registry::BlockFace from, std::int32_t openers = 0,
                                           std::int32_t comparatorOutput = kMaxSignal, bool mutedWire = false);
 
+/// parity: `BlockState.getSignal`, what the block itself gives without a conductor's neighbours.
+[[nodiscard]] std::int32_t ownSignalFrom(const WorldState& world, std::string_view worldName, std::int32_t x,
+                                         std::int32_t y, std::int32_t z, registry::BlockFace from,
+                                         bool mutedWire = false);
+
 /// parity: `SignalGetter.getSignal`.
 [[nodiscard]] std::int32_t signalFrom(const WorldState& world, std::string_view worldName, std::int32_t x,
                                       std::int32_t y, std::int32_t z, registry::BlockFace from, bool mutedWire = false);

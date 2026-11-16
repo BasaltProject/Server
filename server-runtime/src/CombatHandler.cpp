@@ -302,11 +302,10 @@ player::DamageContext CombatHandler::damageContext() const {
     context.healed = hooks_.healed;
     context.resurrectAllowed = hooks_.resurrectAllowed;
     context.slotChanged = [this](const PlayerSession&, std::int32_t slot) { owner_->sendInventorySlot(slot); };
-    context.disableBlocking = [this](PlayerSession& player, std::int32_t ticks) {
+    context.disableBlocking = [this](PlayerSession& player, const Identifier& item, std::int32_t ticks) {
         owner_->itemUseTimers().stopBlocking();
         const world::LoadedWorld* world = owner_->currentWorld();
-        player::startCooldownFor(player, Identifier::vanilla("shield"), world == nullptr ? 0 : world->gameTime(),
-                                 ticks);
+        player::startCooldownFor(player, item, world == nullptr ? 0 : world->gameTime(), ticks);
     };
     context.death.registry = owner_->options().playerRegistry;
     context.death.logger = owner_->logger();
