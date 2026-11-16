@@ -632,7 +632,23 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         if (session == nullptr || body.failed()) {
             return;
         }
+        const std::int32_t previousInputs = session->extras.inputFlags;
         session->extras.inputFlags = inputs;
+        // parity: `ServerGamePacketListenerImpl.handlePlayerInput` only raises the event for a changed `Input`.
+        if (inputs != previousInputs && session->events != nullptr) {
+            const auto flag = [inputs](std::int32_t bit) { return (inputs & bit) != 0; };
+            session->events->notify(&server::plugins::pluginEventTypes::playerInput,
+                                    [&](server::plugins::PluginEvent& event) {
+                                        plugins::EventSink::player(event, *session);
+                                        event.set("forward", flag(kForwardInputFlag));
+                                        event.set("backward", flag(kBackInputFlag));
+                                        event.set("left", flag(kLeftInputFlag));
+                                        event.set("right", flag(kRightInputFlag));
+                                        event.set("jump", flag(kJumpInputFlag));
+                                        event.set("sneak", flag(kSneakInputFlag));
+                                        event.set("sprint", flag(kSprintInputFlag));
+                                    });
+        }
         if (options_.plugins.sneakChanged && ((inputs & kSneakInputFlag) != 0) != session->sneaking) {
             options_.plugins.sneakChanged(*session, (inputs & kSneakInputFlag) != 0);
         }

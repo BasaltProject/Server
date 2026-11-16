@@ -5,6 +5,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/BlockPos.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -28,7 +29,7 @@ struct PlaceContext {
     BreakContext blocks;
 
     std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
-                       const std::string& item)>
+                       const std::string& item, const std::optional<std::array<std::int32_t, 3>>& second)>
         placeAllowed;
 
     std::function<void(const PlayerSession& player)> sendInventory;

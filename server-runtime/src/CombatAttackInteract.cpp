@@ -45,6 +45,7 @@
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
@@ -145,6 +146,13 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     if (entity->type().path() == "armor_stand" && !entity->dying &&
         useArmorStand(*session, *entity, interact.hand == wire::protocol::play::InteractPacket::kMainHand,
                       static_cast<double>(interact.y)) == ArmorStandUse::Done) {
+        return;
+    }
+    if (entity->type().path() == "sheep" && !entity->dying &&
+        dyeSheep(*session, *entity,
+                 interact.hand == wire::protocol::play::InteractPacket::kMainHand
+                     ? PlayerInventory::kHotbarStart + session->inventory.heldSlot()
+                     : PlayerInventory::kOffhandSlot)) {
         return;
     }
     // parity: `Entity.interact`'s leashes.
@@ -448,7 +456,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         herd != nullptr && herd->state().gameplay().mechanics.animalBreedingCooldownSeconds > 0 &&
         world::breedingCooldowns::active(herd->name(), session->uuid().toString(), entity->type(), herd->gameTime());
     if (entity::breeding::canFallInLove(*entity) && !waiting) {
-        entity::breeding::feed(*entity, session->uuid().toString());
+        plugins::hookEvents::enterLove(world->events(), world->name(), *entity, session);
     } else if (entity::breeding::canAgeUp(*entity)) {
         entity::breeding::feedBaby(*entity);
     } else {

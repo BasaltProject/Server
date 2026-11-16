@@ -62,6 +62,23 @@ void fillKnock(server::plugins::PluginEvent& event, const entity::entityCombat::
 [[nodiscard]] bool spawnChangeAllowed(const EventSink& sink, const player::PlayerSession& who, std::int32_t& x,
                                       std::int32_t& y, std::int32_t& z, std::string_view cause);
 
+/// Raises `block.cauldron_level`: false when cancelled, else `to` carries the state a listener chose.
+[[nodiscard]] bool cauldronChange(const EventSink& sink, std::string_view world, std::int32_t x, std::int32_t y,
+                                  std::int32_t z, std::string_view reason, std::int32_t from, std::int32_t& to,
+                                  const player::PlayerSession* who = nullptr, std::int32_t entityId = -1);
+
+/// Raises `entity.enter_love` and, unless cancelled, puts `animal` in love for the ticks a listener left.
+bool enterLove(const EventSink& sink, std::string_view world, entity::ServerEntity& animal,
+               const player::PlayerSession* cause);
+
+/// Raises `entity.egg_hatch` for any thrown egg, and takes what a listener left in the three outputs.
+void eggHatch(const EventSink& sink, std::string_view world, const entity::ServerEntity& egg, bool& hatching,
+              std::int32_t& count, std::string& type);
+
+/// Raises `player.sign_open`: false when a listener kept the sign editor from opening.
+[[nodiscard]] bool signOpenAllowed(const EventSink& sink, const player::PlayerSession& who, std::int32_t x,
+                                   std::int32_t y, std::int32_t z, bool front, std::string_view cause);
+
 /// Spawns what `who` dropped and takes it back if a plugin cancels the `entity.drop_item` it raises.
 void dropFor(world::LoadedWorld& world, const entity::ServerEntity& who, world::DroppedItem dropped);
 

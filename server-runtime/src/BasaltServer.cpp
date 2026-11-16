@@ -1309,6 +1309,22 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                         static_cast<void>(spawning_->spawnMob(world, type, x, y, z, yaw, "triggered"));
                     }
                 },
+            .spawnHatched =
+                [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y, double z,
+                       float yaw, std::string_view variant) {
+                    if (spawning_ == nullptr) {
+                        return;
+                    }
+                    spawning_->spawnMob(world, type, x, y, z, yaw, "egg", [variant](entity::ServerEntity& chick) {
+                        chick.age = entity::breeding::kBabyAge;
+                        if (chick.type().path() == "chicken") {
+                            if (!chick.sourceNbt.has_value()) {
+                                chick.sourceNbt = wire::nbt::NbtCompound{};
+                            }
+                            chick.sourceNbt->putString("variant", std::string{variant});
+                        }
+                    });
+                },
             .crystalDestroyed =
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer) {
@@ -1719,6 +1735,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             .blockTags = &vanillaData_.blockTags,
             .damageTypeTags = &vanillaData_.damageTypeTags,
             .entityTags = &vanillaData_.entityTags,
+            .lootTables = &vanillaData_.lootTables,
             // parity: `MinecartCommandBlock.MinecartCommandBase.createCommandSourceStack`.
             .runCommand =
                 [this](world::LoadedWorld& world, entity::ServerEntity& cart, const std::string& line) {

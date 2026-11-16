@@ -500,6 +500,7 @@ std::uint32_t computeTickKinds(const wire::common::Identifier& type) {
     set(path == "wandering_trader" || path == "trader_llama", kinds::kTrader);
     set(shulkers::isShulker(type), kinds::kShulker);
     set(horses::isCamel(type), kinds::kCamel);
+    set(path == "chicken", kinds::kChicken);
     return bits;
 }
 

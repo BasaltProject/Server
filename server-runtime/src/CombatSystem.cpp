@@ -330,13 +330,14 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         }
         return;
     }
-    // parity: `Snowball.onHitEntity`, which hurts for nothing but still shoves and wakes what it meets.
-    if (path == "snowball") {
+    // parity: `Snowball.onHitEntity` and `ThrownEgg.onHitEntity`, which hurt for nothing but still shove what they
+    // meet.
+    if (path == "snowball" || path == "egg") {
         const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
         if (target.has_value()) {
             entity.removed = true;
-            const std::int32_t configured = world.state().gameplay().items.snowballDamage;
-            const bool blaze = target->mob != nullptr && target->mob->type().path() == "blaze";
+            const std::int32_t configured = path == "snowball" ? world.state().gameplay().items.snowballDamage : -1;
+            const bool blaze = path == "snowball" && target->mob != nullptr && target->mob->type().path() == "blaze";
             const auto damage = static_cast<float>(configured >= 0 ? configured : (blaze ? 3 : 0));
             if (target->mob != nullptr && !world::endCrystals::isCrystal(target->mob->type())) {
                 entity::entityCombat::blame(*target->mob, entity.ownerId, entity.entityId(), entity.type());
@@ -356,6 +357,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                                                                        .z = fromZ,
                                                                        .name = shooterName(watchers, living, entity),
                                                                        .ownerId = entity.ownerId});
+            }
+            if (path == "egg") {
+                hatchEgg(world, watchers, entity);
             }
             return;
         }
@@ -412,6 +416,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     hitBlock(world, watchers, entity, *hit, kind.sticks);
     if (!kind.sticks) {
         entity.removed = true;
+        if (path == "egg") {
+            hatchEgg(world, watchers, entity);
+        }
     }
 }
 

@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ContainerDrops.hpp>
+#include <basalt/server/runtime/world/ContainerLoot.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
@@ -267,6 +268,10 @@ void VehicleSystem::destroy(world::LoadedWorld& world, ServerEntity& vehicle, co
     const bool container =
         entity::boats::hasChest(vehicle.type()) || path == "chest_minecart" || path == "hopper_minecart";
     if (container && vehicle.sourceNbt.has_value()) {
+        // parity: `Containers.dropContents` reads each slot through `getItem`, which unpacks the loot table first.
+        if (options_.lootTables != nullptr) {
+            static_cast<void>(world::containerLoot::unpackEntity(world, *options_.lootTables, vehicle, std::nullopt));
+        }
         const std::int32_t size = path == "hopper_minecart" ? 5 : player::Menu::kChestSize;
         random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
         for (const std::optional<server::world::loot::ItemStack>& slot :

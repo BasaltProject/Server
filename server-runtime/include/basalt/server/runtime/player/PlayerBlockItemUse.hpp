@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 namespace basalt::server::runtime::world {
 class LoadedWorld;
@@ -23,6 +24,12 @@ bool useBoneMealFor(const BreakContext& context, PlayerSession& player, world::L
 
 bool useHoneycombFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, std::int32_t x,
                      std::int32_t y, std::int32_t z, std::int32_t heldSlot, const storage::StoredItemStack& held);
+
+/// parity: `SignApplicator`s (dye, ink, glow ink, honeycomb); the sound to play when one took.
+[[nodiscard]] std::optional<std::string_view> useSignItemFor(const BreakContext& context, PlayerSession& player,
+                                                             world::LoadedWorld& world, std::int32_t x, std::int32_t y,
+                                                             std::int32_t z, std::int32_t heldSlot,
+                                                             const storage::StoredItemStack& held);
 
 void primeTntFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, std::int32_t x,
                  std::int32_t y, std::int32_t z, std::int32_t heldSlot, const storage::StoredItemStack& held,

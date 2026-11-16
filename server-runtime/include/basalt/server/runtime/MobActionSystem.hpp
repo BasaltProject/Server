@@ -278,6 +278,7 @@ public:
                            const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& bullet,
                            random::RandomSource& random);
 
+    void tickChicken(world::LoadedWorld& world, entity::ServerEntity& chicken, random::RandomSource& random);
     void tickCopperGolem(world::LoadedWorld& world, entity::ServerEntity& golem, random::RandomSource& random);
 
     enum class GolemUse : std::uint8_t { Pass, Done, ConsumeOne, DamageTool };
@@ -300,6 +301,8 @@ public:
 
     void trailSnow(world::LoadedWorld& world, const entity::ServerEntity& golem);
 
+    void extinguishInCauldron(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                              const entity::ServerEntity& mob, const std::array<std::int32_t, 3>& at);
     void tickFire(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                   entity::ServerEntity& mob, random::RandomSource& random);
 

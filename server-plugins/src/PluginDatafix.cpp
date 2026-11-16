@@ -185,14 +185,14 @@ metamorph::datafix::LegacyBlockState modernState(std::int32_t id) {
     if (fixer::upgrade(fixer::Domain::Chunk, chunk, 1343).empty()) {
         const wire::nbt::NbtList* list = chunk.getList("sections");
         for (std::size_t at = 0; list != nullptr && at < list->size(); ++at) {
-            const NbtCompound* section = (*list)[at].get<NbtCompound>();
-            const NbtTag* y = section == nullptr ? nullptr : section->find("Y");
+            const NbtCompound* candidate = (*list)[at].get<NbtCompound>();
+            const NbtTag* y = candidate == nullptr ? nullptr : candidate->find("Y");
             const bool origin = y != nullptr && ((y->get<std::int8_t>() != nullptr && *y->get<std::int8_t>() == 0) ||
                                                  (y->get<std::int32_t>() != nullptr && *y->get<std::int32_t>() == 0));
             if (!origin) {
                 continue;
             }
-            const NbtCompound* states = section->getCompound("block_states");
+            const NbtCompound* states = candidate->getCompound("block_states");
             const wire::nbt::NbtList* palette = states == nullptr ? nullptr : states->getList("palette");
             for (std::size_t entryAt = 0; palette != nullptr && entryAt < palette->size(); ++entryAt) {
                 const NbtCompound* entry = (*palette)[entryAt].get<NbtCompound>();

@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerBlocksAttacks.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSigns.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/BlockTransformers.hpp>
@@ -27,6 +28,7 @@
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/Signs.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Waxing.hpp>
 #include <basalt/server/world/Chunk.hpp>
@@ -212,6 +214,57 @@ bool useHoneycombFor(const BreakContext& context, PlayerSession& player, world::
     reshapeBlock(context, world, x, y, z, *waxed, world::blockEffect::Effect::kWaxOn);
     spendOne(context, player, heldSlot, held);
     return true;
+}
+
+std::optional<std::string_view> useSignItemFor(const BreakContext& context, PlayerSession& player,
+                                               world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
+                                               const std::int32_t z, const std::int32_t heldSlot,
+                                               const storage::StoredItemStack& held) {
+    const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
+    const std::optional<wire::common::Identifier> type =
+        stateId.has_value() ? world::signs::typeOf(*stateId) : std::nullopt;
+    const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
+    const server::world::ChunkBlockEntity* sign = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+    // parity: `SignBlock.useItemOn`, which needs `mayBuild` and an unwaxed sign.
+    if (!type.has_value() || sign == nullptr || world::signs::isWaxed(sign->data()) ||
+        (player.gamemode != Gamemode::Survival && player.gamemode != Gamemode::Creative)) {
+        return std::nullopt;
+    }
+    const bool front = world::signs::facesFront(*stateId, x, z, player.x, player.z);
+    const std::string_view item = std::string_view{held.id}.substr(held.id.find(':') + 1);
+    const bool honeycomb = item == "honeycomb";
+    // parity: `SignApplicator.canApplyToSign`, which only honeycomb waives for an empty side.
+    if (!honeycomb && !world::signs::hasMessage(sign->data(), front)) {
+        return std::nullopt;
+    }
+    std::optional<wire::nbt::NbtCompound> data;
+    std::string_view sound;
+    if (honeycomb) {
+        data = world::signs::withWaxed(sign->data());
+        sound = "item.honeycomb.wax_on";
+    } else if (item == "glow_ink_sac") {
+        data = world::signs::withGlowing(sign->data(), front, true);
+        sound = "item.glow_ink_sac.use";
+    } else if (item == "ink_sac") {
+        data = world::signs::withGlowing(sign->data(), front, false);
+        sound = "item.ink_sac.use";
+    } else if (item.ends_with("_dye")) {
+        data = world::signs::withColor(sign->data(), front, item.substr(0, item.size() - 4));
+        sound = "item.dye.use";
+    }
+    if (!data.has_value()) {
+        return std::nullopt;
+    }
+    announceSign(context, world, x, y, z, *type, *data);
+    if (honeycomb && context.blocks != nullptr) {
+        world::BlockChange change{.x = x, .y = y, .z = z, .stateId = *stateId};
+        change.effects.emplace_back(world::blockEffect::Effect{.type = world::blockEffect::Effect::kWaxOn, .data = 0});
+        context.blocks->announceBlock(playersIn(context, world.name()), change);
+    }
+    heardBySculk(context, world, "block_change", x, y, z);
+    statAwards::used(player, held.id);
+    spendOne(context, player, heldSlot, held);
+    return sound;
 }
 
 void primeTntFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, const std::int32_t x,

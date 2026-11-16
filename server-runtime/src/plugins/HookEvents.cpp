@@ -1,5 +1,6 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -7,9 +8,50 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <algorithm>
+#include <expected>
+#include <map>
+#include <optional>
 
 namespace basalt::server::runtime::plugins::hookEvents {
 namespace {
+
+[[nodiscard]] std::int32_t cauldronLevel(const std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr || block->path() == "cauldron") {
+        return 0;
+    }
+    const auto properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto level = properties.find("level");
+    return level == properties.end() ? 3 : std::stoi(level->second);
+}
+
+[[nodiscard]] std::string cauldronBlockData(const std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    std::string text = "minecraft:" + std::string{block == nullptr ? "cauldron" : block->path()};
+    const auto properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    if (const auto level = properties.find("level"); level != properties.end()) {
+        text += "[level=" + level->second + "]";
+    }
+    return text;
+}
+
+[[nodiscard]] std::optional<std::int32_t> cauldronStateOf(const std::string_view data) {
+    const std::size_t bracket = data.find('[');
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+        wire::common::Identifier::parse(data.substr(0, bracket));
+    if (!id.has_value() || !id->path().ends_with("cauldron")) {
+        return std::nullopt;
+    }
+    std::map<std::string, std::string> properties;
+    if (bracket != std::string_view::npos) {
+        const std::string_view body = data.substr(bracket + 1, data.size() - bracket - 2);
+        const std::size_t equals = body.find('=');
+        if (equals != std::string_view::npos) {
+            properties.emplace(std::string{body.substr(0, equals)}, std::string{body.substr(equals + 1)});
+        }
+    }
+    return registry::blockStateDefinitions::stateIdOf(*id, properties);
+}
 
 /// The `org.bukkit.entity.Pose` constant of each pose.
 [[nodiscard]] std::string_view poseName(const wire::protocol::play::Pose pose) {
@@ -218,6 +260,67 @@ bool spawnChangeAllowed(const EventSink& sink, const player::PlayerSession& who,
     return true;
 }
 
+bool enterLove(const EventSink& sink, const std::string_view world, entity::ServerEntity& animal,
+               const player::PlayerSession* cause) {
+    std::int32_t ticks = entity::breeding::kLoveTicks;
+    const server::plugins::PluginEvent* answered =
+        sink.ask(&server::plugins::pluginEventTypes::entityEnterLove, [&](server::plugins::PluginEvent& event) {
+            entity(event, world, animal);
+            event.set("player_name", cause == nullptr ? std::string{} : cause->name());
+            event.set("player_uuid", cause == nullptr ? std::string{} : cause->uuid().toString());
+            event.set("ticks", static_cast<std::int64_t>(ticks));
+        });
+    if (answered != nullptr) {
+        if (answered->cancelled()) {
+            return false;
+        }
+        if (const auto* edited = std::get_if<std::int64_t>(&answered->get("ticks")); edited != nullptr) {
+            ticks = static_cast<std::int32_t>(*edited);
+        }
+    }
+    entity::breeding::feed(animal, cause == nullptr ? std::nullopt : std::optional{cause->uuid().toString()});
+    animal.loveTicks = ticks;
+    return true;
+}
+
+void eggHatch(const EventSink& sink, const std::string_view world, const entity::ServerEntity& egg, bool& hatching,
+              std::int32_t& count, std::string& type) {
+    const server::plugins::PluginEvent* answered =
+        sink.ask(&server::plugins::pluginEventTypes::entityEggHatch, [&](server::plugins::PluginEvent& event) {
+            entity(event, world, egg);
+            event.set("hatching", hatching);
+            event.set("count", static_cast<std::int64_t>(count));
+            event.set("hatch_type", type);
+        });
+    if (answered == nullptr) {
+        return;
+    }
+    if (const auto* edited = std::get_if<bool>(&answered->get("hatching")); edited != nullptr) {
+        hatching = *edited;
+    }
+    if (const auto* edited = std::get_if<std::int64_t>(&answered->get("count")); edited != nullptr) {
+        count = static_cast<std::int32_t>(std::clamp<std::int64_t>(*edited, 0, 127));
+    }
+    if (const auto* edited = std::get_if<std::string>(&answered->get("hatch_type")); edited != nullptr) {
+        type = *edited;
+    }
+    if (!hatching) {
+        count = 0;
+    }
+}
+
+bool signOpenAllowed(const EventSink& sink, const player::PlayerSession& who, const std::int32_t x,
+                     const std::int32_t y, const std::int32_t z, const bool front, const std::string_view cause) {
+    return sink.allowed(&server::plugins::pluginEventTypes::playerSignOpen, [&](server::plugins::PluginEvent& event) {
+        EventSink::player(event, who);
+        event.set("x", static_cast<std::int64_t>(x));
+        event.set("y", static_cast<std::int64_t>(y));
+        event.set("z", static_cast<std::int64_t>(z));
+        event.set("side", std::string{front ? "front" : "back"});
+        event.set("cause", std::string{cause});
+    });
+}
+
 void dropFor(world::LoadedWorld& world, const entity::ServerEntity& who, world::DroppedItem dropped) {
     const std::int32_t id = dropped.entityId;
     const std::string item = dropped.item.toString();
@@ -238,6 +341,38 @@ void dropFor(world::LoadedWorld& world, const entity::ServerEntity& who, world::
 std::string blockName(const std::int32_t stateId) {
     const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
     return block == nullptr ? std::string{"minecraft:air"} : block->toString();
+}
+
+bool cauldronChange(const EventSink& sink, const std::string_view world, const std::int32_t x, const std::int32_t y,
+                    const std::int32_t z, const std::string_view reason, const std::int32_t from, std::int32_t& to,
+                    const player::PlayerSession* who, const std::int32_t entityId) {
+    const server::plugins::PluginEvent* answered =
+        sink.ask(&server::plugins::pluginEventTypes::blockCauldronLevel, [&](server::plugins::PluginEvent& event) {
+            if (who != nullptr) {
+                EventSink::player(event, *who);
+            } else {
+                event.set("player_name", std::string{});
+                event.set("player_uuid", std::string{});
+            }
+            position(event, world, x, y, z);
+            event.set("entity_id", static_cast<std::int64_t>(entityId));
+            event.set("reason", std::string{reason});
+            event.set("old_level", static_cast<std::int64_t>(cauldronLevel(from)));
+            event.set("new_level", static_cast<std::int64_t>(cauldronLevel(to)));
+            event.set("new_block", cauldronBlockData(to));
+        });
+    if (answered == nullptr) {
+        return true;
+    }
+    if (answered->cancelled()) {
+        return false;
+    }
+    if (const auto* edited = std::get_if<std::string>(&answered->get("new_block")); edited != nullptr) {
+        if (const std::optional<std::int32_t> state = cauldronStateOf(*edited); state.has_value()) {
+            to = *state;
+        }
+    }
+    return true;
 }
 
 } // namespace basalt::server::runtime::plugins::hookEvents

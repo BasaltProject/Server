@@ -230,22 +230,9 @@ std::optional<CommandSyntaxError> writeEntityData(const DataHolderRef::Entity& h
     if (holder.player != nullptr || holder.mob == nullptr) {
         return CommandSyntaxError{.component = wire::text::Component::translatable("commands.data.entity.invalid")};
     }
-    entity::ServerEntity& mob = *holder.mob;
-    const NbtCompound current = entity::entityNbt::encode(mob);
-    if (const NbtTag* uuid = current.find("UUID"); uuid != nullptr) {
-        tag.set("UUID", *uuid);
-    }
-    tag.putString("id", mob.type().toString());
-    std::unique_ptr<entity::ServerEntity> loaded = entity::entityNbt::decode(tag, mob.entityId(), mob.protocolType());
-    if (loaded == nullptr) {
+    if (!entity::entityNbt::load(*holder.mob, std::move(tag))) {
         return CommandSyntaxError{.component = wire::text::Component::translatable("commands.data.entity.invalid")};
     }
-    loaded->vehicleId = mob.vehicleId;
-    loaded->passengerIds = mob.passengerIds;
-    loaded->leashHolderId = mob.leashHolderId;
-    loaded->dragon = mob.dragon;
-    loaded->removed = mob.removed;
-    mob = std::move(*loaded);
     return std::nullopt;
 }
 

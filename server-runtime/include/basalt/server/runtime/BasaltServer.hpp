@@ -57,6 +57,7 @@
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
+#include <basalt/server/runtime/plugins/EventHooks.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/plugins/ServerInventories.hpp>
 #include <basalt/server/runtime/plugins/ServerMiscServices.hpp>
@@ -352,6 +353,7 @@ private:
     std::shared_ptr<void> bukkit_;
     std::vector<bukkit::JavaPluginJar> javaPlugins_;
     plugins::EventSink eventSink_{[this] { return plugins_ == nullptr ? nullptr : &plugins_->events(); }};
+    BlockInteractionHandler::Hooks blockHooks_ = plugins::eventHooks::blockShared(eventSink_);
 
     std::unique_ptr<BlockChangeBroadcaster> broadcaster_;
     std::unique_ptr<ExplosionSystem> explosions_;

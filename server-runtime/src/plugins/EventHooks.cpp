@@ -19,28 +19,7 @@ namespace {
 
 using server::plugins::PluginEvent;
 
-[[nodiscard]] std::int32_t cauldronLevel(const std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    if (block == nullptr || block->path() == "cauldron") {
-        return 0;
-    }
-    const auto properties = registry::blockStateDefinitions::propertiesOf(stateId);
-    const auto level = properties.find("level");
-    return level == properties.end() ? 3 : std::stoi(level->second);
-}
-
-[[nodiscard]] std::string cauldronBlockData(const std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    std::string text = "minecraft:" + std::string{block == nullptr ? "cauldron" : block->path()};
-    const auto properties = registry::blockStateDefinitions::propertiesOf(stateId);
-    if (const auto level = properties.find("level"); level != properties.end()) {
-        text += "[level=" + level->second + "]";
-    }
-    return text;
-}
-
 using server::plugins::pluginEventTypes::blockBreak;
-using server::plugins::pluginEventTypes::blockCauldronLevel;
 using server::plugins::pluginEventTypes::blockDamage;
 using server::plugins::pluginEventTypes::blockDrops;
 using server::plugins::pluginEventTypes::blockFertilize;
@@ -142,7 +121,7 @@ std::optional<float> raiseHeal(const EventSink& sink, const player::PlayerSessio
     return edited == nullptr ? amount : static_cast<float>(*edited);
 }
 
-BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const EventSink& sink) {
+BlockInteractionHandler::Hooks blockShared(const EventSink& sink) {
     BlockInteractionHandler::Hooks hooks;
     hooks.breakAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
                                  std::int32_t stateId, bool& dropItems) {
@@ -207,24 +186,15 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
         drops = std::move(next);
     };
     hooks.placeAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
-                                 const std::string& item) {
+                                 const std::string& item, const std::optional<std::array<std::int32_t, 3>>& second) {
         return sink.allowed(&blockPlace, [&](PluginEvent& event) {
             EventSink::player(event, who);
             position(event, x, y, z);
             event.set("block", item);
-        });
-    };
-    hooks.interactAllowed = [&owner, &sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y,
-                                            std::int32_t z, const std::string& item, std::string_view face,
-                                            bool mainHand) {
-        return sink.allowed(&playerInteract, [&](PluginEvent& event) {
-            EventSink::player(event, who);
-            event.set("action", std::string{"right_click_block"});
-            position(event, x, y, z);
-            event.set("block", blockNameAt(owner, x, y, z));
-            event.set("item", item);
-            event.set("hand", std::string{mainHand ? "main_hand" : "off_hand"});
-            event.set("face", std::string{face});
+            event.set("multi", second.has_value());
+            event.set("second_x", static_cast<std::int64_t>(second.has_value() ? (*second)[0] : x));
+            event.set("second_y", static_cast<std::int64_t>(second.has_value() ? (*second)[1] : y));
+            event.set("second_z", static_cast<std::int64_t>(second.has_value() ? (*second)[2] : z));
         });
     };
     hooks.airUseAllowed = [&sink](const player::PlayerSession& who, const std::string& item, bool mainHand) {
@@ -239,18 +209,6 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
             EventSink::player(event, who);
             event.set("item", item);
             event.set("count", static_cast<std::int64_t>(count));
-        });
-    };
-    hooks.digAllowed = [&owner, &sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
-                                       std::string_view face, bool instaBreak) {
-        return sink.allowed(&blockDamage, [&](PluginEvent& event) {
-            EventSink::player(event, who);
-            position(event, x, y, z);
-            event.set("block", blockNameAt(owner, x, y, z));
-            event.set("face", std::string{face});
-            event.set("insta_break", instaBreak);
-            const std::optional<storage::StoredItemStack>& held = who.inventory.heldItem();
-            event.set("item", held.has_value() ? held->id : std::string{});
         });
     };
     hooks.itemDamageAllowed = [&sink](const player::PlayerSession& who, const std::string& item, std::int32_t amount,
@@ -307,15 +265,8 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
         return hookEvents::spawnChangeAllowed(sink, who, x, y, z, cause);
     };
     hooks.cauldronAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
-                                    std::string_view reason, std::int32_t from, std::int32_t to) {
-        return sink.allowed(&blockCauldronLevel, [&](PluginEvent& event) {
-            EventSink::player(event, who);
-            position(event, x, y, z);
-            event.set("reason", std::string{reason});
-            event.set("old_level", static_cast<std::int64_t>(cauldronLevel(from)));
-            event.set("new_level", static_cast<std::int64_t>(cauldronLevel(to)));
-            event.set("new_block", cauldronBlockData(to));
-        });
+                                    std::string_view reason, std::int32_t from, std::int32_t& to) {
+        return hookEvents::cauldronChange(sink, who.worldName, x, y, z, reason, from, to, &who);
     };
     hooks.flowerPotAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
                                      const std::string& item, bool placing) {
@@ -411,6 +362,36 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
             EventSink::player(event, who);
             position(event, x, y, z);
             event.set("entering", false);
+        });
+    };
+    return hooks;
+}
+
+BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const EventSink& sink) {
+    BlockInteractionHandler::Hooks hooks = blockShared(sink);
+    hooks.interactAllowed = [&owner, &sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y,
+                                            std::int32_t z, const std::string& item, std::string_view face,
+                                            bool mainHand) {
+        return sink.allowed(&playerInteract, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            event.set("action", std::string{"right_click_block"});
+            position(event, x, y, z);
+            event.set("block", blockNameAt(owner, x, y, z));
+            event.set("item", item);
+            event.set("hand", std::string{mainHand ? "main_hand" : "off_hand"});
+            event.set("face", std::string{face});
+        });
+    };
+    hooks.digAllowed = [&owner, &sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
+                                       std::string_view face, bool instaBreak) {
+        return sink.allowed(&blockDamage, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            position(event, x, y, z);
+            event.set("block", blockNameAt(owner, x, y, z));
+            event.set("face", std::string{face});
+            event.set("insta_break", instaBreak);
+            const std::optional<storage::StoredItemStack>& held = who.inventory.heldItem();
+            event.set("item", held.has_value() ? held->id : std::string{});
         });
     };
     return hooks;

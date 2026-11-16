@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
@@ -645,14 +646,18 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         if (const std::optional<world::stalactiteDrips::Fill> fill =
                 world::stalactiteDrips::fillCauldron(world.state(), x, y, z, !hasSkylight);
             fill.has_value()) {
-            world.state().setBlockState(x, y, z, fill->stateId);
-            scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = fill->stateId});
-            // parity: `AbstractCauldronBlock.receiveStalactiteDrip` ends the fill with `BLOCK_CHANGE`.
-            world::vibrations::emit(world.state(), "block_change", x + 0.5, y + 0.5, z + 0.5,
-                                    world.clock().totalTicks());
-            broadcaster_->sendEffects(watchers, x, y, z, fill->stateId,
-                                      {world::blockEffect::Effect{.type = fill->levelEvent}});
-            broadcaster_->notifyAround(world, watchers, x, y, z, here);
+            std::int32_t fillState = fill->stateId;
+            if (plugins::hookEvents::cauldronChange(world.events(), world.state().eventWorld(), x, y, z, "NATURAL_FILL",
+                                                    here, fillState)) {
+                world.state().setBlockState(x, y, z, fillState);
+                scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = fillState});
+                // parity: `AbstractCauldronBlock.receiveStalactiteDrip` ends the fill with `BLOCK_CHANGE`.
+                world::vibrations::emit(world.state(), "block_change", x + 0.5, y + 0.5, z + 0.5,
+                                        world.clock().totalTicks());
+                broadcaster_->sendEffects(watchers, x, y, z, fillState,
+                                          {world::blockEffect::Effect{.type = fill->levelEvent}});
+                broadcaster_->notifyAround(world, watchers, x, y, z, here);
+            }
         }
         // parity: `CreakingHeartBlock.tick`.
         if (const std::optional<std::int32_t> heart = world::scheduledBlocks::creakingHeartTick(

@@ -1,11 +1,13 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/IceAndSnow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NaturalSpawner.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/world/terrain/BiomeClimateData.hpp>
 #include <basalt/server/world/terrain/BiomeTemperature.hpp>
@@ -63,29 +65,8 @@ namespace temperature = server::world::terrain::biomeTemperature;
     return airOrSnow && blockSurvival::isSupported(world.state(), x, y, z, snowDefault);
 }
 
-} // namespace
-
-void precipitate(LoadedWorld& world, std::int32_t x, std::int32_t z, std::vector<BlockChange>& changes) {
-    const std::int32_t maxHeight = world.gameRules().number(*gameRules::byId("max_snow_accumulation_height"));
-    const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
-    if (chunk == nullptr) {
-        return;
-    }
-    const std::int32_t top = chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::MotionBlocking);
-    const std::optional<wire::common::Identifier> biomeId = naturalSpawner::biomeAt(world, x, top, z);
-    if (!biomeId.has_value()) {
-        return;
-    }
-    const std::string biome = biomeId->toString();
-    if (shouldFreeze(world, biome, x, top - 1, z)) {
-        const registry::BlockState* ice = registry::blocks::named("ice");
-        if (ice != nullptr && world.state().setBlockState(x, top - 1, z, ice->stateId)) {
-            changes.push_back(BlockChange{.x = x, .y = top - 1, .z = z, .stateId = ice->stateId});
-        }
-    }
-    if (!world.weather().raining || maxHeight <= 0) {
-        return;
-    }
+void pileSnow(LoadedWorld& world, const std::string& biome, std::int32_t x, std::int32_t top, std::int32_t z,
+              std::int32_t maxHeight, std::vector<BlockChange>& changes) {
     const registry::BlockState* snow = registry::blocks::named("snow");
     if (snow == nullptr || !shouldSnow(world, biome, x, top, z, snow->stateId)) {
         return;
@@ -106,6 +87,89 @@ void precipitate(LoadedWorld& world, std::int32_t x, std::int32_t z, std::vector
     if (world.state().setBlockState(x, top, z, next)) {
         changes.push_back(BlockChange{.x = x, .y = top, .z = z, .stateId = next});
     }
+}
+
+/// parity: `CauldronBlock.shouldHandlePrecipitation`.
+[[nodiscard]] bool precipitationHits(random::RandomSource& random, const bool snow) {
+    return random.nextFloat() < (snow ? 0.1F : 0.05F);
+}
+
+/// parity: the cauldrons' `handlePrecipitation`, which rain and snow fill one level at a time.
+void handleCauldron(LoadedWorld& world, const std::string& biome, std::int32_t x, std::int32_t y, std::int32_t z,
+                    random::RandomSource& random, std::vector<BlockChange>& changes) {
+    const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
+    const wire::common::Identifier* block =
+        state.has_value() ? registry::blockStateDefinitions::blockOf(*state) : nullptr;
+    if (block == nullptr || !server::world::terrain::biomeClimateFor(biome).hasPrecipitation) {
+        return;
+    }
+    const std::string_view path = block->path();
+    if (path != "cauldron" && path != "water_cauldron" && path != "powder_snow_cauldron") {
+        return;
+    }
+    const bool snow = temperature::coldEnoughToSnow(biome, x, y, z);
+    if (!precipitationHits(random, snow)) {
+        return;
+    }
+    std::int32_t next = 0;
+    if (path == "cauldron") {
+        next = registry::blocks::defaultStateIdOf(
+                   wire::common::Identifier::vanilla(snow ? "powder_snow_cauldron" : "water_cauldron"))
+                   .value_or(0);
+    } else {
+        if ((path == "water_cauldron") == snow) {
+            return;
+        }
+        const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*state);
+        const std::int32_t level = std::stoi(properties.at("level"));
+        if (level == 3) {
+            return;
+        }
+        next = registry::blockStateDefinitions::stateIdOf(*block, {{"level", std::to_string(level + 1)}}, *state)
+                   .value_or(*state);
+    }
+    if (next == 0 || next == *state) {
+        return;
+    }
+    std::int32_t to = next;
+    if (!plugins::hookEvents::cauldronChange(world.events(), world.state().eventWorld(), x, y, z, "NATURAL_FILL",
+                                             *state, to)) {
+        return;
+    }
+    if (world.state().setBlockState(x, y, z, to)) {
+        changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = to});
+        vibrations::emit(world.state(), "block_change", x + 0.5, y + 0.5, z + 0.5, world.clock().totalTicks());
+    }
+}
+
+} // namespace
+
+void precipitate(LoadedWorld& world, std::int32_t x, std::int32_t z, random::RandomSource& random,
+                 std::vector<BlockChange>& changes) {
+    const std::int32_t maxHeight = world.gameRules().number(*gameRules::byId("max_snow_accumulation_height"));
+    const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
+    if (chunk == nullptr) {
+        return;
+    }
+    const std::int32_t top = chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::MotionBlocking);
+    const std::optional<wire::common::Identifier> biomeId = naturalSpawner::biomeAt(world, x, top, z);
+    if (!biomeId.has_value()) {
+        return;
+    }
+    const std::string biome = biomeId->toString();
+    if (shouldFreeze(world, biome, x, top - 1, z)) {
+        const registry::BlockState* ice = registry::blocks::named("ice");
+        if (ice != nullptr && world.state().setBlockState(x, top - 1, z, ice->stateId)) {
+            changes.push_back(BlockChange{.x = x, .y = top - 1, .z = z, .stateId = ice->stateId});
+        }
+    }
+    if (!world.weather().raining) {
+        return;
+    }
+    if (maxHeight > 0) {
+        pileSnow(world, biome, x, top, z, maxHeight, changes);
+    }
+    handleCauldron(world, biome, x, top - 1, z, random, changes);
 }
 
 } // namespace basalt::server::runtime::world::iceAndSnow

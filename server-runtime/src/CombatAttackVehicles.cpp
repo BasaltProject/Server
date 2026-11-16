@@ -148,6 +148,36 @@ bool CombatHandler::tameOrSit(const world::LoadedWorld& world, PlayerSession& se
         if (*entity.owner != session.uuid().toString()) {
             return true;
         }
+        // parity: `Wolf.mobInteract` and `Cat.mobInteract`, a dye the collar does not wear yet repaints it.
+        const std::string_view path = entity.type().path();
+        if ((path == "wolf" || path == "cat") && held.has_value() && held->id.ends_with("_dye")) {
+            const std::string_view name = std::string_view{held->id}.substr(held->id.find(':') + 1);
+            constexpr std::array<std::string_view, 16> kDyes{
+                "white",      "orange", "magenta", "light_blue", "yellow", "lime",  "pink", "gray",
+                "light_gray", "cyan",   "purple",  "blue",       "brown",  "green", "red",  "black"};
+            const auto dye = std::ranges::find(kDyes, name.substr(0, name.size() - 4));
+            const std::int32_t color = static_cast<std::int32_t>(dye - kDyes.begin());
+            const std::int32_t current =
+                entity.sourceNbt.has_value() ? entity.sourceNbt->getByte("CollarColor", 14) : 14;
+            if (dye != kDyes.end() && color != (current & 0x0F)) {
+                if (!entity.sourceNbt.has_value()) {
+                    entity.sourceNbt = wire::nbt::NbtCompound{};
+                }
+                entity.sourceNbt->putByte("CollarColor", static_cast<std::int8_t>(color));
+                ++entity.sourceNbtVersion;
+                if (session.gamemode != Gamemode::Creative) {
+                    storage::StoredItemStack left = *held;
+                    left.count -= 1;
+                    session.inventory.set(heldSlot, left.count <= 0 ? std::nullopt : std::optional{left});
+                    owner_->sendInventorySlot(heldSlot);
+                }
+                return true;
+            }
+            // parity: only a cat falls through to the sit toggle with a dye it already wears.
+            if (dye != kDyes.end() && path == "wolf") {
+                return true;
+            }
+        }
         entity.sitting = !entity.sitting;
         entity::ai::navigation::stop(entity);
         broadcastTameFlags(entity);

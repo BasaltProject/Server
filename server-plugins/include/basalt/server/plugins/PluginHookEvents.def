@@ -132,9 +132,9 @@ HOOK_EVENT(blockVaultChangeState, "block.vault_change_state", true,
 HOOK_EVENT(playerItemMend, "player.item_mend", true,
            FIELDS("player_name", "player_uuid", "world", "slot", "orb_id", "repair", "consumed"), MUTABLE("repair"))
 HOOK_EVENT(blockCauldronLevel, "block.cauldron_level", true,
-           FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "reason", "old_level", "new_level",
-                  "new_block"),
-           MUTABLE())
+           FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "entity_id", "reason", "old_level",
+                  "new_level", "new_block"),
+           MUTABLE("new_block"))
 HOOK_EVENT(playerFlowerPot, "player.flower_pot", true,
            FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "item", "placing"), MUTABLE())
 HOOK_EVENT(playerLecternInsert, "player.lectern_insert", true,
@@ -150,7 +150,7 @@ HOOK_EVENT(entityBreakDoor, "entity.break_door", true,
 HOOK_EVENT(entityPoseChange, "entity.pose_change", false,
            FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "pose", "old_pose"), MUTABLE())
 HOOK_EVENT(blockLootGenerate, "block.loot_generate", true,
-           FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "table", "loot"), MUTABLE("loot"))
+           FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "entity_id", "table", "loot"), MUTABLE("loot"))
 HOOK_EVENT(playerLootReplenish, "player.loot_replenish", true,
            FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "table", "can_loot"), MUTABLE("can_loot"))
 HOOK_EVENT(playerTrade, "player.trade", true,
@@ -169,4 +169,21 @@ HOOK_EVENT(entityVillagerReplenishTrade, "entity.villager_replenish_trade", true
            FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "cost_a", "cost_a_count", "cost_b",
                   "cost_b_count", "result", "result_count", "uses", "max_uses", "experience", "price_multiplier",
                   "demand", "special_price"),
+           MUTABLE())
+HOOK_EVENT(entityEnterLove, "entity.enter_love", true,
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "player_name", "player_uuid", "ticks"),
+           MUTABLE("ticks"))
+HOOK_EVENT(entitySheepDye, "entity.sheep_dye", true,
+           FIELDS("player_name", "player_uuid", "world", "entity_id", "entity_type", "color"), MUTABLE("color"))
+HOOK_EVENT(playerEggThrow, "player.egg_throw", false,
+           FIELDS("player_name", "player_uuid", "world", "entity_id", "hatching", "count", "hatch_type"),
+           MUTABLE("hatching", "count", "hatch_type"))
+HOOK_EVENT(entityEggHatch, "entity.egg_hatch", false,
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "hatching", "count", "hatch_type"),
+           MUTABLE("hatching", "count", "hatch_type"))
+HOOK_EVENT(playerSignOpen, "player.sign_open", true,
+           FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "side", "cause"), MUTABLE())
+HOOK_EVENT(playerInput, "player.input", false,
+           FIELDS("player_name", "player_uuid", "world", "forward", "backward", "left", "right", "jump", "sneak",
+                  "sprint"),
            MUTABLE())

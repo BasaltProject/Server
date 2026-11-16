@@ -13,6 +13,10 @@
 #include <string_view>
 #include <vector>
 
+namespace basalt::server::runtime::entity {
+class ServerEntity;
+}
+
 namespace basalt::server::runtime::world {
 
 class LoadedWorld;
@@ -56,13 +60,20 @@ struct Lootable {
 /// A zero seed rolls on the table's own stream, as the jar does.
 void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, std::int64_t seed,
           std::vector<std::optional<server::world::loot::ItemStack>>& slots, bool byPlayer,
-          const std::array<std::int32_t, 3>& at, const std::optional<Opener>& opener = std::nullopt);
+          const std::array<std::int32_t, 3>& at, const std::optional<Opener>& opener = std::nullopt,
+          std::int32_t holderEntity = -1);
 
 /// parity: `RandomizableContainer.unpackLootTable`.
 std::optional<wire::common::Identifier> unpack(LoadedWorld& world, RealLootTables& tables, std::int32_t x,
                                                std::int32_t y, std::int32_t z,
                                                const std::optional<wire::common::Uuid>& player,
                                                const std::optional<Opener>& opener = std::nullopt);
+
+/// parity: `ContainerEntity.unpackChestVehicleLootTable`, for chest minecarts, hopper minecarts and chest boats.
+std::optional<wire::common::Identifier> unpackEntity(LoadedWorld& world, RealLootTables& tables,
+                                                     entity::ServerEntity& vehicle,
+                                                     const std::optional<wire::common::Uuid>& player,
+                                                     const std::optional<Opener>& opener = std::nullopt);
 
 } // namespace containerLoot
 

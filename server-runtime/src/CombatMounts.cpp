@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -115,7 +116,7 @@ bool CombatHandler::feedMount(PlayerSession& session, ServerEntity& horse, const
         }
         const bool couldLove = horse.age == 0 && entity::breeding::canFallInLove(horse);
         if (couldLove) {
-            entity::breeding::feed(horse, session.uuid().toString());
+            plugins::hookEvents::enterLove(world->events(), world->name(), horse, &session);
         }
         const bool couldAgeUp = entity::breeding::canAgeUp(horse);
         if (couldAgeUp) {
@@ -133,7 +134,7 @@ bool CombatHandler::feedMount(PlayerSession& session, ServerEntity& horse, const
     const bool llama = horses::isLlama(horse.type());
     if (feeding.love && horses::tamed(horse) && horse.age == 0 && entity::breeding::canFallInLove(horse)) {
         used = true;
-        entity::breeding::feed(horse, session.uuid().toString());
+        plugins::hookEvents::enterLove(world->events(), world->name(), horse, &session);
     }
     if (horse.health < max && feeding.heal > 0.0F) {
         horse.health = std::min(max, horse.health + static_cast<double>(feeding.heal));

@@ -190,8 +190,10 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     }
     // Asked once the block is decided to go down; a plugin veto makes the client put its prediction back.
     const Identifier* placedName = reg::blockStateDefinitions::blockOf(blockStateId);
+    const std::optional<std::array<std::int32_t, 3>> secondAt =
+        second.has_value() ? std::optional{std::array{second->x, second->y, second->z}} : std::nullopt;
     if (context.placeAllowed && !context.placeAllowed(*session, placeAt.x, placeAt.y, placeAt.z,
-                                                      placedName == nullptr ? "" : placedName->toString())) {
+                                                      placedName == nullptr ? "" : placedName->toString(), secondAt)) {
         if (context.blocks.putBack) {
             context.blocks.putBack(*session, placeAt.x, placeAt.y, placeAt.z,
                                    world.state().blockState(placeAt.x, placeAt.y, placeAt.z).value_or(0));

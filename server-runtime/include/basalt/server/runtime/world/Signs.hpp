@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -36,6 +37,20 @@ inline constexpr std::size_t kMaxLineLength = 384;
 
 /// Whether this sign refuses to be edited. parity: `SignBlockEntity.isWaxed`.
 [[nodiscard]] bool isWaxed(const wire::nbt::NbtCompound& data);
+
+/// parity: `SignBlockEntity.setWaxed`; nothing when it already was.
+[[nodiscard]] std::optional<wire::nbt::NbtCompound> withWaxed(const wire::nbt::NbtCompound& data);
+
+/// parity: `SignText.withColor`; nothing when the colour is unknown or already worn.
+[[nodiscard]] std::optional<wire::nbt::NbtCompound> withColor(const wire::nbt::NbtCompound& data, bool front,
+                                                              std::string_view color);
+
+/// parity: `SignText.withGlowingText`; nothing when the side already is so.
+[[nodiscard]] std::optional<wire::nbt::NbtCompound> withGlowing(const wire::nbt::NbtCompound& data, bool front,
+                                                                bool glowing);
+
+/// parity: `SignText.hasMessage`.
+[[nodiscard]] bool hasMessage(const wire::nbt::NbtCompound& data, bool front);
 
 /// parity: `SignBlockEntity.applyImplicitComponents`.
 [[nodiscard]] wire::nbt::NbtCompound withComponents(const wire::nbt::NbtCompound& data,

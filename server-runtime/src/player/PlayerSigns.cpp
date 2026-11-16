@@ -58,10 +58,20 @@ bool writeSignFor(const BreakContext& context, world::LoadedWorld& world, Player
     const wire::nbt::NbtCompound data = world.state().gameplay().blocks.signAllowColors
                                             ? world::signs::withColouredText(base, front, lines)
                                             : world::signs::withText(base, front, lines);
-    chunk->setBlockEntity(world::signs::blockEntity(x & 15, y, z & 15, *type, data));
-    const std::optional<std::int32_t> typeId = reg::blockEntityTypes::idOf(*type);
+    announceSign(context, world, x, y, z, *type, data);
+    return true;
+}
+
+void announceSign(const BreakContext& context, world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
+                  const std::int32_t z, const Identifier& type, const wire::nbt::NbtCompound& data) {
+    server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
+    if (chunk == nullptr) {
+        return;
+    }
+    chunk->setBlockEntity(world::signs::blockEntity(x & 15, y, z & 15, type, data));
+    const std::optional<std::int32_t> typeId = reg::blockEntityTypes::idOf(type);
     if (!typeId.has_value()) {
-        return true;
+        return;
     }
     const wire::protocol::play::BlockEntityDataPacket packet{
         .pos = {.x = x, .y = y, .z = z}, .typeId = *typeId, .tag = data};
@@ -76,7 +86,6 @@ bool writeSignFor(const BreakContext& context, world::LoadedWorld& world, Player
                                                 [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
         }
     }
-    return true;
 }
 
 } // namespace basalt::server::runtime::player

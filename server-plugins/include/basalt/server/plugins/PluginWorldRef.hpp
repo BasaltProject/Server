@@ -431,6 +431,13 @@ public:
         return std::nullopt;
     }
 
+    /// Applies a saved compound to a live entity in place (`Entity.load`); false for players and malformed tags.
+    virtual bool loadEntityNbt(std::int32_t entityId, std::span<const std::uint8_t> nbt) {
+        static_cast<void>(entityId);
+        static_cast<void>(nbt);
+        return false;
+    }
+
     /// Brings an entity back from `entityNbt`; returns its new id, or -1 (also when entity.spawn is cancelled).
     virtual std::int32_t spawnEntityNbt(std::span<const std::uint8_t> nbt, std::string_view cause) {
         static_cast<void>(nbt);

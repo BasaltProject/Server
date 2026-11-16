@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <vector>
 
 namespace basalt::server::runtime::command {
@@ -112,7 +113,15 @@ public:
     }
 
     [[nodiscard]] ArgumentParser wire() const override {
-        return ArgumentParser{kParserId, ArgumentParser::Bounds<T>{.min = min_, .max = max_}};
+        // parity: ArgumentInfo.serializeToNetwork writes a bound only when it differs from the type's extreme
+        ArgumentParser::Bounds<T> bounds;
+        if (min_ != std::numeric_limits<T>::lowest()) {
+            bounds.min = min_;
+        }
+        if (max_ != std::numeric_limits<T>::max()) {
+            bounds.max = max_;
+        }
+        return ArgumentParser{kParserId, bounds};
     }
 
 private:

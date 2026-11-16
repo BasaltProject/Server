@@ -138,20 +138,20 @@ TEST_CASE("an entity is saved with the fields its own class has and no others") 
     CHECK(arrow.contains("Air"));
     CHECK_FALSE(arrow.contains("Health"));
     CHECK_FALSE(arrow.contains("Age"));
-    CHECK_FALSE(arrow.contains("NoAI"));
+    CHECK_FALSE(arrow.contains("LeftHanded"));
     CHECK_FALSE(arrow.contains("Sitting"));
     CHECK_FALSE(arrow.contains("InLove"));
 
     const NbtCompound cow = entityNbt::encode(entityOf("cow"));
     CHECK(cow.contains("Health"));
     CHECK(cow.contains("Age"));
-    CHECK(cow.contains("NoAI"));
+    CHECK(cow.contains("LeftHanded"));
     CHECK(cow.contains("InLove"));
     CHECK_FALSE(cow.contains("Sitting"));
 
     const NbtCompound stand = entityNbt::encode(entityOf("armor_stand"));
     CHECK(stand.contains("Health"));
-    CHECK_FALSE(stand.contains("NoAI"));
+    CHECK_FALSE(stand.contains("LeftHanded"));
     CHECK(entityNbt::encode(entityOf("wolf")).contains("Sitting"));
 }
 

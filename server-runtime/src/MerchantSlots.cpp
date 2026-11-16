@@ -149,11 +149,12 @@ bool VillagerTradeController::mayTakeResult() const {
 bool VillagerTradeController::askPurchase() {
     rewardExp_ = true;
     increaseUses_ = true;
-    if (!hooks_.purchaseAllowed || custom_ || !openTradingWith_.has_value() || !activeOffer_.has_value() ||
+    if (!hooks_.purchaseAllowed || (!custom_ && !openTradingWith_.has_value()) || !activeOffer_.has_value() ||
         openOffers_ == nullptr || *activeOffer_ >= openOffers_->list.size()) {
         return true;
     }
-    return hooks_.purchaseAllowed(*openTradingWith_, openOffers_->list[*activeOffer_], rewardExp_, increaseUses_);
+    const std::int32_t trader = custom_ ? -1 : *openTradingWith_;
+    return hooks_.purchaseAllowed(trader, openOffers_->list[*activeOffer_], rewardExp_, increaseUses_);
 }
 
 void VillagerTradeController::takeResult(const bool asked) {

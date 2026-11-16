@@ -62,6 +62,7 @@ inline constexpr std::uint32_t kParrot = 1U << 10;
 inline constexpr std::uint32_t kTrader = 1U << 11;
 inline constexpr std::uint32_t kShulker = 1U << 12;
 inline constexpr std::uint32_t kCamel = 1U << 13;
+inline constexpr std::uint32_t kChicken = 1U << 14;
 } // namespace basalt::server::runtime::entity::kinds
 
 namespace basalt::server::runtime::config {
@@ -253,6 +254,8 @@ public:
     std::int32_t age = 0;
 
     std::int32_t loveTicks = 0;
+    /// parity: `Chicken.eggTime`, rolled on its first tick when it was not saved.
+    std::int32_t eggLayTime = -1;
     std::optional<std::string> loveCause;
     std::int32_t courtshipTicks = 0;
     /// parity: `PARENT_AGE_AFTER_BREEDING`, the five minutes before either can breed again.

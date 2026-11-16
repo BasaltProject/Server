@@ -1,5 +1,8 @@
 #pragma once
 
+#include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
+
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -21,6 +24,10 @@ using SignChangeAllowed = std::function<bool(PlayerSession& who, std::int32_t x,
 bool writeSignFor(const BreakContext& context, world::LoadedWorld& world, PlayerSession& session, std::int32_t x,
                   std::int32_t y, std::int32_t z, bool front, std::vector<std::string> lines,
                   const SignChangeAllowed& allowed = {});
+
+/// Stores the sign's data and tells everyone in the world.
+void announceSign(const BreakContext& context, world::LoadedWorld& world, std::int32_t x, std::int32_t y,
+                  std::int32_t z, const wire::common::Identifier& type, const wire::nbt::NbtCompound& data);
 
 [[nodiscard]] std::vector<std::string> signLinesOf(std::string_view text);
 

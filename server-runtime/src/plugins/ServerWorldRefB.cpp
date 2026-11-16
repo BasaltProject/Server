@@ -341,6 +341,13 @@ std::optional<std::vector<std::uint8_t>> LoadedWorldRef::entityNbt(std::int32_t 
     return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(entity::entityNbt::encode(*found)));
 }
 
+bool LoadedWorldRef::loadEntityNbt(std::int32_t entityId, std::span<const std::uint8_t> nbt) {
+    entity::ServerEntity* found = world_->state().entity(entityId);
+    const auto parsed = wire::nbt::nbtIO::read(nbt);
+    const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+    return found != nullptr && given != nullptr && entity::entityNbt::load(*found, *given);
+}
+
 std::int32_t LoadedWorldRef::spawnEntityNbt(std::span<const std::uint8_t> nbt, std::string_view cause) {
     const auto parsed = wire::nbt::nbtIO::read(nbt);
     const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;

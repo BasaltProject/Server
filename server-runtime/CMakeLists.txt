@@ -264,6 +264,7 @@ basalt_module(server-runtime-core
         src/CombatDeathLoot.cpp
         src/CombatHandler.cpp
         src/BlockTests.cpp
+        src/CombatEggs.cpp
         src/CombatSystem.cpp
         src/CombatSystemHits.cpp
         src/CombatWindCharges.cpp
@@ -305,6 +306,7 @@ basalt_module(server-runtime-core
         src/MobActionCreakingHeart.cpp
         src/MobActionAmbient.cpp
         src/MobActionArmadillo.cpp
+        src/MobActionChicken.cpp
         src/MobActionAxolotl.cpp
         src/MobActionBees.cpp
         src/MobActionBreeze.cpp
@@ -606,6 +608,7 @@ basalt_module(server-runtime-core
         src/CombatVehicles.cpp
         src/CombatMounts.cpp
         src/CombatArmorStands.cpp
+        src/CombatSheepDye.cpp
         src/CombatShearing.cpp
         src/CombatSpear.cpp
         src/CombatSpin.cpp

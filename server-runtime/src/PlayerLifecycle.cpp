@@ -611,6 +611,7 @@ void PlayerLifecycle::leavePlayIfPresent() {
     // Before leaving the registry, so a save elsewhere cannot write a half-gone player.
     savePlayerState();
     registry->remove(session->uuid());
+    registry->depart(session);
     if (owner_->options().progress != nullptr) {
         owner_->options().progress->unload(session->uuid().toString());
     }
@@ -643,6 +644,7 @@ void PlayerLifecycle::leavePlayIfPresent() {
             });
     }
     // Retired rather than dropped: the tick loop may be mid-way through a list that still holds this player.
+    registry->settle(session->uuid());
     registry->retire(owner_->takePlayerSession());
 }
 

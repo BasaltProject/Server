@@ -30,6 +30,9 @@ using ProtocolTypeOf = std::function<std::optional<std::int32_t>(const wire::com
 [[nodiscard]] std::unique_ptr<ServerEntity> decode(const wire::nbt::NbtCompound& tag, std::int32_t entityId,
                                                    std::int32_t protocolType);
 
+/// parity: `Entity.load`; false when the tag does not describe an entity of this world.
+[[nodiscard]] bool load(ServerEntity& entity, wire::nbt::NbtCompound tag);
+
 [[nodiscard]] std::vector<std::unique_ptr<ServerEntity>> decodeTree(const wire::nbt::NbtCompound& tag,
                                                                     const AllocateEntityId& allocateEntityId,
                                                                     const ProtocolTypeOf& protocolTypeOf);

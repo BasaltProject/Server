@@ -90,7 +90,9 @@ constexpr std::int32_t kForwardInputFlag = 0x01;
 constexpr std::int32_t kBackInputFlag = 0x02;
 constexpr std::int32_t kLeftInputFlag = 0x04;
 constexpr std::int32_t kRightInputFlag = 0x08;
+constexpr std::int32_t kJumpInputFlag = 0x10;
 constexpr std::int32_t kSneakInputFlag = 0x20;
+constexpr std::int32_t kSprintInputFlag = 0x40;
 
 // Packets a client sends without anyone having done anything.
 const std::set<std::int32_t> kPassivePackets{0x00, 0x06, 0x0b, 0x0d, 0x0e, 0x15, 0x1c, 0x1e,

@@ -49,7 +49,7 @@ public:
                            std::vector<server::world::loot::ItemStack>& drops)>
             blockDrops;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
-                           const std::string& item)>
+                           const std::string& item, const std::optional<std::array<std::int32_t, 3>>& second)>
             placeAllowed;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
                            const std::string& item, std::string_view face, bool mainHand)>
@@ -81,7 +81,7 @@ public:
             spawnChangeAllowed;
         player::HarvestGate harvestAllowed;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
-                           std::string_view reason, std::int32_t from, std::int32_t to)>
+                           std::string_view reason, std::int32_t from, std::int32_t& to)>
             cauldronAllowed;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
                            const std::string& item, bool placing)>

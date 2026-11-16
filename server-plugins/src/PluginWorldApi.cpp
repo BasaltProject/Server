@@ -279,6 +279,31 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("block_shape");
+    wire::lua::pushHostFunction(lua, "worlds.block_outline", [server](LuaArgs& args) {
+        const std::vector<double> boxes = server->services().worlds().outlineBoxes(
+            static_cast<std::int32_t>(args.checkInteger(1)), static_cast<std::int32_t>(args.integerOr(2, 0)),
+            static_cast<std::int32_t>(args.integerOr(3, 0)));
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const double value : boxes) {
+            args.pushNumber(value);
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("block_outline");
+    wire::lua::pushHostFunction(lua, "worlds.block_visual", [server](LuaArgs& args) {
+        const std::vector<double> boxes =
+            server->services().worlds().visualBoxes(static_cast<std::int32_t>(args.checkInteger(1)));
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const double value : boxes) {
+            args.pushNumber(value);
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("block_visual");
     wire::lua::pushHostFunction(lua, "worlds.block_sounds", [server](LuaArgs& args) {
         const std::vector<std::string> facts =
             server->services().worlds().blockSounds(static_cast<std::int32_t>(args.checkInteger(1)));

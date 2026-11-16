@@ -6,8 +6,11 @@
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/ContainerLoot.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/InventoryPackets.hpp>
 #include <basalt/wire/protocol/play/VehiclePackets.hpp>
@@ -197,6 +200,22 @@ void ContainerMenuController::openEntityChest(PlayerSession& session, entity::Se
     openBlockData_ = {-1, -1, -1, -1};
     if (!vehicle.sourceNbt.has_value()) {
         vehicle.sourceNbt = wire::nbt::NbtCompound{};
+    }
+    if (world::RealLootTables* tables = owner_->options().lootTables; tables != nullptr) {
+        const std::optional<wire::common::Identifier> rolled = world::containerLoot::unpackEntity(
+            *world, *tables, vehicle, session.uuid(),
+            world::containerLoot::Opener{.name = session.name(),
+                                         .uuid = session.uuid().toString(),
+                                         .luck = session.luck(),
+                                         .mainhand =
+                                             session.inventory.heldItem().has_value()
+                                                 ? wire::common::Identifier::parse(session.inventory.heldItem()->id)
+                                                       .value_or(wire::common::Identifier::vanilla("air"))
+                                                 : std::optional<wire::common::Identifier>{}});
+        // parity: `unpackChestVehicleLootTable` fires `GENERATE_LOOT` for the player who opened it.
+        if (rolled.has_value() && owner_->options().advancementTriggers != nullptr) {
+            owner_->options().advancementTriggers->onContainerLoot(session.name(), session.uuid().toString(), *rolled);
+        }
     }
     owner_->sendCompressed(wire::protocol::play::OpenScreenPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         wire::protocol::play::OpenScreenPacket{.containerId = openMenu.containerId(),

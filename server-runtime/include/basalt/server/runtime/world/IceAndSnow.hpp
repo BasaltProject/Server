@@ -16,7 +16,8 @@ class LoadedWorld;
 namespace iceAndSnow {
 
 /// One roll that hit: the column at (x, z) freezes its top water and, in rain, gains a layer of snow.
-void precipitate(LoadedWorld& world, std::int32_t x, std::int32_t z, std::vector<BlockChange>& changes);
+void precipitate(LoadedWorld& world, std::int32_t x, std::int32_t z, random::RandomSource& random,
+                 std::vector<BlockChange>& changes);
 
 } // namespace iceAndSnow
 

@@ -448,6 +448,18 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             blockUsed();
             return;
         }
+        if (clickedState.has_value() && world::signs::isSign(*clickedState) && held.has_value()) {
+            world::LoadedWorld* here = owner_->currentWorld();
+            if (const std::optional<std::string_view> sound =
+                    here == nullptr ? std::nullopt
+                                    : player::useSignItemFor(breakContext(), *session, *here, hit.pos.x, hit.pos.y,
+                                                             hit.pos.z, heldSlot, *held);
+                sound.has_value()) {
+                broadcastSound(hit.pos, "minecraft:" + std::string{*sound}, 1.0F, 1.0F);
+                blockUsed();
+                return;
+            }
+        }
         if (clickedState.has_value() && world::signs::isSign(*clickedState) && editSign(hit.pos)) {
             blockUsed();
             return;

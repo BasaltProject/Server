@@ -85,7 +85,7 @@ struct BreakContext {
                        std::int32_t z, std::string_view face)>
         hangingAllowed;
     std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
-                       std::string_view reason, std::int32_t from, std::int32_t to)>
+                       std::string_view reason, std::int32_t from, std::int32_t& to)>
         cauldronAllowed;
     std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
                        const std::string& item, bool placing)>

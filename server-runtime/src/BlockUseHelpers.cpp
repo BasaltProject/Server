@@ -23,6 +23,7 @@
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -114,6 +115,11 @@ void BlockInteractionHandler::openNewSign(const BlockPos& pos, std::int32_t stat
     if (chunk->blockEntityAt(pos.x & 15, pos.y, pos.z & 15) == nullptr) {
         chunk->setBlockEntity(world::signs::blockEntity(pos.x & 15, pos.y, pos.z & 15, *type));
     }
+    if (const PlayerSession* session = owner_->playerSession();
+        session != nullptr &&
+        !plugins::hookEvents::signOpenAllowed(world->events(), *session, pos.x, pos.y, pos.z, true, "place")) {
+        return;
+    }
     owner_->sendCompressed(play::OpenSignEditorPacket::kId, [&pos](wire::io::ByteBuffer& buffer) {
         play::OpenSignEditorPacket{.pos = pos, .isFrontText = true}.write(buffer);
     });
@@ -134,6 +140,9 @@ bool BlockInteractionHandler::editSign(const BlockPos& pos) {
     const bool front = world::signs::facesFront(*stateId, pos.x, pos.z, session->x, session->z);
     if (!world::signs::hasEditableText(existing->data(), front)) {
         return false;
+    }
+    if (!plugins::hookEvents::signOpenAllowed(world->events(), *session, pos.x, pos.y, pos.z, front, "interact")) {
+        return true;
     }
     owner_->sendCompressed(play::OpenSignEditorPacket::kId, [&pos, front](wire::io::ByteBuffer& buffer) {
         play::OpenSignEditorPacket{.pos = pos, .isFrontText = front}.write(buffer);

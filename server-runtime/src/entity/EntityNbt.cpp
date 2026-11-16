@@ -214,6 +214,25 @@ ServerEntity* decodeGeneratedTreeNode(const server::world::ChunkGeneratedEntity&
     return wire::common::Uuid::parse(tag.getString(key));
 }
 
+bool load(ServerEntity& mob, NbtCompound tag) {
+    const NbtCompound current = encode(mob);
+    if (const NbtTag* uuid = current.find("UUID"); uuid != nullptr) {
+        tag.set("UUID", *uuid);
+    }
+    tag.putString("id", mob.type().toString());
+    std::unique_ptr<ServerEntity> loaded = decode(tag, mob.entityId(), mob.protocolType());
+    if (loaded == nullptr) {
+        return false;
+    }
+    loaded->vehicleId = mob.vehicleId;
+    loaded->passengerIds = mob.passengerIds;
+    loaded->leashHolderId = mob.leashHolderId;
+    loaded->dragon = mob.dragon;
+    loaded->removed = mob.removed;
+    mob = std::move(*loaded);
+    return true;
+}
+
 NbtCompound encodeTree(const ServerEntity& root, const EntityById& entityById) {
     std::set<std::int32_t> visited;
     return encodeTreeNode(root, entityById, visited);
@@ -265,6 +284,10 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     entity->deathTime = numericInt(tag, "DeathTime");
     entity->dying = entity->deathTime > 0;
     entity->fireTicks = numericInt(tag, "Fire");
+    entity->fallDistance = numericDouble(tag, "fall_distance");
+    entity->onGround = numericBoolean(tag, "OnGround");
+    entity->portalCooldown = numericInt(tag, "PortalCooldown");
+    entity->hurtCooldown = numericInt(tag, "invulnerable_time");
     entity->lastHurtByPlayer = uuidIn(tag, "last_hurt_by_player");
     entity->lastHurtByPlayerTime = numericInt(tag, "last_hurt_by_player_memory_time");
     entity->noGravity = numericBoolean(tag, "NoGravity");

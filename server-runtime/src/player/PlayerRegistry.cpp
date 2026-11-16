@@ -47,6 +47,27 @@ void PlayerRegistry::remove(const wire::common::Uuid& uuid) {
     sessions_.erase(found);
 }
 
+void PlayerRegistry::depart(PlayerSession* session) {
+    if (session != nullptr) {
+        const std::lock_guard<std::mutex> guard{lock_};
+        departing_[session->uuid()] = session;
+    }
+}
+
+void PlayerRegistry::settle(const wire::common::Uuid& uuid) {
+    const std::lock_guard<std::mutex> guard{lock_};
+    departing_.erase(uuid);
+}
+
+std::vector<PlayerSession*> PlayerRegistry::departing() const {
+    const std::lock_guard<std::mutex> guard{lock_};
+    std::vector<PlayerSession*> out;
+    for (const auto& [id, session] : departing_) {
+        out.push_back(session);
+    }
+    return out;
+}
+
 void PlayerRegistry::retire(std::unique_ptr<PlayerSession> session) {
     if (session == nullptr) {
         return;
@@ -88,7 +109,11 @@ void PlayerRegistry::collect() {
 PlayerSession* PlayerRegistry::get(const wire::common::Uuid& uuid) const {
     const std::lock_guard<std::mutex> guard{lock_};
     const auto found = sessions_.find(uuid);
-    return found == sessions_.end() ? nullptr : found->second;
+    if (found != sessions_.end()) {
+        return found->second;
+    }
+    const auto leaving = departing_.find(uuid);
+    return leaving == departing_.end() ? nullptr : leaving->second;
 }
 
 std::size_t PlayerRegistry::count() const {

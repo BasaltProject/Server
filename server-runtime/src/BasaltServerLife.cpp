@@ -54,6 +54,7 @@
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventHooks.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/AntiXray.hpp>
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
@@ -514,6 +515,16 @@ player::BreakContext BasaltServer::breakContext() {
             event.set("entering", false);
         });
     };
+    context.breakAllowed = blockHooks_.breakAllowed;
+    context.blockDrops = blockHooks_.blockDrops;
+    context.itemDamageAllowed = blockHooks_.itemDamageAllowed;
+    context.fishing = blockHooks_.fishing;
+    context.fertilizeAllowed = blockHooks_.fertilizeAllowed;
+    context.foodEaten = blockHooks_.foodEaten;
+    context.hangingAllowed = blockHooks_.hangingAllowed;
+    context.cauldronAllowed = blockHooks_.cauldronAllowed;
+    context.flowerPotAllowed = blockHooks_.flowerPotAllowed;
+    context.lecternInsertAllowed = blockHooks_.lecternInsertAllowed;
     context.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
         if (orbs_ != nullptr) {
             const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::BlockBreak};
@@ -1150,7 +1161,7 @@ void BasaltServer::startBedrockListener() {
                                      world::breedingCooldowns::active(found->second->name(), session->uuid().toString(),
                                                                       target->type(), found->second->gameTime());
                 if (entity::breeding::canFallInLove(*target) && !waiting) {
-                    entity::breeding::feed(*target, session->uuid().toString());
+                    plugins::hookEvents::enterLove(found->second->events(), found->second->name(), *target, session);
                 } else if (entity::breeding::canAgeUp(*target)) {
                     entity::breeding::feedBaby(*target);
                 } else {

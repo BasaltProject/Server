@@ -162,7 +162,9 @@ const PluginEventType& blockBreak() {
 
 const PluginEventType& blockPlace() {
     static const PluginEventType type{
-        "block.place", true, {"player_name", "player_uuid", "world", "x", "y", "z", "block"}};
+        "block.place",
+        true,
+        {"player_name", "player_uuid", "world", "x", "y", "z", "block", "multi", "second_x", "second_y", "second_z"}};
     return type;
 }
 
@@ -292,7 +294,8 @@ const PluginEventType& serverBroadcast() {
 }
 
 const PluginEventType& entitySpawn() {
-    static const PluginEventType type{"entity.spawn", true, {"entity_type", "world", "x", "y", "z", "reason"}};
+    static const PluginEventType type{
+        "entity.spawn", true, {"entity_type", "world", "x", "y", "z", "reason", "spawner_x", "spawner_y", "spawner_z"}};
     return type;
 }
 

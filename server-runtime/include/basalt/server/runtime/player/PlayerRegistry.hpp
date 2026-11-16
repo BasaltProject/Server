@@ -27,6 +27,13 @@ public:
 
     void remove(const wire::common::Uuid& uuid);
 
+    /// Keeps a removed session reachable by `get` and `departing` until `settle`, for the quit hooks.
+    void depart(PlayerSession* session);
+
+    void settle(const wire::common::Uuid& uuid);
+
+    [[nodiscard]] std::vector<PlayerSession*> departing() const;
+
     void retire(std::unique_ptr<PlayerSession> session);
 
     void keepAlive(std::shared_ptr<void> owner);
@@ -50,6 +57,7 @@ private:
     /// Kept in join order, which is the order vanilla lists players in.
     std::shared_ptr<const std::vector<PlayerSession*>> order_ = std::make_shared<const std::vector<PlayerSession*>>();
     std::unordered_map<wire::common::Uuid, PlayerSession*> sessions_;
+    std::unordered_map<wire::common::Uuid, PlayerSession*> departing_;
     std::int32_t nextEntityId_ = 1;
     std::vector<std::pair<std::chrono::steady_clock::time_point, std::unique_ptr<PlayerSession>>> retired_;
     std::vector<std::pair<std::chrono::steady_clock::time_point, std::shared_ptr<void>>> kept_;

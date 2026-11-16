@@ -175,6 +175,7 @@ public:
     bool createBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z, std::span<const std::uint8_t> nbt) override;
     bool removeBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> entityNbt(std::int32_t entityId) override;
+    bool loadEntityNbt(std::int32_t entityId, std::span<const std::uint8_t> nbt) override;
     std::int32_t spawnEntityNbt(std::span<const std::uint8_t> nbt, std::string_view cause) override;
     [[nodiscard]] std::optional<DragonFightFacts> dragonFight() override;
     bool setDragonPreviouslyKilled(bool value) override;

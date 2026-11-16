@@ -305,7 +305,7 @@ void addCatMetadata(Entries& into, const NbtCompound& data) {
             .value = SetEntityDataPacket::RegistryIdValue{.value = *variant, .registry = RegistryHolder::CatVariant}});
     }
     const std::int32_t collarColor = data.getByte("CollarColor", 14) & 0xFF;
-    if (collarColor != 14) {
+    if (collarColor != 14 || data.contains("CollarColor")) {
         into.push_back(Entry{.index = 23, .value = SetEntityDataPacket::IntValue{.value = collarColor}});
     }
     addRegistryMetadata(into, data, "sound_variant", 24, runtime::registry::vanillaRegistryData::catSoundVariants(),
@@ -542,6 +542,10 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
         }
         addVillagerMetadata(entries, data, 20, 21);
     } else if (type == "wolf") {
+        if (data.contains("CollarColor")) {
+            entries.push_back(Entry{
+                .index = 21, .value = SetEntityDataPacket::IntValue{.value = data.getByte("CollarColor") & 0xFF}});
+        }
         addRegistryMetadata(entries, data, "variant", 23, runtime::registry::vanillaRegistryData::wolfVariants(),
                             "minecraft:pale", RegistryHolder::WolfVariant);
         addRegistryMetadata(entries, data, "sound_variant", 24,

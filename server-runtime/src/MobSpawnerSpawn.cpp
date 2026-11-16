@@ -375,6 +375,9 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
                                     event.set("y", loaded.main->y);
                                     event.set("z", loaded.main->z);
                                     event.set("reason", std::string{turn.trial ? "trial_spawner" : "spawner"});
+                                    event.set("spawner_x", static_cast<std::int64_t>(turn.pos[0]));
+                                    event.set("spawner_y", static_cast<std::int64_t>(turn.pos[1]));
+                                    event.set("spawner_z", static_cast<std::int64_t>(turn.pos[2]));
                                 })) {
         return Attempt::Abort;
     }

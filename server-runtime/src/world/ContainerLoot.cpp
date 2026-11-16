@@ -1,6 +1,7 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/command/DataArguments.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/plugins/TradeHookEvents.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
@@ -11,6 +12,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <expected>
 #include <random>
 #include <span>
@@ -115,7 +117,7 @@ bool Lootable::shouldRefill(const std::optional<wire::common::Uuid>& player, con
 
 void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, std::int64_t seed,
           std::vector<std::optional<server::world::loot::ItemStack>>& slots, bool byPlayer,
-          const std::array<std::int32_t, 3>& at, const std::optional<Opener>& opener) {
+          const std::array<std::int32_t, 3>& at, const std::optional<Opener>& opener, const std::int32_t holderEntity) {
     const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
         wire::common::Identifier::parse(table);
     const server::world::loot::LootTable* rolled = id.has_value() ? tables.byId(*id) : nullptr;
@@ -162,10 +164,10 @@ void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, st
         const server::plugins::PluginEvent* asked = world.state().events().ask(
             &server::plugins::pluginEventTypes::blockLootGenerate, [&](server::plugins::PluginEvent& event) {
                 plugins::hookEvents::position(event, world.state().eventWorld(), at[0], at[1], at[2]);
-                if (byPlayer && opener.has_value()) {
-                    event.set("player_name", opener->name);
-                    event.set("player_uuid", opener->uuid);
-                }
+                const bool opened = byPlayer && opener.has_value();
+                event.set("player_name", opened ? opener->name : std::string{});
+                event.set("player_uuid", opened ? opener->uuid : std::string{});
+                event.set("entity_id", static_cast<std::int64_t>(holderEntity));
                 event.set("table", std::string{table});
                 event.set("loot", before);
             });
@@ -278,6 +280,36 @@ std::optional<wire::common::Identifier> unpack(LoadedWorld& world, RealLootTable
         blockInventory::writeFor(path, again->data(), slots);
     }
     return named;
+}
+
+std::optional<wire::common::Identifier> unpackEntity(LoadedWorld& world, RealLootTables& tables,
+                                                     entity::ServerEntity& vehicle,
+                                                     const std::optional<wire::common::Uuid>& player,
+                                                     const std::optional<Opener>& opener) {
+    if (!vehicle.sourceNbt.has_value()) {
+        return std::nullopt;
+    }
+    wire::nbt::NbtCompound& data = *vehicle.sourceNbt;
+    const std::string table{data.getString(kTableKey)};
+    if (table.empty()) {
+        return std::nullopt;
+    }
+    const std::int64_t seed = data.getLong(kSeedKey);
+    // parity: `setLootTable(null)` goes first, so the roll cannot run twice.
+    static_cast<void>(data.remove(kTableKey));
+    static_cast<void>(data.remove(kSeedKey));
+    const std::int32_t size = vehicle.type().path() == "hopper_minecart" ? 5 : 27;
+    blockInventory::Slots slots = blockInventory::read(data, size);
+    const std::array<std::int32_t, 3> at{static_cast<std::int32_t>(std::floor(vehicle.x)),
+                                         static_cast<std::int32_t>(std::floor(vehicle.y)),
+                                         static_cast<std::int32_t>(std::floor(vehicle.z))};
+    fill(world, tables, table, seed, slots, player.has_value(), at, opener, vehicle.entityId());
+    if (vehicle.sourceNbt.has_value()) {
+        blockInventory::write(*vehicle.sourceNbt, slots);
+    }
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> rolled =
+        wire::common::Identifier::parse(table);
+    return rolled.has_value() ? std::optional{*rolled} : std::nullopt;
 }
 
 } // namespace basalt::server::runtime::world::containerLoot

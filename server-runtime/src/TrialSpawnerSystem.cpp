@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Entities.hpp>
@@ -13,6 +14,8 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
+#include <basalt/server/runtime/plugins/TradeHookEvents.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
@@ -454,10 +457,27 @@ void TrialSpawnerSystem::ejectReward(Turn& turn, const std::string& table) {
     }
     server::world::loot::LootContext context{};
     options_.lootTables->prepareAt(context, turn.world, turn.pos[0] + 0.5, turn.pos[1] + 0.5, turn.pos[2] + 0.5);
-    const std::vector<server::world::loot::ItemStack> drops =
-        rolled->generate(turn.random, 0.0F, std::nullopt, context);
+    std::vector<server::world::loot::ItemStack> drops = rolled->generate(turn.random, 0.0F, std::nullopt, context);
     if (drops.empty()) {
         return;
+    }
+    // parity: Paper's `BlockDispenseLootEvent` in `TrialSpawner.ejectReward`.
+    const std::string before = plugins::tradeEvents::linesOf(drops);
+    const server::plugins::PluginEvent* asked = turn.world.events().ask(
+        &server::plugins::pluginEventTypes::blockDispenseLoot, [&](server::plugins::PluginEvent& event) {
+            plugins::hookEvents::position(event, turn.world.state().eventWorld(), turn.pos[0], turn.pos[1],
+                                          turn.pos[2]);
+            event.set("loot_table", table);
+            event.set("loot", before);
+        });
+    if (asked != nullptr) {
+        if (asked->cancelled()) {
+            return;
+        }
+        if (const auto* edited = std::get_if<std::string>(&asked->get("loot"));
+            edited != nullptr && *edited != before) {
+            drops = plugins::tradeEvents::stacksOf(*edited);
+        }
     }
     const auto triangle = [&turn](double center, double spread) {
         const double first = turn.random.nextDouble();

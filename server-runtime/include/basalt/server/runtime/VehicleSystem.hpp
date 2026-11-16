@@ -29,7 +29,8 @@ class PlayerSession;
 
 namespace basalt::server::runtime::world {
 class LoadedWorld;
-}
+class RealLootTables;
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
 
@@ -66,6 +67,7 @@ public:
         const world::realBlockTags::TagMembers* blockTags = nullptr;
         const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
         const world::realEntityTypeTags::TagMembers* entityTags = nullptr;
+        world::RealLootTables* lootTables = nullptr;
         std::function<std::int32_t(world::LoadedWorld& world, entity::ServerEntity& cart, const std::string& command)>
             runCommand;
         std::function<bool(world::LoadedWorld& world, wire::nbt::NbtCompound& data,

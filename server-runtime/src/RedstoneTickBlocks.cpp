@@ -224,12 +224,14 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
         return;
     }
     world::randomTicks::Context context = randomContext(world);
+    random::RandomSource random = freshRandom();
     if (!world.settings().rules.environment.disableIceAndSnow) {
-        context.precipitate = [&world](std::int32_t x, std::int32_t z, std::vector<world::BlockChange>& found) {
-            world::iceAndSnow::precipitate(world, x, z, found);
+        // parity: `ServerLevel.tickPrecipitation` and `randomTick` share the level's one `random`.
+        context.precipitate = [&world, &random](std::int32_t x, std::int32_t z,
+                                                std::vector<world::BlockChange>& found) {
+            world::iceAndSnow::precipitate(world, x, z, random, found);
         };
     }
-    random::RandomSource random = freshRandom();
     std::vector<world::BlockChange> changes = randomTicks_.tick(context, chunks, speed, random);
     if (changes.empty()) {
         return;

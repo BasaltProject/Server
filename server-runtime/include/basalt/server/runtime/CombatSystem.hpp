@@ -71,6 +71,10 @@ public:
         std::function<void(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                            double z, float yaw)>
             spawnMob;
+        /// parity: `ThrownEgg.onHit`, a baby made `TRIGGERED` and wearing the variant of the egg.
+        std::function<void(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
+                           double z, float yaw, std::string_view variant)>
+            spawnHatched;
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer)>
             crystalDestroyed;
@@ -191,6 +195,10 @@ private:
                                   std::int32_t x, std::int32_t y, std::int32_t z) const;
 
     /// parity: `Projectile.onHitBlock`.
+    /// parity: `ThrownEgg.onHit`, the chance of chicks where it broke.
+    void hatchEgg(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                  entity::ServerEntity& egg);
+
     void hitBlock(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                   const entity::ServerEntity& projectile, const entity::BlockHit& hit, bool byArrow);
 

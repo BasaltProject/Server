@@ -40,6 +40,19 @@ constexpr std::string_view kBack = "back_text";
     return text;
 }
 
+constexpr std::array<std::string_view, 16> kColors{"white", "orange", "magenta",    "light_blue", "yellow", "lime",
+                                                   "pink",  "gray",   "light_gray", "cyan",       "purple", "blue",
+                                                   "brown", "green",  "red",        "black"};
+
+void carryStyle(wire::nbt::NbtCompound& text, const wire::nbt::NbtCompound& data, const bool front) {
+    const wire::nbt::NbtCompound* old = data.getCompound(front ? kFront : kBack);
+    if (old == nullptr) {
+        return;
+    }
+    text.putString("color", std::string{old->getString("color", "black")});
+    text.putByte("has_glowing_text", old->getByte("has_glowing_text"));
+}
+
 } // namespace
 
 bool isSign(std::int32_t stateId) {
@@ -73,8 +86,10 @@ wire::nbt::NbtCompound withText(const wire::nbt::NbtCompound& data, bool isFront
     for (const std::string& line : lines) {
         trimmed.push_back(line.substr(0, kMaxLineLength));
     }
+    wire::nbt::NbtCompound text = side(trimmed);
+    carryStyle(text, data, isFront);
     wire::nbt::NbtCompound updated = data;
-    updated.set(isFront ? kFront : kBack, wire::nbt::NbtTag::ofCompound(side(trimmed)));
+    updated.set(isFront ? kFront : kBack, wire::nbt::NbtTag::ofCompound(std::move(text)));
     return updated;
 }
 
@@ -101,6 +116,7 @@ wire::nbt::NbtCompound withColouredText(const wire::nbt::NbtCompound& data, bool
     text.set("messages", wire::nbt::NbtTag::ofList(std::move(messages)));
     text.putString("color", "black");
     text.putByte("has_glowing_text", 0);
+    carryStyle(text, data, isFront);
     wire::nbt::NbtCompound updated = data;
     updated.set(isFront ? kFront : kBack, wire::nbt::NbtTag::ofCompound(std::move(text)));
     return updated;
@@ -132,6 +148,46 @@ std::string plainText(const wire::nbt::NbtCompound& data, const bool front) {
 }
 
 bool isWaxed(const wire::nbt::NbtCompound& data) { return data.getByte("is_waxed") != 0; }
+
+std::optional<wire::nbt::NbtCompound> withWaxed(const wire::nbt::NbtCompound& data) {
+    if (isWaxed(data)) {
+        return std::nullopt;
+    }
+    wire::nbt::NbtCompound updated = data;
+    updated.putByte("is_waxed", 1);
+    return updated;
+}
+
+std::optional<wire::nbt::NbtCompound> withColor(const wire::nbt::NbtCompound& data, const bool front,
+                                                const std::string_view color) {
+    const wire::nbt::NbtCompound* side = data.getCompound(front ? kFront : kBack);
+    if (std::ranges::find(kColors, color) == kColors.end() ||
+        (side != nullptr && side->getString("color", "black") == color)) {
+        return std::nullopt;
+    }
+    wire::nbt::NbtCompound text = side == nullptr ? wire::nbt::NbtCompound{} : *side;
+    text.putString("color", std::string{color});
+    wire::nbt::NbtCompound updated = data;
+    updated.set(front ? kFront : kBack, wire::nbt::NbtTag::ofCompound(std::move(text)));
+    return updated;
+}
+
+std::optional<wire::nbt::NbtCompound> withGlowing(const wire::nbt::NbtCompound& data, const bool front,
+                                                  const bool glowing) {
+    const wire::nbt::NbtCompound* side = data.getCompound(front ? kFront : kBack);
+    if ((side != nullptr && (side->getByte("has_glowing_text") != 0) == glowing) || (side == nullptr && !glowing)) {
+        return std::nullopt;
+    }
+    wire::nbt::NbtCompound text = side == nullptr ? wire::nbt::NbtCompound{} : *side;
+    text.putByte("has_glowing_text", glowing ? 1 : 0);
+    wire::nbt::NbtCompound updated = data;
+    updated.set(front ? kFront : kBack, wire::nbt::NbtTag::ofCompound(std::move(text)));
+    return updated;
+}
+
+bool hasMessage(const wire::nbt::NbtCompound& data, const bool front) {
+    return plainText(data, front).find_first_not_of('\n') != std::string::npos;
+}
 
 wire::nbt::NbtCompound withComponents(const wire::nbt::NbtCompound& data, const wire::nbt::NbtCompound& components) {
     wire::nbt::NbtCompound updated = data;

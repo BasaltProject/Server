@@ -33,6 +33,7 @@
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
@@ -88,12 +89,13 @@ void playPortalTravelSound(const PlayerSession& player) {
 
 EnvironmentTickSystem::EnvironmentTickSystem(player::PlayerRegistry& players, const config::WorldsConfig& worldsConfig,
                                              Worlds worlds, ChunkSimulationView& chunkSimulation,
-                                             BlockChangeBroadcaster&, const command::CommandEnvironment& environment,
+                                             BlockChangeBroadcaster& broadcaster,
+                                             const command::CommandEnvironment& environment,
                                              NaturalSpawningSystem& spawning, Hooks hooks, Options options,
                                              wire::common::Logger logger)
-    : players_(&players), worldsConfig_(&worldsConfig), worlds_(std::move(worlds)), chunkSimulation_(&chunkSimulation),
-      environment_(&environment), spawning_(&spawning), hooks_(std::move(hooks)), options_(std::move(options)),
-      logger_(std::move(logger)) {}
+    : players_(&players), worldsConfig_(&worldsConfig), broadcaster_(&broadcaster), worlds_(std::move(worlds)),
+      chunkSimulation_(&chunkSimulation), environment_(&environment), spawning_(&spawning), hooks_(std::move(hooks)),
+      options_(std::move(options)), logger_(std::move(logger)) {}
 
 void EnvironmentTickSystem::tickPlayers(world::LoadedWorld& world) {
     player::VitalsContext vitals;
@@ -456,6 +458,68 @@ void EnvironmentTickSystem::tickEntityPortals(world::LoadedWorld& world) {
     }
 }
 
+void EnvironmentTickSystem::extinguishInCauldron(world::LoadedWorld& world, PlayerSession& player) {
+    if (player.gamemode == wire::protocol::play::Gamemode::Spectator) {
+        return;
+    }
+    namespace mth = wire::common::mth;
+    constexpr double kHalfWidth = 0.3;
+    const double maxY = player.y + (player.sneaking ? 1.5 : 1.8);
+    for (std::int32_t blockX = mth::floor(player.x - kHalfWidth); blockX <= mth::floor(player.x + kHalfWidth);
+         ++blockX) {
+        for (std::int32_t blockZ = mth::floor(player.z - kHalfWidth); blockZ <= mth::floor(player.z + kHalfWidth);
+             ++blockZ) {
+            for (std::int32_t blockY = mth::floor(player.y); blockY <= std::max(mth::floor(player.y), mth::floor(maxY));
+                 ++blockY) {
+                const std::optional<std::int32_t> stateId = world.state().blockState(blockX, blockY, blockZ);
+                const wire::common::Identifier* block =
+                    stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+                if (block == nullptr ||
+                    (block->path() != "water_cauldron" && block->path() != "powder_snow_cauldron")) {
+                    continue;
+                }
+                const std::int32_t level =
+                    std::stoi(registry::blockStateDefinitions::propertiesOf(*stateId).at("level"));
+                // parity: `LayeredCauldronBlock.getEntityInsideCollisionShape`, the column of liquid.
+                const double fill = (6.0 + (3.0 * level)) / 16.0;
+                if (!(player.x + kHalfWidth > blockX + 0.125 && player.x - kHalfWidth < blockX + 0.875 &&
+                      player.z + kHalfWidth > blockZ + 0.125 && player.z - kHalfWidth < blockZ + 0.875 &&
+                      maxY > blockY + 0.25 && player.y < blockY + fill)) {
+                    continue;
+                }
+                if (player.fireTicks > 0) {
+                    // parity: `handleEntityOnFireInside` turns powder snow into water at the same level, then lowers
+                    // it.
+                    std::int32_t lowered =
+                        level <= 1 ? registry::blocks::defaultStateIdOf(wire::common::Identifier::vanilla("cauldron"))
+                                         .value_or(0)
+                                   : registry::blockStateDefinitions::stateIdOf(
+                                         wire::common::Identifier::vanilla("water_cauldron"),
+                                         {{"level", std::to_string(level - 1)}})
+                                         .value_or(0);
+                    if (plugins::hookEvents::cauldronChange(world.events(), world.state().eventWorld(), blockX, blockY,
+                                                            blockZ, "EXTINGUISH", *stateId, lowered, &player,
+                                                            player.entityId()) &&
+                        world.state().setBlockState(blockX, blockY, blockZ, lowered)) {
+                        std::vector<PlayerSession*> watchers;
+                        for (PlayerSession* other : players_->snapshot()) {
+                            if (other->worldName == world.name()) {
+                                watchers.push_back(other);
+                            }
+                        }
+                        broadcaster_->announceBlock(
+                            watchers, world::BlockChange{.x = blockX, .y = blockY, .z = blockZ, .stateId = lowered});
+                        broadcaster_->notifyAround(world, watchers, blockX, blockY, blockZ, std::nullopt);
+                    }
+                }
+                // parity: `InsideBlockEffectType.EXTINGUISH` clears the fire even when the event was cancelled.
+                player.fireTicks = std::min(player.fireTicks, 0);
+                return;
+            }
+        }
+    }
+}
+
 void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
     random::RandomSource contactRandom = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     for (PlayerSession* player : players_->snapshot()) {
@@ -499,6 +563,7 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
                 player->fireTicks = fireBeforeContact;
             }
         }
+        extinguishInCauldron(world, *player);
         const double eyeY = player->y + world::fluids::eyeHeight(player->sneaking);
         const auto blockX = static_cast<std::int32_t>(std::floor(player->x));
         const auto blockZ = static_cast<std::int32_t>(std::floor(player->z));

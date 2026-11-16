@@ -67,6 +67,20 @@ void addBulkBlockEntityMethods(PluginObject& object, const std::shared_ptr<Plugi
                     pushText(args, snbtOf(world->entityNbt(id)));
                     return 1;
                 })
+        .method("set_entity_nbt",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    std::int32_t id = 0;
+                    if (args.isTable(base)) {
+                        args.pushField(base, "id");
+                        id = static_cast<std::int32_t>(args.toInteger(-1));
+                        args.pop(1);
+                    } else {
+                        id = intAt(args, base);
+                    }
+                    args.pushBoolean(world->loadEntityNbt(id, bytesOf(args, base + 1)));
+                    return 1;
+                })
         .method("plugin_data",
                 [world](LuaArgs& args) {
                     pushText(args, snbtOf(world->pluginData()));

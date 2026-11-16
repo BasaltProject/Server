@@ -126,8 +126,12 @@ private:
 
     void strikeLightning(world::LoadedWorld& world);
 
+    /// parity: `LayeredCauldronBlock.entityInside` for a burning player standing in the liquid.
+    void extinguishInCauldron(world::LoadedWorld& world, player::PlayerSession& player);
+
     player::PlayerRegistry* players_;
     const config::WorldsConfig* worldsConfig_;
+    BlockChangeBroadcaster* broadcaster_;
     Worlds worlds_;
     ChunkSimulationView* chunkSimulation_;
     const command::CommandEnvironment* environment_;

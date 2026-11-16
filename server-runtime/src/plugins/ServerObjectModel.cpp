@@ -619,6 +619,11 @@ private:
                 return player;
             }
         }
+        for (player::PlayerSession* player : registry_->departing()) {
+            if (player->uuid().toString() == uuid_) {
+                return player;
+            }
+        }
         return nullptr;
     }
 
@@ -658,6 +663,11 @@ std::shared_ptr<PluginPlayerRef> RegistryPlayers::byName(std::string_view name) 
 
 std::shared_ptr<PluginPlayerRef> RegistryPlayers::byUuid(std::string_view uuid) const {
     for (const player::PlayerSession* player : registry_->snapshot()) {
+        if (player->uuid().toString() == uuid) {
+            return playerRefFor(*registry_, player->uuid().toString(), player->name(), hooks_);
+        }
+    }
+    for (const player::PlayerSession* player : registry_->departing()) {
         if (player->uuid().toString() == uuid) {
             return playerRefFor(*registry_, player->uuid().toString(), player->name(), hooks_);
         }

@@ -177,6 +177,9 @@ private:
     /// parity: `ItemFrame.interact`.
     bool useItemFrame(player::PlayerSession& session, entity::ServerEntity& frame);
 
+    /// parity: `DyeItem.interactLivingEntity` on a sheep, with the dye in that hand slot.
+    bool dyeSheep(player::PlayerSession& session, entity::ServerEntity& sheep, std::int32_t handSlot);
+
     enum class ArmorStandUse : std::uint8_t { Pass, Done };
 
     /// parity: `ArmorStand.interact`, the slot a click swaps with the hand.

@@ -46,12 +46,30 @@ NbtCompound encode(const ServerEntity& entity) {
     tag.putString("id", entity.type().toString());
     tag.set("UUID", uuidTag(entity.uuid()));
     // parity: `LivingEntity.addAdditionalSaveData` writes `DeathTime` as a short.
-    if (entity.deathTime > 0) {
+    if (entity.livingType()) {
         tag.putShort("DeathTime", static_cast<std::int16_t>(entity.deathTime));
+        if (!tag.contains("HurtTime")) {
+            tag.putShort("HurtTime", 0);
+        }
+        if (!tag.contains("AbsorptionAmount")) {
+            tag.putFloat("AbsorptionAmount", 0.0F);
+        }
+        if (!tag.contains("FallFlying")) {
+            tag.putBoolean("FallFlying", false);
+        }
     }
-    // parity: `Entity.addAdditionalSaveData` writes `Fire` as a short.
-    if (entity.fireTicks > 0) {
-        tag.putShort("Fire", static_cast<std::int16_t>(entity.fireTicks));
+    // parity: `Entity.saveWithoutId` always writes these, `Fire` as a short.
+    tag.putDouble("fall_distance", entity.fallDistance);
+    tag.putShort("Fire", static_cast<std::int16_t>(entity.fireTicks));
+    tag.putBoolean("OnGround", entity.onGround);
+    if (!tag.contains("Invulnerable")) {
+        tag.putBoolean("Invulnerable", false);
+    }
+    tag.putInt("PortalCooldown", entity.portalCooldown);
+    if (entity.hurtCooldown > 0) {
+        tag.putInt("invulnerable_time", entity.hurtCooldown);
+    } else {
+        tag.remove("invulnerable_time");
     }
     // parity: `Entity.addAdditionalSaveData` writes `NoGravity` whenever it is set.
     if (entity.noGravity) {
@@ -100,7 +118,15 @@ NbtCompound encode(const ServerEntity& entity) {
     }
     if (mobs::isMob(entity.type())) {
         tag.putBoolean("PersistenceRequired", entity.persistent);
-        tag.putBoolean("NoAI", entity.noAi);
+        // parity: `Mob.addAdditionalSaveData` writes `NoAI` only when set and `LeftHanded` always.
+        if (entity.noAi) {
+            tag.putBoolean("NoAI", true);
+        } else {
+            tag.remove("NoAI");
+        }
+        if (!tag.contains("LeftHanded")) {
+            tag.putBoolean("LeftHanded", false);
+        }
         tag.putBoolean("CanPickUpLoot", entity.canPickUpLoot);
     }
     if (ageableMobs::isAgeable(path)) {
@@ -211,6 +237,9 @@ NbtCompound encode(const ServerEntity& entity) {
     }
     if (path == "sniffer") {
         sniffers::write(entity, tag);
+    }
+    if (path == "chicken" && entity.eggLayTime >= 0) {
+        tag.putInt("EggLayTime", entity.eggLayTime);
     }
     if (path == "armadillo") {
         armadillos::write(entity, tag);

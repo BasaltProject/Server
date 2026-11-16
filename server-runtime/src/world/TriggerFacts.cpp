@@ -154,6 +154,12 @@ loot::EntityFacts ofEntity(const entity::ServerEntity& entity) {
     } else if (path == "sheep") {
         facts.components.emplace("minecraft:sheep/color", "white");
     }
+    if (path == "chicken") {
+        // parity: `Chicken` answers the `chicken/variant` component predicate, temperate unless saved otherwise.
+        const std::string_view variant = entity.sourceNbt.has_value() ? entity.sourceNbt->getString("variant") : "";
+        facts.components.emplace("minecraft:chicken/variant",
+                                 variant.empty() ? std::string{"minecraft:temperate"} : std::string{variant});
+    }
     if (entity.heldItem.has_value() && !facts.equipment.contains("mainhand")) {
         wear(facts, "mainhand",
              storage::StoredItemStack{.id = *entity.heldItem, .count = 1, .components = entity.heldItemComponents});

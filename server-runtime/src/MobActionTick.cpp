@@ -85,6 +85,8 @@ struct FireContact {
     float fireDamage = 0.0F;
     std::array<std::int32_t, 3> lavaAt{};
     std::array<std::int32_t, 3> fireAt{};
+    bool cauldron = false;
+    std::array<std::int32_t, 3> cauldronAt{};
 };
 
 /// parity: `Entity.checkInsideBlocks` for lava, fire and water, over every cell the deflated box touches.
@@ -122,6 +124,17 @@ struct FireContact {
                 if (path == "lava_cauldron") {
                     contact.lava = true;
                     contact.lavaAt = {blockX, blockY, blockZ};
+                } else if ((path == "water_cauldron" || path == "powder_snow_cauldron") && !contact.cauldron) {
+                    // parity: `LayeredCauldronBlock.getEntityInsideCollisionShape`, the column of liquid.
+                    const double fill =
+                        (6.0 + (3.0 * std::stoi(registry::blockStateDefinitions::propertiesOf(state).at("level")))) /
+                        16.0;
+                    if (mob.x + half > blockX + 0.125 && mob.x - half < blockX + 0.875 &&
+                        mob.z + half > blockZ + 0.125 && mob.z - half < blockZ + 0.875 && maxY > blockY + 0.25 &&
+                        minY < blockY + fill) {
+                        contact.cauldron = true;
+                        contact.cauldronAt = {blockX, blockY, blockZ};
+                    }
                 } else if (path == "fire" || path == "soul_fire") {
                     contact.fire = true;
                     contact.fireAt = {blockX, blockY, blockZ};
@@ -134,6 +147,31 @@ struct FireContact {
 }
 
 } // namespace
+
+void MobActionSystem::extinguishInCauldron(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                           const ServerEntity& mob, const std::array<std::int32_t, 3>& at) {
+    const std::optional<std::int32_t> stateId = world.state().blockState(at[0], at[1], at[2]);
+    const Identifier* block = stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+    if (block == nullptr) {
+        return;
+    }
+    const std::int32_t level = std::stoi(registry::blockStateDefinitions::propertiesOf(*stateId).at("level"));
+    // parity: `handleEntityOnFireInside` turns powder snow into water at the same level, then lowers it.
+    std::int32_t lowered = level <= 1
+                               ? registry::blocks::defaultStateIdOf(Identifier::vanilla("cauldron")).value_or(0)
+                               : registry::blockStateDefinitions::stateIdOf(Identifier::vanilla("water_cauldron"),
+                                                                            {{"level", std::to_string(level - 1)}})
+                                     .value_or(0);
+    if (!plugins::hookEvents::cauldronChange(world.events(), world.state().eventWorld(), at[0], at[1], at[2],
+                                             "EXTINGUISH", *stateId, lowered, nullptr, mob.entityId())) {
+        return;
+    }
+    if (world.state().setBlockState(at[0], at[1], at[2], lowered)) {
+        broadcaster_->announceBlock(watchers,
+                                    world::BlockChange{.x = at[0], .y = at[1], .z = at[2], .stateId = lowered});
+        broadcaster_->notifyAround(world, watchers, at[0], at[1], at[2], std::nullopt);
+    }
+}
 
 void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                ServerEntity& mob, random::RandomSource& random) {
@@ -202,7 +240,10 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
     if (contact.fire) {
         burn(contact.fireDamage, "in_fire", Identifier::vanilla("in_fire"));
     }
-    if (contact.water ||
+    if (contact.cauldron && mob.fireTicks > 0) {
+        extinguishInCauldron(world, watchers, mob, contact.cauldronAt);
+    }
+    if (contact.water || contact.cauldron ||
         (mob.fireTicks > 0 && world::precipitation::entityInRain(world, mob.x, mob.y, mob.z, mob.height()))) {
         // parity: `InsideBlockEffectType.EXTINGUISH` and `Entity.move`'s rain.
         mob.fireTicks = std::min(mob.fireTicks, 0);

@@ -202,6 +202,9 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
             return;
         }
     }
+    if ((entity.tickKinds() & entity::kinds::kChicken) != 0) {
+        actions_->tickChicken(world, entity, random);
+    }
     if (entity.panicTicks > 0) {
         entity.panicTicks--;
     }

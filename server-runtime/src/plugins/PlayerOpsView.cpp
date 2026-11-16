@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerTabList.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/plugins/PlayerOps.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
@@ -330,6 +331,16 @@ std::optional<Value> view(Context& context, const Verb verb, const std::string_v
                                                         .y = static_cast<std::int32_t>(asInt(arg(args, 1))),
                                                         .z = static_cast<std::int32_t>(asInt(arg(args, 2)))},
                                                 .isFrontText = asBool(arg(args, 3), true)};
+        // A virtual sign has no block behind it, so only a real one is a `PlayerOpenSignEvent` with cause plugin.
+        if (world::LoadedWorld* world = worldOf(context); world != nullptr) {
+            const std::optional<std::int32_t> stateId =
+                world->state().blockState(packet.pos.x, packet.pos.y, packet.pos.z);
+            if (stateId.has_value() && world::signs::isSign(*stateId) &&
+                !hookEvents::signOpenAllowed(world->events(), session, packet.pos.x, packet.pos.y, packet.pos.z,
+                                             packet.isFrontText, "plugin")) {
+                return false;
+            }
+        }
         connection.sendPlayPacket(play::OpenSignEditorPacket::kId,
                                   [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
         return true;
