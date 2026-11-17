@@ -1,4 +1,5 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
@@ -12,6 +13,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/FoodData.hpp>
 #include <basalt/server/runtime/player/PlayerArrowPickup.hpp>
+#include <basalt/server/runtime/player/PlayerExhaustion.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
 #include <basalt/server/runtime/player/PlayerMovementStats.hpp>
@@ -435,8 +437,10 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
         world().blockState(static_cast<std::int32_t>(std::floor(x)), static_cast<std::int32_t>(std::floor(y)),
                            static_cast<std::int32_t>(std::floor(z)));
     const bool inWater = feet.has_value() && world::fluids::of(*feet) == world::Submersion::Water;
-    session->food.addExhaustion(session->food.movementExhaustion(x - session->x, y - session->y, z - session->z,
-                                                                 session->sprinting, onGround, inWater));
+    player::causeExhaustion(*session,
+                            session->food.movementExhaustion(x - session->x, y - session->y, z - session->z,
+                                                             session->sprinting, onGround, inWater),
+                            inWater ? "swim" : "sprint");
     // parity: the server reads a jump off the packets, exactly here: it left the ground moving up.
     if (session->onGround && !onGround && y > session->y) {
         if (options_.events != nullptr && !options_.events->allowed(&server::plugins::pluginEventTypes::playerJump,
@@ -452,7 +456,8 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
             sendPlayerPosition(session->x, session->y, session->z, yaw, pitch);
             return;
         }
-        session->food.addExhaustion(session->food.jumpExhaustion(session->sprinting));
+        player::causeExhaustion(*session, session->food.jumpExhaustion(session->sprinting),
+                                session->sprinting ? "jump_sprint" : "jump");
         session->stats.increment(storage::stats::jump());
     }
     noteFloating(y - session->y);

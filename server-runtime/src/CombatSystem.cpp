@@ -1,5 +1,6 @@
 #include "CombatSystemShared.hpp"
 
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
@@ -36,11 +37,13 @@
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <limits>
 #include <set>
 #include <utility>
+#include <variant>
 
 namespace basalt::server::runtime {
 using namespace combatSystem;
@@ -145,6 +148,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         entity.removed = true;
+        entity.removeCause = "hit";
         // parity: `AbstractWindCharge.onHitEntity`.
         if (target.has_value()) {
             if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
@@ -197,6 +201,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         entity.removed = true;
+        entity.removeCause = "hit";
         if (path == "fireball") {
             if (target.has_value()) {
                 hitByLargeFireball(world, watchers, living, entity, *target, fromX, fromZ);
@@ -258,6 +263,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         entity.removed = true;
+        entity.removeCause = "hit";
         if (options_.dragonFireballLanded) {
             options_.dragonFireballLanded(world, watchers, living, entity);
         }
@@ -269,6 +275,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         entity.removed = true;
+        entity.removeCause = "hit";
         // parity: `WitherSkull.onHitEntity` hurts a vehicle like anything else before the blast.
         if (target.has_value() && target->mob != nullptr &&
             (world::detectorRails::isMinecart(target->mob->type()) || entity::boats::isBoat(target->mob->type()))) {
@@ -300,6 +307,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         entity.removed = true;
+        entity.removeCause = "hit";
         const std::int32_t bx = static_cast<std::int32_t>(std::floor(entity.x));
         const std::int32_t by = static_cast<std::int32_t>(std::floor(entity.y));
         const std::int32_t bz = static_cast<std::int32_t>(std::floor(entity.z));
@@ -336,6 +344,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
         if (target.has_value()) {
             entity.removed = true;
+            entity.removeCause = "hit";
             const std::int32_t configured = path == "snowball" ? world.state().gameplay().items.snowballDamage : -1;
             const bool blaze = path == "snowball" && target->mob != nullptr && target->mob->type().path() == "blaze";
             const auto damage = static_cast<float>(configured >= 0 ? configured : (blaze ? 3 : 0));
@@ -373,6 +382,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         entity.removed = true;
+        entity.removeCause = "hit";
         splashPotion(world, watchers, living, entity);
         return;
     }
@@ -391,6 +401,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         // parity: `Projectile.onHit` discards a thrown projectile that struck anything.
         if (!kind.sticks && targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
             entity.removed = true;
+            entity.removeCause = "hit";
         }
         return;
     }
@@ -416,6 +427,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     hitBlock(world, watchers, entity, *hit, kind.sticks);
     if (!kind.sticks) {
         entity.removed = true;
+        entity.removeCause = "hit";
         if (path == "egg") {
             hatchEgg(world, watchers, entity);
         }
@@ -457,7 +469,29 @@ void CombatSystem::hitBlock(world::LoadedWorld& world, const std::vector<PlayerS
         [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             broadcaster_.dropBrokenBlock(world, bx, by, bz, stateId, true);
         },
-        projectile.ownerId);
+        projectile.ownerId,
+        [&](std::int32_t signal) -> std::optional<std::int32_t> {
+            const server::plugins::PluginEvent* answered = world.events().ask(
+                &server::plugins::pluginEventTypes::blockTargetHit, [&](server::plugins::PluginEvent& event) {
+                    event.set("world", world.name());
+                    event.set("x", static_cast<std::int64_t>(hit.blockX));
+                    event.set("y", static_cast<std::int64_t>(hit.blockY));
+                    event.set("z", static_cast<std::int64_t>(hit.blockZ));
+                    event.set("projectile_id", static_cast<std::int64_t>(projectile.entityId()));
+                    event.set("projectile_type", projectile.type().toString());
+                    constexpr std::array<std::string_view, 6> kFaces{"down", "up", "north", "south", "west", "east"};
+                    event.set("face", std::string{kFaces[static_cast<std::size_t>(hit.face)]});
+                    event.set("signal", static_cast<std::int64_t>(signal));
+                });
+            if (answered == nullptr) {
+                return signal;
+            }
+            if (answered->cancelled()) {
+                return std::nullopt;
+            }
+            const auto* edited = std::get_if<std::int64_t>(&answered->get("signal"));
+            return edited != nullptr ? static_cast<std::int32_t>(*edited) : signal;
+        });
     if (!change.has_value()) {
         return;
     }

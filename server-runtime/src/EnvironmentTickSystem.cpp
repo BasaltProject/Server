@@ -411,6 +411,17 @@ void EnvironmentTickSystem::tickEntityPortals(world::LoadedWorld& world) {
                                   !world.gameRules().get(world::gameRules::kAllowEnteringNetherUsingPortals))) {
             continue;
         }
+        // parity: `Entity.handlePortal` raises `EntityPortalReadyEvent` once the portal timer is up.
+        if (const server::plugins::PluginEvent* ready =
+                world.events().ask(&server::plugins::pluginEventTypes::entityPortalReady,
+                                   [&](server::plugins::PluginEvent& event) {
+                                       plugins::hookEvents::entity(event, world.name(), *mob);
+                                       event.set("to_world", target->name());
+                                       event.set("kind", std::string{"nether"});
+                                   });
+            ready != nullptr && ready->cancelled()) {
+            continue;
+        }
         const std::optional<world::PortalExit> exit =
             world::netherPortals::exitFor(world, *target, mob->x, mob->y, mob->z, *axis);
         if (!exit.has_value()) {
@@ -435,6 +446,29 @@ void EnvironmentTickSystem::tickEntityPortals(world::LoadedWorld& world) {
             }
             const auto edited = [&answered](const char* name, double& value) {
                 if (const auto* number = std::get_if<double>(&answered->get(name)); number != nullptr) {
+                    value = *number;
+                }
+            };
+            edited("to_x", toX);
+            edited("to_y", toY);
+            edited("to_z", toZ);
+        }
+        // parity: `CraftEventFactory.callEntityPortalExitEvent`, after the destination is known.
+        if (const server::plugins::PluginEvent* leaving =
+                world.events().ask(&server::plugins::pluginEventTypes::entityPortalExit,
+                                   [&](server::plugins::PluginEvent& event) {
+                                       plugins::hookEvents::entity(event, world.name(), *mob);
+                                       event.set("to_world", target->name());
+                                       event.set("to_x", toX);
+                                       event.set("to_y", toY);
+                                       event.set("to_z", toZ);
+                                   });
+            leaving != nullptr) {
+            if (leaving->cancelled()) {
+                continue;
+            }
+            const auto edited = [&leaving](const char* name, double& value) {
+                if (const auto* number = std::get_if<double>(&leaving->get(name)); number != nullptr) {
                     value = *number;
                 }
             };

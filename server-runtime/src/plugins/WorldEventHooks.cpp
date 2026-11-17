@@ -97,6 +97,23 @@ void redstone(RedstoneTickSystem::Hooks& hooks, const EventSink& sink) {
             event.set("face", std::string{face});
         });
     };
+    hooks.preDispenseAllowed = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                       const std::string& item, std::int32_t slot) {
+        return sink.allowed(&blockPreDispense, [&](PluginEvent& event) {
+            here(event, world, x, y, z);
+            event.set("item", item);
+            event.set("slot", static_cast<std::int64_t>(slot));
+        });
+    };
+    hooks.dispenseFailedEffect = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y,
+                                         std::int32_t z) {
+        const PluginEvent* answered = sink.ask(&blockFailedDispense, [&](PluginEvent& event) {
+            here(event, world, x, y, z);
+            event.set("play_effect", true);
+        });
+        const auto* play = answered == nullptr ? nullptr : std::get_if<bool>(&answered->get("play_effect"));
+        return play == nullptr || *play;
+    };
     hooks.allowHopperMove = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
                                     std::string_view kind, const world::hoppers::Move& move) {
         return sink.allowed(&inventoryMoveItem, [&](PluginEvent& event) {

@@ -1,4 +1,5 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -395,6 +396,10 @@ const config::MobSettings& WorldState::mobSettings() const noexcept {
 }
 
 std::vector<std::int32_t> WorldState::collectRemovedEntities() { return entityRegistry_.collectRemovedEntities(); }
+
+std::vector<EntityRegistry::RemovalNotice> WorldState::takeRemovalNotices() {
+    return entityRegistry_.takeRemovalNotices();
+}
 
 bool WorldState::tntMayPrime(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view reason,
                              std::string_view who) const {

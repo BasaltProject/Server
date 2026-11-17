@@ -62,6 +62,8 @@ void ContainerMenuController::recomputeGrindstoneResult() {
         [&books](const wire::common::Identifier& id, const std::int32_t level) { return books.minCost(id, level); });
     grindstoneSlots_[Menu::kGrindstoneResult] = made.output;
     grindstoneWorth_ = made.experience;
+    std::int32_t noCost = 0;
+    announceResult("grindstone", grindstoneSlots_[Menu::kGrindstoneResult], noCost);
 }
 
 void ContainerMenuController::takeGrindstoneResult(PlayerSession& session) {

@@ -218,10 +218,12 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
     if (entry == nullptr || mob.removed) {
         return false;
     }
-    if (!world.events().allowed(&server::plugins::pluginEventTypes::entityTransform,
+    if (conversion.reason != "silent" &&
+        !world.events().allowed(&server::plugins::pluginEventTypes::entityTransform,
                                 [&](server::plugins::PluginEvent& event) {
                                     plugins::hookEvents::entity(event, world.name(), mob);
                                     event.set("to_type", conversion.into.toString());
+                                    event.set("reason", std::string{conversion.reason});
                                 })) {
         return false;
     }
@@ -255,6 +257,7 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
     carryOver(world, watchers, mob, *converted);
     // parity: `SINGLE` discards the old mob; it neither dies nor drops anything.
     mob.removed = true;
+    mob.removeCause = "transformation";
     ServerEntity& spawned = world.state().spawnEntity(std::move(converted));
     if (spawnedId != nullptr) {
         *spawnedId = spawned.entityId();
@@ -386,9 +389,17 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
     }
     // parity: `Pig.thunderHit`.
     if (path == "pig" && !peaceful) {
+        // parity: `Pig.thunderHit` leaves the pig alone, bolt damage included, when `PigZapEvent` is cancelled.
+        if (!world.events().allowed(&server::plugins::pluginEventTypes::entityPigZap,
+                                    [&](server::plugins::PluginEvent& event) {
+                                        plugins::hookEvents::entity(event, world.name(), mob);
+                                        event.set("bolt_id", static_cast<std::int64_t>(boltId));
+                                    })) {
+            return;
+        }
         random::RandomSource random = freshRandom();
-        const conversions::Conversion conversion{.into = wire::common::Identifier::vanilla("zombified_piglin"),
-                                                 .keepEquipment = false};
+        const conversions::Conversion conversion{
+            .into = wire::common::Identifier::vanilla("zombified_piglin"), .keepEquipment = false, .reason = "silent"};
         if (convertMob(world, watchers, mob, conversion, [&random](wire::nbt::NbtCompound& tag) {
                 wire::nbt::NbtCompound stack;
                 stack.putString("id", random.nextInt(20) == 0 ? "minecraft:golden_spear" : "minecraft:golden_sword");
@@ -403,8 +414,10 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
     }
     // parity: `Villager.thunderHit`, a witch that stays.
     if (path == "villager" && !peaceful) {
-        const conversions::Conversion conversion{
-            .into = wire::common::Identifier::vanilla("witch"), .keepEquipment = false, .keepCanPickUpLoot = false};
+        const conversions::Conversion conversion{.into = wire::common::Identifier::vanilla("witch"),
+                                                 .keepEquipment = false,
+                                                 .keepCanPickUpLoot = false,
+                                                 .reason = "lightning"};
         if (convertMob(world, watchers, mob, conversion,
                        [](wire::nbt::NbtCompound& tag) { tag.putBoolean("PersistenceRequired", true); })) {
             releaseVillagerPois(world, mob);

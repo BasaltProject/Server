@@ -58,6 +58,13 @@ std::string npcProfileName(std::int32_t entityId) {
     return name.size() <= kProfileNameLimit ? name : name.substr(0, kProfileNameLimit);
 }
 
+std::string npcName(const NpcView& npc) {
+    if (!npc.fake || npc.name.empty()) {
+        return npcProfileName(npc.entityId);
+    }
+    return npc.name.size() <= kProfileNameLimit ? npc.name : npc.name.substr(0, kProfileNameLimit);
+}
+
 /// parity: `ItemFrameBlock`'s own facing, as the spawn packet's extra data.
 std::int32_t frameDirectionData(std::string_view facing) {
     if (facing == "down") {
@@ -101,6 +108,92 @@ void EntityVisibilityTracker::hideNameTagOf(const std::string& member) {
     });
 }
 
+void EntityVisibilityTracker::syncNpcState(const NpcView& npc, NpcSent& sent) {
+    using wire::protocol::play::AnimatePacket;
+    using wire::protocol::play::EntityTeleportPacket;
+    using wire::protocol::play::SwingAnimationPacket;
+    const bool first = sent.stateVersion < 0;
+    sent.stateVersion = npc.stateVersion;
+    if (npc.fake) {
+        owner_->sendPlayPacket(EntityTeleportPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            EntityTeleportPacket{.entityId = npc.entityId,
+                                 .x = npc.x,
+                                 .y = npc.y,
+                                 .z = npc.z,
+                                 .yaw = npc.yaw,
+                                 .pitch = npc.pitch,
+                                 .onGround = npc.onGround}
+                .write(buffer);
+        });
+        owner_->sendPlayPacket(RotateHeadPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            RotateHeadPacket{.entityId = npc.entityId, .headYaw = npc.headYaw}.write(buffer);
+        });
+        if (first || sent.flags != npc.flags || sent.pose != npc.pose) {
+            sent.flags = npc.flags;
+            sent.pose = npc.pose;
+            owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                SetEntityDataPacket::posture(npc.entityId, npc.flags, static_cast<wire::protocol::play::Pose>(npc.pose))
+                    .write(buffer);
+            });
+        }
+    }
+    const auto same = [](const entity::GeneratedEquipment& left, const entity::GeneratedEquipment& right) {
+        return left.slot == right.slot && left.item == right.item && left.count == right.count &&
+               left.components == right.components;
+    };
+    if (!std::ranges::equal(sent.equipment, npc.equipment, same)) {
+        world::RealEnchantments* enchantments = owner_->options().enchantments;
+        std::vector<SetEquipmentPacket::Slot> slots;
+        for (const entity::GeneratedEquipment& before : sent.equipment) {
+            if (std::ranges::none_of(npc.equipment, [&](const auto& now) { return now.slot == before.slot; })) {
+                slots.push_back(SetEquipmentPacket::Slot{.type = before.slot, .stack = std::nullopt});
+            }
+        }
+        for (const entity::GeneratedEquipment& slot : npc.equipment) {
+            const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(slot.item);
+            const server::registry::Item* item =
+                id.has_value() ? server::registry::items::registry().byName(*id) : nullptr;
+            if (item == nullptr) {
+                continue;
+            }
+            slots.push_back(SetEquipmentPacket::Slot{
+                .type = slot.slot,
+                .stack = wire::protocol::play::WireItemStack{
+                    .itemId = item->protocolId,
+                    .count = slot.count,
+                    .components =
+                        item::itemComponentCodecs::toWire(slot.components, [enchantments](const Identifier& name) {
+                            return enchantments == nullptr ? std::nullopt : enchantments->protocolIdOf(name);
+                        })}});
+        }
+        sent.equipment = npc.equipment;
+        if (!slots.empty()) {
+            owner_->sendPlayPacket(SetEquipmentPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                SetEquipmentPacket{.entityId = npc.entityId, .slots = slots}.write(buffer);
+            });
+        }
+    }
+    for (const auto& [seq, action] : npc.animations) {
+        if (seq <= sent.animation) {
+            continue;
+        }
+        sent.animation = seq;
+        if (action == 0 || action == 3) {
+            owner_->sendPlayPacket(SwingAnimationPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                SwingAnimationPacket{.entityId = npc.entityId, .hand = action == 3 ? 1 : 0, .animation = {}}.write(
+                    buffer);
+            });
+            continue;
+        }
+        const std::uint8_t id = action == 4   ? AnimatePacket::kCriticalHit
+                                : action == 5 ? AnimatePacket::kMagicCriticalHit
+                                              : AnimatePacket::kWakeUp;
+        owner_->sendPlayPacket(AnimatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            AnimatePacket{.entityId = npc.entityId, .action = id}.write(buffer);
+        });
+    }
+}
+
 void EntityVisibilityTracker::syncNpcs() {
     PlayerSession* session = owner_->playerSession();
     const ClientSession::PluginHooks& plugins = owner_->options().plugins;
@@ -128,8 +221,14 @@ void EntityVisibilityTracker::syncNpcs() {
             });
         }
         trackedNpcs_.insert_or_assign(npc.entityId, npc.version);
+        npcSent_.insert_or_assign(npc.entityId,
+                                  NpcSent{.uuid = npc.uuid,
+                                          .stateVersion = -1,
+                                          .animation = npc.animations.empty() ? 0 : npc.animations.back().first});
         // Before the entity: a name tag drawn before its hiding team arrives flashes on screen.
-        hideNameTagOf(npcProfileName(npc.entityId));
+        if (!npc.fake) {
+            hideNameTagOf(npcProfileName(npc.entityId));
+        }
         std::vector<wire::protocol::login::GameProfileProperty> properties;
         if (npc.skinTexture.has_value()) {
             properties.push_back(wire::protocol::login::GameProfileProperty{
@@ -138,8 +237,8 @@ void EntityVisibilityTracker::syncNpcs() {
         owner_->sendPlayPacket(wire::protocol::play::PlayerInfoUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::PlayerInfoUpdatePacket::initializing(
                 {wire::protocol::play::PlayerInfoEntry{.uuid = npc.uuid,
-                                                       .name = npcProfileName(npc.entityId),
-                                                       .listed = false,
+                                                       .name = npcName(npc),
+                                                       .listed = npc.listed,
                                                        .gamemode = wire::protocol::play::Gamemode::Survival,
                                                        .properties = properties}})
                 .write(buffer);
@@ -163,6 +262,13 @@ void EntityVisibilityTracker::syncNpcs() {
         owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             SetEntityDataPacket::skinParts(npc.entityId, player::PlayerSession::kAllSkinParts).write(buffer);
         });
+    }
+    for (const NpcView& npc : here) {
+        const auto sent = npcSent_.find(npc.entityId);
+        if (sent == npcSent_.end() || sent->second.stateVersion == npc.stateVersion) {
+            continue;
+        }
+        syncNpcState(npc, sent->second);
     }
     // Head turns are per connection: each player sees the NPC looking at them, with no server state.
     for (const NpcView& npc : here) {
@@ -209,8 +315,18 @@ void EntityVisibilityTracker::syncNpcs() {
     if (gone.empty()) {
         return;
     }
+    std::vector<wire::common::Uuid> unlisted;
     for (const std::int32_t entityId : gone) {
         trackedNpcs_.erase(entityId);
+        if (const auto sent = npcSent_.find(entityId); sent != npcSent_.end()) {
+            unlisted.push_back(sent->second.uuid);
+            npcSent_.erase(sent);
+        }
+    }
+    if (!unlisted.empty()) {
+        owner_->sendPlayPacket(wire::protocol::play::PlayerInfoRemovePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            wire::protocol::play::PlayerInfoRemovePacket{.players = unlisted}.write(buffer);
+        });
     }
     owner_->sendPlayPacket(RemoveEntitiesPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         RemoveEntitiesPacket{.entityIds = gone}.write(buffer);

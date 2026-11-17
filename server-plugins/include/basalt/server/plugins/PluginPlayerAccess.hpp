@@ -327,6 +327,34 @@ public:
     [[nodiscard]] virtual std::optional<std::vector<std::string>> audience() const = 0;
 
     virtual void remove() = 0;
+
+    /// A fake player a plugin drew itself: where it stands, which way it faces and whether it rests on the ground.
+    virtual void place(double x, double y, double z, float yaw, float pitch, float headYaw, bool onGround) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(yaw);
+        static_cast<void>(pitch);
+        static_cast<void>(headYaw);
+        static_cast<void>(onGround);
+    }
+
+    /// The shared flags byte and the pose id (`Pose` ordinal) of a fake player.
+    virtual void posture(std::uint8_t flags, std::int32_t pose) {
+        static_cast<void>(flags);
+        static_cast<void>(pose);
+    }
+
+    virtual void listed(bool shown) { static_cast<void>(shown); }
+
+    /// Slot order: main hand, off hand, feet, legs, chest, head. An empty stack clears the slot.
+    virtual void equip(std::int32_t slot, std::span<const std::uint8_t> stack) {
+        static_cast<void>(slot);
+        static_cast<void>(stack);
+    }
+
+    /// A `ClientboundAnimatePacket` action id.
+    virtual void animate(std::int32_t action) { static_cast<void>(action); }
 };
 
 class PluginPlayers {

@@ -73,7 +73,7 @@ HOOK_EVENT(blockCanBuild, "block.can_build", false,
 HOOK_EVENT(entityAlliedCheck, "entity.allied_check", false,
            FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "other_id", "allied"), MUTABLE("allied"))
 HOOK_EVENT(entityTransform, "entity.transform", true,
-           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "to_type"), MUTABLE())
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "to_type", "reason"), MUTABLE())
 HOOK_EVENT(entitySplit, "entity.split", true, FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "count"),
            MUTABLE("count"))
 HOOK_EVENT(entityPiglinBarter, "entity.piglin_barter", true,
@@ -199,3 +199,52 @@ HOOK_EVENT(blockBellResonate, "block.bell_resonate", false, FIELDS("world", "x",
            MUTABLE("entities"))
 HOOK_EVENT(blockBellRevealRaider, "block.bell_reveal_raider", true,
            FIELDS("world", "x", "y", "z", "entity_id", "entity_type"), MUTABLE())
+HOOK_EVENT(entityPigZap, "entity.pig_zap", true,
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "bolt_id"), MUTABLE())
+HOOK_EVENT(entityRemove, "entity.remove", false,
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "cause"), MUTABLE())
+HOOK_EVENT(entityPlace, "entity.place", true,
+           FIELDS("player_name", "player_uuid", "world", "entity_type", "x", "y", "z", "block_x", "block_y", "block_z",
+                  "face", "hand"),
+           MUTABLE())
+HOOK_EVENT(blockPreDispense, "block.pre_dispense", true, FIELDS("world", "x", "y", "z", "item", "slot"), MUTABLE())
+HOOK_EVENT(blockFailedDispense, "block.failed_dispense", false, FIELDS("world", "x", "y", "z", "play_effect"),
+           MUTABLE("play_effect"))
+HOOK_EVENT(playerStopUsingItem, "player.stop_using_item", false,
+           FIELDS("player_name", "player_uuid", "world", "item", "ticks"), MUTABLE())
+HOOK_EVENT(playerNameEntity, "player.name_entity", true,
+           FIELDS("player_name", "player_uuid", "world", "entity_id", "entity_type", "name", "persistent"),
+           MUTABLE("name", "persistent"))
+HOOK_EVENT(playerExhaustion, "player.exhaustion", true,
+           FIELDS("player_name", "player_uuid", "world", "reason", "exhaustion"), MUTABLE("exhaustion"))
+HOOK_EVENT(blockShearEntity, "block.shear_entity", true,
+           FIELDS("world", "x", "y", "z", "entity_id", "entity_type", "tool"), MUTABLE())
+HOOK_EVENT(playerItemFrameChange, "player.item_frame_change", true,
+           FIELDS("player_name", "player_uuid", "world", "entity_id", "entity_type", "item", "action"), MUTABLE())
+HOOK_EVENT(playerChangeBeaconEffect, "player.change_beacon_effect", true,
+           FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "primary", "secondary"),
+           MUTABLE("primary", "secondary"))
+HOOK_EVENT(playerElytraBoost, "player.elytra_boost", true,
+           FIELDS("player_name", "player_uuid", "world", "item", "hand", "consume"), MUTABLE("consume"))
+HOOK_EVENT(playerBedTry, "player.bed_try", false,
+           FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "result", "can_sleep", "use_bed"),
+           MUTABLE("use_bed"))
+HOOK_EVENT(playerBedFailEnter, "player.bed_fail_enter", true,
+           FIELDS("player_name", "player_uuid", "world", "x", "y", "z", "reason", "will_explode", "message"),
+           MUTABLE("will_explode", "message"))
+HOOK_EVENT(playerStonecutterSelect, "player.stonecutter_select", true,
+           FIELDS("player_name", "player_uuid", "world", "recipe"), MUTABLE("recipe"))
+HOOK_EVENT(playerLoomSelect, "player.loom_select", true,
+           FIELDS("player_name", "player_uuid", "world", "pattern"), MUTABLE("pattern"))
+HOOK_EVENT(blockTargetHit, "block.target_hit", true,
+           FIELDS("world", "x", "y", "z", "projectile_id", "projectile_type", "face", "signal"), MUTABLE("signal"))
+HOOK_EVENT(entityJump, "entity.jump", true, FIELDS("entity_id", "entity_type", "world", "x", "y", "z"), MUTABLE())
+HOOK_EVENT(entityHorseJump, "entity.horse_jump", true,
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "power"), MUTABLE())
+HOOK_EVENT(entityPortalReady, "entity.portal_ready", true,
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "to_world", "kind"), MUTABLE())
+HOOK_EVENT(entityPortalExit, "entity.portal_exit", true,
+           FIELDS("entity_id", "entity_type", "world", "x", "y", "z", "to_world", "to_x", "to_y", "to_z"),
+           MUTABLE("to_x", "to_y", "to_z"))
+HOOK_EVENT(blockDispenseArmor, "block.dispense_armor", true, FIELDS("world", "x", "y", "z", "entity_id", "item"),
+           MUTABLE())

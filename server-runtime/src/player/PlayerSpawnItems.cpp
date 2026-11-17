@@ -1,3 +1,5 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -11,6 +13,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -43,11 +46,37 @@ constexpr double kMinecartRestHeight = 0.0625;
     return {at.x, at.y, at.z};
 }
 
+constexpr std::array<std::string_view, 6> kPlaceFaces{"down", "up", "north", "south", "west", "east"};
+
+[[nodiscard]] bool entityPlaceAllowed(world::LoadedWorld& world, const PlayerSession& player, const Identifier& type,
+                                      const std::int32_t heldSlot, const BlockHit& hit, const double x, const double y,
+                                      const double z) {
+    return world.events().allowed(
+        &server::plugins::pluginEventTypes::entityPlace, [&](server::plugins::PluginEvent& event) {
+            plugins::EventSink::player(event, player);
+            event.set("entity_type", type.toString());
+            event.set("x", x);
+            event.set("y", y);
+            event.set("z", z);
+            event.set("block_x", static_cast<std::int64_t>(hit.x));
+            event.set("block_y", static_cast<std::int64_t>(hit.y));
+            event.set("block_z", static_cast<std::int64_t>(hit.z));
+            const auto face = static_cast<std::size_t>(hit.direction);
+            event.set("face", std::string{face < kPlaceFaces.size() ? kPlaceFaces[face] : "up"});
+            event.set("hand", std::string{heldSlot == PlayerInventory::kOffhandSlot ? "off_hand" : "main_hand"});
+        });
+}
+
 [[nodiscard]] bool spawnFromItem(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                                  const Identifier& type, const std::int32_t heldSlot,
-                                 const storage::StoredItemStack& held, const double x, const double y, const double z) {
+                                 const storage::StoredItemStack& held, const double x, const double y, const double z,
+                                 const BlockHit* placed = nullptr) {
     const reg::EntityTypeEntry* entry = reg::entityTypes::of(type);
     if (entry == nullptr || context.registry == nullptr) {
+        return false;
+    }
+    // parity: `BoatItem` and `MinecartItem` ask `EntityPlaceEvent` before the entity joins the world.
+    if (placed != nullptr && !entityPlaceAllowed(world, player, type, heldSlot, *placed, x, y, z)) {
         return false;
     }
     world.state().spawnEntity(std::make_unique<entity::ServerEntity>(
@@ -101,7 +130,7 @@ bool placeMinecartFor(const BreakContext& context, PlayerSession& player, world:
     }
     const double lift = loose ? 1.0 : 0.0;
     if (!spawnFromItem(context, player, world, type, heldSlot, held, hit.x + 0.5,
-                       hit.y + lift + kMinecartRestHeight + slope, hit.z + 0.5)) {
+                       hit.y + lift + kMinecartRestHeight + slope, hit.z + 0.5, &hit)) {
         return false;
     }
     // parity: `MinecartItem` raises `ENTITY_PLACE` at the rail's own square, not at the cart.
@@ -114,7 +143,7 @@ bool placeBoatFor(const BreakContext& context, PlayerSession& player, world::Loa
     // parity: `getBoat` puts it at the hit itself, which is the face of the block clicked.
     const std::array<std::int32_t, 3> at = beyond(hit);
     if (!spawnFromItem(context, player, world, item, heldSlot, held, at[0] + 0.5, static_cast<double>(at[1]),
-                       at[2] + 0.5)) {
+                       at[2] + 0.5, &hit)) {
         return false;
     }
     // parity: `BoatItem` raises `ENTITY_PLACE` at the exact point clicked, not at the square.
@@ -171,6 +200,10 @@ bool placeEndCrystalFor(const BreakContext& context, PlayerSession& player, worl
         std::make_unique<entity::ServerEntity>(context.registry->allocateEntityId(), wire::common::Uuid::random(),
                                                entry->id, entry->protocolId, x + 0.5, static_cast<double>(y), z + 0.5);
     world::endCrystals::setShowBottom(*crystal, false);
+    if (!entityPlaceAllowed(world, player, Identifier::vanilla("end_crystal"), heldSlot, hit, x + 0.5,
+                            static_cast<double>(y), z + 0.5)) {
+        return false;
+    }
     world.state().spawnEntity(std::move(crystal));
     heardBySculk(context, world, "entity_place", x, y, z, {.entity = player.uuid()});
     if (player.gamemode != Gamemode::Creative) {

@@ -251,6 +251,18 @@ entity::ServerEntity& EntityRegistry::spawnEntity(std::unique_ptr<entity::Server
     return spawned;
 }
 
+std::vector<EntityRegistry::RemovalNotice> EntityRegistry::takeRemovalNotices() {
+    const WorldWriteLock lock{*mutex_};
+    std::vector<RemovalNotice> notices;
+    for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
+        if (entity->removed && !entity->removeAnnounced) {
+            entity->removeAnnounced = true;
+            notices.push_back({entity->entityId(), entity->removeCause});
+        }
+    }
+    return notices;
+}
+
 std::vector<std::int32_t> EntityRegistry::collectRemovedEntities() {
     const WorldWriteLock lock{*mutex_};
     std::vector<std::int32_t> gone;

@@ -28,12 +28,21 @@ constexpr double kMaxSignal = 15.0;
 [[nodiscard]] double fraction(double value) { return value - std::floor(value); }
 
 [[nodiscard]] std::optional<BlockChange> hitTarget(WorldState& world, const entity::BlockHit& hit, std::int32_t stateId,
-                                                   const wire::common::Identifier& block, bool byArrow) {
+                                                   const wire::common::Identifier& block, bool byArrow,
+                                                   const OnTarget& onTarget) {
+    // parity: `TargetHitEvent` is asked before the block looks at its own countdown.
+    std::int32_t signal = signalFor(hit);
+    if (onTarget) {
+        const std::optional<std::int32_t> answered = onTarget(signal);
+        if (!answered.has_value()) {
+            return std::nullopt;
+        }
+        signal = *answered;
+    }
     // parity: a target already counting down keeps the signal it has; only the first hit sets it.
     if (world.hasScheduledBlockTick(hit.blockX, hit.blockY, hit.blockZ, targetBlock())) {
         return std::nullopt;
     }
-    const std::int32_t signal = signalFor(hit);
     const std::map<std::string, std::string> properties{{"power", std::to_string(signal)}};
     const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(block, properties, stateId);
     if (!turned.has_value()) {
@@ -139,7 +148,7 @@ constexpr double kBellTopEdge = static_cast<double>(0.8124F);
 
 std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const entity::BlockHit& hit, bool byArrow,
                                  bool burning, bool tntExplodes, const OnDestroyed& destroyed,
-                                 std::optional<std::int32_t> ownerId) {
+                                 std::optional<std::int32_t> ownerId, const OnTarget& onTarget) {
     const std::optional<std::int32_t> stateId = world.blockState(hit.blockX, hit.blockY, hit.blockZ);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -150,7 +159,7 @@ std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const
     }
     const std::string& path = block->path();
     if (path == "target") {
-        return hitTarget(world, hit, *stateId, *block, byArrow);
+        return hitTarget(world, hit, *stateId, *block, byArrow, onTarget);
     }
     // parity: `TntBlock.onProjectileHit`.
     if (path == "tnt") {

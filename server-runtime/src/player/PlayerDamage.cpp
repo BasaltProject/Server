@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -14,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerBlocksAttacks.hpp>
 #include <basalt/server/runtime/player/PlayerCombatMessage.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
+#include <basalt/server/runtime/player/PlayerExhaustion.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -45,6 +47,7 @@
 #include <functional>
 #include <numbers>
 #include <random>
+#include <variant>
 #include <vector>
 
 namespace basalt::server::runtime::player {
@@ -774,6 +777,9 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
             session->lastHurtByMobTime.store(kPlayerHitMemoryTicks);
         }
     }
+    // parity: `Player.actuallyHurt` charges the damage type's exhaustion once the hit got through.
+    causeExhaustion(*session, damageExhaustion(damageType.value_or(world::triggerFacts::damageTypeOf(deathMessageId))),
+                    "damaged");
     session->stats.addDamageTaken(damage);
     {
         world::LoadedWorld* recorded = context.world ? context.world() : nullptr;

@@ -366,6 +366,9 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
     hooks.npcs = [this] {
         std::vector<NpcView> views;
         for (const std::shared_ptr<plugins::Npc>& npc : npcs_.all()) {
+            if (npc->fake && !npc->placed) {
+                continue;
+            }
             std::optional<std::vector<std::string>> visibleTo;
             if (npc->visibleTo.has_value()) {
                 visibleTo = std::vector<std::string>{npc->visibleTo->begin(), npc->visibleTo->end()};
@@ -382,9 +385,26 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
                                     .looksAtPlayers = npc->looksAtPlayers,
                                     .skinTexture = npc->skinTexture,
                                     .skinSignature = npc->skinSignature,
-                                    .visibleTo = std::move(visibleTo)});
+                                    .visibleTo = std::move(visibleTo),
+                                    .name = npc->name,
+                                    .fake = npc->fake,
+                                    .listed = npc->listed,
+                                    .onGround = npc->onGround,
+                                    .headYaw = npc->headYaw,
+                                    .flags = npc->flags,
+                                    .pose = npc->pose,
+                                    .stateVersion = npc->stateVersion(),
+                                    .equipment = npc->equipment,
+                                    .animations = npc->animations});
         }
         return views;
+    };
+    hooks.npcAt = [this](std::int32_t entityId) -> std::optional<std::array<double, 3>> {
+        const std::shared_ptr<plugins::Npc> npc = npcs_.of(entityId);
+        if (npc == nullptr) {
+            return std::nullopt;
+        }
+        return std::array<double, 3>{npc->x, npc->y, npc->z};
     };
     hooks.npcClicked = [this](std::int32_t entityId, const std::string& playerUuid) {
         return npcs_.clicked(entityId, playerUuid);

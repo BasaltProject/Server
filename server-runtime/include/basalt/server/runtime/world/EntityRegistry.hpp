@@ -77,6 +77,14 @@ public:
 
     [[nodiscard]] std::vector<std::int32_t> collectRemovedEntities();
 
+    struct RemovalNotice {
+        std::int32_t id;
+        std::string_view cause;
+    };
+
+    /// The entities flagged removed that nobody has announced yet, still resolvable by id.
+    [[nodiscard]] std::vector<RemovalNotice> takeRemovalNotices();
+
 private:
     WorldMutex* mutex_;
     const config::MobSettings* mobSettings_ = nullptr;

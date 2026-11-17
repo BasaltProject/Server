@@ -79,6 +79,9 @@ public:
     bool setRemaining(std::int32_t ticks);
     void completeUse(player::PlayerSession& session);
     void clearUse();
+
+    /// Raises `player.stop_using_item` for the item the player lets go of, if any.
+    void announceStopUsing();
     bool startUse(player::PlayerSession& session, std::int32_t slot);
 
 private:

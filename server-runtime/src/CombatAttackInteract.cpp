@@ -86,6 +86,9 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         return;
     }
     ServerEntity* entity = world->state().entity(interact.entityId);
+    if (entity == nullptr && hooks_.npcInteracted && hooks_.npcInteracted(*session, interact)) {
+        return;
+    }
     if (entity == nullptr || entity->removed) {
         return;
     }
@@ -131,8 +134,31 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
                                             ? inHand->components.find("minecraft:custom_name")
                                             : nullptr;
         if (name != nullptr) {
-            entity->customName = wire::text::toPlainText(wire::text::componentNbt::deserialize(*name));
-            entity->persistent = true;
+            std::string named = wire::text::toPlainText(wire::text::componentNbt::deserialize(*name));
+            bool keep = true;
+            if (session->events != nullptr) {
+                const server::plugins::PluginEvent* answered = session->events->ask(
+                    &server::plugins::pluginEventTypes::playerNameEntity, [&](server::plugins::PluginEvent& event) {
+                        plugins::EventSink::player(event, *session);
+                        event.set("entity_id", static_cast<std::int64_t>(entity->entityId()));
+                        event.set("entity_type", entity->type().toString());
+                        event.set("name", named);
+                        event.set("persistent", true);
+                    });
+                if (answered != nullptr) {
+                    if (answered->cancelled()) {
+                        return;
+                    }
+                    if (const auto* edited = std::get_if<std::string>(&answered->get("name")); edited != nullptr) {
+                        named = *edited;
+                    }
+                    if (const auto* edited = std::get_if<bool>(&answered->get("persistent")); edited != nullptr) {
+                        keep = *edited;
+                    }
+                }
+            }
+            entity->customName = named;
+            entity->persistent = keep;
             if (session->gamemode != Gamemode::Creative) {
                 storage::StoredItemStack left = *inHand;
                 left.count -= 1;

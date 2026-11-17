@@ -85,6 +85,7 @@ bool CombatSystem::deflected(const std::vector<PlayerSession*>& watchers, const 
 void CombatSystem::landEnderPearl(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                   ServerEntity& pearl) {
     pearl.removed = true;
+    pearl.removeCause = "hit";
     if (!pearl.ownerId.has_value()) {
         return;
     }

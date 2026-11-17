@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
+#include <basalt/server/runtime/player/PlayerExhaustion.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -392,7 +393,7 @@ bool CombatHandler::stab(PlayerSession& session, world::LoadedWorld& world, std:
     session.stats.addDamageDealt(lost);
     player::pvp::showDamageIndicator(owner_->playersInSameWorld(), mob->x, mob->y + (mob->height() * 0.5), mob->z,
                                      lost);
-    session.food.addExhaustion(kStabExhaustion);
+    player::causeExhaustion(session, kStabExhaustion, "attack");
     if (died) {
         killEntity(*mob);
     } else if (hurt) {
@@ -480,7 +481,7 @@ bool CombatHandler::stabPlayer(PlayerSession& session, PlayerSession& victim, st
     player::pvp::showDamageIndicator(
         owner_->playersInSameWorld(), victim.x,
         victim.y + (server::registry::entityTypeShapes::heightOf(Identifier::vanilla("player")) * 0.5), victim.z, lost);
-    session.food.addExhaustion(kStabExhaustion);
+    player::causeExhaustion(session, kStabExhaustion, "attack");
     return true;
 }
 
@@ -514,7 +515,7 @@ void CombatHandler::postPiercingAttack(PlayerSession& session, world::LoadedWorl
         player::wearItemIn(owner_->blockInteraction().breakContext(), session, slot, outcome.itemDamage);
     }
     if (outcome.exhaustion > 0.0F) {
-        session.food.addExhaustion(outcome.exhaustion);
+        player::causeExhaustion(session, outcome.exhaustion, "attack");
     }
     if (outcome.pushed) {
         // parity: `ApplyEntityImpulse` adds to the motion and sends a player the sum at once.

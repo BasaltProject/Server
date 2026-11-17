@@ -114,6 +114,7 @@ void WorldEntityRef::remove() {
     entity::ServerEntity* found = entity();
     if (found != nullptr) {
         found->removed = true;
+        found->removeCause = "plugin";
     }
 }
 

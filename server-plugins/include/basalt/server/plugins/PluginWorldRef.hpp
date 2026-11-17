@@ -55,6 +55,22 @@ public:
     virtual std::shared_ptr<PluginNpcRef> npc(std::string_view name, double x, double y, double z,
                                               std::function<void(const std::string&)> onClick) = 0;
 
+    /// A fake player with a profile the plugin chose, drawn to viewers but never a connected player.
+    virtual std::shared_ptr<PluginNpcRef> fakePlayer(std::string_view uuid, std::string_view name, double x, double y,
+                                                     double z) {
+        static_cast<void>(uuid);
+        static_cast<void>(name);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return nullptr;
+    }
+
+    virtual std::shared_ptr<PluginNpcRef> npcById(std::int32_t entityId) {
+        static_cast<void>(entityId);
+        return nullptr;
+    }
+
     virtual std::shared_ptr<PluginEntityRef> spawn(std::string_view type, double x, double y, double z) = 0;
 
     /// Puts a stack (its NBT) on the ground; answers the new entity id, or -1.

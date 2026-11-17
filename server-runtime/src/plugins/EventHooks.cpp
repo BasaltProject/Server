@@ -2,7 +2,9 @@
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/plugins/EventHooks.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
@@ -99,6 +101,13 @@ void playerAsEntity(PluginEvent& event, const player::PlayerSession& who) {
     event.set("entity_id", static_cast<std::int64_t>(who.entityId()));
     event.set("entity_type", std::string{kPlayerType});
     event.set("world", who.worldName);
+}
+
+bool npcInReach(const player::PlayerSession& who, const std::array<double, 3>& at) {
+    const wire::common::Identifier playerType = wire::common::Identifier::vanilla("player");
+    return player::combat::withinAttackReach(who.x, who.y, who.z, at[0], at[1], at[2],
+                                             server::registry::entityTypeShapes::widthOf(playerType),
+                                             server::registry::entityTypeShapes::heightOf(playerType));
 }
 
 } // namespace
@@ -589,6 +598,66 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
             event.set("action", std::string{"attack"});
             event.set("hand", std::string{"main_hand"});
         });
+    };
+    hooks.npcInteracted = [&owner, &sink](const player::PlayerSession& who,
+                                          const wire::protocol::play::InteractPacket& interact) {
+        const ClientSession::PluginHooks& plugins = owner.options().plugins;
+        const std::optional<std::array<double, 3>> at = plugins.npcAt ? plugins.npcAt(interact.entityId) : std::nullopt;
+        if (!at.has_value()) {
+            return false;
+        }
+        if (!npcInReach(who, *at)) {
+            return true;
+        }
+        const std::string hand =
+            interact.hand == wire::protocol::play::InteractPacket::kMainHand ? "main_hand" : "off_hand";
+        const auto describe = [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            event.set("entity_id", static_cast<std::int64_t>(interact.entityId));
+            event.set("entity_type", std::string{kPlayerType});
+            event.set("hand", hand);
+        };
+        const bool allowed = sink.allowed(&server::plugins::pluginEventTypes::playerInteractEntityAt,
+                                          [&](PluginEvent& event) {
+                                              describe(event);
+                                              event.set("x", interact.x);
+                                              event.set("y", interact.y);
+                                              event.set("z", interact.z);
+                                          }) &&
+                             sink.allowed(&playerInteractEntity, [&](PluginEvent& event) {
+                                 describe(event);
+                                 event.set("action", std::string{"interact"});
+                             });
+        if (allowed && plugins.npcClicked) {
+            plugins.npcClicked(interact.entityId, who.uuid().toString());
+        }
+        return true;
+    };
+    hooks.npcAttacked = [&owner, &sink, attackAllowed = hooks.attackAllowed](const player::PlayerSession& who,
+                                                                             std::int32_t targetEntityId) {
+        const ClientSession::PluginHooks& plugins = owner.options().plugins;
+        const std::optional<std::array<double, 3>> at = plugins.npcAt ? plugins.npcAt(targetEntityId) : std::nullopt;
+        if (!at.has_value()) {
+            return false;
+        }
+        if (!npcInReach(who, *at)) {
+            return true;
+        }
+        constexpr double kNominalDamage = 1.0;
+        const bool allowed = attackAllowed(who, targetEntityId) && sink.allowed(&entityDamage, [&](PluginEvent& event) {
+            event.set("entity_id", static_cast<std::int64_t>(targetEntityId));
+            event.set("entity_type", std::string{kPlayerType});
+            event.set("world", who.worldName);
+            event.set("cause", std::string{"player_attack"});
+            event.set("amount", kNominalDamage);
+            event.set("attacker_name", std::string{kPlayerType});
+            event.set("attacker_id", static_cast<std::int64_t>(who.entityId()));
+            event.set("direct_id", static_cast<std::int64_t>(who.entityId()));
+        });
+        if (allowed && plugins.npcClicked) {
+            plugins.npcClicked(targetEntityId, who.uuid().toString());
+        }
+        return true;
     };
     hooks.mountAllowed = [&sink](const player::PlayerSession& who, const entity::ServerEntity& vehicle) {
         return sink.allowed(&entityMount, [&](PluginEvent& event) {

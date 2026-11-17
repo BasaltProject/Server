@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/StatusEffectSystem.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/player/PlayerExhaustion.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -79,8 +80,10 @@ void StatusEffectSystem::applyEffectTick(world::LoadedWorld& world, player::Play
                             world::damageTypes::kWither, std::nullopt);
         }
     } else if (active.effect == world::mobEffects::hunger()) {
-        player.food.addExhaustion(world.state().gameplay().mechanics.hungerExhaustionAmount *
-                                  static_cast<float>(active.amplifier + 1));
+        runtime::player::causeExhaustion(player,
+                                         world.state().gameplay().mechanics.hungerExhaustionAmount *
+                                             static_cast<float>(active.amplifier + 1),
+                                         "hunger_effect");
     } else if (active.effect == world::mobEffects::badOmen() || active.effect == world::mobEffects::raidOmen()) {
         if (tickOmens_) {
             tickOmens_(world, player, active);

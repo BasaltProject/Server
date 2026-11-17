@@ -1,3 +1,5 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
@@ -9,6 +11,7 @@
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerTabList.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -394,6 +397,19 @@ void EntityVisibilityTracker::syncSummonedEntities() {
     }
     syncPassengers(entities, me, session->entityId());
     std::vector<std::int32_t> gone;
+    if (world::LoadedWorld* current = owner_->currentWorld(); current != nullptr) {
+        for (const world::EntityRegistry::RemovalNotice& notice : current->state().takeRemovalNotices()) {
+            const entity::ServerEntity* removed = current->state().entity(notice.id);
+            if (removed == nullptr) {
+                continue;
+            }
+            current->events().notify(
+                &server::plugins::pluginEventTypes::entityRemove, [&](server::plugins::PluginEvent& event) {
+                    plugins::hookEvents::entity(event, current->name(), *removed);
+                    event.set("cause", std::string{notice.cause.empty() ? "despawn" : notice.cause});
+                });
+        }
+    }
     for (const std::int32_t entityId : owner_->world().collectRemovedEntities()) {
         if (trackedEntities_.erase(entityId) > 0) {
             gone.push_back(entityId);

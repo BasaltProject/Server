@@ -284,6 +284,7 @@ void FireworkSystem::explode(world::LoadedWorld& world, const std::vector<Player
             &server::plugins::pluginEventTypes::entityFireworkExplode,
             [&](server::plugins::PluginEvent& event) { plugins::hookEvents::entity(event, world.name(), rocket); })) {
         rocket.removed = true;
+        rocket.removeCause = "explode";
         return;
     }
     broadcastEvent(watchers, rocket.entityId(), kExplodeEvent);
@@ -302,6 +303,7 @@ void FireworkSystem::explode(world::LoadedWorld& world, const std::vector<Player
                             {.entity = owner});
     dealExplosionDamage(world, watchers, living, rocket);
     rocket.removed = true;
+    rocket.removeCause = "explode";
 }
 
 void FireworkSystem::dealExplosionDamage(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,

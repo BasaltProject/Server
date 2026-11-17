@@ -451,6 +451,7 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
         dropHeldItem(true);
         break;
     case Action::ReleaseUseItem:
+        owner_->itemUseTimers().announceStopUsing();
         // parity: letting go before the animation ends eats nothing at all.
         owner_->itemUseTimers().stopEating();
         owner_->itemUseTimers().releaseBow();

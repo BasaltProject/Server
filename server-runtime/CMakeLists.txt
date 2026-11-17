@@ -318,6 +318,7 @@ basalt_module(server-runtime-core
         src/MobActionNeutral.cpp
         src/MobActionPiglin.cpp
         src/MobActionPickup.cpp
+        src/MobActionDispenserEquip.cpp
         src/MobActionPiglinBrain.cpp
         src/MobActionSniffer.cpp
         src/MobActionPiglinItems.cpp
@@ -430,6 +431,7 @@ basalt_module(server-runtime-core
         src/player/PlayerSigns.cpp
         src/player/PlayerBooks.cpp
         src/player/PlayerCooldowns.cpp
+        src/player/PlayerExhaustion.cpp
         src/player/PlayerPick.cpp
         src/player/PlayerBlockToggle.cpp
         src/player/PlayerBuckets.cpp

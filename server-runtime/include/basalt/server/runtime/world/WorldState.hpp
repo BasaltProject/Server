@@ -470,6 +470,8 @@ public:
 
     [[nodiscard]] std::vector<std::int32_t> collectRemovedEntities();
 
+    [[nodiscard]] std::vector<EntityRegistry::RemovalNotice> takeRemovalNotices();
+
     /// parity: `TntBlock.explode`, which spawns the entity where the block stood.
     void primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event,
                   std::optional<std::int32_t> ownerId = std::nullopt);

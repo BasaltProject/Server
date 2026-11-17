@@ -97,6 +97,7 @@ bool pickUpMobFor(const BreakContext& context, MobActionSystem* mobs, PlayerSess
         mobs->dropLeash(world, mob, true);
     }
     mob.removed = true;
+    mob.removeCause = "pickup";
     return true;
 }
 

@@ -44,6 +44,9 @@ public:
                                    player::DeathLoot& loot)>
             died;
         std::function<bool(const player::PlayerSession& player, std::int32_t targetEntityId)> attackAllowed;
+        std::function<bool(const player::PlayerSession& player, const wire::protocol::play::InteractPacket& interact)>
+            npcInteracted;
+        std::function<bool(const player::PlayerSession& player, std::int32_t targetEntityId)> npcAttacked;
         std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& vehicle)> mountAllowed;
         std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& vehicle)> dismountAllowed;
         std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& hanging)>

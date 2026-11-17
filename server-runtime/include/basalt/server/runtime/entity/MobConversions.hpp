@@ -33,6 +33,7 @@ struct Conversion {
     bool quietInPeace = false;
     enum class Finalize : std::uint8_t { None, Frog, CuredVillager, ZombieVillager };
     Finalize finalize = Finalize::None;
+    std::string_view reason;
 };
 
 [[nodiscard]] std::optional<std::uint8_t> shakingIndexOf(std::string_view typePath);

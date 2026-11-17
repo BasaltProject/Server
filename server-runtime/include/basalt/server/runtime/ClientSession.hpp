@@ -162,6 +162,7 @@ public:
         Surfaces surfaces;
         std::function<std::vector<NpcView>()> npcs;
         std::function<bool(std::int32_t entityId, const std::string& playerUuid)> npcClicked;
+        std::function<std::optional<std::array<double, 3>>(std::int32_t entityId)> npcAt;
         std::function<bool(const player::PlayerSession& player, const std::string& item, std::int32_t count,
                            std::int32_t entityId)>
             pickupAllowed;

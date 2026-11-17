@@ -84,6 +84,7 @@ std::vector<PickedArrow> pickupNearbyArrows(PlayerSession& session, world::World
             static_cast<void>(session.inventory.add(itemOf(*candidate)));
         }
         candidate->removed = true;
+        candidate->removeCause = "pickup";
         taken.push_back(PickedArrow{.entityId = candidate->entityId()});
     }
     return taken;

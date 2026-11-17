@@ -35,6 +35,7 @@
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/Menu.hpp>
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
+#include <basalt/server/runtime/player/PlayerExhaustion.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerMace.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
@@ -72,6 +73,22 @@
 namespace basalt::server::runtime {
 using namespace combatAttack;
 
+namespace {
+
+[[nodiscard]] bool frameChangeAllowed(world::LoadedWorld& world, const PlayerSession& session,
+                                      const ServerEntity& frame, const std::string& item, std::string_view action) {
+    return world.events().allowed(&server::plugins::pluginEventTypes::playerItemFrameChange,
+                                  [&](server::plugins::PluginEvent& event) {
+                                      plugins::EventSink::player(event, session);
+                                      event.set("entity_id", static_cast<std::int64_t>(frame.entityId()));
+                                      event.set("entity_type", frame.type().toString());
+                                      event.set("item", item);
+                                      event.set("action", std::string{action});
+                                  });
+}
+
+} // namespace
+
 bool CombatHandler::useItemFrame(PlayerSession& session, ServerEntity& frame) {
     world::LoadedWorld* world = owner_->currentWorld();
     if (world == nullptr) {
@@ -88,6 +105,13 @@ bool CombatHandler::useItemFrame(PlayerSession& session, ServerEntity& frame) {
     if (hand.has_value() && !world::itemFrames::shownIn(frame).has_value() && owner_->options().maps != nullptr &&
         !(frame.sourceNbt.has_value() && frame.sourceNbt->getBoolean("Fixed")) &&
         owner_->options().maps->tooManyMarkers(hand->components, world->settings().rules.tuning.mapMarkerLimit)) {
+        return true;
+    }
+    // parity: `ItemFrame.interact` raises `PlayerItemFrameChangeEvent` before the item goes in or turns.
+    if (const std::optional<server::world::loot::ItemStack> inside = world::itemFrames::shownIn(frame);
+        inside.has_value()
+            ? !frameChangeAllowed(*world, session, frame, inside->item.toString(), "rotate")
+            : hand.has_value() && !frameChangeAllowed(*world, session, frame, hand->item.toString(), "place")) {
         return true;
     }
     const world::itemFrames::Touched touched = world::itemFrames::interact(frame, hand);
@@ -292,7 +316,7 @@ void CombatHandler::breakVehicle(PlayerSession& session, ServerEntity& vehicle) 
     if (enchanted - base > 0.0F) {
         broadcastAnimation(vehicle.entityId(), wire::protocol::play::AnimatePacket::kMagicCriticalHit);
     }
-    session.food.addExhaustion(session.food.tuning.combat);
+    player::causeExhaustion(session, session.food.tuning.combat, "attack");
 }
 
 void CombatHandler::breakCushion(PlayerSession& session, ServerEntity& cushion) {
@@ -336,6 +360,9 @@ void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {
     // parity: `dropItem` puts nothing in the world for a creative player or with `entity_drops` off.
     const bool drops = session.gamemode != Gamemode::Creative && world->gameRules().get(world::gameRules::kEntityDrops);
     if (shown.has_value()) {
+        if (!frameChangeAllowed(*world, session, frame, shown->item.toString(), "remove")) {
+            return;
+        }
         static_cast<void>(frame.sourceNbt->remove("Item"));
         broadcastFrame(frame);
         // parity: `dropItem` takes the map's marker off unless drops are off.

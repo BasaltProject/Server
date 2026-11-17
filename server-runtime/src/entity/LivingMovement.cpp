@@ -1,8 +1,13 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/LivingMovement.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
+#include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cmath>
 #include <cstdint>
@@ -276,6 +281,13 @@ void travelSwimming(world::WorldState& world, ServerEntity& entity, double forwa
 
 void jump(world::WorldState& world, ServerEntity& entity) {
     if (!entity.onGround) {
+        return;
+    }
+    // parity: `LivingEntity.aiStep` asks `EntityJumpEvent` right before `jumpFromGround`.
+    if (!world.events().allowed(&server::plugins::pluginEventTypes::entityJump,
+                                [&](server::plugins::PluginEvent& event) {
+                                    plugins::hookEvents::entity(event, world.eventWorld(), entity);
+                                })) {
         return;
     }
     const double power =

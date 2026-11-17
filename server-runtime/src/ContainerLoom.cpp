@@ -1,7 +1,10 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Looms.hpp>
 #include <basalt/server/runtime/world/RealBannerPatterns.hpp>
@@ -9,6 +12,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <utility>
+#include <variant>
 
 namespace basalt::server::runtime {
 namespace {
@@ -111,7 +115,30 @@ void ContainerMenuController::selectLoomPattern(const std::int32_t button) {
     if (button < 0 || static_cast<std::size_t>(button) >= loomPatterns_.size()) {
         return;
     }
-    loomPattern_ = button;
+    std::int32_t chosen = button;
+    // parity: `LoomMenu.clickMenuButton` asks `PlayerLoomPatternSelectEvent` and honours its pattern.
+    if (PlayerSession* chooser = owner_->playerSession(); chooser != nullptr && chooser->events != nullptr) {
+        const std::string& wanted = loomPatterns_[static_cast<std::size_t>(button)];
+        const server::plugins::PluginEvent* answered = chooser->events->ask(
+            &server::plugins::pluginEventTypes::playerLoomSelect, [&](server::plugins::PluginEvent& event) {
+                plugins::EventSink::player(event, *chooser);
+                event.set("pattern", wanted);
+            });
+        if (answered != nullptr) {
+            if (answered->cancelled()) {
+                sendLoomNumbers();
+                sendInventory();
+                return;
+            }
+            if (const auto* edited = std::get_if<std::string>(&answered->get("pattern")); edited != nullptr) {
+                const auto found = std::ranges::find(loomPatterns_, *edited);
+                if (found != loomPatterns_.end()) {
+                    chosen = static_cast<std::int32_t>(found - loomPatterns_.begin());
+                }
+            }
+        }
+    }
+    loomPattern_ = chosen;
     const std::optional<storage::StoredItemStack>& banner = loomSlots_[Menu::kLoomBanner];
     const std::optional<storage::StoredItemStack>& dye = loomSlots_[Menu::kLoomDye];
     if (!banner.has_value() || !dye.has_value()) {
@@ -119,7 +146,7 @@ void ContainerMenuController::selectLoomPattern(const std::int32_t button) {
     }
     const std::optional<std::string> colour = world::looms::dyeColourOf(dye->id);
     loomSlots_[Menu::kLoomResult] =
-        colour.has_value() ? world::looms::weave(*banner, loomPatterns_[static_cast<std::size_t>(button)], *colour)
+        colour.has_value() ? world::looms::weave(*banner, loomPatterns_[static_cast<std::size_t>(chosen)], *colour)
                            : std::nullopt;
     sendLoomNumbers();
     sendInventory();

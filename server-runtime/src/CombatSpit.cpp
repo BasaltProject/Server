@@ -222,6 +222,7 @@ void CombatSystem::tickLlamaSpit(world::LoadedWorld& world, const std::vector<Pl
         }
         hitBlock(world, watchers, spit, *hit, false);
         spit.removed = true;
+        spit.removeCause = "hit";
         return;
     }
     const double horizontal = std::sqrt((spit.velocityX * spit.velocityX) + (spit.velocityZ * spit.velocityZ));
@@ -230,6 +231,7 @@ void CombatSystem::tickLlamaSpit(world::LoadedWorld& world, const std::vector<Pl
     // parity: gone once every square its box touches is solid, or in water.
     if (buried(world.state(), spit) || wet) {
         spit.removed = true;
+        spit.removeCause = "hit";
         return;
     }
     // parity: the drag is taken off the movement it started with.

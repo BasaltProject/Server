@@ -132,6 +132,7 @@ void CombatSystem::deflectArrow(ServerEntity& arrow) {
             (arrow.velocityZ * arrow.velocityZ) <
         kStopped) {
         arrow.removed = true;
+        arrow.removeCause = "hit";
     }
 }
 
@@ -198,6 +199,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
     if (piercing) {
         if (arrow.piercedIds.size() >= static_cast<std::size_t>(arrow.pierceLevel) + 1) {
             arrow.removed = true;
+            arrow.removeCause = "hit";
             return ArrowHit::Stopped;
         }
         arrow.piercedIds.push_back(target->mob != nullptr ? target->mob->entityId() : target->player->entityId());
@@ -209,6 +211,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
 
     if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
         arrow.removed = true;
+        arrow.removeCause = "hit";
         hitCrystal(world, watchers, *target->mob, false, false,
                    firedByPlayer(watchers, arrow) ? arrow.ownerId : std::nullopt);
         return ArrowHit::Stopped;

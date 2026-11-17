@@ -1510,6 +1510,79 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 [this](world::LoadedWorld& world, entity::ServerEntity& armadillo) {
                     return mobActions_ != nullptr && mobActions_->brushArmadillo(world, armadillo);
                 },
+            .equipEntityAt =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t dx,
+                       std::int32_t dy, std::int32_t dz, const server::world::loot::ItemStack& stack) {
+                    if (mobActions_ == nullptr) {
+                        return false;
+                    }
+                    for (entity::ServerEntity* candidate : world.state().entities()) {
+                        if (!(candidate->x + (candidate->width() / 2.0) > x &&
+                              candidate->x - (candidate->width() / 2.0) < x + 1.0 &&
+                              candidate->y + candidate->height() > y && candidate->y < y + 1.0 &&
+                              candidate->z + (candidate->width() / 2.0) > z &&
+                              candidate->z - (candidate->width() / 2.0) < z + 1.0)) {
+                            continue;
+                        }
+                        const std::optional<std::uint8_t> slot = mobActions_->dispenserEquipSlot(*candidate, stack);
+                        if (!slot.has_value()) {
+                            continue;
+                        }
+                        // parity: only the first entity that can wear it is offered the item.
+                        if (!eventSink_.allowed(&server::plugins::pluginEventTypes::blockDispenseArmor,
+                                                [&](server::plugins::PluginEvent& event) {
+                                                    event.set("world", world.name());
+                                                    event.set("x", static_cast<std::int64_t>(dx));
+                                                    event.set("y", static_cast<std::int64_t>(dy));
+                                                    event.set("z", static_cast<std::int64_t>(dz));
+                                                    event.set("entity_id",
+                                                              static_cast<std::int64_t>(candidate->entityId()));
+                                                    event.set("item", stack.item.toString());
+                                                })) {
+                            return false;
+                        }
+                        mobActions_->dispenserEquip(*candidate, *slot, stack);
+                        return true;
+                    }
+                    return false;
+                },
+            .shearEntityAt =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t dx,
+                       std::int32_t dy, std::int32_t dz, const std::string& tool) {
+                    if (mobActions_ == nullptr) {
+                        return false;
+                    }
+                    for (entity::ServerEntity* candidate : world.state().entities()) {
+                        if (candidate->removed || candidate->dying || !candidate->livingType() ||
+                            !mobActions_->readyForShearing(*candidate) ||
+                            !(candidate->x + (candidate->width() / 2.0) > x &&
+                              candidate->x - (candidate->width() / 2.0) < x + 1.0 &&
+                              candidate->y + candidate->height() > y && candidate->y < y + 1.0 &&
+                              candidate->z + (candidate->width() / 2.0) > z &&
+                              candidate->z - (candidate->width() / 2.0) < z + 1.0)) {
+                            continue;
+                        }
+                        // parity: `ShearsDispenseItemBehavior` asks `BlockShearEntityEvent` and keeps looking when
+                        // refused.
+                        if (!eventSink_.allowed(&server::plugins::pluginEventTypes::blockShearEntity,
+                                                [&](server::plugins::PluginEvent& event) {
+                                                    event.set("world", world.name());
+                                                    event.set("x", static_cast<std::int64_t>(dx));
+                                                    event.set("y", static_cast<std::int64_t>(dy));
+                                                    event.set("z", static_cast<std::int64_t>(dz));
+                                                    event.set("entity_id",
+                                                              static_cast<std::int64_t>(candidate->entityId()));
+                                                    event.set("entity_type", candidate->type().toString());
+                                                    event.set("tool", tool);
+                                                })) {
+                            continue;
+                        }
+                        if (mobActions_->shearMob(*candidate, wire::protocol::play::SoundSource::Blocks)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                },
             .mobSpawners = mobSpawners_.get(),
             .trialSpawners = trialSpawners_.get(),
             .vaults = vaults_.get()});

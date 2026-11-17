@@ -1,3 +1,5 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
@@ -14,6 +16,7 @@
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/player/PlayerTrident.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
@@ -127,6 +130,21 @@ namespace {
 /// parity: `Item.getUseDuration` of a bow, a crossbow, a trident and a shield.
 constexpr std::int32_t kHeldUseTicks = 72000;
 } // namespace
+
+void ItemUseTimers::announceStopUsing() {
+    const PlayerSession* session = owner_->playerSession();
+    const std::optional<UseState> state = useState();
+    if (session == nullptr || session->events == nullptr || !state.has_value() || !usedItem_.has_value()) {
+        return;
+    }
+    // parity: `ServerPlayer.releaseUsingItem` tells `PlayerStopUsingItemEvent` how long the item was held.
+    session->events->notify(&server::plugins::pluginEventTypes::playerStopUsingItem,
+                            [&](server::plugins::PluginEvent& event) {
+                                plugins::EventSink::player(event, *session);
+                                event.set("item", usedItem_->toString());
+                                event.set("ticks", static_cast<std::int64_t>(state->used));
+                            });
+}
 
 std::optional<ItemUseTimers::UseState> ItemUseTimers::useState() const {
     if (eatingSlot_ >= 0) {

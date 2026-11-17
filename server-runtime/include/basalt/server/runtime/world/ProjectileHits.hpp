@@ -20,10 +20,14 @@ inline constexpr std::int32_t kThrownHoldTicks = 8;
 /// parity: `TntBlock.onProjectileHit`.
 using OnDestroyed = std::function<void(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z)>;
 
+/// Gets the signal a target is about to take; nullopt cancels the hit, a value replaces the signal.
+using OnTarget = std::function<std::optional<std::int32_t>(std::int32_t signal)>;
+
 [[nodiscard]] std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const entity::BlockHit& hit,
                                                bool byArrow, bool burning, bool tntExplodes,
                                                const OnDestroyed& destroyed = {},
-                                               std::optional<std::int32_t> ownerId = std::nullopt);
+                                               std::optional<std::int32_t> ownerId = std::nullopt,
+                                               const OnTarget& onTarget = {});
 
 /// parity: `TargetBlock.getRedstoneStrength`.
 [[nodiscard]] std::int32_t signalFor(const entity::BlockHit& hit);

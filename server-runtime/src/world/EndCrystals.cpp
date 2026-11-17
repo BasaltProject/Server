@@ -69,6 +69,7 @@ Hit hurt(entity::ServerEntity& crystal, bool byDragon, bool byExplosion, bool by
         return Hit::Ignored;
     }
     crystal.removed = true;
+    crystal.removeCause = "explode";
     crystal.killed = true;
     return byExplosion ? Hit::Removed : Hit::Explodes;
 }

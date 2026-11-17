@@ -30,6 +30,10 @@ inline constexpr std::int32_t kSize = 9;
 /// Every field falls back to the registry when unset, so `{}` gives vanilla behaviour.
 struct Hooks {
     std::function<std::int32_t()> allocateEntityId;
+    /// False cancels the dispense of the picked slot before anything happens, as `BlockPreDispenseEvent` does.
+    std::function<bool(const server::world::loot::ItemStack& stack, std::int32_t slot)> preDispense;
+    /// False silences the click of an empty dispenser, as `BlockFailedDispenseEvent` does.
+    std::function<bool()> failedEffect;
     /// False cancels the shot of the chosen stack, as `BlockDispenseEvent` does.
     std::function<bool(const server::world::loot::ItemStack& stack, server::registry::BlockFace out)> dispensing;
     /// Unset, only snow and iron golems can stand up from a carved pumpkin.
@@ -54,6 +58,12 @@ struct Hooks {
         launchFirework;
     /// parity: `BeehiveBlock.releaseBeesAndResetHoneyLevel(..., BEE_RELEASED)`.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> releaseHive;
+    /// Shears whatever is ready in the square in front; false when nothing was.
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, const server::world::loot::ItemStack& tool)>
+        shearEntity;
+    /// Dresses whoever stands in the square in front with one item; false when nobody takes it.
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, const server::world::loot::ItemStack& stack)>
+        equipEntity;
     /// parity: `Armadillo.brushOffScute`, the loot, sound and interaction event of a brushing.
     std::function<bool(entity::ServerEntity& armadillo)> brushArmadillo;
 };

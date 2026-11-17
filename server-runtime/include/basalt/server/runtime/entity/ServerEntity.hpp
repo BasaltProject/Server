@@ -628,6 +628,8 @@ public:
     std::optional<std::vector<std::string>> visibleTo;
 
     bool removed = false;
+    std::string_view removeCause;
+    bool removeAnnounced = false;
 
     bool killed = false;
 

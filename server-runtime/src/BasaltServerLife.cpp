@@ -1,4 +1,5 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -2167,9 +2168,32 @@ void BasaltServer::startBedrockListener() {
                                 id.has_value() ? world::mobEffects::byProtocolId(*id) : std::nullopt;
                             return effect.has_value() ? effect->toString() : std::string{};
                         };
-                        const std::string primary = named(applied.beacon->primary);
-                        const std::string secondary = named(applied.beacon->secondary);
-                        if (world::beacons::allows(primary, secondary, stored.levels)) {
+                        std::string primary = named(applied.beacon->primary);
+                        std::string secondary = named(applied.beacon->secondary);
+                        // parity: `BeaconMenu.updateEffects` asks `PlayerChangeBeaconEffectEvent` first.
+                        bool changeAllowed = true;
+                        if (const server::plugins::PluginEvent* answered =
+                                where->events().ask(&server::plugins::pluginEventTypes::playerChangeBeaconEffect,
+                                                    [&](server::plugins::PluginEvent& event) {
+                                                        plugins::EventSink::player(event, *session);
+                                                        event.set("x", static_cast<std::int64_t>(windows->open->x));
+                                                        event.set("y", static_cast<std::int64_t>(windows->open->y));
+                                                        event.set("z", static_cast<std::int64_t>(windows->open->z));
+                                                        event.set("primary", primary);
+                                                        event.set("secondary", secondary);
+                                                    });
+                            answered != nullptr) {
+                            changeAllowed = !answered->cancelled();
+                            if (const auto* edited = std::get_if<std::string>(&answered->get("primary"));
+                                edited != nullptr) {
+                                primary = *edited;
+                            }
+                            if (const auto* edited = std::get_if<std::string>(&answered->get("secondary"));
+                                edited != nullptr) {
+                                secondary = *edited;
+                            }
+                        }
+                        if (changeAllowed && world::beacons::allows(primary, secondary, stored.levels)) {
                             stored.primary = primary;
                             stored.secondary = secondary;
                             world::beacons::write(stored, entity->data());

@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
+#include <basalt/server/runtime/player/PlayerExhaustion.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -48,6 +49,8 @@ namespace reg = server::registry;
 using play::BlockPos;
 using play::Gamemode;
 using wire::common::Identifier;
+
+constexpr float kBlockBreakExhaustion = 0.005F;
 
 /// parity: `Block.popResource` and a thrown stack's own opening movement.
 constexpr double kPopJitter = 0.25;
@@ -501,6 +504,8 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     }
     if (brokenBlock != nullptr) {
         session->stats.increment(storage::stats::mined(brokenBlock->toString()));
+        // parity: `Block.playerDestroy`, in survival.
+        causeExhaustion(*session, kBlockBreakExhaustion, "block_mined");
     }
 
     const std::vector<PlayerSession*> watchers = playersIn(context, world.name());

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
+#include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 
 #include <cstdint>
@@ -9,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -38,16 +40,41 @@ public:
 
     bool looksAtPlayers = true;
 
+    bool fake = false;
+    bool placed = false;
+    bool listed = false;
+    bool onGround = true;
+    float headYaw = 0.0F;
+    std::uint8_t flags = 0;
+    std::int32_t pose = 0;
+    std::vector<entity::GeneratedEquipment> equipment;
+    std::vector<std::pair<std::int32_t, std::int32_t>> animations;
+
     [[nodiscard]] std::int32_t version() const noexcept { return version_; }
 
     [[nodiscard]] bool removed() const noexcept { return removed_; }
 
     void changed() noexcept { version_++; }
 
+    [[nodiscard]] std::int32_t stateVersion() const noexcept { return stateVersion_; }
+
+    void stateChanged() noexcept { stateVersion_++; }
+
+    void animate(std::int32_t action) {
+        constexpr std::size_t kKeptAnimations = 32;
+        if (animations.size() >= kKeptAnimations) {
+            animations.erase(animations.begin());
+        }
+        animations.emplace_back(++animationSeq_, action);
+        stateVersion_++;
+    }
+
     void remove() noexcept { removed_ = true; }
 
 private:
     std::int32_t version_ = 0;
+    std::int32_t stateVersion_ = 0;
+    std::int32_t animationSeq_ = 0;
     bool removed_ = false;
 };
 
@@ -119,6 +146,16 @@ public:
     [[nodiscard]] std::optional<std::vector<std::string>> audience() const override;
 
     void remove() override;
+
+    void place(double x, double y, double z, float yaw, float pitch, float headYaw, bool onGround) override;
+
+    void posture(std::uint8_t flags, std::int32_t pose) override;
+
+    void listed(bool shown) override;
+
+    void equip(std::int32_t slot, std::span<const std::uint8_t> stack) override;
+
+    void animate(std::int32_t action) override;
 
 private:
     std::shared_ptr<Npc> npc_;

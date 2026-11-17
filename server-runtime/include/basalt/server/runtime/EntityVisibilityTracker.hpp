@@ -44,6 +44,16 @@ struct NpcView {
     std::optional<std::string> skinTexture;
     std::optional<std::string> skinSignature;
     std::optional<std::vector<std::string>> visibleTo;
+    std::string name;
+    bool fake = false;
+    bool listed = false;
+    bool onGround = true;
+    float headYaw = 0.0F;
+    std::uint8_t flags = 0;
+    std::int32_t pose = 0;
+    std::int32_t stateVersion = 0;
+    std::vector<entity::GeneratedEquipment> equipment;
+    std::vector<std::pair<std::int32_t, std::int32_t>> animations;
 };
 
 class EntityVisibilityTracker {
@@ -69,6 +79,10 @@ public:
     }
 
 private:
+    struct NpcSent;
+
+    void syncNpcState(const NpcView& npc, NpcSent& sent);
+
     void syncPassengers(const std::vector<entity::ServerEntity*>& entities, const std::string& viewer,
                         std::int32_t viewerEntityId);
 
@@ -93,6 +107,17 @@ private:
     std::set<std::int32_t> settledItems_;
     std::unordered_set<std::int32_t> trackedEntities_;
     std::map<std::int32_t, std::int32_t> trackedNpcs_;
+
+    struct NpcSent {
+        wire::common::Uuid uuid;
+        std::int32_t stateVersion = -1;
+        std::int32_t animation = 0;
+        std::uint8_t flags = 0;
+        std::int32_t pose = 0;
+        std::vector<entity::GeneratedEquipment> equipment;
+    };
+
+    std::map<std::int32_t, NpcSent> npcSent_;
     bool namelessTeamMade_ = false;
 
     struct SentNameTag {

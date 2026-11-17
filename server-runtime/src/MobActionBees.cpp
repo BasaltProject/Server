@@ -297,6 +297,7 @@ void MobActionSystem::enterHive(ServerEntity& bee, const Pos& hive) {
                             world->gameTime(), {.entity = bee.uuid()});
     // parity: `discard`, gone into the hive without dying.
     bee.removed = true;
+    bee.removeCause = "enter_block";
     markDirty(*world, hive);
     // parity: `BeehiveBlockEntity.setChanged`.
     if (beehives::isFireNearby(world->state(), hive)) {

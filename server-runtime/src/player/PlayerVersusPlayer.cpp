@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
+#include <basalt/server/runtime/player/PlayerExhaustion.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerMace.hpp>
 #include <basalt/server/runtime/player/PlayerMovementStats.hpp>
@@ -520,7 +521,7 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
     attacker.stats.addDamageDealt(lost);
     showDamageIndicator(playersIn(context, attacker.worldName), victim.x, victim.y + (playerHeight() * 0.5), victim.z,
                         lost);
-    attacker.food.addExhaustion(attacker.food.tuning.combat);
+    causeExhaustion(attacker, attacker.food.tuning.combat, "attack");
     return true;
 }
 

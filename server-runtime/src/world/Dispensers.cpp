@@ -715,6 +715,10 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
     if (stack.item == shears()) {
         const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
         if (!target.has_value() || honeyOf(*target) < kFullHive) {
+            // parity: `ShearsDispenseItemBehavior.tryShearEntity`, after the hive had nothing to give.
+            if (hooks.shearEntity && hooks.shearEntity(tx, ty, tz, stack)) {
+                return Special{.handled = true, .left = wornOnce(stack, context.random)};
+            }
             return Special{.refused = true};
         }
         const std::optional<std::int32_t> emptied = registry::blockStateDefinitions::stateIdOf(
@@ -937,7 +941,9 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     const std::optional<std::size_t> slot = randomFullSlot(slots, context.random);
     if (!slot.has_value()) {
         // parity: `DispenserBlock.dispenseFrom`, which clicks at nothing when it is empty. That.
-        result.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kDispenserFail, .data = 0});
+        if (!hooks.failedEffect || hooks.failedEffect()) {
+            result.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kDispenserFail, .data = 0});
+        }
         heard(world, "block_activate", x, y, z, hooks.gameTime);
         return result;
     }
@@ -946,6 +952,9 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         return result;
     }
     const ItemStack stack = *slots[*slot];
+    if (hooks.preDispense && !hooks.preDispense(stack, static_cast<std::int32_t>(*slot))) {
+        return result;
+    }
     if (hooks.dispensing && !hooks.dispensing(stack, *out)) {
         result.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kDispenserDispense, .data = 0});
         result.effects.emplace_back(
@@ -1026,6 +1035,18 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         return result;
     }
 
+    // parity: `EquipmentDispenseItemBehavior`, tried before the item is thrown.
+    if (!dropper && hooks.equipEntity &&
+        hooks.equipEntity(x + registry::stepX(*out), y + registry::stepY(*out), z + registry::stepZ(*out), stack)) {
+        dispenseSound(blockEffect::Effect::kDispenserDispense);
+        dispenseSmoke();
+        slots[*slot] = minusOne(stack);
+        blockInventory::write(blockEntity->data(), slots);
+        chunk->markDirty();
+        redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
+        result.fired = true;
+        return result;
+    }
     // parity: a minecart goes on the rail rather than into a container or the air.
     if (!dropper && stack.item.path().ends_with("minecart") && dispenseMinecart(world, x, y, z, *out, stack, hooks)) {
         dispenseSound(blockEffect::Effect::kDispenserDispense);

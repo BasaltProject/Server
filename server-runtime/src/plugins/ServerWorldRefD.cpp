@@ -313,6 +313,30 @@ std::shared_ptr<server::plugins::PluginNpcRef> LoadedWorldRef::npc(std::string_v
         std::move(label));
 }
 
+std::shared_ptr<server::plugins::PluginNpcRef> LoadedWorldRef::fakePlayer(std::string_view uuid, std::string_view name,
+                                                                          double x, double y, double z) {
+    const std::optional<wire::common::Uuid> id = wire::common::Uuid::parse(std::string{uuid});
+    if (hooks_.npcs == nullptr || !hooks_.nextEntityId || !id.has_value()) {
+        return nullptr;
+    }
+    auto npc = std::make_shared<Npc>(hooks_.nextEntityId(), *id, std::string{name}, world_->name(), x, y, z);
+    npc->fake = true;
+    npc->looksAtPlayers = false;
+    hooks_.npcs->add(npc);
+    return std::make_shared<NpcHandle>(std::move(npc), *hooks_.npcs, NpcHandle::Profiles{}, nullptr);
+}
+
+std::shared_ptr<server::plugins::PluginNpcRef> LoadedWorldRef::npcById(std::int32_t entityId) {
+    if (hooks_.npcs == nullptr) {
+        return nullptr;
+    }
+    std::shared_ptr<Npc> npc = hooks_.npcs->of(entityId);
+    if (npc == nullptr) {
+        return nullptr;
+    }
+    return std::make_shared<NpcHandle>(std::move(npc), *hooks_.npcs, NpcHandle::Profiles{}, nullptr);
+}
+
 server::world::ChunkHeight LoadedWorldRef::chunkHeight() const {
     return config::dimensionFacts(world_->declaration().dimension).chunkHeight;
 }

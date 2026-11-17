@@ -61,6 +61,11 @@ public:
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            const std::string& item, std::string_view face)>
             dispenseAllowed;
+        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           const std::string& item, std::int32_t slot)>
+            preDispenseAllowed;
+        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
+            dispenseFailedEffect;
         world::randomTicks::MayChange mayChange;
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::int32_t stateId)>
@@ -124,6 +129,13 @@ public:
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
         /// parity: `Armadillo.brushOffScute` from the dispenser's brush behaviour.
         std::function<bool(world::LoadedWorld& world, entity::ServerEntity& armadillo)> brushArmadillo;
+        std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t dx,
+                           std::int32_t dy, std::int32_t dz, const server::world::loot::ItemStack& stack)>
+            equipEntityAt;
+        std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t dispenserX, std::int32_t dispenserY, std::int32_t dispenserZ,
+                           const std::string& tool)>
+            shearEntityAt;
         MobSpawnerSystem* mobSpawners = nullptr;
         TrialSpawnerSystem* trialSpawners = nullptr;
         VaultSystem* vaults = nullptr;

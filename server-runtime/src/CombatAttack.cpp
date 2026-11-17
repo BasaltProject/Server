@@ -36,6 +36,7 @@
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/Menu.hpp>
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
+#include <basalt/server/runtime/player/PlayerExhaustion.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerMace.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
@@ -116,6 +117,9 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
             }
             return;
         }
+    }
+    if (target == nullptr && hooks_.npcAttacked && hooks_.npcAttacked(*session, attack.entityId)) {
+        return;
     }
     if (target == nullptr || target->removed) {
         return;
@@ -295,7 +299,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     // parity: `itemAttackInteraction`.
     player::pvp::itemAttackInteraction(melee, *world, *session, nullptr, target, heldStack,
                                        PlayerInventory::kHotbarStart + session->inventory.heldSlot());
-    session->food.addExhaustion(session->food.tuning.combat);
+    player::causeExhaustion(*session, session->food.tuning.combat, "attack");
     if (result.died) {
         killEntity(*target);
     } else {

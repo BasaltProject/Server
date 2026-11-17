@@ -1,3 +1,5 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
@@ -329,6 +331,15 @@ void CombatHandler::handleRidingCommand(wire::protocol::play::PlayerCommandPacke
         if (state.dashCooldown == 0) {
             state.dashCooldown = horses::kDashCooldownTicks;
         }
+        return;
+    }
+    // parity: `AbstractHorse.handleStartJump` asks `HorseJumpEvent` first.
+    const float jumpPower = data >= 90 ? 1.0F : 0.4F + (0.4F * static_cast<float>(data) / 90.0F);
+    if (!world->events().allowed(&server::plugins::pluginEventTypes::entityHorseJump,
+                                 [&](server::plugins::PluginEvent& event) {
+                                     plugins::hookEvents::entity(event, world->name(), *vehicle);
+                                     event.set("power", static_cast<double>(jumpPower));
+                                 })) {
         return;
     }
     // parity: `AbstractHorse.handleStartJump`: up on its hind legs and the jump sound.

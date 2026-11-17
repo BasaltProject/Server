@@ -243,6 +243,11 @@ public:
     std::shared_ptr<server::plugins::PluginNpcRef> npc(std::string_view name, double x, double y, double z,
                                                        std::function<void(const std::string&)> onClick) override;
 
+    std::shared_ptr<server::plugins::PluginNpcRef> fakePlayer(std::string_view uuid, std::string_view name, double x,
+                                                              double y, double z) override;
+
+    std::shared_ptr<server::plugins::PluginNpcRef> npcById(std::int32_t entityId) override;
+
 private:
     [[nodiscard]] server::world::ChunkHeight chunkHeight() const;
     [[nodiscard]] static std::int32_t biomeIndexOf(std::int32_t biomeId);

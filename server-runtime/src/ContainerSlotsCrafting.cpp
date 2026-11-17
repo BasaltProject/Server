@@ -1,5 +1,6 @@
 #include "ContainerSlotsShared.hpp"
 
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -32,6 +33,7 @@
 #include <cstdint>
 #include <random>
 #include <utility>
+#include <variant>
 
 namespace basalt::server::runtime {
 using namespace containerSlots;
@@ -249,6 +251,32 @@ void ContainerMenuController::selectStonecutterRecipe(std::int32_t button) {
         recipeUsed_.reset();
     } else {
         const server::world::crafting::Recipe* chosen = options[static_cast<std::size_t>(button)];
+        // parity: `StonecutterMenu.clickMenuButton` asks `PlayerStonecutterRecipeSelectEvent` and honours its recipe.
+        const wire::common::Identifier* picked = recipes->nameOf(chosen);
+        PlayerSession* chooser = owner_->playerSession();
+        if (picked != nullptr && chooser != nullptr && chooser->events != nullptr) {
+            const server::plugins::PluginEvent* answered = chooser->events->ask(
+                &server::plugins::pluginEventTypes::playerStonecutterSelect, [&](server::plugins::PluginEvent& event) {
+                    plugins::EventSink::player(event, *chooser);
+                    event.set("recipe", picked->toString());
+                });
+            if (answered != nullptr) {
+                if (answered->cancelled()) {
+                    sendInventory();
+                    return;
+                }
+                if (const auto* edited = std::get_if<std::string>(&answered->get("recipe"));
+                    edited != nullptr && *edited != picked->toString()) {
+                    for (const server::world::crafting::Recipe* option : options) {
+                        const wire::common::Identifier* optionName = recipes->nameOf(option);
+                        if (optionName != nullptr && optionName->toString() == *edited) {
+                            chosen = option;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         stonecutterResult_ = storedOf(chosen->result);
         // parity: `StonecutterMenu.setupResultSlot` sets the recipe used along with the result.
         const wire::common::Identifier* name = recipes->nameOf(chosen);

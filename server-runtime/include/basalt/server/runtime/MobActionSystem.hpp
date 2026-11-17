@@ -556,6 +556,13 @@ public:
     /// The entity id of the zombie villager it turned into, or -1 when it did not.
     [[nodiscard]] std::int32_t pluginZombify(entity::ServerEntity& villager);
 
+    /// parity: `LivingEntity.canEquipWithDispenser`: the slot the stack would fill, when the target takes it.
+    [[nodiscard]] std::optional<std::uint8_t> dispenserEquipSlot(const entity::ServerEntity& target,
+                                                                 const server::world::loot::ItemStack& stack) const;
+
+    /// parity: `EquipmentDispenseItemBehavior.dispenseEquipment`, one item of the stack.
+    void dispenserEquip(entity::ServerEntity& target, std::uint8_t slot, const server::world::loot::ItemStack& stack);
+
     /// parity: `Shearable.readyForShearing`, for the mobs that have one.
     [[nodiscard]] bool readyForShearing(const entity::ServerEntity& mob) const;
 

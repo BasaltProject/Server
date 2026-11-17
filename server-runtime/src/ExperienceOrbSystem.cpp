@@ -267,6 +267,7 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
                 tagOf(orb).putInt("Count", countOf(orb) + countOf(*other));
                 tagOf(orb).putShort("Age", static_cast<std::int16_t>(std::min(ageOf(orb), ageOf(*other))));
                 other->removed = true;
+                other->removeCause = "merge";
             }
         }
     }
@@ -389,6 +390,7 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
         tagOf(orb).putInt("Count", left);
         if (left <= 0) {
             orb.removed = true;
+            orb.removeCause = "pickup";
             return;
         }
     }

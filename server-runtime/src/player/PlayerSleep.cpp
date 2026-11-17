@@ -1,3 +1,5 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
@@ -7,6 +9,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -16,7 +19,9 @@
 #include <basalt/wire/text/Component.hpp>
 
 #include <array>
+#include <cmath>
 #include <string>
+#include <variant>
 
 namespace basalt::server::runtime::player {
 namespace {
@@ -57,6 +62,31 @@ void showSleeping(const BreakContext& context, const PlayerSession& player, worl
             watcher->connection().showSleeping(player.entityId(), bed);
         }
     }
+}
+
+/// parity: `Monster.isPreventingPlayerRest` within eight by five by eight blocks of the bed.
+[[nodiscard]] bool monsterKeepsUsUp(const PlayerSession& player, world::LoadedWorld& world,
+                                    const std::array<std::int32_t, 3>& head) {
+    for (entity::ServerEntity* other : world.state().entities()) {
+        const std::string_view path = other->type().path();
+        // parity: `Monster.isPreventingPlayerRest`, which the monster-category mobs outside `Monster` lack.
+        if (other->removed || entity::mobs::categoryOf(other->type()) != "monster" || path == "slime" ||
+            path == "magma_cube" || path == "ghast" || path == "phantom" || path == "hoglin" || path == "shulker" ||
+            path == "ender_dragon") {
+            continue;
+        }
+        if (path == "zombified_piglin" &&
+            !entity::neutralAnger::isAngryAtPlayer(*other, player.uuid(), true, world.gameTime(),
+                                                   world.gameRules().get(world::gameRules::kUniversalAnger))) {
+            continue;
+        }
+        if (std::abs(other->x - (head[0] + 0.5)) < 8.0 + (other->width() / 2.0) && other->y < head[1] + 5.0 &&
+            other->y + other->height() > head[1] - 5.0 &&
+            std::abs(other->z - (head[2] + 0.5)) < 8.0 + (other->width() / 2.0)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace
@@ -103,58 +133,120 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
 
     // parity: `ServerPlayer.startSleepInBed`.
     const std::array<std::int32_t, 3> foot{head[0] - step[0], head[1] - step[1], head[2] - step[2]};
-    if (!force && !world::beds::reachable(player.x, player.y, player.z, head[0], head[1], head[2]) &&
-        !world::beds::reachable(player.x, player.y, player.z, foot[0], foot[1], foot[2])) {
-        refuse(player, world::translationKeyOf(world::BedProblem::TooFarAway));
-        return world::BedProblem::TooFarAway;
-    }
-    if (!force && (suffocatesAt(context.blocks, world, head[0], head[1] + 1, head[2]) ||
-                   suffocatesAt(context.blocks, world, foot[0], foot[1] + 1, foot[2]))) {
-        refuse(player, world::translationKeyOf(world::BedProblem::Obstructed));
-        return world::BedProblem::Obstructed;
-    }
     const bool dark = world::beds::isNight(world.clock().totalTicks()) || world.weather().thundering;
     const bool setsSpawn = world::beds::holds(rule.canSetSpawn, dark);
-    if (setsSpawn && context.setSpawn) {
-        context.setSpawn(player, head[0], head[1], head[2]);
-    }
-    if (!force && !world::beds::holds(rule.canSleep, dark)) {
-        if (!rule.errorKey.empty()) {
-            refuse(player, rule.errorKey);
+    std::optional<world::BedProblem> problem;
+    std::string_view problemKey;
+    if (!force && !world::beds::reachable(player.x, player.y, player.z, head[0], head[1], head[2]) &&
+        !world::beds::reachable(player.x, player.y, player.z, foot[0], foot[1], foot[2])) {
+        problem = world::BedProblem::TooFarAway;
+        problemKey = world::translationKeyOf(*problem);
+    } else if (!force && (suffocatesAt(context.blocks, world, head[0], head[1] + 1, head[2]) ||
+                          suffocatesAt(context.blocks, world, foot[0], foot[1] + 1, foot[2]))) {
+        problem = world::BedProblem::Obstructed;
+        problemKey = world::translationKeyOf(*problem);
+    } else {
+        if (setsSpawn && context.setSpawn) {
+            context.setSpawn(player, head[0], head[1], head[2]);
         }
-        return world::BedProblem::NotPossibleNow;
+        if (!force && !world::beds::holds(rule.canSleep, dark)) {
+            problem = world::BedProblem::NotPossibleNow;
+            problemKey = rule.errorKey;
+        } else if (!force && player.gamemode != wire::protocol::play::Gamemode::Creative &&
+                   !world.state().gameplay().player.sleepIgnoreNearbyMobs && monsterKeepsUsUp(player, world, head)) {
+            problem = world::BedProblem::NotSafe;
+            problemKey = world::translationKeyOf(*problem);
+        }
     }
-    // parity: `Player.startSleepInBed`, a monster within eight by five by eight blocks of the bed keeps you up.
-    if (!force && player.gamemode != wire::protocol::play::Gamemode::Creative &&
-        !world.state().gameplay().player.sleepIgnoreNearbyMobs) {
-        for (entity::ServerEntity* other : world.state().entities()) {
-            const std::string_view path = other->type().path();
-            // parity: `Monster.isPreventingPlayerRest`, which the monster-category mobs outside `Monster` lack.
-            if (other->removed || entity::mobs::categoryOf(other->type()) != "monster" || path == "slime" ||
-                path == "magma_cube" || path == "ghast" || path == "phantom" || path == "hoglin" || path == "shulker" ||
-                path == "ender_dragon") {
-                continue;
+    // parity: `CraftEventFactory.callPlayerBedEnterEvent`, then `callPlayerBedFailEnterEvent` for what still fails.
+    if (player.events != nullptr) {
+        const auto name = [](const std::optional<world::BedProblem>& found, const world::beds::Rule& by) {
+            if (!found.has_value()) {
+                return std::string{"ok"};
             }
-            if (path == "zombified_piglin" &&
-                !entity::neutralAnger::isAngryAtPlayer(*other, player.uuid(), true, world.gameTime(),
-                                                       world.gameRules().get(world::gameRules::kUniversalAnger))) {
-                continue;
+            switch (*found) {
+            case world::BedProblem::TooFarAway:
+                return std::string{"too_far_away"};
+            case world::BedProblem::Obstructed:
+                return std::string{"obstructed"};
+            case world::BedProblem::NotSafe:
+                return std::string{"not_safe"};
+            default:
+                return std::string{by.canSleep == world::beds::When::Never ? "not_possible_here" : "not_possible_now"};
             }
-            if (std::abs(other->x - (head[0] + 0.5)) < 8.0 + (other->width() / 2.0) && other->y < head[1] + 5.0 &&
-                other->y + other->height() > head[1] - 5.0 &&
-                std::abs(other->z - (head[2] + 0.5)) < 8.0 + (other->width() / 2.0)) {
-                refuse(player, world::translationKeyOf(world::BedProblem::NotSafe));
-                return world::BedProblem::NotSafe;
+        };
+        const std::string reason = name(problem, rule);
+        const server::plugins::PluginEvent* tried = player.events->ask(
+            &server::plugins::pluginEventTypes::playerBedTry, [&](server::plugins::PluginEvent& event) {
+                plugins::EventSink::player(event, player);
+                event.set("x", static_cast<std::int64_t>(head[0]));
+                event.set("y", static_cast<std::int64_t>(head[1]));
+                event.set("z", static_cast<std::int64_t>(head[2]));
+                event.set("result", reason);
+                event.set("can_sleep", std::string{world::beds::holds(rule.canSleep, dark) ? "allowed" : "denied"});
+                event.set("use_bed", std::string{"default"});
+            });
+        if (tried != nullptr) {
+            if (const auto* use = std::get_if<std::string>(&tried->get("use_bed")); use != nullptr) {
+                if (*use == "allow") {
+                    problem.reset();
+                } else if (*use == "deny" && !problem.has_value()) {
+                    problem = world::BedProblem::NotHere;
+                }
             }
         }
+        if (problem.has_value() && *problem != world::BedProblem::NotHere) {
+            bool message = true;
+            bool explode = false;
+            std::string text{problemKey};
+            const server::plugins::PluginEvent* failed = player.events->ask(
+                &server::plugins::pluginEventTypes::playerBedFailEnter, [&](server::plugins::PluginEvent& event) {
+                    plugins::EventSink::player(event, player);
+                    event.set("x", static_cast<std::int64_t>(head[0]));
+                    event.set("y", static_cast<std::int64_t>(head[1]));
+                    event.set("z", static_cast<std::int64_t>(head[2]));
+                    event.set("reason", reason);
+                    event.set("will_explode", false);
+                    event.set("message", text);
+                });
+            if (failed != nullptr) {
+                message = !failed->cancelled();
+                if (const auto* edited = std::get_if<std::string>(&failed->get("message")); edited != nullptr) {
+                    text = *edited;
+                }
+                if (const auto* boom = std::get_if<bool>(&failed->get("will_explode")); boom != nullptr) {
+                    explode = *boom && message;
+                }
+            }
+            if (explode) {
+                for (const world::BlockChange& change :
+                     world::beds::destroy(world.state(), head[0], head[1], head[2])) {
+                    announceBlock(context.blocks, world.name(), change.x, change.y, change.z, change.stateId);
+                }
+                if (context.explode) {
+                    context.explode(world, head[0] + 0.5, head[1] + 0.5, head[2] + 0.5, player.entityId());
+                }
+            } else if (message && !text.empty()) {
+                refuse(player, text);
+            }
+            return problem;
+        }
+    } else if (problem.has_value()) {
+        if (!problemKey.empty()) {
+            refuse(player, problemKey);
+        }
+        return problem;
+    }
+    if (problem.has_value()) {
+        return problem;
     }
 
-    const std::int32_t occupied = world::beds::withOccupied(*headState, true);
-    world.state().setBlockState(head[0], head[1], head[2], occupied);
-    announceBlock(context.blocks, world.name(), head[0], head[1], head[2], occupied);
     if (context.bedAllowed && !context.bedAllowed(player, head[0], head[1], head[2])) {
         return world::BedProblem::NotHere;
     }
+    const std::int32_t occupied = world::beds::withOccupied(*headState, true);
+    world.state().setBlockState(head[0], head[1], head[2], occupied);
+    announceBlock(context.blocks, world.name(), head[0], head[1], head[2], occupied);
     player.sleepingBed = head;
     player.sleepTicks = 0;
     player.stats.reset(storage::stats::timeSinceRest());

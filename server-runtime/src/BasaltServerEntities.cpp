@@ -1,6 +1,7 @@
 #include "BasaltServerTickShared.hpp"
 
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
@@ -241,6 +242,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                 [&split](entity::ServerEntity& half) { entity::cubeMobs::applySize(half, split.size); }));
         }
         dying->removed = true;
+        dying->removeCause = "death";
     }
 
     // One snapshot per tick: `entities()` copies under the world lock and per-entity calls made a lock convoy.
@@ -396,6 +398,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         if (entity->y <
             static_cast<double>(config::dimensionFacts(world.declaration().dimension).chunkHeight.minY() - 64)) {
             entity->removed = true;
+            entity->removeCause = "out_of_world";
             continue;
         }
         if (entity->sourceNbt.has_value() && entity->type().path() == "armor_stand") {
@@ -419,6 +422,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                 continue;
             }
             entity->removed = true;
+            entity->removeCause = "explode";
             explosions_->blowUp(world, watchers, entity->x, entity->y + entity::primedTnt::kExplosionOffset, entity->z,
                                 entity->explosionPower > 0.0F ? entity->explosionPower
                                                               : entity::primedTnt::kExplosionPower,

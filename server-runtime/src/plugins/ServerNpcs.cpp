@@ -1,9 +1,22 @@
 #include <basalt/server/runtime/plugins/ServerNpcs.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/wire/nbt/NbtIO.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::plugins {
+
+namespace {
+
+using SlotType = wire::protocol::play::SetEquipmentPacket::SlotType;
+
+constexpr std::array<SlotType, 6> kNpcSlots{SlotType::MainHand, SlotType::OffHand, SlotType::Feet,
+                                            SlotType::Legs,     SlotType::Chest,   SlotType::Head};
+
+} // namespace
 
 void NpcRegistry::add(std::shared_ptr<Npc> npc, OnClick onClick) {
     const std::int32_t entityId = npc->entityId;
@@ -151,5 +164,51 @@ void NpcHandle::remove() {
         label_->remove();
     }
 }
+
+void NpcHandle::place(double x, double y, double z, float yaw, float pitch, float headYaw, bool onGround) {
+    npc_->x = x;
+    npc_->y = y;
+    npc_->z = z;
+    npc_->yaw = yaw;
+    npc_->pitch = pitch;
+    npc_->headYaw = headYaw;
+    npc_->onGround = onGround;
+    npc_->placed = true;
+    npc_->looksAtPlayers = false;
+    npc_->stateChanged();
+}
+
+void NpcHandle::posture(std::uint8_t flags, std::int32_t pose) {
+    npc_->flags = flags;
+    npc_->pose = pose;
+    npc_->stateChanged();
+}
+
+void NpcHandle::listed(bool shown) {
+    npc_->listed = shown;
+    npc_->changed();
+}
+
+void NpcHandle::equip(std::int32_t slot, std::span<const std::uint8_t> stack) {
+    if (slot < 0 || static_cast<std::size_t>(slot) >= kNpcSlots.size()) {
+        return;
+    }
+    const SlotType type = kNpcSlots[static_cast<std::size_t>(slot)];
+    std::erase_if(npc_->equipment, [type](const entity::GeneratedEquipment& worn) { return worn.slot == type; });
+    if (!stack.empty()) {
+        const auto parsed = wire::nbt::nbtIO::read(stack);
+        const wire::nbt::NbtCompound* compound =
+            parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+        const std::optional<server::world::loot::ItemStack> read =
+            compound == nullptr ? std::nullopt : world::blockInventory::readStack(*compound);
+        if (read.has_value() && read->count > 0) {
+            npc_->equipment.push_back(entity::GeneratedEquipment{
+                .slot = type, .item = read->item.toString(), .count = read->count, .components = read->components});
+        }
+    }
+    npc_->stateChanged();
+}
+
+void NpcHandle::animate(std::int32_t action) { npc_->animate(action); }
 
 } // namespace basalt::server::runtime::plugins

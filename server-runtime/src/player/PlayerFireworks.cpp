@@ -1,11 +1,16 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/FireworkSystem.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/player/PlayerFireworks.hpp>
 #include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <array>
+#include <string>
+#include <variant>
 
 namespace basalt::server::runtime::player {
 namespace {
@@ -69,10 +74,31 @@ bool useRocketFor(const BreakContext& context, FireworkSystem& fireworks, Player
     if (!holdsRocket(player, slot) || !player.fallFlying) {
         return false;
     }
+    bool consume = true;
+    if (player.events != nullptr) {
+        // parity: `FireworkRocketItem.use` asks `PlayerElytraBoostEvent` before the rocket exists.
+        const server::plugins::PluginEvent* answered = player.events->ask(
+            &server::plugins::pluginEventTypes::playerElytraBoost, [&](server::plugins::PluginEvent& event) {
+                plugins::EventSink::player(event, player);
+                event.set("item", std::string{"minecraft:firework_rocket"});
+                event.set("hand", std::string{slot == PlayerInventory::kOffhandSlot ? "off_hand" : "main_hand"});
+                event.set("consume", true);
+            });
+        if (answered != nullptr) {
+            if (answered->cancelled()) {
+                return true;
+            }
+            if (const auto* edited = std::get_if<bool>(&answered->get("consume")); edited != nullptr) {
+                consume = *edited;
+            }
+        }
+    }
     static_cast<void>(
         fireworks.attach(world, rocketOf(*player.inventory.at(slot)), player.entityId(), player.x, player.y, player.z));
     gliding::wearWings(context, player, world.state().gameplay().mechanics.elytraDamagePerFireworkBoost);
-    spendOne(context, player, slot);
+    if (consume) {
+        spendOne(context, player, slot);
+    }
     return true;
 }
 

@@ -361,6 +361,15 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             const world::dispensers::Result result = world::dispensers::fire(
                 context, x, y, z,
                 {.allocateEntityId = [this] { return players_->allocateEntityId(); },
+                 .preDispense =
+                     [this, &world, x, y, z](const server::world::loot::ItemStack& stack, std::int32_t slot) {
+                         return !hooks_.preDispenseAllowed ||
+                                hooks_.preDispenseAllowed(world, x, y, z, stack.item.toString(), slot);
+                     },
+                 .failedEffect =
+                     [this, &world, x, y, z] {
+                         return !hooks_.dispenseFailedEffect || hooks_.dispenseFailedEffect(world, x, y, z);
+                     },
                  .dispensing =
                      [this, &world, x, y, z](const server::world::loot::ItemStack& stack,
                                              server::registry::BlockFace out) {
@@ -412,6 +421,18 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                          if (options_.releaseHive) {
                              options_.releaseHive(world, hx, hy, hz, stateId);
                          }
+                     },
+                 .shearEntity =
+                     [this, &world, x, y, z](std::int32_t sx, std::int32_t sy, std::int32_t sz,
+                                             const server::world::loot::ItemStack& tool) {
+                         return options_.shearEntityAt != nullptr &&
+                                options_.shearEntityAt(world, sx, sy, sz, x, y, z, tool.item.toString());
+                     },
+                 .equipEntity =
+                     [this, &world, x, y, z](std::int32_t sx, std::int32_t sy, std::int32_t sz,
+                                             const server::world::loot::ItemStack& stack) {
+                         return options_.equipEntityAt != nullptr &&
+                                options_.equipEntityAt(world, sx, sy, sz, x, y, z, stack);
                      },
                  .brushArmadillo =
                      [this, &world](entity::ServerEntity& armadillo) {
