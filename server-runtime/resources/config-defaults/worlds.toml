@@ -561,6 +561,16 @@ range-chunks = 8
 # most this level, replacing vanilla's own darkness rules. -1 keeps vanilla's.
 monster-max-light-level = -1
 
+[defaults.mobs.activation-range]
+# NOT VANILLA when true. A mob with no player within its range (a sphere, in blocks) skips its AI, pushes,
+# breathing and movement, and runs a full tick only once every inactive-tick-interval ticks. Mobs that ride,
+# are ridden, are leashed, burning, airborne, dying or hunting a target keep ticking every tick.
+enabled = false
+monster = 32
+animal = 32
+misc = 16
+inactive-tick-interval = 20
+
 [defaults.mobs.despawn]
 # sphere is vanilla: distance to the nearest player is measured in three dimensions. cylinder ignores height.
 shape = "sphere"

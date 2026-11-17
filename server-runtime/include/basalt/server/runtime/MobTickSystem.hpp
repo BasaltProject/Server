@@ -50,6 +50,10 @@ public:
                         std::set<std::int32_t>& visited);
 
 private:
+    [[nodiscard]] static bool dormant(const world::LoadedWorld& world, const entity::ServerEntity& entity,
+                                      const std::vector<player::PlayerSession*>& watchers);
+    void despawnCheck(world::LoadedWorld& world, entity::ServerEntity& entity,
+                      const std::vector<player::PlayerSession*>& watchers, random::RandomSource& random);
     void tickMob(world::LoadedWorld& world, entity::ServerEntity& entity,
                  const std::vector<player::PlayerSession*>& watchers, const std::vector<entity::ai::PlayerView>& views,
                  const std::vector<entity::ServerEntity*>& living, random::RandomSource& random);

@@ -119,13 +119,33 @@ void PalettedContainer::copyInto(std::span<std::int32_t> dest) const {
     }
 }
 
+namespace {
+
+template <unsigned Width>
+void decodeMapped(const std::uint64_t* words, std::size_t count, const std::uint8_t* lookup, std::uint8_t* dest) {
+    constexpr std::uint64_t mask = (std::uint64_t{1} << Width) - 1;
+    unsigned __int128 buffer = 0;
+    unsigned buffered = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        if (buffered < Width) {
+            buffer |= static_cast<unsigned __int128>(*words++) << buffered;
+            buffered += 64;
+        }
+        dest[i] = lookup[static_cast<std::uint64_t>(buffer) & mask];
+        buffer >>= Width;
+        buffered -= Width;
+    }
+}
+
+} // namespace
+
 void PalettedContainer::copyMappedInto(std::span<std::uint8_t> dest, std::span<const std::int32_t> table,
                                        std::uint8_t fallback) const {
     if (dest.size() < size_) {
         throw std::invalid_argument{"paletted container needs room for every value"};
     }
     const std::shared_lock<std::shared_mutex> guard{lock_};
-    std::array<std::uint8_t, 4096> mapped{};
+    std::array<std::uint8_t, 4096> mapped;
     std::vector<std::uint8_t> overflow;
     std::uint8_t* lookup = mapped.data();
     if (paletteSize_ > mapped.size()) {
@@ -141,6 +161,25 @@ void PalettedContainer::copyMappedInto(std::span<std::uint8_t> dest, std::span<c
     if (words_.empty()) {
         std::fill_n(dest.begin(), size_, lookup[0]);
         return;
+    }
+    switch (bits_) {
+    case 4:
+        decodeMapped<4>(words_.data(), size_, lookup, dest.data());
+        return;
+    case 5:
+        decodeMapped<5>(words_.data(), size_, lookup, dest.data());
+        return;
+    case 6:
+        decodeMapped<6>(words_.data(), size_, lookup, dest.data());
+        return;
+    case 7:
+        decodeMapped<7>(words_.data(), size_, lookup, dest.data());
+        return;
+    case 8:
+        decodeMapped<8>(words_.data(), size_, lookup, dest.data());
+        return;
+    default:
+        break;
     }
     const auto width = static_cast<unsigned>(bits_);
     const std::uint64_t mask = (std::uint64_t{1} << width) - 1;

@@ -15,43 +15,46 @@ LightSpread::LightSpread(const LightWindow& window, std::int32_t bottomY, std::i
     : window_(&window), bottomY_(bottomY), topY_(topY), outside_(outside) {
     const auto cells = static_cast<std::size_t>(LightWindow::kWidth) * LightWindow::kWidth *
                        static_cast<std::size_t>(topY - bottomY + 1);
-    light_.assign(cells, 0);
-    opacity_.assign(cells, 0);
+    cells_.assign(cells, 0);
     queue_.reserve(kInitialQueue);
-    window.fillOpacity(opacity_, bottomY, topY, skyLight::opacityTable());
+    window.fillOpacity(cells_, bottomY, topY, skyLight::opacityTable());
+    for (std::uint8_t& cell : cells_) {
+        cell = static_cast<std::uint8_t>(cell << 4);
+    }
 }
 
 void LightSpread::push(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t level) {
     const std::size_t at = index(x, y, z);
-    light_[at] = static_cast<std::uint8_t>(level);
+    cells_[at] = static_cast<std::uint8_t>((cells_[at] & 0xF0) | level);
     queue_.push_back(static_cast<std::int32_t>(at));
 }
 
 void LightSpread::seed(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t level) {
     const std::size_t at = index(x, y, z);
-    if (level <= light_[at]) {
+    if (level <= lightAt(at)) {
         return;
     }
-    light_[at] = static_cast<std::uint8_t>(level);
+    cells_[at] = static_cast<std::uint8_t>((cells_[at] & 0xF0) | level);
     queue_.push_back(static_cast<std::int32_t>(at));
 }
 
-void LightSpread::spreadTo(std::size_t target, std::int32_t fromLevel) {
-    const std::int32_t next = fromLevel - std::max(1, static_cast<std::int32_t>(opacity_[target]));
-    if (next <= light_[target]) {
+[[gnu::always_inline]] inline void LightSpread::spreadTo(std::size_t target, std::int32_t fromLevel) {
+    const std::uint8_t cell = cells_[target];
+    const std::int32_t next = fromLevel - std::max(1, cell >> 4);
+    if (next <= (cell & 15)) {
         return;
     }
-    light_[target] = static_cast<std::uint8_t>(next);
+    cells_[target] = static_cast<std::uint8_t>((cell & 0xF0) | next);
     queue_.push_back(static_cast<std::int32_t>(target));
 }
 
 std::vector<SectionLight> LightSpread::run() {
     constexpr std::size_t width = LightWindow::kWidth;
     constexpr std::size_t layer = width * width;
-    const std::size_t cells = light_.size();
+    const std::size_t cells = cells_.size();
     while (queueHead_ < queue_.size()) {
         const auto at = static_cast<std::size_t>(queue_[queueHead_++]);
-        const std::int32_t level = light_[at];
+        const std::int32_t level = cells_[at] & 15;
         if (level <= 1) {
             continue;
         }
@@ -99,7 +102,7 @@ std::vector<SectionLight> LightSpread::centreSections() const {
             for (std::int32_t z = 0; z < 16; ++z) {
                 for (std::int32_t x = 0; x < 16; ++x) {
                     values[static_cast<std::size_t>((y * 16 + z) * 16 + x)] =
-                        light_[this->index(x + 16, worldY, z + 16)];
+                        cells_[this->index(x + 16, worldY, z + 16)] & 15;
                 }
             }
         }

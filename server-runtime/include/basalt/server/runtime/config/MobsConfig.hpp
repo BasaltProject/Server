@@ -128,6 +128,12 @@ struct MobSettings {
     std::int32_t spawnRangeChunks = 8;
     std::int32_t monsterSpawnMaxLightLevel = -1;
 
+    bool activationEnabled = false;
+    std::int32_t activationMonsterRange = 32;
+    std::int32_t activationAnimalRange = 32;
+    std::int32_t activationMiscRange = 16;
+    std::int32_t activationInactiveInterval = 20;
+
     bool despawnCylinder = false;
     std::int32_t despawnIdleTicks = 600;
     std::int32_t despawnRandomOdds = 800;

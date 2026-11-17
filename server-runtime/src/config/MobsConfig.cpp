@@ -524,6 +524,13 @@ std::expected<MobSettings, std::string> MobSettings::from(const TomlTable& table
         r.integer("range-chunks", settings.spawnRangeChunks, 1, 32);
         r.integer("monster-max-light-level", settings.monsterSpawnMaxLightLevel, -1, 15);
     });
+    read("activation-range", [&](Reader& r) {
+        r.boolean("enabled", settings.activationEnabled);
+        r.integer("monster", settings.activationMonsterRange, 1, 1000);
+        r.integer("animal", settings.activationAnimalRange, 1, 1000);
+        r.integer("misc", settings.activationMiscRange, 1, 1000);
+        r.integer("inactive-tick-interval", settings.activationInactiveInterval, 1, 1200);
+    });
     read("despawn", [&](Reader& r) {
         if (r.find("shape") != nullptr) {
             const std::optional<std::string_view> name = r.table.string("shape");

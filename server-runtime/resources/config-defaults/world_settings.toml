@@ -328,6 +328,13 @@
 # range-chunks = 8
 # monster-max-light-level = -1
 
+# [mobs.activation-range]
+# enabled = false
+# monster = 32
+# animal = 32
+# misc = 16
+# inactive-tick-interval = 20
+
 # [mobs.despawn]
 # shape = "sphere"
 # idle-ticks-before-random = 600

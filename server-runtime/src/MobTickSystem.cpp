@@ -136,10 +136,47 @@ void MobTickSystem::tickPassengers(world::LoadedWorld& world, ServerEntity& vehi
     }
 }
 
+bool MobTickSystem::dormant(const world::LoadedWorld& world, const ServerEntity& entity,
+                            const std::vector<PlayerSession*>& watchers) {
+    const config::MobSettings& mobs = world.mobSettings();
+    if (!mobs.activationEnabled || entity.dying || entity.removed || !entity.onGround || entity.fireTicks > 0 ||
+        entity.targetId.has_value() || entity.vehicleId.has_value() || !entity.passengerIds.empty() ||
+        entity.leashHolderId.has_value() || entity.leashHolderUuid.has_value() || entity.leashKnotAt.has_value() ||
+        entity.noAi) {
+        return false;
+    }
+    constexpr std::uint32_t kAlwaysActive =
+        entity::traits::kWarden | entity::traits::kPufferfish | entity::traits::kSulfurCube | entity::traits::kCreaking;
+    if (entity.tickKinds() != 0 || (entity.typeTraits() & kAlwaysActive) != 0) {
+        return false;
+    }
+    const auto category = static_cast<entity::MobCategory>(entity.mobCategoryIndex());
+    const std::int32_t range = category == entity::MobCategory::Monster ? mobs.activationMonsterRange
+                               : category == entity::MobCategory::Misc  ? mobs.activationMiscRange
+                                                                        : mobs.activationAnimalRange;
+    const double rangeSquared = static_cast<double>(range) * static_cast<double>(range);
+    for (const PlayerSession* player : watchers) {
+        const double dx = player->x - entity.x;
+        const double dy = player->y - entity.y;
+        const double dz = player->z - entity.z;
+        if ((dx * dx) + (dy * dy) + (dz * dz) <= rangeSquared) {
+            return false;
+        }
+    }
+    const auto interval = static_cast<std::int64_t>(mobs.activationInactiveInterval);
+    return (static_cast<std::int64_t>(entity.tickCount) + entity.entityId()) % interval != 0;
+}
+
 void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
                             const std::vector<PlayerSession*>& watchers,
                             const std::vector<entity::ai::PlayerView>& views, const std::vector<ServerEntity*>& living,
                             random::RandomSource& random) {
+    if (dormant(world, entity, watchers)) {
+        entity.idleTicks++;
+        entity.tickCount++;
+        despawnCheck(world, entity, watchers, random);
+        return;
+    }
     entity.idleTicks++;
     entity.tickCount++;
     if (entity.tuning != nullptr && entity.tuning->ridable == true && !entity.passengerIds.empty()) {
@@ -337,6 +374,11 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
             return;
         }
     }
+    despawnCheck(world, entity, watchers, random);
+}
+
+void MobTickSystem::despawnCheck(world::LoadedWorld& world, ServerEntity& entity,
+                                 const std::vector<PlayerSession*>& watchers, random::RandomSource& random) {
     const auto category = static_cast<entity::MobCategory>(entity.mobCategoryIndex());
     const config::MobSettings& mobs = world.mobSettings();
     const auto categoryAt = static_cast<std::size_t>(category);

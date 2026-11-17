@@ -141,3 +141,16 @@ TEST_CASE("an override reads drops, name lists and refuses an unknown goal") {
     REQUIRE(bad.has_value());
     CHECK_FALSE(MobSettings::from(*bad, MobSettings::vanilla(), "mobs.toml").has_value());
 }
+
+TEST_CASE("the activation range is off by default and reads its keys") {
+    CHECK_FALSE(MobSettings::vanilla().activationEnabled);
+    const std::expected<toml::TomlTable, toml::TomlError> parsed =
+        toml::parse("[activation-range]\nenabled = true\nmonster = 40\ninactive-tick-interval = 10\n");
+    REQUIRE(parsed.has_value());
+    const std::expected<MobSettings, std::string> settings =
+        MobSettings::from(*parsed, MobSettings::vanilla(), "mobs.toml");
+    REQUIRE(settings.has_value());
+    CHECK(settings->activationEnabled);
+    CHECK(settings->activationMonsterRange == 40);
+    CHECK(settings->activationInactiveInterval == 10);
+}

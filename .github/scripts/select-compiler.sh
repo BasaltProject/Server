@@ -55,6 +55,7 @@ Darwin)
         echo "BASALT_SHIM_ARCH=x86_64" >>"$GITHUB_ENV"
     fi
     version="$(brew list --versions llvm | awk '{ print $2 }')"
+    version="${version%%_*}"
     prefix="$HOME/libcxx-$arch"
     if [ ! -f "$prefix/built-$version-$target" ]; then
         rm -rf "$prefix" "$HOME/src-llvm"
