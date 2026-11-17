@@ -290,6 +290,14 @@ public:
     [[nodiscard]] virtual std::optional<std::vector<std::string>> audience() const = 0;
 };
 
+/// An attribute modifier of a fake player; `operation` is the Bukkit ordinal (add, add scalar, multiply scalar).
+struct NpcModifier {
+    std::string id;
+    double amount = 0.0;
+    std::int32_t operation = 0;
+    std::string slot;
+};
+
 class PluginNpcRef {
 public:
     PluginNpcRef() = default;
@@ -347,10 +355,73 @@ public:
 
     virtual void listed(bool shown) { static_cast<void>(shown); }
 
-    /// Slot order: main hand, off hand, feet, legs, chest, head. An empty stack clears the slot.
-    virtual void equip(std::int32_t slot, std::span<const std::uint8_t> stack) {
+    [[nodiscard]] virtual double health() const { return 20.0; }
+
+    virtual void setHealth(double value) { static_cast<void>(value); }
+
+    [[nodiscard]] virtual std::uint8_t flags() const { return 0; }
+
+    [[nodiscard]] virtual std::int32_t pose() const { return 0; }
+
+    /// Bukkit slot numbers: 0-8 hotbar, 9-35 storage, 36-39 feet to head, 40 off hand. Stacks are NBT bytes.
+    [[nodiscard]] virtual std::vector<std::uint8_t> item(std::int32_t slot) const {
+        static_cast<void>(slot);
+        return {};
+    }
+
+    virtual void setItem(std::int32_t slot, std::span<const std::uint8_t> stack) {
         static_cast<void>(slot);
         static_cast<void>(stack);
+    }
+
+    virtual bool setItemById(std::int32_t slot, std::string_view item, std::int32_t count) {
+        static_cast<void>(slot);
+        static_cast<void>(item);
+        static_cast<void>(count);
+        return false;
+    }
+
+    virtual void clearItems() {}
+
+    [[nodiscard]] virtual std::int32_t held() const { return 0; }
+
+    virtual void setHeld(std::int32_t slot) { static_cast<void>(slot); }
+
+    virtual void registerAttribute(std::string_view id, double fallback, double lowest, double highest) {
+        static_cast<void>(id);
+        static_cast<void>(fallback);
+        static_cast<void>(lowest);
+        static_cast<void>(highest);
+    }
+
+    [[nodiscard]] virtual std::optional<double> attributeBase(std::string_view id) const {
+        static_cast<void>(id);
+        return std::nullopt;
+    }
+
+    virtual void setAttributeBase(std::string_view id, double value) {
+        static_cast<void>(id);
+        static_cast<void>(value);
+    }
+
+    [[nodiscard]] virtual std::optional<double> attributeValue(std::string_view id) const {
+        static_cast<void>(id);
+        return std::nullopt;
+    }
+
+    [[nodiscard]] virtual std::vector<NpcModifier> attributeModifiers(std::string_view id) const {
+        static_cast<void>(id);
+        return {};
+    }
+
+    virtual void addAttributeModifier(std::string_view id, const NpcModifier& modifier) {
+        static_cast<void>(id);
+        static_cast<void>(modifier);
+    }
+
+    virtual void removeAttributeModifier(std::string_view id, std::string_view modifierId) {
+        static_cast<void>(id);
+        static_cast<void>(modifierId);
     }
 
     /// A `ClientboundAnimatePacket` action id.

@@ -33,8 +33,7 @@ public:
     struct Hooks {
         std::function<bool(std::int32_t containerId, std::int32_t index, const std::optional<std::string>& resultItem)>
             tradeAllowed;
-        /// Asked before a result is taken, with -1 for a merchant a plugin made: false refuses the purchase, and the
-        /// offer carries a listener's edits.
+        /// Asked before a result is taken (-1 for a plugin merchant): false refuses the purchase.
         std::function<bool(std::int32_t villagerId, world::trades::Offer& offer, bool& rewardExp, bool& increaseUses)>
             purchaseAllowed;
     };

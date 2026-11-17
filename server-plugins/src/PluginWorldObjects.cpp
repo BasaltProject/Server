@@ -1,4 +1,5 @@
 #include <basalt/server/plugins/PluginObjects.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
@@ -75,7 +76,78 @@ void pushNpc(LuaArgs& lua, std::shared_ptr<PluginNpcRef> npc) {
         .reads("z", [npc] { return PluginValue{npc->z()}; })
         .reads("alive", [npc] { return PluginValue{npc->alive()}; })
         .reads("audience", [npc] { return audienceOf(npc->audience()); })
+        .reads("health", [npc] { return PluginValue{npc->health()}; })
+        .reads("max_health", [npc] { return PluginValue{npc->attributeValue("minecraft:max_health").value_or(20.0)}; })
+        .reads("flags", [npc] { return PluginValue{static_cast<std::int64_t>(npc->flags())}; })
+        .reads("pose", [npc] { return PluginValue{static_cast<std::int64_t>(npc->pose())}; })
+        .reads("held_slot", [npc] { return PluginValue{static_cast<std::int64_t>(npc->held())}; })
         .writes("name", [npc](LuaArgs& args, std::int32_t index) { npc->setName(args.checkString(index)); })
+        .writes("health", [npc](LuaArgs& args, std::int32_t index) { npc->setHealth(args.checkNumber(index)); })
+        .writes("held_slot",
+                [npc](LuaArgs& args, std::int32_t index) {
+                    npc->setHeld(static_cast<std::int32_t>(args.checkInteger(index)));
+                })
+        .method("attribute",
+                [npc](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    std::string name = args.checkString(base);
+                    if (name.find(':') == std::string::npos) {
+                        name = "minecraft:" + name;
+                    }
+                    if (args.isNil(base + 1)) {
+                        const std::optional<double> value = npc->attributeValue(name);
+                        if (value.has_value()) {
+                            args.pushNumber(*value);
+                        } else {
+                            args.pushNil();
+                        }
+                        return 1;
+                    }
+                    if (!npc->attributeBase(name).has_value()) {
+                        args.pushBoolean(false);
+                        return 1;
+                    }
+                    npc->setAttributeBase(name, args.checkNumber(base + 1));
+                    args.pushBoolean(true);
+                    return 1;
+                })
+        .method("equip",
+                [npc](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::int32_t slot = static_cast<std::int32_t>(args.checkInteger(base));
+                    if (args.isNil(base + 1)) {
+                        npc->setItem(slot, {});
+                        args.pushBoolean(true);
+                        return 1;
+                    }
+                    args.pushBoolean(npc->setItemById(slot, args.checkString(base + 1),
+                                                      static_cast<std::int32_t>(args.integerOr(base + 2, 1))));
+                    return 1;
+                })
+        .method("item",
+                [npc](LuaArgs& args) {
+                    const std::vector<std::uint8_t> bytes =
+                        npc->item(static_cast<std::int32_t>(args.checkInteger(firstArgument(args))));
+                    if (bytes.empty()) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    const auto parsed = wire::nbt::nbtIO::read(bytes);
+                    const wire::nbt::NbtCompound* stack =
+                        parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+                    if (stack == nullptr) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    args.pushString(std::string{stack->getString("id")});
+                    args.pushInteger(stack->getInt("count", 1));
+                    return 2;
+                })
+        .method("animate",
+                [npc](LuaArgs& args) {
+                    npc->animate(static_cast<std::int32_t>(args.integerOr(firstArgument(args), 0)));
+                    return 0;
+                })
         .method("skin",
                 [npc](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);
@@ -401,6 +473,39 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
                         const std::optional<std::string> texture = stringField(args, skin, "texture");
                         if (texture.has_value()) {
                             made->skin(*texture, stringField(args, skin, "signature"));
+                        }
+                    }
+                    args.pop(1);
+                    pushNpc(args, made);
+                    return 1;
+                })
+        .method("fake_player",
+                [world](LuaArgs& args) {
+                    const std::int32_t options = firstArgument(args);
+                    if (!args.isTable(options)) {
+                        args.raise("world:fake_player{ name = ..., pos = ... } takes a table");
+                    }
+                    args.pushField(options, "pos");
+                    const std::optional<PluginPoint> point = pointFrom(args, args.top());
+                    args.pop(1);
+                    const std::string name = stringField(args, options, "name").value_or("");
+                    if (!point.has_value() || name.empty()) {
+                        args.raise("a fake player needs a name and a pos");
+                    }
+                    const std::string uuid =
+                        stringField(args, options, "uuid").value_or(wire::common::Uuid::random().toString());
+                    const std::shared_ptr<PluginNpcRef> made =
+                        world->fakePlayer(uuid, name, point->x, point->y, point->z);
+                    if (made == nullptr) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    made->place(point->x, point->y, point->z, 0.0F, 0.0F, 0.0F, true);
+                    args.pushField(options, "skin");
+                    if (args.isTable(-1)) {
+                        const std::optional<std::string> texture = stringField(args, args.top(), "texture");
+                        if (texture.has_value()) {
+                            made->skin(*texture, stringField(args, args.top(), "signature"));
                         }
                     }
                     args.pop(1);

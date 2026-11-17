@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -17,8 +18,21 @@
 
 namespace basalt::server::runtime::plugins {
 
+struct NpcAttribute {
+    double base = 0.0;
+    double fallback = 0.0;
+    double lowest = 0.0;
+    double highest = 0.0;
+    std::vector<server::plugins::NpcModifier> modifiers;
+
+    [[nodiscard]] double value() const;
+};
+
 class Npc {
 public:
+    static constexpr std::size_t kItemSlots = 41;
+    static constexpr double kDefaultMaxHealth = 20.0;
+
     Npc(std::int32_t entityId, wire::common::Uuid uuid, std::string name, std::string world, double x, double y,
         double z)
         : entityId(entityId), uuid(uuid), name(std::move(name)), world(std::move(world)), x(x), y(y), z(z) {}
@@ -48,6 +62,10 @@ public:
     std::uint8_t flags = 0;
     std::int32_t pose = 0;
     std::vector<entity::GeneratedEquipment> equipment;
+    double health = kDefaultMaxHealth;
+    std::int32_t held = 0;
+    std::array<std::vector<std::uint8_t>, kItemSlots> items;
+    std::map<std::string, NpcAttribute, std::less<>> attributes;
     std::vector<std::pair<std::int32_t, std::int32_t>> animations;
 
     [[nodiscard]] std::int32_t version() const noexcept { return version_; }
@@ -153,7 +171,30 @@ public:
 
     void listed(bool shown) override;
 
-    void equip(std::int32_t slot, std::span<const std::uint8_t> stack) override;
+    [[nodiscard]] double health() const override { return npc_->health; }
+
+    void setHealth(double value) override;
+
+    [[nodiscard]] std::uint8_t flags() const override { return npc_->flags; }
+
+    [[nodiscard]] std::int32_t pose() const override { return npc_->pose; }
+
+    [[nodiscard]] std::vector<std::uint8_t> item(std::int32_t slot) const override;
+    void setItem(std::int32_t slot, std::span<const std::uint8_t> stack) override;
+    bool setItemById(std::int32_t slot, std::string_view item, std::int32_t count) override;
+    void clearItems() override;
+
+    [[nodiscard]] std::int32_t held() const override { return npc_->held; }
+
+    void setHeld(std::int32_t slot) override;
+
+    void registerAttribute(std::string_view id, double fallback, double lowest, double highest) override;
+    [[nodiscard]] std::optional<double> attributeBase(std::string_view id) const override;
+    void setAttributeBase(std::string_view id, double value) override;
+    [[nodiscard]] std::optional<double> attributeValue(std::string_view id) const override;
+    [[nodiscard]] std::vector<server::plugins::NpcModifier> attributeModifiers(std::string_view id) const override;
+    void addAttributeModifier(std::string_view id, const server::plugins::NpcModifier& modifier) override;
+    void removeAttributeModifier(std::string_view id, std::string_view modifierId) override;
 
     void animate(std::int32_t action) override;
 
@@ -162,6 +203,8 @@ private:
     NpcRegistry* registry_;
     Profiles profiles_;
     std::shared_ptr<server::plugins::PluginHologramRef> label_;
+
+    void refreshEquipment(std::int32_t equipSlot);
 };
 
 } // namespace basalt::server::runtime::plugins

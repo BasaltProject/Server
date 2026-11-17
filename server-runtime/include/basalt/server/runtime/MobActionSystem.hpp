@@ -188,8 +188,7 @@ public:
     [[nodiscard]] std::string heartCommand(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
                                            std::string_view action);
 
-    /// "enter" stores the bee `entityId` and answers 1 when it went in; "honey", "bee" and "emergency" release the
-    /// bees and answer how many left. -1 when there is no hive.
+    /// "enter" stores a bee and answers 1; the other actions release bees and answer how many. -1: no hive.
     std::int32_t hiveCommand(world::LoadedWorld& world, const std::array<std::int32_t, 3>& hive,
                              std::string_view action, std::int32_t entityId, const player::PlayerSession* player);
 

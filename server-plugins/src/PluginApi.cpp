@@ -676,6 +676,7 @@ void install(PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, s
     installMechanics(lua);
     installMessaging(lua, plugin, host);
     installPermissions(lua, plugin, host);
+    installProfiles(lua, instance, plugin, host);
     installListeners(lua, instance, plugin, host);
     installGranted(lua, plugin, host);
     installMisc(lua, plugin, host);

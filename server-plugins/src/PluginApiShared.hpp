@@ -50,4 +50,5 @@ inline void pushHandleTable(LuaArgs& lua, PluginHandle handle) {
 void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host);
 void installMechanics(LuaArgs& lua);
 void installPermissions(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host);
+void installProfiles(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host);
 } // namespace basalt::server::plugins::pluginApi::internal

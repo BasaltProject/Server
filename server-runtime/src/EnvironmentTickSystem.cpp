@@ -522,8 +522,7 @@ void EnvironmentTickSystem::extinguishInCauldron(world::LoadedWorld& world, Play
                     continue;
                 }
                 if (player.fireTicks > 0) {
-                    // parity: `handleEntityOnFireInside` turns powder snow into water at the same level, then lowers
-                    // it.
+                    // parity: `handleEntityOnFireInside` turns powder snow into water, then lowers it
                     std::int32_t lowered =
                         level <= 1 ? registry::blocks::defaultStateIdOf(wire::common::Identifier::vanilla("cauldron"))
                                          .value_or(0)

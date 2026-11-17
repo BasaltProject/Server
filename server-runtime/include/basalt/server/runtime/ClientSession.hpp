@@ -174,8 +174,7 @@ public:
 
         std::function<bool(const player::PlayerSession& player, std::string& message, ChatRouting& routing)>
             chatAllowed;
-        /// A plugin's chat line with {player} and {message} still in it; sent unsigned, since the client cannot
-        /// decorate it.
+        /// A plugin's chat line with {player} and {message} still in it, sent unsigned.
         std::function<std::optional<std::string>(const player::PlayerSession& player)> chatFormat;
         std::function<bool(const player::PlayerSession& player, std::string& command)> commandAllowed;
         std::function<bool(const player::PlayerSession& player)> swapHandsAllowed;

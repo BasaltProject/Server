@@ -1562,8 +1562,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                               candidate->z - (candidate->width() / 2.0) < z + 1.0)) {
                             continue;
                         }
-                        // parity: `ShearsDispenseItemBehavior` asks `BlockShearEntityEvent` and keeps looking when
-                        // refused.
+                        // parity: `ShearsDispenseItemBehavior` keeps looking when `BlockShearEntityEvent` is refused
                         if (!eventSink_.allowed(&server::plugins::pluginEventTypes::blockShearEntity,
                                                 [&](server::plugins::PluginEvent& event) {
                                                     event.set("world", world.name());

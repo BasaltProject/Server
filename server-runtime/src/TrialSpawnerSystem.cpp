@@ -576,8 +576,7 @@ void TrialSpawnerSystem::spawnOminousItemSpawner(Turn& turn) {
 }
 
 std::optional<std::array<double, 3>> TrialSpawnerSystem::positionToSpawnSpawner(Turn& turn) {
-    // parity: `TrialSpawnerState.calculatePositionToSpawnSpawner`, `selectEntityToSpawnItemAbove`,
-    // `calculatePositionAbove`, whose ray is VISUAL.
+    // parity: `TrialSpawnerState.calculatePositionToSpawnSpawner`, whose ray is VISUAL
     struct Candidate {
         double x;
         double y;

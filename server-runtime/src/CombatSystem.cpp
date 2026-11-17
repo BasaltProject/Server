@@ -338,8 +338,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         }
         return;
     }
-    // parity: `Snowball.onHitEntity` and `ThrownEgg.onHitEntity`, which hurt for nothing but still shove what they
-    // meet.
+    // parity: `Snowball.onHitEntity` and `ThrownEgg.onHitEntity` hurt for nothing but still shove
     if (path == "snowball" || path == "egg") {
         const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
         if (target.has_value()) {
