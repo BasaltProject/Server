@@ -313,7 +313,7 @@ jobs:
             -DCMAKE_CXX_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
             "-DCMAKE_SYSROOT=$root" \
             "-DCMAKE_CXX_FLAGS=-nostdinc++ -isystem $root/usr/include/c++/v1" \
-            "-DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ -fuse-ld=lld" \
+            "-DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ -fuse-ld=lld -Wl,-z,notext" \
             "-DCMAKE_CXX_STANDARD_LIBRARIES=$root/usr/lib/libc++.a $root/usr/lib/libcxxrt.a -lpthread" \
             -DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_CXX_STANDARD_LIBRARIES \
             -DCMAKE_ASM_COMPILER=clang-19 -DCMAKE_ASM_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
