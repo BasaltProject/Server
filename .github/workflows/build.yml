@@ -413,11 +413,14 @@ jobs:
       - name: Select the compiler
         run: .github/scripts/select-compiler.sh
 
+      - name: Free runner disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
       - name: Configure with the address and undefined sanitizers
-        run: eval cmake --preset asan $BASALT_CMAKE_ARGS
+        run: eval cmake --preset asan $BASALT_CMAKE_ARGS -DCMAKE_JOB_POOLS=link=2 -DCMAKE_JOB_POOL_LINK=link
 
       - name: Build
-        run: cmake --build build/asan
+        run: cmake --build build/asan && df -h /
 
       - name: Test
         run: ctest --test-dir build/asan --output-on-failure
