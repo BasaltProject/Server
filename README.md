@@ -10,186 +10,60 @@
 <h2 align="center">Basalt Server</h2>
 
 <p align="center">
-  <strong>A Minecraft server rewritten from scratch in C++23. No external JVM.</strong>
+  <strong>A Minecraft server for Java and Bedrock, rewritten from scratch in C++. No JVM required.</strong>
 </p>
 
 <p align="center">
-  <img alt="Minecraft" src="https://img.shields.io/badge/Minecraft-26.3-62B47A?logo=minecraft&logoColor=white">
-  <img alt="Protocol" src="https://img.shields.io/badge/protocol-777-62B47A">
-  <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white">
+  <img alt="Java Edition" src="https://img.shields.io/badge/Java_Edition-26.3-62B47A?logo=minecraft&logoColor=white">
+  <img alt="Bedrock Edition" src="https://img.shields.io/badge/Bedrock_Edition-26.60-62B47A?logo=minecraft&logoColor=white">
+  <img alt="C++" src="https://img.shields.io/badge/language-C%2B%2B-00599C?logo=cplusplus&logoColor=white">
   <img alt="Platforms" src="https://img.shields.io/badge/platforms-macOS_%7C_Linux_%7C_Windows_%7C_Android_%7C_FreeBSD-00599C">
-  <img alt="Build" src="https://img.shields.io/badge/build-CMake-064F8C?logo=cmake&logoColor=white">
-  <img alt="Plugins" src="https://img.shields.io/badge/plugins-Lua-000080?logo=lua&logoColor=white">
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-green">
 </p>
 
-> ⚠️ **Early development.** Most of vanilla's gameplay is in place and Java plugins
-> run, but some systems are still incomplete and the server has seen little
-> long-term use. Back up your worlds, and expect rough edges before trusting it
-> with a public server.
+> ⚠️ **Early development.** Back up your worlds and expect rough edges before using it on a public server.
 
-## Overview
+## About
 
-Basalt Server is a complete reimplementation of the Minecraft server, written
-entirely in **C++23** and shipped as a native binary for each platform.
-The native core requires no external JVM.
+Basalt Server is a native Minecraft server that welcomes **Java Edition and Bedrock Edition players on the same
+world**, with no proxy or extra plugin in between. It aims for exact vanilla parity: the same seed gives the same
+world, with the same drops, damage, redstone and mobs.
 
-It speaks Java Edition's protocol and uses its world format. Older Java clients and
-Bedrock clients are served through translation layers at the edge, which are still
-maturing.
+| Edition | Version | Connection |
+|---|---|---|
+| Java Edition | 26.3 | Native |
+| Bedrock Edition | 26.60 | Native (NetherNet and RakNet) |
 
-Bukkit, Spigot and Paper plugins also run. Server implements those APIs and the
-plugin lifecycle in its own module, and [Shim](https://github.com/BasaltProject/Shim),
-a JVM implemented in C++ (a fork of Avian aimed at Java 25), executes the bytecode
-inside the server process. Shim is built into the binary, so no Java installation
-is needed, and it only starts when a jar is present in `plugins-bukkit/`.
-Large plugins such as FastAsyncWorldEdit and PacketEvents are part of the test
-suite. The `net.minecraft` classes that those plugins expect are an independent reimplementation,
-not Mojang code; see [NOTICE.md](stratum/stratum-bukkit/NOTICE.md). Native Lua plugins remain the first-class path and the one the API is
-designed around.
+- **Cross-play out of the box.** Java and Bedrock clients join the same server and play together.
+- **Native and light.** One binary and a `config/` folder. No JVM to install, no garbage collector pausing the tick.
+- **Lua plugins.** The native API, sandboxed and packaged as `.bspkg`.
+- **Bukkit, Spigot and Paper plugins.** Run through [Shim](https://github.com/BasaltProject/Shim), a JVM built into
+  the binary that only starts when a jar is present.
 
-Two goals drive every decision:
+## Getting started
 
-- **Vanilla parity.** A Basalt Server with no plugins must behave exactly like the
-  official one. Same seed, same world. Same drops, same damage, same redstone,
-  same mobs, bugs included. Parity is the acceptance criterion for every system,
-  not a long-term aspiration.
-- **A plugin platform worth switching to.** The plugin API is native and written
-  in Lua, with first-class tooling: a CLI, a VS Code extension and an IntelliJ
-  IDEA plugin.
+Download a binary from the [releases page](https://github.com/BasaltProject/Server/releases) (stable builds and a
+rolling **Nightly**), run it once, accept the [Minecraft EULA](https://www.minecraft.net/en-us/eula) by setting
+`eula = true` in `eula.toml`, and start it again. Or pass `--accept-eula`.
 
-| | |
-|---|---|
-| Language | C++23 native core; no external JVM required |
-| Target version | Minecraft 26.3 (protocol 777) |
-| Distribution | Native binaries per platform |
-| World storage | Linear regions by default; Anvil worlds are read and converted on load |
-| Plugin API | Lua, `.bspkg` packages; Bukkit, Spigot and Paper jars through Shim |
-| Message model | Adventure-style immutable components; no legacy `§` formatting |
-| Configuration | A `config/` folder, one TOML file per domain |
-| Remote management | REST and WebSocket API with token auth; RCON only for compatibility, off by default |
-| License | GPL-3.0 |
-
-## Why native
-
-A Minecraft server spends its life moving bytes, ticking a world and waiting.
-None of that needs a virtual machine.
-
-The core starts without a VM boot, class loading or warm-up. There is no JVM heap to
-size and no garbage collector that can pause the tick. Deployment is one binary and a config folder,
-with no runtime to install or match. The
-embedded Java runtime only comes up when Bukkit-style jars are present, and a server
-without them never pays for it.
-
-## Plugins
-
-Plugins are written in Lua and packaged as `.bspkg` files, each with a manifest,
-code, resources and metadata. They run inside a sandbox with a per-tick
-instruction budget, so a broken plugin cannot take the server down.
-
-```lua
--- hello.lua
-basalt.on("player_join", function(event)
-    event.player:send("<gradient:aqua:green>Welcome to Basalt!</gradient>")
-end)
-```
-
-Text is authored in MiniMessage and rendered through the component model, never
-through legacy colour codes.
-
-The Lua runtime is the official Lua 5.5.1, built from source into the binary, so
-it is the same runtime everywhere Basalt runs with nothing to install alongside
-it.
-
-## Download and documentation
-
-Binaries for Linux (glibc and musl), macOS, Windows, Android and FreeBSD are on the [releases page](https://github.com/BasaltProject/Server/releases):
-a stable release every Monday when there is something new, and a moving **Nightly** prerelease that follows `main`.
-Each asset is the executable itself, with a `SHA256SUMS` file beside them. The full documentation for operators and
-plugin authors is at [basaltmc.org/docs](https://basaltmc.org/docs/server/introduction).
-
-## Configuration
-
-Configuration lives in **`config/`**, one TOML file per domain, generated with
-comments and vanilla defaults on first start:
-
-```
-config/
-  server.toml        network, remote API, plugins, performance, logging
-  worlds.toml        worlds to load and the defaults every world inherits
-  groups.toml        permission groups
-  limits.toml        per-connection packet and spam limits
-  server_list.toml   what the server list shows
-  commands.toml      per-command settings
-  messages.toml      server messages
-  tab_list.toml      scoreboard.toml  boss_bar.toml  animations.toml
-```
-
-Anything that makes the server behave differently from vanilla is opt-in and
-labelled as such in the generated comments. World rules, mob settings and gameplay options
-are set per world, inheriting from the defaults in `worlds.toml` and overridable in
-`worlds/<name>/`. A `server.properties` found on first start is imported once.
-
-## Game assets and the EULA
-
-Basalt Server does **not** contain or distribute any proprietary Minecraft
-content: no structures, no loot tables, no datapacks, no textures, no jars.
-
-Once you accept the [Minecraft EULA](https://www.minecraft.net/en-us/eula), the
-server downloads the official server download from Mojang, verifies its SHA-1 and
-unpacks only the data it needs into a local cache. That happens once per version;
-later starts touch neither the network nor the archive.
-
-**The server never prompts you.** On first start it writes `eula.toml` with
-`eula = false` and stops. Set it to `eula = true` and start again. An accepted
-`eula.txt` from an existing server is read once and migrated. For non-interactive
-environments, `./basalt --accept-eula` is a deliberate act and counts as
-accepting it.
+Configuration, plugins and everything else are in the [documentation](https://basaltmc.org/docs/server/introduction).
 
 ## Building
 
-The network layer lives in [Wire](https://github.com/BasaltProject/Wire), shared
-with the proxy and pulled in as a submodule, so clone with it:
-
 ```bash
 git clone --recurse-submodules https://github.com/BasaltProject/Server.git
-```
-
-In an existing clone, `git submodule update --init` does the same. Without it the
-build fails immediately: half the modules are missing.
-
-You need CMake 3.28 or newer, Ninja and Clang. Then two commands, the same on
-macOS, Linux and Windows:
-
-```bash
+cd Server
 cmake --preset release
 cmake --build build/release
 ```
 
-That leaves a release binary in `build/release/bin/`, named for what it is:
+Needs CMake 3.28+, Ninja and Clang. The binary ends up in `build/release/bin/`.
 
-```
-build/release/bin/BasaltServer-26.3.0-dev-macOS-arm64
-build/release/bin/BasaltServer-26.3.14-Linux-x64
-build/release/bin/BasaltServer-26.3.14-Windows-x64.exe
-build/release/bin/BasaltServer-26.3.14-Windows-arm64.exe
-```
+## Contributing
 
-A build made outside the CI has no build number, so it is `.0-dev`.
-
-The tests run with `ctest --preset debug`, and `--preset asan` builds the same
-tree under the address and undefined sanitizers, which is what the CI does on
-every push.
-
-## Contributing and community
-
-Please read the [contribution guide](CONTRIBUTING.md) and
-[Code of Conduct](.github/CODE_OF_CONDUCT.md) before participating.
-Report suspected vulnerabilities privately using the [security policy](SECURITY.md).
+Read the [contribution guide](CONTRIBUTING.md) and the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
+Report vulnerabilities privately through the [security policy](SECURITY.md).
 
 ## License
 
-Basalt Server is distributed under the [GNU General Public License v3.0](LICENSE).
-
-Basalt is not affiliated with Mojang Studios or Microsoft. Minecraft is a
-trademark of Mojang Studios.
+[GPL-3.0](LICENSE). Basalt is not affiliated with Mojang Studios or Microsoft. Minecraft is a trademark of Mojang Studios.
