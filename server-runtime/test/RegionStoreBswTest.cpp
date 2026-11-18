@@ -158,7 +158,11 @@ TEST_CASE("an existing linear world converts to bsw and back, verified, keeping 
         requireAll(store, chunks);
     }
     {
-        RegionStore store{"world", root, basalt::server::world::kOverworldHeight, 12, RegionStore::kByteBudget,
+        RegionStore store{"world",
+                          root,
+                          basalt::server::world::kOverworldHeight,
+                          12,
+                          RegionStore::kByteBudget,
                           RegionFormatSetting::Linear};
         REQUIRE_FALSE(store.usesAnvil());
         requireAll(store, chunks);

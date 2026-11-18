@@ -3,7 +3,7 @@
 #if defined(__GLIBC__)
 #include <malloc.h>
 #endif
-#if defined(__linux__)
+#if defined(__GLIBC__)
 #include <cctype>
 #include <charconv>
 #include <cstdint>
@@ -17,7 +17,7 @@ namespace basalt::server::runtime {
 
 namespace {
 
-#if defined(__linux__)
+#if defined(__GLIBC__)
 // Clean read-only file mappings (rodata, jars) only hold page cache copies: dropping them from this process is free.
 void dropCleanFileMappings() {
     std::ifstream smaps{"/proc/self/smaps"};
@@ -81,7 +81,7 @@ MemoryReleaser::MemoryReleaser() {
             const bool idle = idle_;
             lock.unlock();
             malloc_trim(0);
-#if defined(__linux__)
+#if defined(__GLIBC__)
             if (idle) {
                 dropCleanFileMappings();
             }
