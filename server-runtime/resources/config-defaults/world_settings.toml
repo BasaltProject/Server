@@ -329,7 +329,7 @@
 # monster-max-light-level = -1
 
 # [mobs.activation-range]
-# enabled = false
+# enabled = true
 # monster = 32
 # animal = 32
 # misc = 16

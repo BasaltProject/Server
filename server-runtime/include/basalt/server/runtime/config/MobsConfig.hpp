@@ -128,7 +128,7 @@ struct MobSettings {
     std::int32_t spawnRangeChunks = 8;
     std::int32_t monsterSpawnMaxLightLevel = -1;
 
-    bool activationEnabled = false;
+    bool activationEnabled = true;
     std::int32_t activationMonsterRange = 32;
     std::int32_t activationAnimalRange = 32;
     std::int32_t activationMiscRange = 16;
@@ -164,7 +164,11 @@ struct MobSettings {
 
     std::map<std::string, std::shared_ptr<const MobOverride>, std::less<>> overrides;
 
-    [[nodiscard]] static MobSettings vanilla() { return MobSettings{}; }
+    [[nodiscard]] static MobSettings vanilla() {
+        MobSettings settings;
+        settings.activationEnabled = false;
+        return settings;
+    }
 
     /// Reads one file's tables over `inherited`; `file` only names the file in an error.
     [[nodiscard]] static std::expected<MobSettings, std::string>

@@ -562,10 +562,11 @@ range-chunks = 8
 monster-max-light-level = -1
 
 [defaults.mobs.activation-range]
-# NOT VANILLA when true. A mob with no player within its range (a sphere, in blocks) skips its AI, pushes,
-# breathing and movement, and runs a full tick only once every inactive-tick-interval ticks. Mobs that ride,
-# are ridden, are leashed, burning, airborne, dying or hunting a target keep ticking every tick.
-enabled = false
+# NOT VANILLA while true, which is the default. A mob with no player within its range (a sphere, in blocks) skips
+# its AI, pushes, breathing and movement, and runs a full tick only once every inactive-tick-interval ticks. Mobs
+# that ride, are ridden, are leashed, burning, airborne, dying or hunting a target keep ticking every tick.
+# enabled = false restores vanilla behaviour.
+enabled = true
 monster = 32
 animal = 32
 misc = 16

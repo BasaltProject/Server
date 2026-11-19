@@ -98,12 +98,14 @@ TEST_CASE("every commented default is valid TOML") {
     }
 }
 
-TEST_CASE("the generated mob defaults are vanilla's") {
+TEST_CASE("the generated mob defaults are vanilla's but for the activation range") {
     const std::string root = scratch("config-mobs");
     const std::expected<WorldsConfig, std::string> loaded = WorldsConfig::load(ConfigDirectory{root}, root + "/worlds");
     REQUIRE(loaded.has_value());
     CHECK_FALSE(fileIO::exists(root + "/worlds/mobs.toml"));
-    CHECK(loaded->settingsFor(loaded->defaultWorld()).mobs == MobSettings::vanilla());
+    MobSettings expected = MobSettings::vanilla();
+    expected.activationEnabled = true;
+    CHECK(loaded->settingsFor(loaded->defaultWorld()).mobs == expected);
 }
 
 TEST_CASE("an override naming an unknown field is refused with the file") {
@@ -142,7 +144,8 @@ TEST_CASE("an override reads drops, name lists and refuses an unknown goal") {
     CHECK_FALSE(MobSettings::from(*bad, MobSettings::vanilla(), "mobs.toml").has_value());
 }
 
-TEST_CASE("the activation range is off by default and reads its keys") {
+TEST_CASE("the activation range is on by default, off in vanilla, and reads its keys") {
+    CHECK(MobSettings{}.activationEnabled);
     CHECK_FALSE(MobSettings::vanilla().activationEnabled);
     const std::expected<toml::TomlTable, toml::TomlError> parsed =
         toml::parse("[activation-range]\nenabled = true\nmonster = 40\ninactive-tick-interval = 10\n");
