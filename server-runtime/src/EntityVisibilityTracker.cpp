@@ -160,13 +160,17 @@ bool inTrackingRange(const ServerEntity& entity, double viewerX, double viewerZ,
     if (shape == nullptr || shape->trackingRange <= 0) {
         return true;
     }
+    const double dx = viewerX - entity.x;
+    const double dz = viewerZ - entity.z;
+    const double cap = viewDistanceChunks * 16.0;
+    if (broadcastPercentage >= 0 && viewDistanceChunks >= 0 && (dx * dx) + (dz * dz) > cap * cap) {
+        return false;
+    }
     const std::int32_t configured = mobs.trackingRange[trackingCategory(entity)];
     const std::int32_t trackingChunks = configured > 0 ? configured : shape->trackingRange;
     // parity: `DedicatedServer.getScaledTrackingDistance`, whole blocks scaled by `entity-broadcast-range-percentage`.
     const std::int32_t scaled = broadcastPercentage * (trackingChunks * 16) / 100;
     const double range = std::min(static_cast<double>(scaled), viewDistanceChunks * 16.0);
-    const double dx = viewerX - entity.x;
-    const double dz = viewerZ - entity.z;
     return (dx * dx) + (dz * dz) <= range * range;
 }
 
@@ -432,22 +436,12 @@ void EntityVisibilityTracker::syncSummonedEntities() {
 
 void EntityVisibilityTracker::syncPassengers(const std::vector<ServerEntity*>& entities, const std::string& viewer,
                                              std::int32_t viewerEntityId) {
-    std::unordered_set<std::int32_t> visibleEntityIds;
-    bool built = false;
     const auto visibleId = [&](std::int32_t entityId) {
-        if (!built) {
-            built = true;
-            visibleEntityIds.reserve(entities.size());
-            for (const ServerEntity* entity : entities) {
-                if (!entity->removed && visibleTo(*entity, viewer)) {
-                    visibleEntityIds.insert(entity->entityId());
-                }
-            }
-        }
-        return visibleEntityIds.contains(entityId);
+        const ServerEntity* entity = owner_->world().entity(entityId);
+        return entity != nullptr && !entity->removed && visibleTo(*entity, viewer);
     };
     for (const ServerEntity* vehicle : entities) {
-        if (vehicle->passengerIds.empty() && lastPassengers_.empty()) {
+        if (vehicle->passengerIds.empty() && !lastPassengers_.contains(vehicle->entityId())) {
             continue;
         }
         if (!trackedEntities_.contains(vehicle->entityId()) || !visibleId(vehicle->entityId())) {
