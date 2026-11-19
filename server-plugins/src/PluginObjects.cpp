@@ -379,165 +379,168 @@ void pushPlayerData(LuaArgs& lua, PluginStorage& storage, std::string pluginId, 
 
 void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginStorage* storage,
                 const std::string& pluginId, const PluginText* text) {
-    const auto hasPermission = [player](LuaArgs& args) {
-        args.pushBoolean(player->may(args.checkString(firstArgument(args))));
-        return 1;
-    };
-    PluginObject object{"player"};
-    object.reads("name", [player] { return PluginValue{player->name()}; })
-        .reads("uuid", [player] { return PluginValue{player->uuid()}; })
-        .reads("online", [player] { return PluginValue{player->online()}; })
-        .reads("health", [player] { return PluginValue{player->health()}; })
-        .reads("food", [player] { return PluginValue{static_cast<std::int64_t>(player->food())}; })
-        .reads("gamemode", [player] { return PluginValue{player->gamemode()}; })
-        .reads("level", [player] { return PluginValue{static_cast<std::int64_t>(player->level())}; })
-        .reads("world", [player] { return PluginValue{player->world()}; })
-        .reads("x", [player] { return PluginValue{player->x()}; })
-        .reads("y", [player] { return PluginValue{player->y()}; })
-        .reads("z", [player] { return PluginValue{player->z()}; })
-        .reads("ping", [player] { return PluginValue{static_cast<std::int64_t>(player->ping())}; })
-        .reads("sneaking", [player] { return PluginValue{player->sneaking()}; })
-        .reads("held_item",
-               [player] {
-                   const std::optional<std::string> held = player->heldItem();
-                   return held.has_value() ? PluginValue{*held} : PluginValue{};
-               })
-        .reads("attributes", [player] { return PluginValue{player->attributes()}; })
-        .pushes("inventory", [player](LuaArgs& args) { pushInventory(args, player); })
-        .pushes("pos",
-                [player](LuaArgs& args) { pushPosition(args, player->world(), player->x(), player->y(), player->z()); })
-        .pushes("data",
-                [player, storage, pluginId](LuaArgs& args) {
-                    if (storage == nullptr || pluginId.empty()) {
-                        args.pushNil();
-                        return;
-                    }
-                    pushPlayerData(args, *storage, pluginId, player->uuid());
-                })
-        .writes("health", [player](LuaArgs& args, std::int32_t index) { player->setHealth(args.checkNumber(index)); })
-        .writes("food",
-                [player](LuaArgs& args, std::int32_t index) {
-                    player->setFood(static_cast<std::int32_t>(args.checkInteger(index)));
-                })
-        .writes("gamemode",
-                [player](LuaArgs& args, std::int32_t index) { player->setGamemode(args.checkString(index)); })
-        .writes("level",
-                [player](LuaArgs& args, std::int32_t index) {
-                    player->setLevel(static_cast<std::int32_t>(args.checkInteger(index)));
-                })
-        .method("send",
-                [player, text](LuaArgs& args) {
-                    player->send(resolved(text, args));
-                    return 0;
-                })
-        .method("action_bar",
-                [player, text](LuaArgs& args) {
-                    player->actionBar(resolved(text, args));
-                    return 0;
-                })
-        .method("title",
-                [player, text](LuaArgs& args) {
-                    const std::int32_t base = firstArgument(args);
-                    std::string subtitle;
-                    if (args.isString(base + 1)) {
-                        subtitle =
-                            text == nullptr ? args.toText(base + 1) : text->resolve(args.toText(base + 1), nullptr, 0);
-                    }
-                    player->title(resolved(text, args), subtitle, timing(args, base + 2, "fade_in", kFadeIn),
-                                  timing(args, base + 2, "stay", kStay), timing(args, base + 2, "fade_out", kFadeOut));
-                    return 0;
-                })
-        .method("attribute",
-                [player](LuaArgs& args) {
-                    const std::int32_t base = firstArgument(args);
-                    const std::string name = args.checkString(base);
-                    if (args.isNil(base + 1)) {
-                        const std::optional<double> value = player->attribute(name);
-                        if (value.has_value()) {
-                            args.pushNumber(*value);
-                        } else {
-                            args.pushNil();
-                        }
-                        return 1;
-                    }
-                    args.pushBoolean(player->setAttribute(name, args.checkNumber(base + 1)));
-                    return 1;
-                })
-        .method("sound",
-                [player](LuaArgs& args) {
-                    const std::int32_t base = firstArgument(args);
-                    player->sound(args.checkString(base), static_cast<float>(args.numberOr(base + 1, 1.0)),
-                                  static_cast<float>(args.numberOr(base + 2, 1.0)));
-                    return 0;
-                })
-        .method("particle",
-                [player](LuaArgs& args) {
-                    const std::int32_t base = firstArgument(args);
-                    const std::string name = args.checkString(base);
-                    const std::optional<PluginPoint> point = pointFrom(args, base + 1);
-                    const std::int32_t next = point.has_value() ? base + 2 : base + 1;
-                    player->particle(name, point.has_value() ? point->x : player->x(),
-                                     point.has_value() ? point->y : player->y(),
-                                     point.has_value() ? point->z : player->z(),
-                                     static_cast<std::int32_t>(args.integerOr(next, 1)), args.numberOr(next + 1, 0.0));
-                    return 0;
-                })
-        .method("effect",
-                [player](LuaArgs& args) {
-                    const std::int32_t base = firstArgument(args);
-                    const std::string name = args.checkString(base);
-                    const double seconds = args.numberOr(base + 1, -1.0);
-                    const std::int32_t level = static_cast<std::int32_t>(args.integerOr(base + 2, 1));
-                    const std::int32_t ticks =
-                        seconds < 0.0 ? -1 : static_cast<std::int32_t>(seconds * kTicksPerSecond);
-                    args.pushBoolean(player->effect(name, ticks, level > 0 ? level - 1 : 0));
-                    return 1;
-                })
-        .method("kick",
-                [player, text](LuaArgs& args) {
-                    player->kick(resolved(text, args));
-                    return 0;
-                })
-        .method("has_permission", hasPermission)
-        .method("may", hasPermission)
-        .method("grant",
-                [player, pluginId](LuaArgs& args) {
-                    player->setPermission(pluginId, args.checkString(firstArgument(args)), true);
-                    return 0;
-                })
-        .method("deny",
-                [player, pluginId](LuaArgs& args) {
-                    player->setPermission(pluginId, args.checkString(firstArgument(args)), false);
-                    return 0;
-                })
-        .method("revoke",
-                [player, pluginId](LuaArgs& args) {
-                    player->setPermission(pluginId, args.checkString(firstArgument(args)), std::nullopt);
-                    return 0;
-                })
-        .method("give",
-                [player](LuaArgs& args) {
-                    const std::int32_t first = firstArgument(args);
-                    args.pushBoolean(
-                        player->give(args.checkString(first), static_cast<std::int32_t>(args.integerOr(first + 1, 1))));
-                    return 1;
-                })
-        .method("teleport", [player](LuaArgs& args) {
-            const std::int32_t first = firstArgument(args);
-            const std::optional<PluginPoint> point = pointFrom(args, first);
-            if (point.has_value()) {
-                args.pushBoolean(
-                    player->teleport(point->world.value_or(player->world()), point->x, point->y, point->z));
-                return 1;
-            }
-            const bool named = args.isString(first) && !args.isNumber(first);
-            const std::string world = named ? args.toText(first) : player->world();
-            const std::int32_t base = named ? first + 1 : first;
-            args.pushBoolean(player->teleport(world, args.checkNumber(base), args.checkNumber(base + 1),
-                                              args.checkNumber(base + 2)));
+    PluginObject::pushLazy(lua, "player", [player = std::move(player), storage, pluginId, text](PluginObject& object) {
+        const auto hasPermission = [player](LuaArgs& args) {
+            args.pushBoolean(player->may(args.checkString(firstArgument(args))));
             return 1;
-        });
-    bindPlayerOperations(object, player);
-    std::move(object).push(lua);
+        };
+        object.reads("name", [player] { return PluginValue{player->name()}; })
+            .reads("uuid", [player] { return PluginValue{player->uuid()}; })
+            .reads("online", [player] { return PluginValue{player->online()}; })
+            .reads("health", [player] { return PluginValue{player->health()}; })
+            .reads("food", [player] { return PluginValue{static_cast<std::int64_t>(player->food())}; })
+            .reads("gamemode", [player] { return PluginValue{player->gamemode()}; })
+            .reads("level", [player] { return PluginValue{static_cast<std::int64_t>(player->level())}; })
+            .reads("world", [player] { return PluginValue{player->world()}; })
+            .reads("x", [player] { return PluginValue{player->x()}; })
+            .reads("y", [player] { return PluginValue{player->y()}; })
+            .reads("z", [player] { return PluginValue{player->z()}; })
+            .reads("ping", [player] { return PluginValue{static_cast<std::int64_t>(player->ping())}; })
+            .reads("sneaking", [player] { return PluginValue{player->sneaking()}; })
+            .reads("held_item",
+                   [player] {
+                       const std::optional<std::string> held = player->heldItem();
+                       return held.has_value() ? PluginValue{*held} : PluginValue{};
+                   })
+            .reads("attributes", [player] { return PluginValue{player->attributes()}; })
+            .pushes("inventory", [player](LuaArgs& args) { pushInventory(args, player); })
+            .pushes(
+                "pos",
+                [player](LuaArgs& args) { pushPosition(args, player->world(), player->x(), player->y(), player->z()); })
+            .pushes("data",
+                    [player, storage, pluginId](LuaArgs& args) {
+                        if (storage == nullptr || pluginId.empty()) {
+                            args.pushNil();
+                            return;
+                        }
+                        pushPlayerData(args, *storage, pluginId, player->uuid());
+                    })
+            .writes("health",
+                    [player](LuaArgs& args, std::int32_t index) { player->setHealth(args.checkNumber(index)); })
+            .writes("food",
+                    [player](LuaArgs& args, std::int32_t index) {
+                        player->setFood(static_cast<std::int32_t>(args.checkInteger(index)));
+                    })
+            .writes("gamemode",
+                    [player](LuaArgs& args, std::int32_t index) { player->setGamemode(args.checkString(index)); })
+            .writes("level",
+                    [player](LuaArgs& args, std::int32_t index) {
+                        player->setLevel(static_cast<std::int32_t>(args.checkInteger(index)));
+                    })
+            .method("send",
+                    [player, text](LuaArgs& args) {
+                        player->send(resolved(text, args));
+                        return 0;
+                    })
+            .method("action_bar",
+                    [player, text](LuaArgs& args) {
+                        player->actionBar(resolved(text, args));
+                        return 0;
+                    })
+            .method("title",
+                    [player, text](LuaArgs& args) {
+                        const std::int32_t base = firstArgument(args);
+                        std::string subtitle;
+                        if (args.isString(base + 1)) {
+                            subtitle = text == nullptr ? args.toText(base + 1)
+                                                       : text->resolve(args.toText(base + 1), nullptr, 0);
+                        }
+                        player->title(resolved(text, args), subtitle, timing(args, base + 2, "fade_in", kFadeIn),
+                                      timing(args, base + 2, "stay", kStay),
+                                      timing(args, base + 2, "fade_out", kFadeOut));
+                        return 0;
+                    })
+            .method("attribute",
+                    [player](LuaArgs& args) {
+                        const std::int32_t base = firstArgument(args);
+                        const std::string name = args.checkString(base);
+                        if (args.isNil(base + 1)) {
+                            const std::optional<double> value = player->attribute(name);
+                            if (value.has_value()) {
+                                args.pushNumber(*value);
+                            } else {
+                                args.pushNil();
+                            }
+                            return 1;
+                        }
+                        args.pushBoolean(player->setAttribute(name, args.checkNumber(base + 1)));
+                        return 1;
+                    })
+            .method("sound",
+                    [player](LuaArgs& args) {
+                        const std::int32_t base = firstArgument(args);
+                        player->sound(args.checkString(base), static_cast<float>(args.numberOr(base + 1, 1.0)),
+                                      static_cast<float>(args.numberOr(base + 2, 1.0)));
+                        return 0;
+                    })
+            .method("particle",
+                    [player](LuaArgs& args) {
+                        const std::int32_t base = firstArgument(args);
+                        const std::string name = args.checkString(base);
+                        const std::optional<PluginPoint> point = pointFrom(args, base + 1);
+                        const std::int32_t next = point.has_value() ? base + 2 : base + 1;
+                        player->particle(
+                            name, point.has_value() ? point->x : player->x(),
+                            point.has_value() ? point->y : player->y(), point.has_value() ? point->z : player->z(),
+                            static_cast<std::int32_t>(args.integerOr(next, 1)), args.numberOr(next + 1, 0.0));
+                        return 0;
+                    })
+            .method("effect",
+                    [player](LuaArgs& args) {
+                        const std::int32_t base = firstArgument(args);
+                        const std::string name = args.checkString(base);
+                        const double seconds = args.numberOr(base + 1, -1.0);
+                        const std::int32_t level = static_cast<std::int32_t>(args.integerOr(base + 2, 1));
+                        const std::int32_t ticks =
+                            seconds < 0.0 ? -1 : static_cast<std::int32_t>(seconds * kTicksPerSecond);
+                        args.pushBoolean(player->effect(name, ticks, level > 0 ? level - 1 : 0));
+                        return 1;
+                    })
+            .method("kick",
+                    [player, text](LuaArgs& args) {
+                        player->kick(resolved(text, args));
+                        return 0;
+                    })
+            .method("has_permission", hasPermission)
+            .method("may", hasPermission)
+            .method("grant",
+                    [player, pluginId](LuaArgs& args) {
+                        player->setPermission(pluginId, args.checkString(firstArgument(args)), true);
+                        return 0;
+                    })
+            .method("deny",
+                    [player, pluginId](LuaArgs& args) {
+                        player->setPermission(pluginId, args.checkString(firstArgument(args)), false);
+                        return 0;
+                    })
+            .method("revoke",
+                    [player, pluginId](LuaArgs& args) {
+                        player->setPermission(pluginId, args.checkString(firstArgument(args)), std::nullopt);
+                        return 0;
+                    })
+            .method("give",
+                    [player](LuaArgs& args) {
+                        const std::int32_t first = firstArgument(args);
+                        args.pushBoolean(player->give(args.checkString(first),
+                                                      static_cast<std::int32_t>(args.integerOr(first + 1, 1))));
+                        return 1;
+                    })
+            .method("teleport", [player](LuaArgs& args) {
+                const std::int32_t first = firstArgument(args);
+                const std::optional<PluginPoint> point = pointFrom(args, first);
+                if (point.has_value()) {
+                    args.pushBoolean(
+                        player->teleport(point->world.value_or(player->world()), point->x, point->y, point->z));
+                    return 1;
+                }
+                const bool named = args.isString(first) && !args.isNumber(first);
+                const std::string world = named ? args.toText(first) : player->world();
+                const std::int32_t base = named ? first + 1 : first;
+                args.pushBoolean(player->teleport(world, args.checkNumber(base), args.checkNumber(base + 1),
+                                                  args.checkNumber(base + 2)));
+                return 1;
+            });
+        bindPlayerOperations(object, player);
+    });
 }
 } // namespace basalt::server::plugins

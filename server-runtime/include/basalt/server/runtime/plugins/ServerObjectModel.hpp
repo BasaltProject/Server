@@ -137,6 +137,8 @@ public:
 
     [[nodiscard]] std::vector<std::shared_ptr<server::plugins::PluginPlayerRef>> online() const override;
 
+    [[nodiscard]] std::size_t onlineCount() const override;
+
     [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef> byName(std::string_view name) const override;
 
     [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef> byUuid(std::string_view uuid) const override;

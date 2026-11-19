@@ -16,6 +16,9 @@ struct Fields {
     std::map<std::string, PluginObject::Writer, std::less<>> writers;
     std::map<std::string, PluginObject::Method, std::less<>> methods;
     std::shared_ptr<const PluginObject::Fallback> fallback;
+    std::function<void(PluginObject&)> populate;
+
+    void ensure();
 
     [[nodiscard]] std::string names() const {
         std::set<std::string> all;
@@ -38,6 +41,31 @@ struct Fields {
         return out;
     }
 };
+
+void pushFields(wire::lua::LuaArgs& lua, const std::shared_ptr<Fields>& fields);
+} // namespace
+
+struct PluginObjectAccess {
+    static void take(PluginObject& from, Fields& into) {
+        into.readers = std::move(from.readers_);
+        into.pushers = std::move(from.pushers_);
+        into.writers = std::move(from.writers_);
+        into.methods = std::move(from.methods_);
+        into.fallback = std::move(from.fallback_);
+    }
+};
+
+namespace {
+void Fields::ensure() {
+    if (!populate) {
+        return;
+    }
+    const std::function<void(PluginObject&)> build = std::move(populate);
+    populate = nullptr;
+    PluginObject object{kind};
+    build(object);
+    PluginObjectAccess::take(object, *this);
+}
 } // namespace
 
 void pushValue(wire::lua::LuaArgs& lua, const PluginValue& value) {
@@ -89,18 +117,28 @@ PluginObject& PluginObject::method(std::string name, Method body) {
 }
 
 void PluginObject::push(wire::lua::LuaArgs& lua) && {
-    auto fields = std::make_shared<Fields>(Fields{.kind = std::move(kind_),
-                                                  .readers = std::move(readers_),
-                                                  .pushers = std::move(pushers_),
-                                                  .writers = std::move(writers_),
-                                                  .methods = std::move(methods_),
-                                                  .fallback = std::move(fallback_)});
+    auto fields = std::make_shared<Fields>();
+    fields->kind = std::move(kind_);
+    PluginObjectAccess::take(*this, *fields);
+    pushFields(lua, fields);
+}
+
+void PluginObject::pushLazy(wire::lua::LuaArgs& lua, std::string kind, std::function<void(PluginObject&)> populate) {
+    auto fields = std::make_shared<Fields>();
+    fields->kind = std::move(kind);
+    fields->populate = std::move(populate);
+    pushFields(lua, fields);
+}
+
+namespace {
+void pushFields(wire::lua::LuaArgs& lua, const std::shared_ptr<Fields>& fields) {
     lua.pushTable();
     lua.pushTable();
     wire::lua::pushHostFunction(lua, fields->kind + ".index", [fields](wire::lua::LuaArgs& args) {
-        const std::string key = args.checkString(2);
+        fields->ensure();
+        const std::string_view key = args.checkView(2);
         if (const auto method = fields->methods.find(key); method != fields->methods.end()) {
-            wire::lua::pushHostFunction(args, fields->kind + "." + key, method->second);
+            wire::lua::pushHostFunction(args, fields->kind, method->second);
             return 1;
         }
         if (const auto pusher = fields->pushers.find(key); pusher != fields->pushers.end()) {
@@ -110,7 +148,10 @@ void PluginObject::push(wire::lua::LuaArgs& lua) && {
         const auto reader = fields->readers.find(key);
         if (reader == fields->readers.end() && fields->fallback != nullptr) {
             if (const auto method = fields->fallback->method(key); method.has_value()) {
-                wire::lua::pushHostFunction(args, fields->kind + "." + key, *method);
+                wire::lua::pushHostFunction(args, fields->kind, *method);
+                return 1;
+            }
+            if (fields->fallback->push && fields->fallback->push(key, args)) {
                 return 1;
             }
             if (const auto read = fields->fallback->reader(key); read.has_value()) {
@@ -119,13 +160,14 @@ void PluginObject::push(wire::lua::LuaArgs& lua) && {
             }
         }
         if (reader == fields->readers.end()) {
-            args.raise("a " + fields->kind + " has no '" + key + "'; it has " + fields->names());
+            args.raise("a " + fields->kind + " has no '" + std::string{key} + "'; it has " + fields->names());
         }
         pushValue(args, reader->second());
         return 1;
     });
     lua.setField("__index");
     wire::lua::pushHostFunction(lua, fields->kind + ".newindex", [fields](wire::lua::LuaArgs& args) {
+        fields->ensure();
         const std::string key = args.checkString(2);
         const auto writer = fields->writers.find(key);
         if (writer == fields->writers.end() && fields->fallback != nullptr) {
@@ -151,4 +193,5 @@ void PluginObject::push(wire::lua::LuaArgs& lua) && {
     lua.setField("__tostring");
     lua.setMetatable(-2);
 }
+} // namespace
 } // namespace basalt::server::plugins

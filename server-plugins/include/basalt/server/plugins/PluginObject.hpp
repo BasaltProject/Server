@@ -27,6 +27,7 @@ public:
         std::function<std::optional<Method>(std::string_view)> method;
         std::function<std::optional<Reader>(std::string_view)> reader;
         std::function<std::optional<Writer>(std::string_view)> writer;
+        std::function<bool(std::string_view, wire::lua::LuaArgs&)> push;
         std::string names;
     };
 
@@ -44,7 +45,12 @@ public:
 
     void push(wire::lua::LuaArgs& lua) &&;
 
+    /// Like push, but `populate` only runs when a member is first used, so an untouched object stays cheap.
+    static void pushLazy(wire::lua::LuaArgs& lua, std::string kind, std::function<void(PluginObject&)> populate);
+
 private:
+    friend struct PluginObjectAccess;
+
     std::string kind_;
     std::map<std::string, Reader, std::less<>> readers_;
     std::map<std::string, Pusher, std::less<>> pushers_;

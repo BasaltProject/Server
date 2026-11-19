@@ -36,7 +36,7 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
     });
     lua.setField("by_uuid");
     wire::lua::pushHostFunction(lua, "players.count", [server](LuaArgs& args) {
-        args.pushInteger(static_cast<std::int64_t>(server->services().players().online().size()));
+        args.pushInteger(static_cast<std::int64_t>(server->services().players().onlineCount()));
         return 1;
     });
     lua.setField("count");

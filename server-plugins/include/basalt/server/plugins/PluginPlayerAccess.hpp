@@ -439,6 +439,8 @@ public:
 
     [[nodiscard]] virtual std::vector<std::shared_ptr<PluginPlayerRef>> online() const = 0;
 
+    [[nodiscard]] virtual std::size_t onlineCount() const { return online().size(); }
+
     [[nodiscard]] virtual std::shared_ptr<PluginPlayerRef> byName(std::string_view name) const = 0;
 
     [[nodiscard]] virtual std::shared_ptr<PluginPlayerRef> byUuid(std::string_view uuid) const = 0;

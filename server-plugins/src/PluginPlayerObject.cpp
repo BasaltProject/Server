@@ -37,6 +37,13 @@ void bindPlayerOperations(PluginObject& object, const std::shared_ptr<PluginPlay
         return PluginObject::Reader{
             [player, key = std::string{name}] { return player->property(key).value_or(PluginValue{}); }};
     };
+    lookup->push = [player](std::string_view name, wire::lua::LuaArgs& args) {
+        if (playerPropertyNamed(name) == nullptr) {
+            return false;
+        }
+        pushValue(args, player->property(name).value_or(PluginValue{}));
+        return true;
+    };
     lookup->writer = [player](std::string_view name) -> std::optional<PluginObject::Writer> {
         const EntityPropertySpec* spec = playerPropertyNamed(name);
         if (spec == nullptr || !spec->writable) {

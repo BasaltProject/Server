@@ -650,6 +650,8 @@ std::vector<std::shared_ptr<PluginPlayerRef>> RegistryPlayers::online() const {
     return refs;
 }
 
+std::size_t RegistryPlayers::onlineCount() const { return registry_->count(); }
+
 std::shared_ptr<PluginPlayerRef> RegistryPlayers::byName(std::string_view name) const {
     for (const player::PlayerSession* player : registry_->snapshot()) {
         if (player->name().size() == name.size() && std::ranges::equal(player->name(), name, [](char left, char right) {
