@@ -502,6 +502,7 @@ basalt_module(server-runtime-core
         src/world/RealBannerPatterns.cpp
         src/world/RealBiomeSpawns.cpp
         src/world/RealBlockTags.cpp
+        src/world/StateTagMemo.cpp
         src/world/RealItemTags.cpp
         src/world/RealFluidTags.cpp
         src/world/RealEntityTypeTags.cpp

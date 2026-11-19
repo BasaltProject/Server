@@ -92,6 +92,7 @@ struct FireContact {
 /// parity: `Entity.checkInsideBlocks` for lava, fire and water, over every cell the deflated box touches.
 [[nodiscard]] FireContact fireContactOf(world::LoadedWorld& world, const ServerEntity& mob) {
     constexpr double kDeflate = 1.0E-5;
+    const world::WorldState::BlockReadScope readScope{world.state()};
     FireContact contact;
     const double half = (mob.width() / 2.0) - kDeflate;
     const double minY = mob.y + kDeflate;
@@ -180,13 +181,13 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
     const auto blockY = static_cast<std::int32_t>(std::floor(mob.y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(mob.z));
     const bool sensitive = mob.burnsInDay >= 0 ? mob.burnsInDay != 0 : entity::sunBurn::burns(mob.type());
-    if (sensitive) {
-        const bool day = !world::beds::isNight(world.clock().totalTicks());
-        const std::int32_t light = world::worldLight::skyLight(world.state(), blockX, blockY, blockZ);
+    if (sensitive && !world::beds::isNight(world.clock().totalTicks())) {
         const bool openSky = world::worldLight::skyLight(world.state(), blockX, blockY + 1, blockZ) >= kSkyLightMax;
         const std::optional<std::int32_t> here = world.state().blockState(blockX, blockY, blockZ);
         const bool inWater = world::fluids::of(here.value_or(0)) == world::Submersion::Water;
-        if (entity::sunBurn::shouldBurn(sensitive, day, light, openSky, inWater, random)) {
+        const std::int32_t light =
+            openSky && !inWater ? world::worldLight::skyLight(world.state(), blockX, blockY, blockZ) : 0;
+        if (entity::sunBurn::shouldBurn(sensitive, true, light, openSky, inWater, random)) {
             std::int32_t fireTicks = entity::sunBurn::kFireTicks;
             if (wasBurning || !hooks_.combustAllowed ||
                 hooks_.combustAllowed(world, mob, fireTicks, "sunlight", -1, nullptr)) {

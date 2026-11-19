@@ -76,15 +76,21 @@ bool MobActionSystem::tickConversion(world::LoadedWorld& world, const std::vecto
     const bool wasShaking = conversions::isShaking(mob);
     const double eyeY = mob.y + entity::mobBreathing::eyeHeightOf(mob);
     const std::int32_t eyeBlockY = mth::floor(eyeY);
-    const std::optional<std::int32_t> eyeState =
-        world.state().blockState(mth::floor(mob.x), eyeBlockY, mth::floor(mob.z));
-    const bool eyeInWater = eyeState.has_value() && world::fluidFlow::kindOf(*eyeState) == world::FluidKind::Water &&
-                            eyeY < eyeBlockY + static_cast<double>(world::fluidFlow::heightAt(
-                                                   world.state(), mth::floor(mob.x), eyeBlockY, mth::floor(mob.z)));
+    bool eyeInWater = false;
+    bool inPowderSnow = false;
+    {
+        const world::WorldState::BlockReadScope readScope{world.state()};
+        const std::optional<std::int32_t> eyeState =
+            world.state().blockState(mth::floor(mob.x), eyeBlockY, mth::floor(mob.z));
+        eyeInWater = eyeState.has_value() && world::fluidFlow::kindOf(*eyeState) == world::FluidKind::Water &&
+                     eyeY < eyeBlockY + static_cast<double>(world::fluidFlow::heightAt(world.state(), mth::floor(mob.x),
+                                                                                       eyeBlockY, mth::floor(mob.z)));
+        inPowderSnow =
+            isBlock(world, mob.x, mob.y, mob.z, "powder_snow") || isBlock(world, mob.x, eyeY, mob.z, "powder_snow");
+    }
     const conversions::Around around{
         .eyeInWater = eyeInWater,
-        .inPowderSnow =
-            isBlock(world, mob.x, mob.y, mob.z, "powder_snow") || isBlock(world, mob.x, eyeY, mob.z, "powder_snow"),
+        .inPowderSnow = inPowderSnow,
         // parity: `gameplay/piglins_zombify`, which only the Nether's dimension type turns off.
         .piglinsZombify =
             world.attributeOverride("minecraft:gameplay/piglins_zombify")

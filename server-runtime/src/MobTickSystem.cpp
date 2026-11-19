@@ -91,6 +91,9 @@ void MobTickSystem::tickTree(world::LoadedWorld& world, ServerEntity& root, cons
         root.y = from[1];
         root.z = from[2];
     }
+    if (root.passengerIds.empty()) {
+        return;
+    }
     std::set<std::int32_t> visited{root.entityId()};
     tickPassengers(world, root, watchers, views, living, random, visited);
 }

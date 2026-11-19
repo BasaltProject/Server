@@ -119,7 +119,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                       {.entity = projectileOwnerOf(world, watchers, entity)});
     }
     const std::string_view path = kind.type.path();
-    if (deflected(watchers, living, entity, fromX, fromY, fromZ)) {
+    if (deflected(world, watchers, living, entity, fromX, fromY, fromZ)) {
         return;
     }
 

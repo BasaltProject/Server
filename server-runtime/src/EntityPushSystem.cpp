@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/StateTagMemo.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
@@ -45,6 +46,42 @@ constexpr double kCartPushThreshold = static_cast<double>(1.0E-4F);
 /// parity: `ArmorStand.pushEntities`, a rideable cart within this squared distance.
 constexpr double kArmorStandCartReach = 0.2;
 constexpr float kCrammingDamage = 6.0F;
+
+/// A reusable per-thread list for a push pass; a nested pass on the same thread gets its own.
+class ScratchBodies {
+public:
+    ScratchBodies() : owned_(!busy()) {
+        if (owned_) {
+            busy() = true;
+            shared().clear();
+        }
+    }
+
+    ~ScratchBodies() {
+        if (owned_) {
+            busy() = false;
+        }
+    }
+
+    ScratchBodies(const ScratchBodies&) = delete;
+    ScratchBodies& operator=(const ScratchBodies&) = delete;
+
+    [[nodiscard]] std::vector<EntityPushSystem::Body>& bodies() const { return owned_ ? shared() : local_; }
+
+private:
+    static bool& busy() {
+        thread_local bool value = false;
+        return value;
+    }
+
+    static std::vector<EntityPushSystem::Body>& shared() {
+        thread_local std::vector<EntityPushSystem::Body> value;
+        return value;
+    }
+
+    bool owned_;
+    mutable std::vector<EntityPushSystem::Body> local_;
+};
 
 [[nodiscard]] std::optional<std::int32_t> vehicleOf(const EntityPushSystem::Body& body) {
     return body.mob != nullptr ? body.mob->vehicleId : body.player->vehicleId;
@@ -146,8 +183,8 @@ bool EntityPushSystem::onClimbable(world::LoadedWorld& world, double x, double y
     if (block == nullptr) {
         return false;
     }
-    if (options_.blockTags != nullptr &&
-        world::realBlockTags::contains(*options_.blockTags, "minecraft:climbable", *block)) {
+    static const world::StateTagMemo climbable{"minecraft:climbable"};
+    if (options_.blockTags != nullptr && climbable.contains(*options_.blockTags, *state)) {
         return true;
     }
     // parity: `trapdoorUsableAsLadder`, an open trapdoor over a ladder facing the same way.
@@ -230,6 +267,12 @@ bool EntityPushSystem::pushableBy(world::LoadedWorld& world, const Body& pusher,
 std::vector<EntityPushSystem::Body> EntityPushSystem::entitiesIn(world::LoadedWorld& world, const Body& self,
                                                                  const Aabb& box) const {
     std::vector<Body> found;
+    gatherEntities(world, self, box, found);
+    return found;
+}
+
+void EntityPushSystem::gatherEntities(world::LoadedWorld& world, const Body& self, const Aabb& box,
+                                      std::vector<Body>& found) const {
     thread_local std::vector<ServerEntity*> mobs;
     // parity: `EntitySectionStorage`.
     constexpr double kMargin = 2.0;
@@ -246,8 +289,11 @@ std::vector<EntityPushSystem::Body> EntityPushSystem::entitiesIn(world::LoadedWo
         }
     }
     const std::shared_ptr<const std::vector<PlayerSession*>> everyone = players_->view();
+    constexpr double kPlayerReach = 0.5;
     for (PlayerSession* player : *everyone) {
-        if (player == self.player || player->worldName != world.name() || player->dead) {
+        if (player == self.player || player->dead || player->x < box.minX - kPlayerReach ||
+            player->x > box.maxX + kPlayerReach || player->z < box.minZ - kPlayerReach ||
+            player->z > box.maxZ + kPlayerReach || player->worldName != world.name()) {
             continue;
         }
         const Body body{.player = player};
@@ -255,14 +301,19 @@ std::vector<EntityPushSystem::Body> EntityPushSystem::entitiesIn(world::LoadedWo
             found.push_back(body);
         }
     }
-    return found;
 }
 
 std::vector<EntityPushSystem::Body> EntityPushSystem::pushablesIn(world::LoadedWorld& world, const Body& pusher,
                                                                   const Aabb& box) const {
-    std::vector<Body> found = entitiesIn(world, pusher, box);
-    std::erase_if(found, [&](const Body& input) { return !pushableBy(world, pusher, input); });
+    std::vector<Body> found;
+    gatherPushables(world, pusher, box, found);
     return found;
+}
+
+void EntityPushSystem::gatherPushables(world::LoadedWorld& world, const Body& pusher, const Aabb& box,
+                                       std::vector<Body>& found) const {
+    gatherEntities(world, pusher, box, found);
+    std::erase_if(found, [&](const Body& input) { return !pushableBy(world, pusher, input); });
 }
 
 void EntityPushSystem::crammed(world::LoadedWorld& world, const Body& body) {
@@ -306,7 +357,9 @@ void EntityPushSystem::pushByMob(world::LoadedWorld& world, ServerEntity& mob) {
         }
         return;
     }
-    const std::vector<Body> pushables = pushablesIn(world, self, boxOf(self));
+    const ScratchBodies scratch;
+    std::vector<Body>& pushables = scratch.bodies();
+    gatherPushables(world, self, boxOf(self), pushables);
     if (pushables.empty()) {
         return;
     }
@@ -337,7 +390,9 @@ void EntityPushSystem::pushByPlayer(world::LoadedWorld& world, PlayerSession& pl
     if (player.dead || player.gamemode == Gamemode::Spectator) {
         return;
     }
-    const std::vector<Body> pushables = pushablesIn(world, self, boxOf(self));
+    const ScratchBodies scratch;
+    std::vector<Body>& pushables = scratch.bodies();
+    gatherPushables(world, self, boxOf(self), pushables);
     if (pushables.empty()) {
         return;
     }

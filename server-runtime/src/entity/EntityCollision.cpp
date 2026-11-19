@@ -96,6 +96,11 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
     return distance;
 }
 
+void gather(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFor, std::vector<Aabb>& out) {
+    out.clear();
+    forEachBox(blockAt, box, shapeFor, [&out](const Aabb& collider) { out.push_back(collider); });
+}
+
 /// parity: `AABB.collide`.
 [[nodiscard]] double clip(Axis axis, const Aabb& box, const std::vector<Aabb>& boxes, double distance) {
     double left = distance;
@@ -113,7 +118,9 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFo
                                                    double stepHeight, double skip) {
     const Aabb reach = grounded.expandTowards(dx, stepHeight, dz);
     std::vector<double> heights;
-    for (const Aabb& collider : collidingBoxes(blockAt, reach)) {
+    thread_local std::vector<Aabb> colliders;
+    gather(blockAt, reach, {}, colliders);
+    for (const Aabb& collider : colliders) {
         for (const double edge : {collider.minY, collider.maxY}) {
             const double height = edge - grounded.minY;
             // A step is a step up: the floor's own edges measure zero or less from the feet.
@@ -137,7 +144,8 @@ std::array<double, 3> collide(const BlockAt& blockAt, const Aabb& box, double dx
     if (dx == 0.0 && dy == 0.0 && dz == 0.0) {
         return out;
     }
-    const std::vector<Aabb> boxes = collidingBoxes(blockAt, box.expandTowards(dx, dy, dz), shapeFor);
+    thread_local std::vector<Aabb> boxes;
+    gather(blockAt, box.expandTowards(dx, dy, dz), shapeFor, boxes);
     if (boxes.empty()) {
         return out;
     }

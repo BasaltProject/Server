@@ -50,6 +50,7 @@ public:
 
 private:
     std::set<std::string, std::less<>> targets_;
+    std::string key_;
     std::int32_t randomInterval_;
 };
 

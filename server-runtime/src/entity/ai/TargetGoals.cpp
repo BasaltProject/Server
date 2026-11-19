@@ -69,20 +69,30 @@ void NearestAttackablePlayerGoal::stop(MobContext& mob) { mob.mob.targetId.reset
 
 NearestAttackableEntityGoal::NearestAttackableEntityGoal(std::set<std::string, std::less<>> targets,
                                                          std::int32_t randomInterval)
-    : targets_(std::move(targets)), randomInterval_(randomInterval) {}
+    : targets_(std::move(targets)), randomInterval_(randomInterval) {
+    for (const std::string& name : targets_) {
+        key_ += name;
+        key_ += ',';
+    }
+}
 
 namespace {
 
-[[nodiscard]] ServerEntity* nearestOf(MobContext& mob, const std::set<std::string, std::less<>>& targets) {
+[[nodiscard]] ServerEntity* nearestOf(MobContext& mob, const std::set<std::string, std::less<>>& targets,
+                                      const std::string& key) {
     const double range = followRange(mob);
     ServerEntity* best = nullptr;
     double bestDistance = range * range;
-    for (ServerEntity* candidate : mob.entities) {
-        if (candidate == nullptr || candidate == &mob.mob || candidate->removed || candidate->health <= 0.0) {
+    const world::EntityRegistry::Matches typed =
+        mob.world.entitySnapshotMatching(mob.entities, key, [&targets](const ServerEntity& candidate) {
+            return targets.contains(candidate.type().path());
+        });
+    for (ServerEntity* candidate : *typed) {
+        if (candidate == &mob.mob || candidate->removed || candidate->health <= 0.0) {
             continue;
         }
         const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);
-        if (distance > bestDistance || !targets.contains(candidate->type().path())) {
+        if (distance > bestDistance) {
             continue;
         }
         bestDistance = distance;
@@ -100,7 +110,7 @@ bool NearestAttackableEntityGoal::canUse(MobContext& mob) {
     if (randomInterval_ > 0 && mob.random.nextInt(reducedTickDelay(randomInterval_)) != 0) {
         return false;
     }
-    return nearestOf(mob, targets_) != nullptr;
+    return nearestOf(mob, targets_, key_) != nullptr;
 }
 
 bool NearestAttackableEntityGoal::canContinueToUse(MobContext& mob) {
@@ -113,7 +123,7 @@ bool NearestAttackableEntityGoal::canContinueToUse(MobContext& mob) {
 }
 
 void NearestAttackableEntityGoal::start(MobContext& mob) {
-    const ServerEntity* nearest = nearestOf(mob, targets_);
+    const ServerEntity* nearest = nearestOf(mob, targets_, key_);
     mob.mob.targetId = nearest == nullptr ? std::nullopt : std::optional{nearest->entityId()};
 }
 

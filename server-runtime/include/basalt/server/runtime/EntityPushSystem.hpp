@@ -76,6 +76,12 @@ public:
     [[nodiscard]] static entity::Aabb boxOf(const Body& body);
 
 private:
+    void gatherEntities(world::LoadedWorld& world, const Body& self, const entity::Aabb& box,
+                        std::vector<Body>& out) const;
+
+    void gatherPushables(world::LoadedWorld& world, const Body& pusher, const entity::Aabb& box,
+                         std::vector<Body>& out) const;
+
     void doPush(world::LoadedWorld& world, const Body& pusher, const Body& target);
 
     void entityPush(world::LoadedWorld& world, const Body& target, const Body& pusher);

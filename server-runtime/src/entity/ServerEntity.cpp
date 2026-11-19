@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/MobSteps.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Sniffers.hpp>
 
@@ -150,6 +151,7 @@ ServerEntity::ServerEntity(std::int32_t entityId, wire::common::Uuid uuid, wire:
     tickKinds_ = computeTickKinds(type_);
     mobCategoryIndex_ =
         static_cast<std::uint8_t>(mobCategoryByName(mobs::categoryOf(type_)).value_or(MobCategory::Misc));
+    stepEmission_ = static_cast<std::uint8_t>(mobSteps::emissionOf(type_));
     ownEye_ = mobBreathing::ownEyeOf(type_.path());
     shape_ = registry::entityTypeShapes::of(type_);
     baseAttributes_ = &registry::entityAttributes::of(type_);
@@ -281,6 +283,13 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
     return entity.age < 0 && (entity.typeTraits() & traits::kBabyMetadata) != 0;
 }
 
+constexpr std::uint32_t kScaledTraits = traits::kCube | traits::kPhantom | traits::kPufferfish;
+
+[[nodiscard]] bool plainBox(const ServerEntity& entity) {
+    return entity.camel == nullptr && entity.sniffer == nullptr && (entity.typeTraits() & kScaledTraits) == 0 &&
+           !baby(entity);
+}
+
 /// parity: `getDefaultDimensions` for a baby.
 [[nodiscard]] std::pair<float, float> defaultBox(const ServerEntity& entity, const wire::common::Identifier& type) {
     const float width = entity.baseWidth();
@@ -318,6 +327,9 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
 } // namespace
 
 double ServerEntity::width() const {
+    if (plainBox(*this)) {
+        return static_cast<double>(baseWidth_);
+    }
     // parity: `Camel.getDefaultDimensions` and `Sniffer.getDefaultDimensions`.
     if (babyCamel(*this)) {
         return static_cast<double>(kBabyCamelWidth);
@@ -329,6 +341,9 @@ double ServerEntity::width() const {
 }
 
 double ServerEntity::height() const {
+    if (plainBox(*this)) {
+        return static_cast<double>(baseHeight_);
+    }
     if (camel != nullptr && camel->lastPoseTick < 0) {
         return babyCamel(*this) ? static_cast<double>(kBabyCamelSittingHeight)
                                 : static_cast<double>(baseHeight_ - kCamelSittingDrop);
@@ -344,6 +359,9 @@ double ServerEntity::height() const {
 }
 
 std::pair<double, double> ServerEntity::dimensions() const {
+    if (plainBox(*this)) {
+        return {static_cast<double>(baseWidth_), static_cast<double>(baseHeight_)};
+    }
     std::optional<std::pair<float, float>> box;
     const auto defaults = [&]() -> const std::pair<float, float>& {
         if (!box.has_value()) {

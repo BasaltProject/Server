@@ -46,16 +46,23 @@
 namespace basalt::server::runtime {
 using namespace combatSystem;
 
-bool CombatSystem::deflected(const std::vector<PlayerSession*>& watchers, const std::vector<ServerEntity*>& living,
-                             ServerEntity& projectile, double fromX, double fromY, double fromZ) {
+bool CombatSystem::deflected(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                             const std::vector<ServerEntity*>& living, ServerEntity& projectile, double fromX,
+                             double fromY, double fromZ) {
     // parity: `Breeze.deflection`, which lets a wind charge through.
     const std::string_view path = projectile.type().path();
     if (path == "wind_charge" || path == "breeze_wind_charge" || options_.entityTags == nullptr) {
         return false;
     }
-    const std::set<Identifier>& deflectors =
-        world::realEntityTypeTags::membersOf(*options_.entityTags, Identifier::vanilla("deflects_projectiles"));
+    static const Identifier kDeflectors = Identifier::vanilla("deflects_projectiles");
+    const std::set<Identifier>& deflectors = world::realEntityTypeTags::membersOf(*options_.entityTags, kDeflectors);
     if (deflectors.empty()) {
+        return false;
+    }
+    const world::EntityRegistry::Matches present = world.state().entitySnapshotMatching(
+        living, "deflects_projectiles",
+        [&deflectors](const ServerEntity& candidate) { return deflectors.contains(candidate.type()); });
+    if (present->empty()) {
         return false;
     }
     const std::optional<Target> target = targetAlong(watchers, living, projectile, fromX, fromY, fromZ);

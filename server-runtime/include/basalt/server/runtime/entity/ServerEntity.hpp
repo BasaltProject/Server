@@ -223,6 +223,9 @@ public:
 
     [[nodiscard]] std::uint8_t mobCategoryIndex() const noexcept { return mobCategoryIndex_; }
 
+    /// `mobSteps::Emission` of the type, as its underlying value.
+    [[nodiscard]] std::uint8_t stepEmission() const noexcept { return stepEmission_; }
+
     [[nodiscard]] std::optional<float> ownEye() const noexcept { return ownEye_; }
 
     [[nodiscard]] bool livingType() const noexcept { return (typeTraits_ & traits::kLiving) != 0; }
@@ -700,6 +703,7 @@ private:
     std::uint32_t typeTraits_ = 0;
     std::uint32_t tickKinds_ = 0;
     std::uint8_t mobCategoryIndex_ = 0;
+    std::uint8_t stepEmission_ = 0;
     std::optional<float> ownEye_;
     const server::registry::entityTypeShapes::Shape* shape_ = nullptr;
     const std::map<std::string, double, std::less<>>* baseAttributes_ = nullptr;

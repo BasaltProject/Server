@@ -268,7 +268,7 @@ private:
     void landEnderPearl(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         entity::ServerEntity& pearl);
     /// parity: `Projectile.hitTargetOrDeflectSelf` against a breeze.
-    bool deflected(const std::vector<player::PlayerSession*>& watchers,
+    bool deflected(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                    const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& projectile, double fromX,
                    double fromY, double fromZ);
 

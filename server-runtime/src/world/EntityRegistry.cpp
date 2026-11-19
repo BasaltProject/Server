@@ -158,9 +158,14 @@ void EntityRegistry::entitiesInRange(std::int32_t minChunkX, std::int32_t maxChu
             if (bucket == index_.end()) {
                 continue;
             }
-            for (const Indexed& held : bucket->second) {
-                if (held.entity->removed || !isIn(held.entity->x, minChunkX, maxChunkX) ||
-                    !isIn(held.entity->z, minChunkZ, maxChunkZ)) {
+            const std::vector<Indexed>& bucketHeld = bucket->second;
+            for (std::size_t at = 0; at < bucketHeld.size(); ++at) {
+                const Indexed& held = bucketHeld[at];
+                if (at + 4 < bucketHeld.size()) {
+                    __builtin_prefetch(bucketHeld[at + 4].entity);
+                }
+                if (!isIn(held.entity->x, minChunkX, maxChunkX) || !isIn(held.entity->z, minChunkZ, maxChunkZ) ||
+                    held.entity->removed) {
                     continue;
                 }
                 const std::int64_t cell = ((static_cast<std::int64_t>(chunkOf(held.entity->x)) - minChunkX) * width) +

@@ -200,7 +200,7 @@ void CombatSystem::tickLlamaSpit(world::LoadedWorld& world, const std::vector<Pl
     spit.y = hit.has_value() ? hit->y : fromY + moveY;
     spit.z = hit.has_value() ? hit->z : fromZ + moveZ;
     const float margin = std::max(0.0F, std::min(kMaxMargin, static_cast<float>(spit.tickCount - 2) / kMarginGrowth));
-    const bool turned = deflected(watchers, living, spit, fromX, fromY, fromZ);
+    const bool turned = deflected(world, watchers, living, spit, fromX, fromY, fromZ);
     std::optional<Target> target;
     if (!turned) {
         target = targetAlong(watchers, living, spit, fromX, fromY, fromZ, static_cast<double>(margin), &spared);

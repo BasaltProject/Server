@@ -9,12 +9,15 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace basalt::server::runtime::world::fluids {
 
 double eyeHeight(bool sneaking) { return sneaking ? 1.27 : 1.62; }
 
-Submersion of(std::int32_t stateId) {
+namespace {
+
+Submersion computeSubmersion(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr || block->namespaceName() != "minecraft") {
         return Submersion::None;
@@ -27,6 +30,21 @@ Submersion of(std::int32_t stateId) {
         return Submersion::Lava;
     }
     return Submersion::None;
+}
+
+} // namespace
+
+Submersion of(std::int32_t stateId) {
+    static const std::vector<Submersion> answers = [] {
+        std::vector<Submersion> built(static_cast<std::size_t>(registry::blockStateDefinitions::stateIdBound()));
+        for (std::size_t id = 0; id < built.size(); ++id) {
+            built[id] = computeSubmersion(static_cast<std::int32_t>(id));
+        }
+        return built;
+    }();
+    return stateId >= 0 && static_cast<std::size_t>(stateId) < answers.size()
+               ? answers[static_cast<std::size_t>(stateId)]
+               : computeSubmersion(stateId);
 }
 
 std::int32_t airAfterTick(std::int32_t air, bool eyesInWater, std::int32_t maxAir) {

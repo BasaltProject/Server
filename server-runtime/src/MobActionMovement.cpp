@@ -21,6 +21,7 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/StateTagMemo.hpp>
 #include <basalt/server/runtime/world/TurtleEggs.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -230,13 +231,17 @@ void MobActionSystem::emitMovement(world::LoadedWorld& world, ServerEntity& mob)
         return;
     }
     world::WorldState& state = world.state();
+    static const world::StateTagMemo kClimbableTag{"minecraft:climbable"};
+    const auto climbableState = [this](std::int32_t stateId) {
+        return options_.blockTags != nullptr && kClimbableTag.contains(*options_.blockTags, stateId);
+    };
     const bool inWater = entity::ai::inWater(state, mob);
     // parity: `Entity.checkFallDamage`.
     if (steps::countsFalls(mob.type()) && !mob.dying) {
         const Pos feet{mth::floor(mob.x), mth::floor(mob.y), mth::floor(mob.z)};
         const std::int32_t feetState = state.blockState(feet[0], feet[1], feet[2]).value_or(0);
         const wire::common::Identifier* feetBlock = server::registry::blockStateDefinitions::blockOf(feetState);
-        const bool climbing = feetBlock != nullptr && blockTagged("minecraft:climbable", *feetBlock).value_or(false);
+        const bool climbing = climbableState(feetState);
         const bool floating =
             !mob.effects.empty() && (mob.effects.contains(wire::common::Identifier::vanilla("slow_falling")) ||
                                      mob.effects.contains(wire::common::Identifier::vanilla("levitation")));
@@ -253,7 +258,7 @@ void MobActionSystem::emitMovement(world::LoadedWorld& world, ServerEntity& mob)
             mob.fallDistance = 0.0;
         }
     }
-    const steps::Emission emission = steps::emissionOf(mob.type());
+    const auto emission = static_cast<steps::Emission>(mob.stepEmission());
     if (emission == steps::Emission::None || mob.vehicleId.has_value()) {
         return;
     }
@@ -262,10 +267,7 @@ void MobActionSystem::emitMovement(world::LoadedWorld& world, ServerEntity& mob)
     const auto horizontal = static_cast<float>(std::sqrt((dx * dx) + (dz * dz)) * static_cast<double>(0.6F));
     const Pos supporting = below(mob, kSupportDepth);
     const std::int32_t supportingState = state.blockState(supporting[0], supporting[1], supporting[2]).value_or(0);
-    const auto climbable = [this](std::int32_t stateId) {
-        const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
-        return block != nullptr && blockTagged("minecraft:climbable", *block).value_or(false);
-    };
+    const auto climbable = climbableState;
     mob.moveDist += climbable(supportingState) ? moved : horizontal;
     mob.flyDist += moved;
     if (mob.moveDist <= mob.nextStep || server::registry::blocks::isAir(supportingState)) {
