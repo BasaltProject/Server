@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
+#include <basalt/server/runtime/world/ChunkIndex.hpp>
 #include <basalt/server/runtime/world/DroppedItemPhysics.hpp>
 #include <basalt/server/runtime/world/EntityRegistry.hpp>
 #include <basalt/server/runtime/world/PendingChunkDecorations.hpp>
@@ -26,6 +27,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <span>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -210,6 +212,10 @@ public:
 
     /// Never generates, so it is safe on a connection thread.
     [[nodiscard]] server::world::Chunk* chunkIfLoaded(std::int32_t chunkX, std::int32_t chunkZ) const;
+
+    /// One read lock for the whole list; a chunk that is not loaded leaves a null.
+    void chunksIfLoaded(std::span<const std::array<std::int32_t, 2>> positions,
+                        std::vector<server::world::Chunk*>& out) const;
 
     server::world::Chunk& getOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ);
 
@@ -440,6 +446,8 @@ public:
 
     void beginEntitySnapshot() { entityRegistry_.beginSnapshot(); }
 
+    void endEntitySnapshot(const entity::ServerEntity* const* data) { entityRegistry_.endSnapshot(data); }
+
     [[nodiscard]] EntityRegistry::Matches
     entitySnapshotMatching(const std::vector<entity::ServerEntity*>& snapshot, const std::string& key,
                            const std::function<bool(const entity::ServerEntity&)>& accepts) const {
@@ -576,7 +584,7 @@ private:
     std::function<void(std::int32_t, std::int32_t, bool)> onNeighbourhoodComplete_;
 
     std::map<std::int64_t, std::unique_ptr<server::world::Chunk>> chunksByPos_;
-    std::unordered_map<std::int64_t, server::world::Chunk*> chunkIndex_;
+    ChunkIndex chunkIndex_;
     /// parity: the counter behind `ScheduledTick.subTickOrder`.
     std::int64_t nextTickOrder_ = 0;
     std::atomic<std::int64_t> chunkVersion_{0};

@@ -431,8 +431,11 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     const wire::common::Identifier& pistonBlock = world::pistons::block();
     std::vector<std::array<std::int32_t, 3>> sliding;
-    for (const std::array<std::int32_t, 2>& position : chunks) {
-        const server::world::Chunk* chunk = world.state().chunkIfLoaded(position[0], position[1]);
+    thread_local std::vector<server::world::Chunk*> resolved;
+    world.state().chunksIfLoaded(chunks, resolved);
+    for (std::size_t slot = 0; slot < chunks.size(); ++slot) {
+        const std::array<std::int32_t, 2>& position = chunks[slot];
+        const server::world::Chunk* chunk = resolved[slot];
         if (chunk == nullptr || chunk->blockEntityCount() == 0) {
             continue;
         }
@@ -460,8 +463,9 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
 
 void RedstoneTickSystem::tickInhabitedTime(world::LoadedWorld& world, const sched::Region& region) {
     const auto simulated = chunkSimulation_->simulatedChunks(world, &region);
-    for (const std::array<std::int32_t, 2>& position : *simulated) {
-        server::world::Chunk* chunk = world.state().chunkIfLoaded(position[0], position[1]);
+    thread_local std::vector<server::world::Chunk*> resolved;
+    world.state().chunksIfLoaded(*simulated, resolved);
+    for (server::world::Chunk* chunk : resolved) {
         if (chunk != nullptr) {
             chunk->increaseInhabitedTime();
         }

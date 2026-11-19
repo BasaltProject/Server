@@ -236,6 +236,7 @@ Chunk::VersionedLight Chunk::sharedSkyLight(const std::function<PackedLight()>& 
         light_->staleSky.store(false);
         held = std::make_shared<const PackedLight>(compute());
         light_->sky.store(held);
+        light_->hasSky.store(true, std::memory_order_release);
         light_->skyVersion = nextLightVersion();
     }
     return {std::move(held), light_->skyVersion};
@@ -248,6 +249,7 @@ Chunk::VersionedLight Chunk::sharedBlockLight(const std::function<PackedLight()>
         light_->staleBlock.store(false);
         held = std::make_shared<const PackedLight>(compute());
         light_->block.store(held);
+        light_->hasBlock.store(true, std::memory_order_release);
         light_->blockVersion = nextLightVersion();
     }
     return {std::move(held), light_->blockVersion};
@@ -289,6 +291,8 @@ bool Chunk::storeLightSection(bool sky, std::size_t section, std::span<const std
 
 void Chunk::invalidateLight() {
     const std::lock_guard<std::mutex> guard{light_->lock};
+    light_->hasSky.store(false, std::memory_order_release);
+    light_->hasBlock.store(false, std::memory_order_release);
     light_->sky.store(nullptr);
     light_->block.store(nullptr);
     light_->staleSky.store(false);

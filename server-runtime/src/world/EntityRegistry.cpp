@@ -48,11 +48,40 @@ bool EntityRegistry::hasNaturalSpawnObstruction(const entity::Aabb& spawnBox, co
 
 void EntityRegistry::beginTick() noexcept { indexValid_ = false; }
 
+void EntityRegistry::rebuildIndexIfStale() const {
+    if (indexValid_) {
+        return;
+    }
+    // Buckets keep their nodes and capacity between builds so a tick does not allocate for them.
+    for (auto& [bucket, held] : index_) {
+        held.clear();
+    }
+    for (std::size_t order = 0; order < entities_.size(); ++order) {
+        entity::ServerEntity* entity = entities_[order].get();
+        const std::int64_t bucket =
+            (static_cast<std::int64_t>(chunkOf(entity->x)) << 32) | static_cast<std::uint32_t>(chunkOf(entity->z));
+        index_[bucket].push_back({entity, order});
+    }
+    if (index_.size() > (entities_.size() * 2) + 256) {
+        std::erase_if(index_, [](const auto& entry) { return entry.second.empty(); });
+    }
+    indexValid_ = true;
+}
+
 void EntityRegistry::beginSnapshot() {
     const std::scoped_lock lock{snapshotMutex_};
     snapshotMatches_.clear();
     snapshotData_ = nullptr;
     snapshotSize_ = 0;
+}
+
+void EntityRegistry::endSnapshot(const entity::ServerEntity* const* data) {
+    const std::scoped_lock lock{snapshotMutex_};
+    if (snapshotData_ == data) {
+        snapshotMatches_.clear();
+        snapshotData_ = nullptr;
+        snapshotSize_ = 0;
+    }
 }
 
 EntityRegistry::Matches
@@ -92,16 +121,7 @@ std::vector<entity::ServerEntity*> EntityRegistry::entitiesIn(std::int32_t chunk
 void EntityRegistry::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ,
                                 std::vector<entity::ServerEntity*>& out) const {
     const WorldWriteLock lock{*mutex_};
-    if (!indexValid_) {
-        index_.clear();
-        for (std::size_t order = 0; order < entities_.size(); ++order) {
-            entity::ServerEntity* entity = entities_[order].get();
-            const std::int64_t bucket =
-                (static_cast<std::int64_t>(chunkOf(entity->x)) << 32) | static_cast<std::uint32_t>(chunkOf(entity->z));
-            index_[bucket].push_back({entity, order});
-        }
-        indexValid_ = true;
-    }
+    rebuildIndexIfStale();
     // Nothing moves a chunk's width in one tick, so the neighbours hold whatever walked in since the build.
     candidates_.clear();
     for (std::int32_t dx = -1; dx <= 1; ++dx) {
@@ -129,16 +149,7 @@ void EntityRegistry::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ,
 void EntityRegistry::entitiesInRange(std::int32_t minChunkX, std::int32_t maxChunkX, std::int32_t minChunkZ,
                                      std::int32_t maxChunkZ, std::vector<entity::ServerEntity*>& out) const {
     const WorldWriteLock lock{*mutex_};
-    if (!indexValid_) {
-        index_.clear();
-        for (std::size_t order = 0; order < entities_.size(); ++order) {
-            entity::ServerEntity* entity = entities_[order].get();
-            const std::int64_t bucket =
-                (static_cast<std::int64_t>(chunkOf(entity->x)) << 32) | static_cast<std::uint32_t>(chunkOf(entity->z));
-            index_[bucket].push_back({entity, order});
-        }
-        indexValid_ = true;
-    }
+    rebuildIndexIfStale();
     const auto width = static_cast<std::int64_t>(maxChunkZ) - minChunkZ + 1;
     const auto isIn = [](double coordinate, std::int32_t low, std::int32_t high) {
         constexpr double kExactBound = 1.0e9;

@@ -85,8 +85,7 @@ void WorldState::mine(std::string_view what) const {
 }
 
 Chunk* WorldState::chunkAtLocked(std::int64_t chunkKey) const {
-    const auto found = chunkIndex_.find(chunkKey);
-    return found == chunkIndex_.end() ? nullptr : found->second;
+    return chunkIndex_.find(chunkKey);
 }
 
 std::vector<Chunk*> WorldState::snapshot() const {
@@ -274,6 +273,16 @@ bool WorldState::isLoaded(std::int32_t chunkX, std::int32_t chunkZ) const {
 Chunk* WorldState::chunkIfLoaded(std::int32_t chunkX, std::int32_t chunkZ) const {
     const WorldReadLock lock{mutex_};
     return chunkAtLocked(key(chunkX, chunkZ));
+}
+
+void WorldState::chunksIfLoaded(std::span<const std::array<std::int32_t, 2>> positions,
+                                std::vector<Chunk*>& out) const {
+    out.clear();
+    out.reserve(positions.size());
+    const WorldReadLock lock{mutex_};
+    for (const std::array<std::int32_t, 2>& position : positions) {
+        out.push_back(chunkAtLocked(key(position[0], position[1])));
+    }
 }
 
 std::optional<Chunk> WorldState::generateDetached(std::int32_t chunkX, std::int32_t chunkZ) {

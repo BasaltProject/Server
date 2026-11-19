@@ -18,6 +18,8 @@ public:
 
     [[nodiscard]] std::int32_t get(std::size_t index) const;
 
+    void prefetch(std::size_t index) const;
+
     bool set(std::size_t index, std::int32_t value);
 
     [[nodiscard]] std::vector<std::int32_t> toVector() const;

@@ -314,13 +314,20 @@ void MobActionSystem::tickBreath(world::LoadedWorld& world, const std::vector<Pl
     // parity: `isEyeInFluid`.
     const double eyeY = mob.y + entity::mobBreathing::eyeHeightOf(mob);
     const std::int32_t eyeBlockY = wire::common::mth::floor(eyeY);
-    const std::int32_t eyeState = stateAt(mob.x, eyeY, mob.z);
-    const wire::common::Identifier* eyeBlock = registry::blockStateDefinitions::blockOf(eyeState);
-    const bool eyeInWater = isWater(eyeState) && eyeY < eyeBlockY + static_cast<double>(world::fluidFlow::heightAt(
-                                                                        world.state(), wire::common::mth::floor(mob.x),
-                                                                        eyeBlockY, wire::common::mth::floor(mob.z)));
-    const bool inWater = isWater(stateAt(mob.x, mob.y, mob.z));
-    const bool inRain = world::precipitation::entityInRain(world, mob.x, mob.y, mob.z, mob.height());
+    bool eyeInWater = false;
+    bool inWater = false;
+    bool inRain = false;
+    const wire::common::Identifier* eyeBlock = nullptr;
+    {
+        const world::WorldState::BlockReadScope readScope{world.state()};
+        const std::int32_t eyeState = stateAt(mob.x, eyeY, mob.z);
+        eyeBlock = registry::blockStateDefinitions::blockOf(eyeState);
+        eyeInWater = isWater(eyeState) && eyeY < eyeBlockY + static_cast<double>(world::fluidFlow::heightAt(
+                                                                 world.state(), wire::common::mth::floor(mob.x),
+                                                                 eyeBlockY, wire::common::mth::floor(mob.z)));
+        inWater = isWater(stateAt(mob.x, mob.y, mob.z));
+    }
+    inRain = world::precipitation::entityInRain(world, mob.x, mob.y, mob.z, mob.height());
     const entity::mobBreathing::Surroundings at{.eyeInWater = eyeInWater,
                                                 .eyeInBubbles =
                                                     eyeBlock != nullptr && eyeBlock->path() == "bubble_column",

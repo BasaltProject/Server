@@ -56,6 +56,9 @@ public:
     /// Forgets what `snapshotMatching` cached for the previous tick's entity snapshot.
     void beginSnapshot();
 
+    /// Drops the cache if it belongs to `data`, before that snapshot vector is freed and its address reused.
+    void endSnapshot(const entity::ServerEntity* const* data);
+
     /// The members of `snapshot`, in its order, that `accepts` takes, scanned once per key and tick.
     [[nodiscard]] Matches snapshotMatching(const std::vector<entity::ServerEntity*>& snapshot, const std::string& key,
                                            const std::function<bool(const entity::ServerEntity&)>& accepts) const;
@@ -101,6 +104,9 @@ private:
     /// for by reading the neighbours and checking each hit against where it stands now. Guarded by `mutex_`.
     mutable std::unordered_map<std::int64_t, std::vector<Indexed>> index_;
     mutable bool indexValid_ = false;
+
+    void rebuildIndexIfStale() const;
+
     mutable std::vector<Indexed> candidates_;
 
     struct RangeKey {

@@ -383,18 +383,29 @@ void EnvironmentTickSystem::tickEntityPortals(world::LoadedWorld& world) {
         return;
     }
     world::LoadedWorld* target = nullptr;
-    for (entity::ServerEntity* mob : world.state().entities()) {
-        std::optional<PortalAxis> axis;
-        const auto column = static_cast<std::int32_t>(std::floor(mob->x));
-        const auto row = static_cast<std::int32_t>(std::floor(mob->z));
-        for (const double lift : {0.0, mob->height() / 2.0}) {
-            const std::optional<std::int32_t> state =
-                world.state().blockState(column, static_cast<std::int32_t>(std::floor(mob->y + lift)), row);
-            axis = state.has_value() ? server::world::portal::PortalShape::axisOf(*state) : std::nullopt;
-            if (axis.has_value()) {
-                break;
+    const std::vector<entity::ServerEntity*> mobs = world.state().entities();
+    thread_local std::vector<std::optional<PortalAxis>> axes;
+    axes.clear();
+    {
+        const world::WorldState::BlockReadScope readScope{world.state()};
+        for (const entity::ServerEntity* mob : mobs) {
+            std::optional<PortalAxis> found;
+            const auto column = static_cast<std::int32_t>(std::floor(mob->x));
+            const auto row = static_cast<std::int32_t>(std::floor(mob->z));
+            for (const double lift : {0.0, mob->height() / 2.0}) {
+                const std::optional<std::int32_t> state =
+                    world.state().blockState(column, static_cast<std::int32_t>(std::floor(mob->y + lift)), row);
+                found = state.has_value() ? server::world::portal::PortalShape::axisOf(*state) : std::nullopt;
+                if (found.has_value()) {
+                    break;
+                }
             }
+            axes.push_back(found);
         }
+    }
+    for (std::size_t at = 0; at < mobs.size(); ++at) {
+        entity::ServerEntity* mob = mobs[at];
+        const std::optional<PortalAxis> axis = axes[at];
         if (mob->portalCooldown > 0) {
             // parity: `Entity.setAsInsidePortal` rests a cooling entity longer while it stands in the frame.
             mob->portalCooldown = axis.has_value() ? kEntityPortalCooldown : mob->portalCooldown - 1;

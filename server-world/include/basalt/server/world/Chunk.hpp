@@ -136,6 +136,11 @@ public:
 
     [[nodiscard]] SharedLight cachedBlockLight() const;
 
+    /// Whether a layer has been computed, without taking a reference to it.
+    [[nodiscard]] bool hasCachedLight(bool sky) const noexcept {
+        return (sky ? light_->hasSky : light_->hasBlock).load(std::memory_order_acquire);
+    }
+
     void invalidateLight();
 
     void markLightStale();
@@ -402,6 +407,8 @@ private:
         std::mutex lock;
         AtomicSharedLight sky;
         AtomicSharedLight block;
+        std::atomic<bool> hasSky{false};
+        std::atomic<bool> hasBlock{false};
         std::atomic<bool> staleSky{false};
         std::atomic<bool> staleBlock{false};
         std::uint64_t skyVersion = 0;

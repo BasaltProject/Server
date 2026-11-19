@@ -609,14 +609,17 @@ std::vector<BlockChange> RandomTicks::tick(const randomTicks::Context& context,
     std::vector<BlockChange> changes;
     const auto found = walks_.find(context.worldName);
     std::int32_t walkState = found == walks_.end() ? static_cast<std::int32_t>(context.seed) : found->second;
-    for (const std::array<std::int32_t, 2>& position : chunks) {
-        const server::world::Chunk* chunk = context.world.chunkIfLoaded(position[0], position[1]);
+    thread_local std::vector<server::world::Chunk*> resolved;
+    context.world.chunksIfLoaded(chunks, resolved);
+    for (std::size_t at = 0; at < chunks.size(); ++at) {
+        const std::array<std::int32_t, 2>& position = chunks[at];
+        const server::world::Chunk* chunk = resolved[at];
         if (chunk == nullptr) {
             continue;
         }
         // parity: a chunk ticks once it is lit, which the light thread gets to a moment after it stands.
         if (context.world.lightsAsynchronously() &&
-            (chunk->cachedBlockLight() == nullptr || (context.hasSkylight && chunk->cachedSkyLight() == nullptr))) {
+            (!chunk->hasCachedLight(false) || (context.hasSkylight && !chunk->hasCachedLight(true)))) {
             context.world.requestLight(position[0], position[1]);
             continue;
         }
@@ -632,10 +635,15 @@ std::vector<BlockChange> RandomTicks::tick(const randomTicks::Context& context,
         }
         for (std::size_t index = 0; index < chunk->sectionCount(); index++) {
             // parity: `LevelChunkSection.isRandomlyTicking`. Skipping the sections that hold nothing.
-            if (!chunk->section(index).mayContain(registry::blockSupport::ticksRandomly)) {
+            if (!chunk->section(index).mayContainRandomTicking(registry::blockSupport::ticksRandomly)) {
                 continue;
             }
             const std::int32_t sectionY = chunk->verticalBounds().minY() + (static_cast<std::int32_t>(index) << 4);
+            std::int32_t ahead = walkState;
+            for (std::int32_t step = 0; step < speed; step++) {
+                const std::int32_t walk = nextWalk(ahead);
+                chunk->section(index).prefetchBlock(walk & 15, (walk >> 16) & 15, (walk >> 8) & 15);
+            }
             for (std::int32_t step = 0; step < speed; step++) {
                 const std::int32_t walk = nextWalk(walkState);
                 const std::int32_t x = minX + (walk & 15);

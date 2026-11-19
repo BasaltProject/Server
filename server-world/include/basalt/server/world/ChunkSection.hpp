@@ -37,6 +37,7 @@ public:
     ChunkSection();
 
     [[nodiscard]] std::int32_t blockStateId(std::int32_t x, std::int32_t y, std::int32_t z) const;
+    void prefetchBlock(std::int32_t x, std::int32_t y, std::int32_t z) const;
 
     bool setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
@@ -59,6 +60,9 @@ public:
     [[nodiscard]] bool mayContain(Predicate&& predicate) const {
         return blockStateIds_.anyValue(std::forward<Predicate>(predicate));
     }
+
+    /// `mayContain` for the one predicate random ticking asks with, remembered until the section is next written.
+    [[nodiscard]] bool mayContainRandomTicking(bool (*ticksRandomly)(std::int32_t)) const;
 
     template <typename Predicate>
     [[nodiscard]] bool mayContainBiome(Predicate&& predicate) const {
@@ -104,6 +108,7 @@ public:
 
 private:
     ContentVersion version_;
+    mutable std::atomic<std::uint64_t> randomTickingMemo_{0};
     PalettedContainer blockStateIds_;
     PalettedContainer biomeIds_;
     std::int32_t nonAirBlockCount_ = 0;

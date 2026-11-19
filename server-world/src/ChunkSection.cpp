@@ -39,6 +39,21 @@ std::uint64_t ContentVersion::get() const noexcept {
 
 ChunkSection::ChunkSection() : blockStateIds_(kBlocks, registry::blocks::air().stateId), biomeIds_(kBiomes, 0) {}
 
+bool ChunkSection::mayContainRandomTicking(bool (*ticksRandomly)(std::int32_t)) const {
+    const std::uint64_t version = version_.get();
+    const std::uint64_t memo = randomTickingMemo_.load(std::memory_order_relaxed);
+    if (memo != 0 && (memo >> 1) == version) {
+        return (memo & 1U) != 0;
+    }
+    const bool found = blockStateIds_.anyValue(ticksRandomly);
+    randomTickingMemo_.store((version << 1) | (found ? 1U : 0U), std::memory_order_relaxed);
+    return found;
+}
+
+void ChunkSection::prefetchBlock(std::int32_t x, std::int32_t y, std::int32_t z) const {
+    blockStateIds_.prefetch(index(x, y, z));
+}
+
 std::int32_t ChunkSection::blockStateId(std::int32_t x, std::int32_t y, std::int32_t z) const {
     return blockStateIds_.get(index(x, y, z));
 }

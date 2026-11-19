@@ -179,9 +179,9 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
     const double lowY = std::min(fromY, projectile.y) - reach;
     const double highY = std::max(fromY, projectile.y) + margin;
     for (ServerEntity* candidate : living) {
-        if (candidate->dragon == nullptr && (candidate->typeTraits() & entity::traits::kPhantom) == 0 &&
-            (candidate->x < lowX || candidate->x > highX || candidate->z < lowZ || candidate->z > highZ ||
-             candidate->y < lowY || candidate->y > highY)) {
+        if ((candidate->x < lowX || candidate->x > highX || candidate->z < lowZ || candidate->z > highZ ||
+             candidate->y < lowY || candidate->y > highY) &&
+            candidate->dragon == nullptr && (candidate->typeTraits() & entity::traits::kPhantom) == 0) {
             continue;
         }
         if (candidate->entityId() == projectile.entityId() || sparedId(candidate->entityId()) ||

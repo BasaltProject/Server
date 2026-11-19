@@ -135,43 +135,51 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
                                                                   double height, std::size_t movedThrough,
                                                                   const Toucher& toucher = {}) {
         // `y` is a range: the jar's box test counts a plate the body reaches upwards too.
-        for (std::int32_t x = wire::common::mth::floor(atX - halfWidth); x <= wire::common::mth::floor(atX + halfWidth);
-             ++x) {
-            for (std::int32_t y = wire::common::mth::floor(atY); y <= wire::common::mth::floor(atY + height); ++y) {
-                for (std::int32_t z = wire::common::mth::floor(atZ - halfWidth);
-                     z <= wire::common::mth::floor(atZ + halfWidth); ++z) {
-                    if (!region.ownsPosition(static_cast<double>(x) + 0.5, static_cast<double>(z) + 0.5)) {
-                        continue;
-                    }
-                    const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
-                    if (!stateId.has_value() || !world::pressurePlates::isPlate(*stateId) ||
-                        !world::pressurePlates::touches(x, y, z, atX, atY, atZ, halfWidth, height)) {
-                        continue;
-                    }
-                    // parity: `PressurePlateBlock.getSignalStrength` counts only mobs on stone plates.
-                    const wire::common::Identifier* plate = server::registry::blockStateDefinitions::blockOf(*stateId);
-                    const bool livingOnly = plate != nullptr && (plate->path() == "stone_pressure_plate" ||
-                                                                 plate->path() == "polished_blackstone_pressure_plate");
-                    if (toucher.id >= 0 && !(livingOnly && !toucher.living) &&
-                        !world::pressurePlates::isPressed(*stateId) &&
-                        !world.events().allowed(&server::plugins::pluginEventTypes::entityInteract,
-                                                [&](server::plugins::PluginEvent& event) {
-                                                    plugins::hookEvents::entity(event, world.name(), toucher.id,
-                                                                                toucher.type, atX, atY, atZ);
-                                                    event.set("block_x", static_cast<std::int64_t>(x));
-                                                    event.set("block_y", static_cast<std::int64_t>(y));
-                                                    event.set("block_z", static_cast<std::int64_t>(z));
-                                                    event.set("block", plugins::hookEvents::blockName(*stateId));
-                                                })) {
-                        continue;
-                    }
-                    if (const std::optional<world::BlockChange> change = world::pressurePlates::update(
-                            world.state(), x, y, z, world::pressurePlates::Trigger::Touched,
-                            standingOn(world, x, y, z, watchers, items, movedThrough), world.gameTime());
-                        change.has_value()) {
-                        broadcaster_->announceRedstone(world, watchers, *change);
+        std::vector<std::array<std::int32_t, 3>> cells;
+        {
+            const world::WorldState::BlockReadScope readScope{world.state()};
+            for (std::int32_t x = wire::common::mth::floor(atX - halfWidth);
+                 x <= wire::common::mth::floor(atX + halfWidth); ++x) {
+                for (std::int32_t y = wire::common::mth::floor(atY); y <= wire::common::mth::floor(atY + height); ++y) {
+                    for (std::int32_t z = wire::common::mth::floor(atZ - halfWidth);
+                         z <= wire::common::mth::floor(atZ + halfWidth); ++z) {
+                        if (!region.ownsPosition(static_cast<double>(x) + 0.5, static_cast<double>(z) + 0.5)) {
+                            continue;
+                        }
+                        const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
+                        if (stateId.has_value() && world::pressurePlates::isPlate(*stateId) &&
+                            world::pressurePlates::touches(x, y, z, atX, atY, atZ, halfWidth, height)) {
+                            cells.push_back({x, y, z});
+                        }
                     }
                 }
+            }
+        }
+        for (const auto& [x, y, z] : cells) {
+            const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
+            if (!stateId.has_value() || !world::pressurePlates::isPlate(*stateId)) {
+                continue;
+            }
+            // parity: `PressurePlateBlock.getSignalStrength` counts only mobs on stone plates.
+            const wire::common::Identifier* plate = server::registry::blockStateDefinitions::blockOf(*stateId);
+            const bool livingOnly = plate != nullptr && (plate->path() == "stone_pressure_plate" ||
+                                                         plate->path() == "polished_blackstone_pressure_plate");
+            if (toucher.id >= 0 && !(livingOnly && !toucher.living) && !world::pressurePlates::isPressed(*stateId) &&
+                !world.events().allowed(
+                    &server::plugins::pluginEventTypes::entityInteract, [&](server::plugins::PluginEvent& event) {
+                        plugins::hookEvents::entity(event, world.name(), toucher.id, toucher.type, atX, atY, atZ);
+                        event.set("block_x", static_cast<std::int64_t>(x));
+                        event.set("block_y", static_cast<std::int64_t>(y));
+                        event.set("block_z", static_cast<std::int64_t>(z));
+                        event.set("block", plugins::hookEvents::blockName(*stateId));
+                    })) {
+                continue;
+            }
+            if (const std::optional<world::BlockChange> change = world::pressurePlates::update(
+                    world.state(), x, y, z, world::pressurePlates::Trigger::Touched,
+                    standingOn(world, x, y, z, watchers, items, movedThrough), world.gameTime());
+                change.has_value()) {
+                broadcaster_->announceRedstone(world, watchers, *change);
             }
         }
     };
@@ -404,27 +412,31 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
     };
     const auto [playerHalf, playerHeight] = sizeOf(wire::common::Identifier::vanilla("player"));
     const auto [itemHalf, itemHeight] = sizeOf(wire::common::Identifier::vanilla("item"));
-    for (const PlayerSession* player : watchers) {
-        if (player->gamemode == Gamemode::Spectator || !region.ownsPosition(player->x, player->z)) {
-            continue;
-        }
-        crossingsOf(world, player->x, player->y, player->z, playerHalf, playerHeight, crossed);
-    }
     thread_local std::vector<world::ItemPose> items;
     world.state().itemPoses(items);
-    for (const world::ItemPose& item : items) {
-        if (region.ownsPosition(item.x, item.z)) {
-            crossingsOf(world, item.x, item.y, item.z, itemHalf, itemHeight, crossed);
+    const std::vector<entity::ServerEntity*> everything = world.state().entities();
+    {
+        const world::WorldState::BlockReadScope readScope{world.state()};
+        for (const PlayerSession* player : watchers) {
+            if (player->gamemode == Gamemode::Spectator || !region.ownsPosition(player->x, player->z)) {
+                continue;
+            }
+            crossingsOf(world, player->x, player->y, player->z, playerHalf, playerHeight, crossed);
         }
-    }
-    // parity: `TripWireBlock.entityInside`.
-    for (const entity::ServerEntity* crossing : world.state().entities()) {
-        if (crossing->removed || entity::blockTriggers::ignored(crossing->type()) ||
-            !region.ownsPosition(crossing->x, crossing->z)) {
-            continue;
+        for (const world::ItemPose& item : items) {
+            if (region.ownsPosition(item.x, item.z)) {
+                crossingsOf(world, item.x, item.y, item.z, itemHalf, itemHeight, crossed);
+            }
         }
-        const auto [half, height] = halfAndHeightOf(*crossing);
-        crossingsOf(world, crossing->x, crossing->y, crossing->z, half, height, crossed);
+        // parity: `TripWireBlock.entityInside`.
+        for (const entity::ServerEntity* crossing : everything) {
+            if (crossing->removed || entity::blockTriggers::ignored(crossing->type()) ||
+                !region.ownsPosition(crossing->x, crossing->z)) {
+                continue;
+            }
+            const auto [half, height] = halfAndHeightOf(*crossing);
+            crossingsOf(world, crossing->x, crossing->y, crossing->z, half, height, crossed);
+        }
     }
     for (const std::int64_t packed : crossed) {
         world::tripwires::press(world.state(), unpackX(packed), unpackY(packed), unpackZ(packed), true,

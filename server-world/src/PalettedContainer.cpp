@@ -70,6 +70,17 @@ std::int32_t PalettedContainer::get(std::size_t index) const {
     return at(index);
 }
 
+void PalettedContainer::prefetch(std::size_t index) const {
+    std::shared_lock<std::shared_mutex> guard{lock_, std::defer_lock};
+    if (shared_.load(std::memory_order_acquire)) {
+        guard.lock();
+    }
+    __builtin_prefetch(palette_.data());
+    if (!words_.empty()) {
+        __builtin_prefetch(words_.data() + ((index * static_cast<std::size_t>(bits_)) >> 6));
+    }
+}
+
 bool PalettedContainer::set(std::size_t index, std::int32_t value) {
     std::unique_lock<std::shared_mutex> guard{lock_, std::defer_lock};
     if (shared_.load(std::memory_order_acquire)) {

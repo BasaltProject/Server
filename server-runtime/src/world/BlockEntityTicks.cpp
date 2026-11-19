@@ -161,10 +161,13 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                               const Hooks& hooks, bool hasSkylight, bool sunMoves, std::int64_t worldSeed) {
     std::vector<BlockChange> changes;
     std::vector<Pending> pending;
+    thread_local std::vector<server::world::Chunk*> resolved;
+    world.chunksIfLoaded(chunks, resolved);
     // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
     if (gameTime % daylightDetectors::kIntervalTicks == 0) {
-        for (const std::array<std::int32_t, 2>& position : chunks) {
-            const server::world::Chunk* chunk = world.chunkIfLoaded(position[0], position[1]);
+        for (std::size_t at = 0; at < chunks.size(); ++at) {
+            const std::array<std::int32_t, 2>& position = chunks[at];
+            const server::world::Chunk* chunk = resolved[at];
             if (chunk == nullptr) {
                 continue;
             }
@@ -187,8 +190,9 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
     }
     std::vector<BlockChange> hives;
     std::vector<std::array<std::int32_t, 3>> catalysts;
-    for (const std::array<std::int32_t, 2>& position : chunks) {
-        server::world::Chunk* chunk = world.chunkIfLoaded(position[0], position[1]);
+    for (std::size_t at = 0; at < chunks.size(); ++at) {
+        const std::array<std::int32_t, 2>& position = chunks[at];
+        server::world::Chunk* chunk = resolved[at];
         if (chunk == nullptr || chunk->blockEntityCount() == 0) {
             continue;
         }
