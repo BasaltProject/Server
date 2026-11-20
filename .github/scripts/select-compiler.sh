@@ -81,6 +81,13 @@ Darwin)
     ;;
 MINGW* | MSYS* | CYGWIN*)
     args=""
+    # The MSVC STL on the runner image rejects Clang older than 22.
+    clang_major="$(clang --version 2>/dev/null | sed -n 's/.*clang version \([0-9]*\).*/\1/p' | head -1)"
+    if [ "${clang_major:-0}" -lt 22 ]; then
+        retry 4 choco upgrade llvm --no-progress -y || retry 4 choco install llvm --no-progress -y
+        echo "C:\\Program Files\\LLVM\\bin" >>"$GITHUB_PATH"
+        export PATH="/c/Program Files/LLVM/bin:$PATH"
+    fi
     if [ "${PROCESSOR_ARCHITECTURE:-}" = ARM64 ] || [ "${PROCESSOR_ARCHITEW6432:-}" = ARM64 ]; then
         # An emulated x64 Clang targets x64 unless told otherwise.
         if ! command -v clang >/dev/null; then
