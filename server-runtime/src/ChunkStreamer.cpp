@@ -1,5 +1,7 @@
 #include "PendingChunkBatch.hpp"
 
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
@@ -8,6 +10,7 @@
 #include <basalt/server/runtime/config/GroupsConfig.hpp>
 #include <basalt/server/runtime/permission/ServerPermissions.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/AntiXray.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -231,6 +234,26 @@ bool ChunkStreamer::bypassesAntiXray(const world::AntiXray& antiXray) const {
     return *batchBypass_;
 }
 
+namespace {
+
+template <typename TypeOf>
+void notifyChunk(ClientSession& owner, TypeOf type, std::int32_t chunkX, std::int32_t chunkZ) {
+    const plugins::EventSink* events = owner.options().events;
+    const player::PlayerSession* session = owner.playerSession();
+    const world::LoadedWorld* world = owner.currentWorld();
+    if (events == nullptr || session == nullptr || world == nullptr || !events->listening(type)) {
+        return;
+    }
+    events->notify(type, [&](server::plugins::PluginEvent& event) {
+        plugins::EventSink::player(event, *session);
+        event.set("world", world->name());
+        event.set("chunk_x", static_cast<std::int64_t>(chunkX));
+        event.set("chunk_z", static_cast<std::int64_t>(chunkZ));
+    });
+}
+
+} // namespace
+
 void ChunkStreamer::sendChunk(Chunk& chunk) {
     world::LoadedWorld* world = owner_->currentWorld();
     const bool hasSkylight = world == nullptr || config::dimensionFacts(world->declaration().dimension).hasSkylight;
@@ -303,6 +326,7 @@ void ChunkStreamer::sendChunk(Chunk& chunk) {
         wire::protocol::varInt::write(buffer, chunk.chunkZ());
         buffer.writeBytes(*lightBytes);
     });
+    notifyChunk(*owner_, &server::plugins::pluginEventTypes::playerChunkLoad, chunk.chunkX(), chunk.chunkZ());
 }
 
 std::int32_t ChunkStreamer::trackedRadius() const {
@@ -370,6 +394,7 @@ void ChunkStreamer::applyDelta(const server::world::ChunkTracker::Delta& delta) 
         owner_->sendCompressed(ForgetLevelChunkPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             ForgetLevelChunkPacket{.chunkX = pos.x, .chunkZ = pos.z}.write(buffer);
         });
+        notifyChunk(*owner_, &server::plugins::pluginEventTypes::playerChunkUnload, pos.x, pos.z);
     }
 }
 
@@ -408,6 +433,7 @@ void ChunkStreamer::streamChunksAround(double x, double z) {
         owner_->sendCompressed(ForgetLevelChunkPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             ForgetLevelChunkPacket{.chunkX = pos.x, .chunkZ = pos.z}.write(buffer);
         });
+        notifyChunk(*owner_, &server::plugins::pluginEventTypes::playerChunkUnload, pos.x, pos.z);
     }
     // No flush: the outbound loop is the only drainer, so the requested rate holds and reads never stall on encoding.
 }

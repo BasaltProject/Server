@@ -108,6 +108,15 @@ void moveLegacyPlayersDatabase(const wire::common::Logger& logger) {
 
 } // namespace
 
+void BasaltServer::toggleWhitelist(bool value) {
+    if (whitelistEnforced_ == value) {
+        return;
+    }
+    whitelistEnforced_ = value;
+    eventSink_.notify(&server::plugins::pluginEventTypes::serverWhitelistToggle,
+                      [value](server::plugins::PluginEvent& event) { event.set("enabled", value); });
+}
+
 BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::WorldsConfig& worldsConfig,
                            config::LiveConfigs& live, Options options)
     : config_(&config), worldsConfig_(&worldsConfig), live_(&live), options_(std::move(options)),
@@ -163,6 +172,23 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         // Resolved, not serialized: a client translates the key itself and a log cannot.
         logger_.info([this, &message] { return wire::text::resolvePlainText(message, options_.lang); });
+    };
+    triggerHooks.criterionAllowed = [this](std::string_view name, const wire::common::Identifier& advancement,
+                                           std::string_view criterion) {
+        if (!eventSink_.listening(&server::plugins::pluginEventTypes::playerAdvancementCriterionGrant)) {
+            return true;
+        }
+        for (player::PlayerSession* player : playerRegistry_.snapshot()) {
+            if (player->name() == name) {
+                return eventSink_.allowed(&server::plugins::pluginEventTypes::playerAdvancementCriterionGrant,
+                                          [&](server::plugins::PluginEvent& event) {
+                                              plugins::EventSink::player(event, *player);
+                                              event.set("advancement", advancement.toString());
+                                              event.set("criterion", std::string{criterion});
+                                          });
+            }
+        }
+        return true;
     };
     triggerHooks.completed = [this](std::string_view name, const wire::common::Identifier& advancement) {
         if (!eventSink_.listening(&server::plugins::pluginEventTypes::playerAdvancement)) {
@@ -711,7 +737,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.nextSeed = [] { return scratchSeed(); };
     wiring.fetchMojangUuid = [](const std::string& name) { return wire::auth::mojangUuidOf(name); };
     wiring.whitelistEnforced = [this] { return whitelistEnforced_; };
-    wiring.setWhitelistEnforced = [this](bool value) { whitelistEnforced_ = value; };
+    wiring.setWhitelistEnforced = [this](bool value) { toggleWhitelist(value); };
     wiring.broadcastConsoleToOps = config.tuning.broadcastConsoleToOps;
     wiring.broadcastRconToOps = config.tuning.broadcastRconToOps;
     wiring.kickUnlistedPlayers = [this] { kickUnlistedPlayers(); };
@@ -915,7 +941,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         .groups = [this]() -> const config::GroupsConfig& { return live_->current()->groups; },
         .sessions = sessions,
         .whitelistEnforced = [this] { return whitelistEnforced_; },
-        .setWhitelistEnforced = [this](bool value) { whitelistEnforced_ = value; }});
+        .setWhitelistEnforced = [this](bool value) { toggleWhitelist(value); }});
     miscServices_.scoreboards = std::make_unique<plugins::ServerScoreboards>(
         plugins::ServerScoreboards::Hooks{.sessions = sessions, .main = &scoreboard_, .mainTeams = &teams_});
     miscServices_.bossBars = std::make_unique<plugins::ServerBossBars>(
@@ -973,7 +999,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             },
         .live = [this] { return config_->tuning.live.get(); },
         .whitelistOn = [this] { return whitelistEnforced_; },
-        .setWhitelistOn = [this](bool value) { whitelistEnforced_ = value; },
+        .setWhitelistOn = [this](bool value) { toggleWhitelist(value); },
         .kickUnlisted = [this] { kickUnlistedPlayers(); },
         .heartbeatSeconds = [this] { return heartbeatSeconds_.load(); },
         .setHeartbeatSeconds =

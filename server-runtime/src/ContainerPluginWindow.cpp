@@ -188,6 +188,9 @@ bool ContainerMenuController::resultMayBeTaken(const MenuSlot& slot, bool shift)
         } else if (openGrindstone_ && block->index == Menu::kGrindstoneResult) {
             kind = "grindstone";
             result = grindstoneSlots_[Menu::kGrindstoneResult];
+        } else if (openCartography_ && block->index == Menu::kCartographyResult) {
+            kind = "cartography";
+            result = cartographySlots_[Menu::kCartographyResult];
         } else if (openStonecutter_ && block->index == Menu::kStonecutterResult) {
             kind = "stonecutter";
             result = stonecutterResult_;

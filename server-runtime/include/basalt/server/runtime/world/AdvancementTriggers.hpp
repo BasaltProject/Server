@@ -66,6 +66,9 @@ public:
         EntityTagged entityTagged;
         Announce announce;
         std::function<void(std::string_view player, const wire::common::Identifier& advancement)> completed;
+        std::function<bool(std::string_view player, const wire::common::Identifier& advancement,
+                           std::string_view criterion)>
+            criterionAllowed;
         AwardExperience awardExperience;
         AwardRecipe awardRecipe;
         server::world::loot::TagLookup tags;

@@ -248,3 +248,10 @@ HOOK_EVENT(entityPortalExit, "entity.portal_exit", true,
            MUTABLE("to_x", "to_y", "to_z"))
 HOOK_EVENT(blockDispenseArmor, "block.dispense_armor", true, FIELDS("world", "x", "y", "z", "entity_id", "item"),
            MUTABLE())
+HOOK_EVENT(serverWhitelistToggle, "server.whitelist_toggle", false, FIELDS("enabled"), MUTABLE())
+HOOK_EVENT(playerChunkLoad, "player.chunk_load", false, FIELDS("player_name", "player_uuid", "world", "chunk_x", "chunk_z"),
+           MUTABLE())
+HOOK_EVENT(playerChunkUnload, "player.chunk_unload", false,
+           FIELDS("player_name", "player_uuid", "world", "chunk_x", "chunk_z"), MUTABLE())
+HOOK_EVENT(playerAdvancementCriterionGrant, "player.advancement_criterion_grant", true,
+           FIELDS("player_name", "player_uuid", "world", "advancement", "criterion"), MUTABLE())

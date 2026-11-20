@@ -416,6 +416,10 @@ bool AdvancementTriggers::award(std::string_view player, std::string_view uuid, 
         return false;
     }
     const bool wasDone = advancement->isComplete(progress_->grantedCriteria(uuid, id));
+    if (hooks_.criterionAllowed && !progress_->grantedCriteria(uuid, id).contains(std::string{criterion}) &&
+        !hooks_.criterionAllowed(player, id, criterion)) {
+        return false;
+    }
     if (!progress_->grantCriterion(uuid, id, criterion)) {
         return false;
     }

@@ -142,6 +142,8 @@ public:
     void requestRestart();
 
 private:
+    void toggleWhitelist(bool value);
+
     void tickWorlds(bool worldRuns);
 
     void startBedrockListener();
