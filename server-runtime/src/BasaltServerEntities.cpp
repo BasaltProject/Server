@@ -248,11 +248,14 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     // One snapshot per tick: `entities()` copies under the world lock and per-entity calls made a lock convoy.
     std::vector<entity::ServerEntity*> living;
     world.state().beginEntitySnapshot();
+
     struct SnapshotRelease {
         world::WorldState& state;
         const std::vector<entity::ServerEntity*>& snapshot;
+
         ~SnapshotRelease() { state.endEntitySnapshot(snapshot.data()); }
     } snapshotRelease{world.state(), living};
+
     for (entity::ServerEntity* candidate : world.state().entities()) {
         if (!candidate->removed) {
             living.push_back(candidate);

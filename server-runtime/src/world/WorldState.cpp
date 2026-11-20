@@ -84,9 +84,7 @@ void WorldState::mine(std::string_view what) const {
     }
 }
 
-Chunk* WorldState::chunkAtLocked(std::int64_t chunkKey) const {
-    return chunkIndex_.find(chunkKey);
-}
+Chunk* WorldState::chunkAtLocked(std::int64_t chunkKey) const { return chunkIndex_.find(chunkKey); }
 
 std::vector<Chunk*> WorldState::snapshot() const {
     const WorldReadLock lock{mutex_};
