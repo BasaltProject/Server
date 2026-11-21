@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -106,7 +107,7 @@ const Kind* ofItem(const Identifier& item) {
         return nullptr;
     }
     const auto found = std::ranges::find_if(kKinds, [&item](const Kind& kind) { return kind.item == item.path(); });
-    return found == kKinds.end() ? nullptr : &*found;
+    return found == kKinds.end() ? nullptr : std::to_address(found);
 }
 
 const Kind* ofEntity(const Identifier& type) {
@@ -114,7 +115,7 @@ const Kind* ofEntity(const Identifier& type) {
         return nullptr;
     }
     const auto found = std::ranges::find_if(kKinds, [&type](const Kind& kind) { return kind.entity == type.path(); });
-    return found == kKinds.end() ? nullptr : &*found;
+    return found == kKinds.end() ? nullptr : std::to_address(found);
 }
 
 bool pickedUpWith(const Kind& kind, const Identifier& held) {

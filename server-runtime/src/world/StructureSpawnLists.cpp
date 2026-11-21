@@ -12,10 +12,10 @@ namespace structure = server::world::structure;
 
 using wire::common::Identifier;
 
-[[nodiscard]] std::vector<SpawnerEntry> entriesOf(const structure::structureSpawnOverrides::Override& override) {
+[[nodiscard]] std::vector<SpawnerEntry> entriesOf(const structure::structureSpawnOverrides::Override& spawnOverride) {
     std::vector<SpawnerEntry> entries;
-    entries.reserve(override.spawns.size());
-    for (const structure::structureSpawnOverrides::SpawnEntry& entry : override.spawns) {
+    entries.reserve(spawnOverride.spawns.size());
+    for (const structure::structureSpawnOverrides::SpawnEntry& entry : spawnOverride.spawns) {
         const std::expected<Identifier, wire::common::IdentifierError> type = Identifier::parse(entry.type);
         if (type.has_value()) {
             entries.push_back(SpawnerEntry{.type = *type,
@@ -30,9 +30,9 @@ using wire::common::Identifier;
 
 [[nodiscard]] const std::vector<SpawnerEntry>& fortressMonsters() {
     static const std::vector<SpawnerEntry> all = [] {
-        const structure::structureSpawnOverrides::Override* override =
+        const structure::structureSpawnOverrides::Override* spawnOverride =
             structure::structureSpawnOverrides::of("fortress", "monster");
-        return override == nullptr ? std::vector<SpawnerEntry>{} : entriesOf(*override);
+        return spawnOverride == nullptr ? std::vector<SpawnerEntry>{} : entriesOf(*spawnOverride);
     }();
     return all;
 }
@@ -52,16 +52,16 @@ std::optional<std::vector<SpawnerEntry>> StructureSpawnLists::listAt(std::string
         return fortressMonsters();
     }
     for (const structure::StructureStartRecord& start : queries_.startsIn(pos)) {
-        const structure::structureSpawnOverrides::Override* override =
+        const structure::structureSpawnOverrides::Override* spawnOverride =
             structure::structureSpawnOverrides::of(start.structure, category);
-        if (override == nullptr) {
+        if (spawnOverride == nullptr) {
             continue;
         }
-        const bool inside = override->bounds == structure::structureSpawnOverrides::Bounds::Piece
+        const bool inside = spawnOverride->bounds == structure::structureSpawnOverrides::Bounds::Piece
                                 ? start.hasPieceAt(pos)
                                 : start.contains(pos);
         if (inside) {
-            return entriesOf(*override);
+            return entriesOf(*spawnOverride);
         }
     }
     return std::nullopt;

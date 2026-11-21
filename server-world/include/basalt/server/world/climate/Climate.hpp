@@ -138,7 +138,7 @@ private:
     explicit RTree(std::unique_ptr<Node> root) : root_(std::move(root)) {}
 
     std::unique_ptr<Node> root_;
-    mutable std::size_t slot_;
+    mutable std::size_t slot_{0};
 };
 
 } // namespace basalt::server::world::climate

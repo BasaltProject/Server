@@ -25,14 +25,14 @@ Component MessageOverrides::apply(const Component& message, const player::Player
 Component MessageOverrides::transform(const Component& component, const player::PlayerSession* player) const {
     const auto* translatable = std::get_if<Component::Translatable>(&component.payload());
     if (translatable != nullptr) {
-        const auto override = messages_.find(translatable->key);
+        const auto messageOverride = messages_.find(translatable->key);
         std::vector<Component> args;
         args.reserve(translatable->args.size());
         for (const Component& argument : translatable->args) {
             args.push_back(transform(argument, player));
         }
-        if (override != messages_.end()) {
-            const Component rendered = render(override->second, args, player);
+        if (messageOverride != messages_.end()) {
+            const Component rendered = render(messageOverride->second, args, player);
             if (component.children().empty()) {
                 return rendered;
             }

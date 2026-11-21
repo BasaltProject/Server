@@ -112,8 +112,8 @@ std::optional<std::string> ServerSettings::get(const std::string_view key) const
     }
     const config::BasaltConfig& config = hooks_.config();
     if (key == "motd") {
-        if (const auto override = motdOverride(); override.has_value()) {
-            return override;
+        if (const auto motd = motdOverride(); motd.has_value()) {
+            return motd;
         }
         std::string joined;
         if (hooks_.serverList) {

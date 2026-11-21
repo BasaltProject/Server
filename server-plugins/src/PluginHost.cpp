@@ -467,8 +467,8 @@ std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& 
         return std::nullopt;
     }
     const std::string id{requested.substr(0, dot)};
-    const std::string_view module = requested.substr(dot + 1);
-    const std::optional<std::string> file = wire::plugins::packageLayout::moduleFile(module);
+    const std::string_view moduleName = requested.substr(dot + 1);
+    const std::optional<std::string> file = wire::plugins::packageLayout::moduleFile(moduleName);
     if (!file.has_value()) {
         return std::nullopt;
     }
@@ -479,7 +479,7 @@ std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& 
     if (owner == nullptr) {
         return std::nullopt;
     }
-    if (!owner->manifest.exports.exportsModule(module)) {
+    if (!owner->manifest.exports.exportsModule(moduleName)) {
         return std::nullopt;
     }
     return owner->pkg->read(*file);

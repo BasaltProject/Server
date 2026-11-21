@@ -264,7 +264,12 @@ BedrockListener::BedrockListener(BedrockOptions options, Hooks hooks, std::strin
     : options_(std::move(options)), hooks_(std::move(hooks)), gameVersion_(std::move(gameVersion)),
       logger_(std::move(logger)) {}
 
-BedrockListener::~BedrockListener() { stop(); }
+BedrockListener::~BedrockListener() {
+    try {
+        stop();
+    } catch (...) {
+    }
+}
 
 std::string BedrockListener::prefixedName(std::string_view gamertag) const {
     return options_.prefix + std::string{gamertag};

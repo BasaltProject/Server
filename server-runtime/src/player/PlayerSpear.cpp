@@ -3,6 +3,7 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
+#include <memory>
 #include <numbers>
 #include <optional>
 
@@ -105,7 +106,7 @@ bool Condition::test(std::int32_t ticksUsed, double attackerSpeed, double relati
 
 const Spear* of(std::string_view itemId) {
     const auto found = std::ranges::find(kSpears, itemId, &Spear::item);
-    return found == kSpears.end() ? nullptr : &*found;
+    return found == kSpears.end() ? nullptr : std::to_address(found);
 }
 
 bool tooSoon(std::int32_t ticksSinceSwing, double attackSpeed, std::int32_t tolerance) {

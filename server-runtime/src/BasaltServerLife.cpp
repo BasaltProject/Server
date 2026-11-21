@@ -1486,7 +1486,10 @@ void BasaltServer::startBedrockListener() {
             worldRegistry_->scheduler().global().submit([this, uuid, slot] {
                 player::PlayerSession* session = playerRegistry_.get(uuid);
                 const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
-                const auto found = session == nullptr ? worlds.end() : worlds.find(session->worldName);
+                if (session == nullptr) {
+                    return;
+                }
+                const auto found = worlds.find(session->worldName);
                 if (found == worlds.end() || found->second == nullptr) {
                     return;
                 }

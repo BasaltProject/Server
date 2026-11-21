@@ -61,7 +61,7 @@ TEST_CASE("every function the Lua API installs is listed in the Kiln API manifes
 TEST_CASE("Lua file paths reject symlink escapes and retain plugin-local access") {
     namespace fs = std::filesystem;
     using basalt::server::plugins::pluginApi::pluginFilePath;
-    const fs::path scratch = fs::temp_directory_path() / "basalt-plugin-path-test";
+    const fs::path scratch = fs::current_path() / "basalt-plugin-path-test";
     fs::remove_all(scratch);
     fs::create_directories(scratch / "plugin" / "local");
     fs::create_directories(scratch / "outside");

@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <memory>
 #include <numbers>
 #include <optional>
 
@@ -88,7 +89,7 @@ struct Throwable {
          false},
     }};
     const auto found = std::ranges::find_if(kThrowables, [&](const Throwable& one) { return one.item == item; });
-    return found == kThrowables.end() ? nullptr : &*found;
+    return found == kThrowables.end() ? nullptr : std::to_address(found);
 }
 
 [[nodiscard]] float uncertaintyOf(const config::GameplayRules::Items& items, std::string_view item) {

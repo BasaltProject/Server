@@ -243,8 +243,8 @@ CommandNode* CommandDispatcher::registerCommand(std::shared_ptr<const Command> c
 }
 
 CommandNode* CommandDispatcher::registerBuilt(const Command& command) {
-    const config::CommandOverride& override = environment_->commands().get(command.name());
-    if (!override.enabled) {
+    const config::CommandOverride& commandOverride = environment_->commands().get(command.name());
+    if (!commandOverride.enabled) {
         return nullptr;
     }
     // A second registration replaces the first so clients do not see two roots with one name.
@@ -261,13 +261,13 @@ CommandNode* CommandDispatcher::registerBuilt(const Command& command) {
 
     auto node = std::make_unique<CommandNode>(NodeKind::Literal, command.name());
     node->requiredLevel = command.permissionLevel();
-    node->permission = override.permission.has_value() ? *override.permission : command.permission();
+    node->permission = commandOverride.permission.has_value() ? *commandOverride.permission : command.permission();
     CommandNode& added = root_.addChild(std::move(node));
     command.build(CommandNodeBuilder{added, root_});
     for (const std::string& alias : command.aliases()) {
         static_cast<void>(registerAlias(alias, added));
     }
-    for (const std::string& alias : override.aliases) {
+    for (const std::string& alias : commandOverride.aliases) {
         static_cast<void>(registerAlias(alias, added));
     }
     return &added;

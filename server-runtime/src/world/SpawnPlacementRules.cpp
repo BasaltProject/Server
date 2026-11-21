@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <memory>
 #include <optional>
 #include <string_view>
 
@@ -201,7 +202,7 @@ constexpr std::int32_t kPatrolBlockLight = 8;
         return nullptr;
     }
     const auto found = std::ranges::find(kRegistrations, std::string_view{type.path()}, &Registration::type);
-    return found == kRegistrations.end() ? nullptr : &*found;
+    return found == kRegistrations.end() ? nullptr : std::to_address(found);
 }
 
 [[nodiscard]] const config::DimensionFacts& factsOf(const LoadedWorld& world) {

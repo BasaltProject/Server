@@ -169,8 +169,11 @@ void RemoteService::Impl::dispatch(std::uint64_t id, bool endBusy, std::string f
 
         ~Pending() {
             if (!ran) {
-                if (const std::shared_ptr<Impl> alive = service.lock()) {
-                    alive->post(Completion{id, std::move(failure), endBusy, false});
+                try {
+                    if (const std::shared_ptr<Impl> alive = service.lock()) {
+                        alive->post(Completion{id, std::move(failure), endBusy, false});
+                    }
+                } catch (...) {
                 }
             }
         }

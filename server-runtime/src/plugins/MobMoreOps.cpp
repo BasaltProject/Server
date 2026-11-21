@@ -533,15 +533,15 @@ void addBosses(Operations& operations) {
         if (entity.dragon == nullptr) {
             return std::vector<std::string>{};
         }
-        std::optional<std::array<std::int32_t, 3>> final;
+        std::optional<std::array<std::int32_t, 3>> finalPos;
         if (arguments.size() >= 6) {
-            final = std::array<std::int32_t, 3>{static_cast<std::int32_t>(asInt(at(arguments, 3))),
-                                                static_cast<std::int32_t>(asInt(at(arguments, 4))),
-                                                static_cast<std::int32_t>(asInt(at(arguments, 5)))};
+            finalPos = std::array<std::int32_t, 3>{static_cast<std::int32_t>(asInt(at(arguments, 3))),
+                                                   static_cast<std::int32_t>(asInt(at(arguments, 4))),
+                                                   static_cast<std::int32_t>(asInt(at(arguments, 5)))};
         }
         const std::optional<entity::enderDragon::Path> path = entity::enderDragon::findPath(
             *entity.dragon, static_cast<std::int32_t>(asInt(at(arguments, 0))),
-            static_cast<std::int32_t>(asInt(at(arguments, 1))), final, asBool(at(arguments, 2)));
+            static_cast<std::int32_t>(asInt(at(arguments, 1))), finalPos, asBool(at(arguments, 2)));
         std::vector<std::string> rows;
         if (path.has_value()) {
             for (const auto& node : path->nodes) {

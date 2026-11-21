@@ -4,6 +4,7 @@
 #include <array>
 #include <charconv>
 #include <cstdint>
+#include <memory>
 #include <utility>
 
 namespace basalt::server::runtime::world {
@@ -81,7 +82,7 @@ const GameRule* byId(std::string_view id) {
     constexpr std::string_view kVanilla = "minecraft:";
     const std::string_view bare = id.starts_with(kVanilla) ? id.substr(kVanilla.size()) : id;
     const auto found = std::ranges::find(kAll, bare, &GameRule::id);
-    return found == kAll.end() ? nullptr : &*found;
+    return found == kAll.end() ? nullptr : std::to_address(found);
 }
 
 } // namespace gameRules
