@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
@@ -30,19 +32,6 @@ constexpr float kPiFloat = 3.1415927F;
 
 constexpr std::array<std::array<std::int32_t, 3>, 6> kDirections = {
     {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}};
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"missing vanilla block minecraft:" + std::string{path}};
-    }
-    return found->stateId;
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
-}
 
 [[nodiscard]] bool isWaterBlock(std::optional<std::int32_t> stateId) {
     if (!stateId.has_value()) {

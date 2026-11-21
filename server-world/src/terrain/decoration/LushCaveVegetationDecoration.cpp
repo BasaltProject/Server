@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -16,7 +18,6 @@
 namespace basalt::server::world::terrain::decoration {
 namespace {
 
-constexpr std::int32_t kVegetalDecorationStep = 9;
 constexpr std::int32_t kMaxPlacementY = 256;
 
 enum class Target : std::uint8_t { Solid, SturdyDown };
@@ -44,11 +45,6 @@ struct FeatureSpec {
 
 [[nodiscard]] std::int32_t blockAt(const Chunk& chunk, const DecorationPos& position) {
     return chunk.decorationBlockStateId(position.x, position.y, position.z);
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
 void placeSporeBlossom(Chunk& chunk, const DecorationPos& origin) {

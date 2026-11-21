@@ -1,3 +1,5 @@
+#include "../DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockStateFamilies.hpp>
@@ -21,7 +23,6 @@ namespace basalt::server::world::terrain::decoration::end {
 namespace {
 
 constexpr std::int32_t kRawGenerationStep = 0;
-constexpr std::int32_t kVegetalDecorationStep = 9;
 constexpr std::int32_t kEndIslandIndex = 0;
 constexpr std::int32_t kChorusPlantIndex = 0;
 constexpr std::int32_t kEndIslandRarity = 14;

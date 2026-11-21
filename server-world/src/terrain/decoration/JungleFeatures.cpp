@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/JungleFeatures.hpp>
@@ -13,14 +15,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
 
 const std::set<std::int32_t>& melonReplaceableStateIds() {
     static const std::set<std::int32_t> ids = [] {

@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/SimpleBlockFeature.hpp>
 #include <basalt/server/world/terrain/decoration/TaigaGroundDecoration.hpp>
@@ -11,14 +13,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
 
 // The state definition orders age=0..3 contiguously; berry_bush requests age=3.
 [[nodiscard]] std::int32_t sweetBerryAge3StateId() { return stateIdOf("sweet_berry_bush") + 3; }

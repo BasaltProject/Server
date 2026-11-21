@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockStateFamilies.hpp>
@@ -14,8 +16,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 namespace {
-
-constexpr std::int32_t kVegetalDecorationStep = 9;
 
 struct Direction {
     std::int32_t x;
@@ -45,14 +45,6 @@ constexpr Direction kUp{0, 1, 0};
 constexpr std::array<Direction, 4> kHorizontalDirections{Direction{0, 0, -1}, Direction{1, 0, 0}, Direction{0, 0, 1},
                                                          Direction{-1, 0, 0}};
 constexpr std::array<std::string_view, 5> kCoralNames{"tube", "brain", "bubble", "fire", "horn"};
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
 
 [[nodiscard]] std::vector<std::int32_t> blockStates(std::string_view suffix) {
     std::vector<std::int32_t> built;
@@ -93,11 +85,6 @@ const std::set<std::string, std::less<>>& coralTargetPaths() {
         return built;
     }();
     return paths;
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 [[nodiscard]] bool isWaterBlock(std::int32_t stateId) { return pathOf(stateId) == "water"; }
@@ -283,11 +270,6 @@ const std::vector<PlacementModifier>& warmOceanModifiers() {
     static const std::vector<PlacementModifier> modifiers = {noiseBasedCountPlacement(20, 400.0), inSquarePlacement(),
                                                              worldgenHeightmapPlacement(HeightmapType::OceanFloor)};
     return modifiers;
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
 } // namespace

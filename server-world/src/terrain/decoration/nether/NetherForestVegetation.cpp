@@ -1,3 +1,4 @@
+#include "../DecorationSupport.hpp"
 #include "NetherVegetalShared.hpp"
 
 #include <basalt/server/registry/Blocks.hpp>
@@ -18,11 +19,6 @@ const PathSet& vegetationSupport() {
                                   "moss_block", "pale_moss_block", "grass_block",   "mycelium", "podzol",
                                   "farmland",   "crimson_nylium",  "warped_nylium", "soul_soil"};
     return paths;
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
 /// parity: 26.3 placement, `count` 64 and trapezoid `offset`.

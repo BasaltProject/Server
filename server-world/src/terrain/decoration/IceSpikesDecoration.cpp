@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/IceSpikesDecoration.hpp>
@@ -14,14 +16,6 @@ namespace {
 constexpr std::int32_t kSurfaceStructuresStep = 4;
 constexpr std::int32_t kIceSpikeGlobalIndex = 0;
 constexpr std::int32_t kIcePatchGlobalIndex = 1;
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
 
 [[nodiscard]] std::set<std::int32_t> stateIdsOf(std::initializer_list<std::string_view> paths) {
     std::set<std::int32_t> ids;

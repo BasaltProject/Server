@@ -1,3 +1,4 @@
+#include "../DecorationSupport.hpp"
 #include "NetherVegetalShared.hpp"
 
 #include <basalt/server/random/WorldgenSeeds.hpp>
@@ -8,8 +9,6 @@
 
 namespace basalt::server::world::terrain::decoration::nether {
 namespace {
-
-constexpr std::int32_t kVegetalDecorationStep = 9;
 
 void placeFeature(Chunk& chunk, random::RandomSource& random, const NetherBiomeLookup& biomeSource,
                   const std::int32_t globalIndex) {

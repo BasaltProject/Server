@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/OverworldBiomePaths.hpp>
@@ -21,11 +23,6 @@ constexpr std::int32_t kRarity = 64;
 constexpr std::int32_t kMaxEmptyCorners = 4;
 constexpr std::int32_t kUndergroundStructuresStep = 3;
 constexpr std::int32_t kBelowTop = 319;
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
-}
 
 [[nodiscard]] std::int32_t state(std::string_view path) {
     const registry::BlockState* found = registry::blocks::named(path);

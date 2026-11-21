@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -51,11 +53,6 @@ constexpr std::array<std::string_view, 4> kBigDripleafFacingNames{"east", "west"
         throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
     }
     return found->stateId;
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 const PathSet& mossReplaceable() {

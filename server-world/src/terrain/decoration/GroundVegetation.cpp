@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/GroundVegetation.hpp>
 
@@ -7,14 +9,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
 
 [[nodiscard]] SimpleBlockFeature::StateProvider constant(std::string_view path) {
     return [path](random::RandomSource&, const DecorationPos&) { return stateIdOf(path); };

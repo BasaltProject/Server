@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/PositionalRandomFactory.hpp>
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/world/terrain/decoration/BambooVegetationDecoration.hpp>
@@ -11,13 +13,7 @@
 namespace basalt::server::world::terrain::decoration {
 namespace {
 
-constexpr std::int32_t kVegetalDecorationStep = 9;
 constexpr std::string_view kBambooVegetation = "bamboo_vegetation";
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
-}
 
 [[nodiscard]] PlacementModifier countExtra(std::int32_t count, float chance, std::int32_t extra) {
     return countExtraPlacement(count, chance, extra);

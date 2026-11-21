@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockStateFamilies.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -21,11 +23,6 @@ using PathSet = std::set<std::string, std::less<>>;
         throw std::runtime_error{"unknown block '" + std::string{name} + "'"};
     }
     return found->stateId;
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 [[nodiscard]] std::int32_t mushroomState(std::int32_t stateId, bool down, bool east, bool north, bool south, bool up,

@@ -1,3 +1,5 @@
+#include "../DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeBlockRules.hpp>
@@ -26,11 +28,6 @@ constexpr double kBranchSlope = 0.381;
 constexpr double kBranchLengthMagic = 0.328;
 
 using PathSet = std::set<std::string, std::less<>>;
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
-}
 
 /// parity: block tag `mangrove_logs_can_grow_through`.
 const PathSet& mangroveLogGrowThroughPaths() {

@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/world/terrain/decoration/FlowerVegetation.hpp>
 #include <basalt/server/world/terrain/decoration/HugeMushroomFeature.hpp>
@@ -9,13 +11,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 namespace {
-
-constexpr std::int32_t kVegetalDecorationStep = 9;
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
-}
 
 // parity: `mushroom_island_vegetation` has no count modifier, one position per chunk.
 const std::vector<PlacementModifier>& islandModifiers() {

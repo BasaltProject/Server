@@ -1,3 +1,5 @@
+#include "../DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockStateFamilies.hpp>
@@ -11,11 +13,6 @@
 
 namespace basalt::server::world::terrain::decoration::tree {
 namespace {
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
-}
 
 /// parity: `minecraft:replaceable_by_trees`, flattened from its leaf and flower tags.
 const PathSet& replaceableByTreesPaths() {

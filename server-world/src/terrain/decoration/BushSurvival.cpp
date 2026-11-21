@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockStateFamilies.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -18,11 +20,6 @@ namespace {
 namespace registry = basalt::server::registry;
 
 constexpr std::int32_t kTooBright = 13;
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : std::string{block->path()};
-}
 
 [[nodiscard]] bool isMushroom(std::int32_t stateId) {
     const std::string path = pathOf(stateId);

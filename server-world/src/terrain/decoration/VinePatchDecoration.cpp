@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -14,7 +16,6 @@
 namespace basalt::server::world::terrain::decoration {
 namespace {
 
-constexpr std::int32_t kVegetalDecorationStep = 9;
 constexpr std::int32_t kFeatureIndex = 94;
 
 struct Direction {
@@ -27,19 +28,6 @@ constexpr std::array<Direction, 5> kDirections = {{{registry::BlockFace::Up, 2},
                                                    {registry::BlockFace::South, 4},
                                                    {registry::BlockFace::West, 1},
                                                    {registry::BlockFace::East, 16}}};
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
-}
 
 const std::set<std::string, std::less<>>& biomes() {
     static const std::set<std::string, std::less<>> paths = {"bamboo_jungle", "jungle", "sparse_jungle"};

@@ -1,3 +1,4 @@
+#include "../DecorationSupport.hpp"
 #include "NetherVegetalShared.hpp"
 
 #include <basalt/server/registry/BlockStateFamilies.hpp>
@@ -25,11 +26,6 @@ const PathSet& weepingRoofSupport() {
 constexpr std::array<std::array<std::int32_t, 3>, 6> kAllNeighbours{
     std::array<std::int32_t, 3>{0, -1, 0}, std::array<std::int32_t, 3>{0, 1, 0},  std::array<std::int32_t, 3>{0, 0, -1},
     std::array<std::int32_t, 3>{0, 0, 1},  std::array<std::int32_t, 3>{-1, 0, 0}, std::array<std::int32_t, 3>{1, 0, 0}};
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
-}
 
 /// parity: the head of a growing vine carries a random age, which decides how much longer it grows.
 [[nodiscard]] std::int32_t vineHeadState(std::string_view path, random::RandomSource& random) {

@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
@@ -25,8 +27,6 @@ constexpr std::int32_t kWaterloggedFalseBit = 2;
 constexpr std::int32_t kAllFaceFalseBits = 64 + 32 + 16 + 8 + 4 + 1;
 constexpr float kSpreadChance = 0.5F;
 constexpr std::int32_t kGlowLichenIndex = 0;
-constexpr std::int32_t kVegetalDecorationStep = 9;
-
 enum class Axis : std::uint8_t { X, Y, Z };
 
 struct Direction {
@@ -68,14 +68,6 @@ constexpr Direction kEast{1, 0, 0, Axis::X, 32, registry::BlockFace::East};
 
 constexpr std::array<Direction, 5> kValidDirections = {kUp, kNorth, kEast, kSouth, kWest};
 constexpr std::array<Direction, 6> kAllDirections = {kDown, kUp, kNorth, kSouth, kWest, kEast};
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
 
 [[nodiscard]] std::int32_t firstGlowLichenStateId() { return stateIdOf("glow_lichen") - 127; }
 

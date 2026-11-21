@@ -1,3 +1,4 @@
+#include "../DecorationSupport.hpp"
 #include "NetherVegetalShared.hpp"
 
 #include <basalt/server/registry/Blocks.hpp>
@@ -108,11 +109,6 @@ const PathSet& stemReplaceable() {
                                   "big_dripleaf_stem",
                                   "small_dripleaf"};
     return paths;
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
 [[nodiscard]] bool isReplaceable(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z,

@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -32,11 +34,6 @@ struct Column {
 [[nodiscard]] std::int32_t state(std::string_view path) {
     const registry::BlockState* found = registry::blocks::named(path);
     return found == nullptr ? registry::blocks::air().stateId : found->stateId;
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 [[nodiscard]] std::int32_t stateAt(const Chunk& chunk, const DecorationPos& position) {

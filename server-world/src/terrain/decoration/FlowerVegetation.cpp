@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/FlowerVegetation.hpp>
@@ -10,14 +12,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
 
 [[nodiscard]] DecorationPos chunkOrigin(const Chunk& chunk) {
     return DecorationPos{chunk.chunkX() * 16, 0, chunk.chunkZ() * 16};

@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -21,11 +23,6 @@ constexpr std::int32_t kLakesStep = 1;
 constexpr std::int32_t kBelowTop = 319;
 
 using PathSet = std::set<std::string, std::less<>>;
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
-}
 
 const PathSet& lavaLakeBiomes() {
     static const PathSet paths = [] {

@@ -1,3 +1,5 @@
+#include "../DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockStateFamilies.hpp>
@@ -49,19 +51,6 @@ constexpr std::array<std::int32_t, 4> kLeafLitterFacingStateOffsets{0, 12, 4, 8}
 constexpr std::array<std::array<std::int32_t, 3>, 6> kBlockNeighbours{
     std::array<std::int32_t, 3>{0, -1, 0}, std::array<std::int32_t, 3>{0, 1, 0},  std::array<std::int32_t, 3>{0, 0, -1},
     std::array<std::int32_t, 3>{0, 0, 1},  std::array<std::int32_t, 3>{-1, 0, 0}, std::array<std::int32_t, 3>{1, 0, 0}};
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
-}
 
 const std::set<std::string, std::less<>>& beneathTreePodzolReplaceablePaths() {
     static const std::set<std::string, std::less<>> paths = {

@@ -1,3 +1,5 @@
+#include "../DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -52,19 +54,6 @@ const PathSet& columnCannotPlaceOn() {
         return built;
     }();
     return paths;
-}
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"missing vanilla block minecraft:" + std::string{path}};
-    }
-    return found->stateId;
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
 [[nodiscard]] bool isInChunk(const Chunk& chunk, std::int32_t x, std::int32_t z) {

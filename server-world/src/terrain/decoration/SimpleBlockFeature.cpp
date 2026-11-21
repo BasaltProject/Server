@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -99,11 +101,6 @@ const PathSet& supportsDryVegetationPaths() {
         return built;
     }();
     return paths;
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 [[nodiscard]] bool contains(const PathSet& paths, const std::string& path) {

@@ -1,3 +1,4 @@
+#include "../DecorationSupport.hpp"
 #include "NetherVegetalShared.hpp"
 
 #include <cstdint>
@@ -20,11 +21,6 @@ const PathSet& normalMushroomBiomes() {
         "netherrack", "basalt",      "blackstone",      "bedrock",           "soul_sand",     "soul_soil",
         "gravel",     "magma_block", "nether_gold_ore", "nether_quartz_ore", "ancient_debris"};
     return lightOverride.contains(path) || solidSupport.contains(path);
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
 } // namespace

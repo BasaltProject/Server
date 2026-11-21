@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -16,16 +18,7 @@
 namespace basalt::server::world::terrain::decoration {
 namespace {
 
-constexpr std::int32_t kVegetalDecorationStep = 9;
 constexpr std::int32_t kMushroomIslandIndex = 82;
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
-    }
-    return found->stateId;
-}
 
 /// parity: block tag `overrides_mushroom_light_requirement`.
 [[nodiscard]] bool overridesLightRequirement(std::int32_t stateId) {
@@ -83,11 +76,6 @@ constexpr std::array<DecorationPos, 6> kAround = {DecorationPos{1, 0, 0}, Decora
         }
     }
     return false;
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
 const std::vector<std::string>& oldGrowthBiomes() {

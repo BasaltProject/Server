@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -136,11 +138,6 @@ const std::set<std::string, std::less<>>& rootReplaceable() {
 [[nodiscard]] std::int32_t sulfurStateId() {
     static const std::int32_t stateId = state("sulfur");
     return stateId;
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 [[nodiscard]] DecorationPos offsetBy(const DecorationPos& position, std::int32_t dx, std::int32_t dy, std::int32_t dz) {
