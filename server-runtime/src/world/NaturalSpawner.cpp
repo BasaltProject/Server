@@ -226,11 +226,11 @@ constexpr std::int64_t kSlimeChunkSalt = 987234911;
         return isWaterFluid(*below) && isWaterBlock(*above) && (anyHeight || (y >= seaLevel - 13 && y <= seaLevel));
     }
     if (type == "drowned") {
-        const bool dark = worldLight::skyLight(world.state(), x, y, z) <= random.nextInt(32) &&
-                          worldLight::blockLight(world.state(), x, y, z) <= 0;
+        // parity: `Drowned.checkDrownedSpawnRules` uses the full `Monster.isDarkEnoughToSpawn`.
+        const bool dark = spawnPlacements::isDarkEnoughToSpawn(world, x, y, z, random);
         const std::optional<Identifier> biome = biomeAt(world, x, y, z);
         const bool river = biome.has_value() && biome->path().find("river") != std::string::npos;
-        const bool frequencyAllows = river ? random.nextInt(15) == 0 : y < seaLevel - 5 && random.nextInt(40) == 0;
+        const bool frequencyAllows = river ? random.nextInt(15) == 0 : random.nextInt(40) == 0 && y < seaLevel - 5;
         return dark && isWaterFluid(*below) && frequencyAllows;
     }
     return true;
