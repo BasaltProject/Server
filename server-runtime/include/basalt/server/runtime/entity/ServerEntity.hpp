@@ -565,6 +565,18 @@ public:
     NavigationWatch navigationWatch;
     float aiSpeed = 0.0F;
 
+    /// parity: `Guardian.DATA_ID_MOVING`, and the value the watchers were last sent.
+    bool guardianMoving = false;
+    bool guardianMovingSent = false;
+
+    /// parity: `Squid.movementVector`, which `SquidRandomMovementGoal` and `SquidFleeGoal` both write.
+    double squidVectorX = 0.0;
+    double squidVectorY = 0.0;
+    double squidVectorZ = 0.0;
+    /// parity: `Squid.tentacleMovement` and `tentacleSpeed`; the speed is negative until its first roll.
+    float squidTentacleMovement = 0.0F;
+    float squidTentacleSpeed = -1.0F;
+
     std::int32_t idleTicks = 0;
 
     bool persistent = false;

@@ -40,9 +40,15 @@ class RandomStrollGoal : public Goal {
 public:
     static constexpr std::int32_t kDefaultInterval = 120;
 
-    explicit RandomStrollGoal(double speedModifier, std::int32_t interval = kDefaultInterval);
+    /// `defaultPos` swaps the land picker for `DefaultRandomPos.getPos(mob, 10, 7)` and adds the Look flag.
+    explicit RandomStrollGoal(double speedModifier, std::int32_t interval = kDefaultInterval, bool defaultPos = false);
 
-    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
+    [[nodiscard]] std::set<GoalFlag> flags() const override {
+        if (defaultPos_) {
+            return {GoalFlag::Move, GoalFlag::Look};
+        }
+        return {GoalFlag::Move};
+    }
 
     [[nodiscard]] bool canUse(MobContext& mob) override;
 
@@ -55,6 +61,7 @@ public:
 private:
     double speedModifier_;
     std::int32_t interval_;
+    bool defaultPos_;
     std::optional<std::array<double, 3>> wanted_;
 };
 
@@ -228,6 +235,11 @@ class AvoidEntityGoal final : public Goal {
 public:
     AvoidEntityGoal(std::set<std::string, std::less<>> avoided, double distance, double walkSpeed, double sprintSpeed);
 
+    /// parity: `AvoidEntityGoal(Player.class, ..., NO_SPECTATORS)`, a fish swimming away from any non-spectator player.
+    struct PlayersTag {};
+
+    AvoidEntityGoal(PlayersTag, double distance, double walkSpeed, double sprintSpeed);
+
     /// parity: `AvoidEntityGoal.toAvoid`, what the last `canUse` found.
     [[nodiscard]] const ServerEntity* threat() const noexcept { return threat_; }
 
@@ -250,6 +262,9 @@ private:
     double walkSpeed_;
     double sprintSpeed_;
     ServerEntity* threat_ = nullptr;
+    bool players_ = false;
+    /// parity: `AvoidEntityGoal.toAvoid` when it is a player, who is no `ServerEntity`.
+    std::optional<std::array<double, 3>> playerThreat_;
     std::optional<std::array<double, 3>> wanted_;
 };
 
@@ -317,9 +332,12 @@ public:
     /// parity: the 0.2 a squid pushes with.
     static constexpr double kSquidPush = 0.2;
 
-    explicit SwimAboutGoal(double push = kSquidPush);
+    /// `claimsFlags` is false for a squid, whose goal has no flags in vanilla, and true for a tadpole.
+    explicit SwimAboutGoal(double push = kSquidPush, bool claimsFlags = false);
 
-    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
+    [[nodiscard]] std::set<GoalFlag> flags() const override {
+        return claimsFlags_ ? std::set<GoalFlag>{GoalFlag::Move, GoalFlag::Look} : std::set<GoalFlag>{};
+    }
 
     [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
 
@@ -329,9 +347,17 @@ public:
 
 private:
     double push_;
-    double vectorX_ = 0.0;
-    double vectorY_ = 0.0;
-    double vectorZ_ = 0.0;
+    bool claimsFlags_;
+};
+
+/// parity: `Squid.SquidFleeGoal`, no flags: it overwrites the squid's movement vector while its attacker is near.
+class SquidFleeGoal final : public Goal {
+public:
+    [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
+
+    [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    void tick(MobContext& mob) override;
 };
 
 /// parity: `AbstractCubeMob.CubeMobMoveControl`.

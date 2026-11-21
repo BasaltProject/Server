@@ -52,7 +52,7 @@ pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, d
                               {blockOf(x), blockOf(y), blockOf(z)}, true);
     }
     // parity: `WaterBoundPathNavigation` over `SwimNodeEvaluator(false)`, water only and no breaching.
-    if (isFish(mob)) {
+    if (isFish(mob) || isGuardian(mob)) {
         const double half = mob.width() / 2.0;
         return swimPath::find(world, {blockOf(mob.x - half), blockOf(mob.y + 0.5), blockOf(mob.z - half)},
                               {blockOf(x), blockOf(y), blockOf(z)}, false);
@@ -276,7 +276,7 @@ void tick(world::WorldState& world, ServerEntity& mob) {
     // parity: `followThePath`: one node a tick at most, then the stuck check.
     const double range = waypointRange(mob);
     // parity: `WaterBoundPathNavigation.getMaxVerticalDistanceToWaypoint`.
-    const double vertical = swimsSmoothly(mob) || isFish(mob) ? 0.5 : 1.0;
+    const double vertical = swimsSmoothly(mob) || isFish(mob) || isGuardian(mob) ? 0.5 : 1.0;
     const std::array<std::int32_t, 3>& current = (*mob.path)[static_cast<std::size_t>(mob.pathIndex)];
     const bool close = std::abs(mob.x - (current[0] + 0.5)) < range && std::abs(mob.z - (current[2] + 0.5)) < range &&
                        std::abs(mob.y - current[1]) < vertical;
@@ -339,6 +339,57 @@ void tickFish(world::WorldState& world, ServerEntity& mob, double speed) {
     livingMovement::travelInWaterFish(world, mob, static_cast<double>(mob.aiSpeed), !mob.targetId.has_value());
 }
 
+/// parity: `GuardianMoveControl.tick` with `Guardian.travelInWater`.
+void tickGuardian(world::WorldState& world, ServerEntity& mob, double speed) {
+    constexpr float kSpeedLerp = 0.125F;
+    constexpr double kLookLerp = 0.125;
+    constexpr double kClimb = 0.1;
+    bool moving = false;
+    if (mob.moving && !navigation::isDone(mob)) {
+        const double dx = mob.wantedX - mob.x;
+        const double dy = mob.wantedY - mob.y;
+        const double dz = mob.wantedZ - mob.z;
+        const double length = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        const double xd = dx / length;
+        const double yd = dy / length;
+        const double zd = dz / length;
+        mob.yaw = rotlerp(mob.yaw, static_cast<float>(std::atan2(dz, dx) * kDegrees) - 90.0F, kTurnRate);
+        const auto wanted = static_cast<float>(mob.moveSpeed * speed);
+        const float newSpeed = mob.aiSpeed + (kSpeedLerp * (wanted - mob.aiSpeed));
+        mob.aiSpeed = newSpeed;
+        const double phase = static_cast<double>(mob.tickCount + mob.entityId());
+        const double push = std::sin(phase * 0.5) * 0.05;
+        const double yawRadians = static_cast<double>(mob.yaw) * std::numbers::pi / 180.0;
+        const double cosYaw = std::cos(yawRadians);
+        const double sinYaw = std::sin(yawRadians);
+        const double yPush = std::sin(phase * 0.75) * 0.05;
+        mob.velocityX += push * cosYaw;
+        mob.velocityY += (yPush * (sinYaw + cosYaw) * 0.25) + (static_cast<double>(newSpeed) * yd * kClimb);
+        mob.velocityZ += push * sinYaw;
+        const double lookX = mob.x + (xd * 2.0);
+        const double lookY = mob.y + mobBreathing::eyeHeightOf(mob) + (yd / length);
+        const double lookZ = mob.z + (zd * 2.0);
+        // parity: the look target eases an eighth of the way from the old one, or is the new one when not looking.
+        if (mob.lookTicks > 0) {
+            const double oldX = mob.lookX;
+            const double oldY = mob.lookY;
+            const double oldZ = mob.lookZ;
+            lookControl::lookAt(mob, oldX + (kLookLerp * (lookX - oldX)), oldY + (kLookLerp * (lookY - oldY)),
+                                oldZ + (kLookLerp * (lookZ - oldZ)));
+        } else {
+            lookControl::lookAt(mob, lookX, lookY, lookZ);
+        }
+        moving = true;
+    } else {
+        mob.aiSpeed = 0.0F;
+    }
+    mob.guardianMoving = moving;
+    mob.moving = false;
+    // parity: `Mob.setSpeed` also sets the forward input to the same number.
+    livingMovement::travelInWaterGuardian(world, mob, static_cast<double>(mob.aiSpeed), moving,
+                                          !mob.targetId.has_value());
+}
+
 } // namespace
 
 void setWanted(ServerEntity& mob, double x, double y, double z, double speedModifier) {
@@ -388,10 +439,25 @@ void tick(world::WorldState& world, ServerEntity& mob, double speed) {
         tickSwimming(world, mob, speed);
         return;
     }
+    // parity: `Squid.travel` is `move(SELF, getDeltaMovement())`, in or out of water; `aiStep` owns drag and gravity.
+    if (isSquid(mob)) {
+        livingMovement::moveByVelocity(world, mob);
+        mob.moving = false;
+        return;
+    }
     // parity: `AbstractFish.travel` swims only in water; out of it the land travel below runs.
     if (isFish(mob) && holdsWater(world, mob.x, mob.y, mob.z)) {
         tickFish(world, mob, speed);
         return;
+    }
+    // parity: `Guardian.travel` swims only in water; out of it the land travel below runs.
+    if (isGuardian(mob) && holdsWater(world, mob.x, mob.y, mob.z)) {
+        tickGuardian(world, mob, speed);
+        return;
+    }
+    // parity: `GuardianMoveControl.tick` has no swim path out of water, it just `setMoving(false)`.
+    if (isGuardian(mob)) {
+        mob.guardianMoving = false;
     }
     // parity: `LivingEntity.travel` picks the fluid path first.
     if (inWater(world, mob)) {
@@ -577,6 +643,16 @@ bool swimsSmoothly(const ServerEntity& mob) { return mob.type().path() == "dolph
 bool isFish(const ServerEntity& mob) {
     const std::string_view path = mob.type().path();
     return path == "cod" || path == "salmon" || path == "tropical_fish" || path == "pufferfish";
+}
+
+bool isGuardian(const ServerEntity& mob) {
+    const std::string_view path = mob.type().path();
+    return path == "guardian" || path == "elder_guardian";
+}
+
+bool isSquid(const ServerEntity& mob) {
+    const std::string_view path = mob.type().path();
+    return path == "squid" || path == "glow_squid";
 }
 
 bool inWater(world::WorldState& world, const ServerEntity& mob) {

@@ -235,6 +235,29 @@ void travelInWater(world::WorldState& world, ServerEntity& entity, double forwar
     entity.velocityY = (entity.velocityY * kVerticalWaterDrag) - (kGravity / kSinkShare);
 }
 
+void moveByVelocity(world::WorldState& world, ServerEntity& entity) {
+    const world::WorldState::BlockReadScope readScope{world};
+    const Aabb box = Aabb::of(entity.x, entity.y, entity.z, entity.width(), entity.height());
+    const std::array<double, 3> moved =
+        entityCollision::collide(blocksOf(world), box, entity.velocityX, entity.velocityY, entity.velocityZ);
+    entity.x += moved[0];
+    entity.y += moved[1];
+    entity.z += moved[2];
+    entity.onGround = moved[1] != entity.velocityY && entity.velocityY < 0.0;
+    const bool collidedX = !nearlyEqual(moved[0], entity.velocityX);
+    const bool collidedZ = !nearlyEqual(moved[2], entity.velocityZ);
+    entity.horizontallyBlocked = collidedX || collidedZ;
+    if (collidedX) {
+        entity.velocityX = 0.0;
+    }
+    if (collidedZ) {
+        entity.velocityZ = 0.0;
+    }
+    if (moved[1] != entity.velocityY) {
+        entity.velocityY = 0.0;
+    }
+}
+
 void travelInWaterFish(world::WorldState& world, ServerEntity& entity, double forward, bool noTarget) {
     // parity: `moveRelative(0.01F, input)`, `move`, then 0.9 of the speed kept on every axis.
     constexpr double kFishInput = 0.01;
@@ -268,6 +291,43 @@ void travelInWaterFish(world::WorldState& world, ServerEntity& entity, double fo
     entity.velocityZ *= kFishDrag;
     if (noTarget) {
         entity.velocityY -= kFishSink;
+    }
+}
+
+void travelInWaterGuardian(world::WorldState& world, ServerEntity& entity, double forward, bool moving,
+                           bool noTarget) {
+    // parity: `moveRelative(0.1F, input)`, `move`, then 0.9 of the speed kept on every axis.
+    constexpr double kGuardianInput = 0.1;
+    constexpr double kGuardianDrag = 0.9;
+    constexpr double kGuardianSink = 0.005;
+    const world::WorldState::BlockReadScope readScope{world};
+    addInput(entity, forward, 0.0, kGuardianInput);
+
+    const Aabb box = Aabb::of(entity.x, entity.y, entity.z, entity.width(), entity.height());
+    const std::array<double, 3> moved =
+        entityCollision::collide(blocksOf(world), box, entity.velocityX, entity.velocityY, entity.velocityZ);
+    entity.x += moved[0];
+    entity.y += moved[1];
+    entity.z += moved[2];
+    entity.onGround = moved[1] != entity.velocityY && entity.velocityY < 0.0;
+    const bool collidedX = !nearlyEqual(moved[0], entity.velocityX);
+    const bool collidedZ = !nearlyEqual(moved[2], entity.velocityZ);
+    entity.horizontallyBlocked = collidedX || collidedZ;
+    if (collidedX) {
+        entity.velocityX = 0.0;
+    }
+    if (collidedZ) {
+        entity.velocityZ = 0.0;
+    }
+    if (moved[1] != entity.velocityY) {
+        entity.velocityY = 0.0;
+    }
+
+    entity.velocityX *= kGuardianDrag;
+    entity.velocityY *= kGuardianDrag;
+    entity.velocityZ *= kGuardianDrag;
+    if (!moving && noTarget) {
+        entity.velocityY -= kGuardianSink;
     }
 }
 

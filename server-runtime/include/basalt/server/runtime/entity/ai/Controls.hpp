@@ -86,6 +86,12 @@ void tickSwimming(ServerEntity& mob);
 /// parity: `AbstractFish`, the four that swim on `FishMoveControl` and `WaterBoundPathNavigation`.
 [[nodiscard]] bool isFish(const ServerEntity& mob);
 
+/// parity: `Guardian` and `ElderGuardian`, on `GuardianMoveControl` and `WaterBoundPathNavigation`.
+[[nodiscard]] bool isGuardian(const ServerEntity& mob);
+
+/// parity: `Squid` and `GlowSquid`, which `travel` by moving along their own velocity.
+[[nodiscard]] bool isSquid(const ServerEntity& mob);
+
 /// parity: `Entity.isInWater`, which is the block its feet are in.
 [[nodiscard]] bool inWater(world::WorldState& world, const ServerEntity& mob);
 

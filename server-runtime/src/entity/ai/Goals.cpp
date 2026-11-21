@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
+#include <basalt/server/runtime/entity/ai/RandomPos.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <algorithm>
@@ -79,8 +80,8 @@ void FloatGoal::tick(MobContext& mob) {
     }
 }
 
-RandomStrollGoal::RandomStrollGoal(double speedModifier, std::int32_t interval)
-    : speedModifier_(speedModifier), interval_(interval) {}
+RandomStrollGoal::RandomStrollGoal(double speedModifier, std::int32_t interval, bool defaultPos)
+    : speedModifier_(speedModifier), interval_(interval), defaultPos_(defaultPos) {}
 
 bool RandomStrollGoal::canUse(MobContext& mob) {
     // parity: a mob nobody has been near for five seconds stops wandering.
@@ -90,7 +91,8 @@ bool RandomStrollGoal::canUse(MobContext& mob) {
     if (mob.random.nextInt(reducedTickDelay(interval_)) != 0) {
         return false;
     }
-    wanted_ = mobBrain::strollTarget(mob.world, mob.mob, mob.random);
+    wanted_ = defaultPos_ ? randomPos::defaultPos(mob.world, mob.mob, mob.random, 10, 7)
+                          : mobBrain::strollTarget(mob.world, mob.mob, mob.random);
     return wanted_.has_value();
 }
 
@@ -161,7 +163,9 @@ bool PanicGoal::canUse(MobContext& mob) {
         return false;
     }
     // parity: `PanicGoal.findRandomPosition`, five across and four up.
-    wanted_ = mobBrain::strollTarget(mob.world, mob.mob, mob.random, 5, 4);
+    // parity: `DefaultRandomPos.getPos(mob, 5, 4)`, which a fish takes in water instead of on the ground.
+    wanted_ = isFish(mob.mob) ? randomPos::defaultPos(mob.world, mob.mob, mob.random, 5, 4)
+                              : mobBrain::strollTarget(mob.world, mob.mob, mob.random, 5, 4);
     return wanted_.has_value();
 }
 
@@ -374,34 +378,61 @@ AvoidEntityGoal::AvoidEntityGoal(std::set<std::string, std::less<>> avoided, dou
     }
 }
 
+AvoidEntityGoal::AvoidEntityGoal(PlayersTag /*tag*/, double distance, double walkSpeed, double sprintSpeed)
+    : distance_(distance), walkSpeed_(walkSpeed), sprintSpeed_(sprintSpeed), players_(true) {}
+
 bool AvoidEntityGoal::canUse(MobContext& mob) {
     threat_ = nullptr;
+    playerThreat_.reset();
     double bestDistance = distance_ * distance_;
-    const world::EntityRegistry::Matches avoidable =
-        mob.world.entitySnapshotMatching(mob.entities, key_, [this](const ServerEntity& candidate) {
-            return avoided_.contains(candidate.type().path());
-        });
-    for (ServerEntity* candidate : *avoidable) {
-        if (candidate == nullptr || candidate->removed) {
-            continue;
+    if (players_) {
+        // parity: `Level.getNearestPlayer` with `NO_SPECTATORS`, which a creative player still is.
+        for (const PlayerView& player : mob.players) {
+            if (player.spectator) {
+                continue;
+            }
+            const double distance = mob.distanceSquaredTo(player.x, player.y, player.z);
+            if (distance > bestDistance) {
+                continue;
+            }
+            bestDistance = distance;
+            playerThreat_ = std::array<double, 3>{player.x, player.y, player.z};
         }
-        const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);
-        if (distance > bestDistance) {
-            continue;
+    } else {
+        const world::EntityRegistry::Matches avoidable =
+            mob.world.entitySnapshotMatching(mob.entities, key_, [this](const ServerEntity& candidate) {
+                return avoided_.contains(candidate.type().path());
+            });
+        for (ServerEntity* candidate : *avoidable) {
+            if (candidate == nullptr || candidate->removed) {
+                continue;
+            }
+            const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);
+            if (distance > bestDistance) {
+                continue;
+            }
+            bestDistance = distance;
+            threat_ = candidate;
         }
-        bestDistance = distance;
-        threat_ = candidate;
     }
-    if (threat_ == nullptr) {
+    if (threat_ == nullptr && !playerThreat_.has_value()) {
         return false;
     }
     // parity: `DefaultRandomPos.getPosAway`, a spot roughly away from what it is avoiding.
-    const std::optional<std::array<double, 3>> away = mobBrain::strollTarget(mob.world, mob.mob, mob.random);
+    // parity: `DefaultRandomPos.getPosAway(mob, 16, 7, threatPos)` for a fish, which swims rather than walks.
+    const std::optional<std::array<double, 3>> away =
+        isFish(mob.mob) ? randomPos::defaultPosAway(
+                              mob.world, mob.mob, mob.random, 16, 7,
+                              threat_ != nullptr ? std::array<double, 3>{threat_->x, threat_->y, threat_->z}
+                                                 : *playerThreat_)
+                        : mobBrain::strollTarget(mob.world, mob.mob, mob.random);
     if (!away.has_value()) {
         return false;
     }
-    const double towardsX = mob.mob.x - threat_->x;
-    const double towardsZ = mob.mob.z - threat_->z;
+    const double threatX = threat_ != nullptr ? threat_->x : (*playerThreat_)[0];
+    const double threatZ = threat_ != nullptr ? threat_->z : (*playerThreat_)[2];
+    const double towardsX = mob.mob.x - threatX;
+    const double towardsZ = mob.mob.z - threatZ;
     if (((*away)[0] - mob.mob.x) * towardsX + ((*away)[2] - mob.mob.z) * towardsZ < 0.0) {
         return false;
     }
@@ -420,17 +451,22 @@ void AvoidEntityGoal::start(MobContext& mob) {
 
 void AvoidEntityGoal::tick(MobContext& mob) {
     constexpr double kSprintRange = 7.0;
-    if (threat_ == nullptr) {
+    std::optional<std::array<double, 3>> at = playerThreat_;
+    if (threat_ != nullptr) {
+        at = std::array<double, 3>{threat_->x, threat_->y, threat_->z};
+    }
+    if (!at.has_value()) {
         return;
     }
     // parity: it breaks into a run once whatever it is avoiding is close.
-    mob.mob.moveSpeed = mob.distanceSquaredTo(threat_->x, threat_->y, threat_->z) < kSprintRange * kSprintRange
+    mob.mob.moveSpeed = mob.distanceSquaredTo((*at)[0], (*at)[1], (*at)[2]) < kSprintRange * kSprintRange
                             ? sprintSpeed_
                             : walkSpeed_;
 }
 
 void AvoidEntityGoal::stop(MobContext& mob) {
     threat_ = nullptr;
+    playerThreat_.reset();
     navigation::stop(mob.mob);
 }
 
@@ -561,7 +597,7 @@ void RangedAttackGoal::tick(MobContext& mob) {
     }
 }
 
-SwimAboutGoal::SwimAboutGoal(double push) : push_(push) {}
+SwimAboutGoal::SwimAboutGoal(double push, bool claimsFlags) : push_(push), claimsFlags_(claimsFlags) {}
 
 bool SwimAboutGoal::canUse(MobContext& mob) {
     // parity: `AbstractSchoolingFish.canRandomSwim`, which a follower does not.
@@ -580,27 +616,109 @@ void SwimAboutGoal::tick(MobContext& mob) {
         static_cast<std::int32_t>(std::floor(mob.mob.x)),
         static_cast<std::int32_t>(std::floor(mob.mob.y)),
         static_cast<std::int32_t>(std::floor(mob.mob.z)));
-    if (!feetState.has_value() || !reg::blockFluids::hasWaterFluid(*feetState)) {
+    const bool wet = feetState.has_value() && reg::blockFluids::hasWaterFluid(*feetState);
+    if (!wet && claimsFlags_) {
         mob.mob.velocityX = 0.0;
         mob.mob.velocityZ = 0.0;
         return;
     }
-    if (mob.mob.idleTicks > kIdleLimit) {
-        vectorX_ = 0.0;
-        vectorY_ = 0.0;
-        vectorZ_ = 0.0;
-    } else if (mob.random.nextInt(reducedTickDelay(kChangeInterval)) == 0 || (vectorX_ == 0.0 && vectorZ_ == 0.0)) {
-        const auto angle = mob.random.nextFloat() * 2.0F * static_cast<float>(std::numbers::pi);
-        vectorX_ = static_cast<double>(std::cos(angle)) * push_;
-        vectorY_ = -kRise + static_cast<double>(mob.random.nextFloat()) * (2 * kRise);
-        vectorZ_ = static_cast<double>(std::sin(angle)) * push_;
+    if (!wet) {
+        // Squid: `MobActionSystem::travelMob` owns its out-of-water physics.
+        return;
     }
-    mob.mob.velocityX = vectorX_;
-    mob.mob.velocityY = vectorY_;
-    mob.mob.velocityZ = vectorZ_;
+    if (mob.mob.idleTicks > kIdleLimit) {
+        mob.mob.squidVectorX = 0.0;
+        mob.mob.squidVectorY = 0.0;
+        mob.mob.squidVectorZ = 0.0;
+    } else if (mob.random.nextInt(reducedTickDelay(kChangeInterval)) == 0 || (mob.mob.squidVectorX == 0.0 && mob.mob.squidVectorZ == 0.0)) {
+        const auto angle = mob.random.nextFloat() * 2.0F * static_cast<float>(std::numbers::pi);
+        mob.mob.squidVectorX = static_cast<double>(std::cos(angle)) * push_;
+        mob.mob.squidVectorY = -kRise + static_cast<double>(mob.random.nextFloat()) * (2 * kRise);
+        mob.mob.squidVectorZ = static_cast<double>(std::sin(angle)) * push_;
+    }
+    // The tadpole (`claimsFlags_`) swims on the vector itself; a squid only jets with it, see `travelMob`.
+    if (claimsFlags_) {
+        mob.mob.velocityX = mob.mob.squidVectorX;
+        mob.mob.velocityY = mob.mob.squidVectorY;
+        mob.mob.velocityZ = mob.mob.squidVectorZ;
+    }
     // parity: `Squid.aiStep`'s own turn towards where it is going.
-    lookControl::lookAt(mob.mob, mob.mob.x + vectorX_ * kLookAhead, mob.mob.y + vectorY_,
-                        mob.mob.z + vectorZ_ * kLookAhead);
+    lookControl::lookAt(mob.mob, mob.mob.x + mob.mob.squidVectorX * kLookAhead, mob.mob.y + mob.mob.squidVectorY,
+                        mob.mob.z + mob.mob.squidVectorZ * kLookAhead);
+}
+
+bool SquidFleeGoal::canUse(MobContext& mob) {
+    // parity: `SquidFleeGoal.canUse`, in water with an attacker from the last hundred ticks within ten blocks.
+    constexpr std::int32_t kHurtMemoryTicks = 100;
+    constexpr double kFleeRange = 10.0;
+    const ServerEntity& self = mob.mob;
+    if (!self.lastHurtByMob.has_value() || self.tickCount - self.lastHurtByMobTimestamp > kHurtMemoryTicks) {
+        return false;
+    }
+    const std::optional<std::int32_t> feetState =
+        mob.world.blockState(static_cast<std::int32_t>(std::floor(self.x)), static_cast<std::int32_t>(std::floor(self.y)),
+                             static_cast<std::int32_t>(std::floor(self.z)));
+    if (!feetState.has_value() || !reg::blockFluids::hasWaterFluid(*feetState)) {
+        return false;
+    }
+    if (const ServerEntity* attacker = mob.entityById(*self.lastHurtByMob); attacker != nullptr) {
+        return mob.distanceSquaredTo(attacker->x, attacker->y, attacker->z) < kFleeRange * kFleeRange;
+    }
+    // parity: a player attacker is a `PlayerView`, not a `ServerEntity`.
+    if (const PlayerView* attacker = mob.playerById(*self.lastHurtByMob); attacker != nullptr) {
+        return mob.distanceSquaredTo(attacker->x, attacker->y, attacker->z) < kFleeRange * kFleeRange;
+    }
+    return false;
+}
+
+void SquidFleeGoal::tick(MobContext& mob) {
+    constexpr double kFleeSpeed = 3.0;
+    constexpr double kFalloffStart = 5.0;
+    constexpr double kVectorDivisor = 20.0;
+    std::array<double, 3> from{};
+    if (const ServerEntity* attacker = mob.mob.lastHurtByMob.has_value() ? mob.entityById(*mob.mob.lastHurtByMob) : nullptr;
+        attacker != nullptr) {
+        from = {attacker->x, attacker->y, attacker->z};
+    } else if (const PlayerView* player = mob.mob.lastHurtByMob.has_value() ? mob.playerById(*mob.mob.lastHurtByMob) : nullptr;
+              player != nullptr) {
+        from = {player->x, player->y, player->z};
+    } else {
+        return;
+    }
+    double fleeX = mob.mob.x - from[0];
+    double fleeY = mob.mob.y - from[1];
+    double fleeZ = mob.mob.z - from[2];
+    const std::optional<std::int32_t> state =
+        mob.world.blockState(static_cast<std::int32_t>(std::floor(mob.mob.x + fleeX)),
+                             static_cast<std::int32_t>(std::floor(mob.mob.y + fleeY)),
+                             static_cast<std::int32_t>(std::floor(mob.mob.z + fleeZ)));
+    if (!state.has_value()) {
+        return;
+    }
+    const bool air = reg::blocks::isAir(*state);
+    if (!reg::blockFluids::hasWaterFluid(*state) && !air) {
+        return;
+    }
+    const double length = std::sqrt(fleeX * fleeX + fleeY * fleeY + fleeZ * fleeZ);
+    if (length > 0.0) {
+        // parity: vanilla calls `fleeTo.normalize()` and discards it, so the vector keeps its length.
+        double scale = kFleeSpeed;
+        if (length > kFalloffStart) {
+            scale -= (length - kFalloffStart) / kFalloffStart;
+        }
+        if (scale > 0.0) {
+            fleeX *= scale;
+            fleeY *= scale;
+            fleeZ *= scale;
+        }
+    }
+    if (air) {
+        fleeY = 0.0;
+    }
+    mob.mob.squidVectorX = fleeX / kVectorDivisor;
+    mob.mob.squidVectorY = fleeY / kVectorDivisor;
+    mob.mob.squidVectorZ = fleeZ / kVectorDivisor;
+    // parity: the bubble particle every tenth tick is drawn client-side in vanilla.
 }
 
 bool HopAboutGoal::canUse(MobContext& mob) {

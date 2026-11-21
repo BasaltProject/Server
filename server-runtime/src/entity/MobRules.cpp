@@ -236,6 +236,14 @@ bool sunBurn::shouldBurn(bool sensitive, bool day, std::int32_t light, bool open
     return random.nextFloat() * kRoll < (brightness - kMargin) * 2.0F;
 }
 
+bool sunBurn::shouldBurn(float brightness, random::RandomSource& random) {
+    // parity: `Mob.isSunBurnTick`, `br > 0.5F && random.nextFloat() * 30.0F < (br - 0.4F) * 2.0F`.
+    static constexpr float kHalf = 0.5F;
+    static constexpr float kMargin = 0.4F;
+    static constexpr float kRoll = 30.0F;
+    return brightness > kHalf && random.nextFloat() * kRoll < (brightness - kMargin) * 2.0F;
+}
+
 bool mobDespawn::shouldDespawn(ServerEntity& mob, MobCategory category, const Ranges& ranges,
                                std::optional<double> nearestDistance, random::RandomSource& random) {
     static constexpr double kPatrolHardDespawnSquared = 16384.0;

@@ -105,6 +105,9 @@ inline constexpr float kFireDamage = 1.0F;
 [[nodiscard]] bool shouldBurn(bool sensitive, bool day, std::int32_t light, bool openSky, bool inWater,
                               random::RandomSource& random);
 
+/// parity: the roll of `Mob.isSunBurnTick`, over the already computed `getLightLevelDependentMagicValue`.
+[[nodiscard]] bool shouldBurn(float brightness, random::RandomSource& random);
+
 } // namespace sunBurn
 
 namespace mobDespawn {

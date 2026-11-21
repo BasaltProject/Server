@@ -650,18 +650,22 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path) {
     // parity: `Squid.SquidRandomMovementGoal` and `AbstractFish.FishSwimGoal` push about in water without a path.
     if (path == "squid" || path == "glow_squid") {
         add<SwimAboutGoal>(selector, 0);
+        add<SquidFleeGoal>(selector, 1);
         return true;
     }
     static const Names kFish{"cod", "salmon", "tropical_fish", "pufferfish", "tadpole"};
     if (kFish.contains(path)) {
         // parity: `AbstractFish.FishSwimGoal`; a tadpole keeps the random push.
         if (path == "tadpole") {
-            add<SwimAboutGoal>(selector, 4, kFishPush);
+            add<SwimAboutGoal>(selector, 4, kFishPush, true);
         } else {
+            // parity: `AbstractFish.registerGoals`, panic, then avoid players, then swim.
+            add<PanicGoal>(selector, 0, 1.25);
+            add<AvoidEntityGoal>(selector, 2, AvoidEntityGoal::PlayersTag{}, 8.0, 1.6, 1.4);
             add<RandomSwimmingGoal>(selector, 4, 1.0, 40, true);
         }
         if (path == "cod" || path == "salmon" || path == "tropical_fish") {
-            add<FollowFlockLeaderGoal>(selector, 3);
+            add<FollowFlockLeaderGoal>(selector, 5);
         }
         return true;
     }
@@ -685,9 +689,10 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path) {
     }
     if (path == "guardian" || path == "elder_guardian") {
         add<BeamAttackGoal>(selector, 4);
-        add<SwimAboutGoal>(selector, 5);
-        add<LookAtPlayerGoal>(selector, 7, kLookFar);
-        add<RandomLookAroundGoal>(selector, 8);
+        // parity: Guardian.registerGoals `RandomStrollGoal(this, 1.0, 80)`, one DefaultRandomPos pick with no water check.
+        add<RandomStrollGoal>(selector, 7, 1.0, 80, true);
+        add<LookAtPlayerGoal>(selector, 8, kLookFar);
+        add<RandomLookAroundGoal>(selector, 9);
         add<HurtByTargetGoal>(selector, 1);
         add<NearestAttackablePlayerGoal>(selector, 2);
         return true;

@@ -47,9 +47,11 @@
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/NaturalSpawner.hpp>
 #include <basalt/server/runtime/world/Precipitation.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
+#include <basalt/server/runtime/world/SpawnPlacementRules.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -69,11 +71,11 @@ using player::PlayerSession;
 using wire::common::Identifier;
 using wire::protocol::play::SetEntityDataPacket;
 
-/// parity: `canSeeSky`, which here is the full fifteen of sky light above the mob.
-constexpr std::int32_t kSkyLightMax = 15;
-
 /// parity: `BaseFireBlock.fireIgnite`, eight seconds.
 constexpr std::int32_t kFireBlockTicks = 160;
+
+/// parity: `Guardian.DATA_ID_MOVING`.
+constexpr std::uint8_t kGuardianMovingIndex = 16;
 
 } // namespace
 
@@ -183,12 +185,18 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
     const auto blockZ = static_cast<std::int32_t>(std::floor(mob.z));
     const bool sensitive = mob.burnsInDay >= 0 ? mob.burnsInDay != 0 : entity::sunBurn::burns(mob.type());
     if (sensitive && !world::beds::isNight(world.clock().totalTicks())) {
-        const bool openSky = world::worldLight::skyLight(world.state(), blockX, blockY + 1, blockZ) >= kSkyLightMax;
+        // parity: `Mob.isSunBurnTick` reads brightness and `canSeeSky` at the eye block, and skips wet mobs.
+        const auto eyeX = static_cast<std::int32_t>(std::floor(mob.x));
+        const auto eyeBlockY = static_cast<std::int32_t>(std::floor(mob.y + entity::mobBreathing::eyeHeightOf(mob)));
+        const auto eyeZ = static_cast<std::int32_t>(std::floor(mob.z));
         const std::optional<std::int32_t> here = world.state().blockState(blockX, blockY, blockZ);
-        const bool inWater = world::fluids::of(here.value_or(0)) == world::Submersion::Water;
-        const std::int32_t light =
-            openSky && !inWater ? world::worldLight::skyLight(world.state(), blockX, blockY, blockZ) : 0;
-        if (entity::sunBurn::shouldBurn(sensitive, true, light, openSky, inWater, random)) {
+        // parity: `Entity.isInWaterOrRain` (water, or rain at the feet or the top of the box); powder snow is not
+        // tracked.
+        const bool wet = world::fluids::of(here.value_or(0)) == world::Submersion::Water ||
+                         world::precipitation::entityInRain(world, mob.x, mob.y, mob.z, mob.height());
+        const float brightness = world::spawnPlacements::lightLevelDependentMagicValue(world, eyeX, eyeBlockY, eyeZ);
+        if (!wet && world::naturalSpawner::canSeeSky(world, eyeX, eyeBlockY, eyeZ) &&
+            entity::sunBurn::shouldBurn(brightness, random)) {
             std::int32_t fireTicks = entity::sunBurn::kFireTicks;
             if (wasBurning || !hooks_.combustAllowed ||
                 hooks_.combustAllowed(world, mob, fireTicks, "sunlight", -1, nullptr)) {
@@ -423,6 +431,85 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
                       wire::protocol::play::SoundSource::Neutral);
         }
     }
+    // parity: `Guardian.aiStep`, the flop on dry ground (its sound is client side) and the body turning with the head.
+    if (entity::ai::isGuardian(mob)) {
+        if (mob.onGround) {
+            const bool wet = [&world, &mob] {
+                const world::WorldState::BlockReadScope readScope{world.state()};
+                const std::optional<std::int32_t> state = world.state().blockState(
+                    wire::common::mth::floor(mob.x), wire::common::mth::floor(mob.y), wire::common::mth::floor(mob.z));
+                return state.has_value() && server::registry::blockFluids::hasWaterFluid(*state);
+            }();
+            if (!wet) {
+                random::RandomSource scratch = freshRandom();
+                random::RandomSource& dice = random != nullptr ? *random : scratch;
+                mob.velocityX += static_cast<double>((dice.nextFloat() * 2.0F - 1.0F) * 0.4F);
+                mob.velocityY += 0.5;
+                mob.velocityZ += static_cast<double>((dice.nextFloat() * 2.0F - 1.0F) * 0.4F);
+                mob.yaw = dice.nextFloat() * 360.0F;
+                mob.onGround = false;
+            }
+        }
+        if (mob.beamTargetId.has_value()) {
+            mob.yaw = mob.headYaw;
+        }
+    }
+    // parity: `Squid.aiStep`, the tentacle cycle, the jet along `movementVector` and the fall on dry ground.
+    if (entity::ai::isSquid(mob)) {
+        constexpr float kTwoPi = 6.2831855F;
+        constexpr float kPi = 3.1415927F;
+        constexpr double kSquidAirDrag = 0.98;
+        constexpr double kSquidGravity = 0.08;
+        constexpr double kSquidCoast = 0.9;
+        constexpr std::int32_t kSquidAnimSynch = 19;
+        random::RandomSource scratch = freshRandom();
+        random::RandomSource& dice = random != nullptr ? *random : scratch;
+        if (mob.squidTentacleSpeed < 0.0F) {
+            mob.squidTentacleSpeed = 1.0F / (dice.nextFloat() + 1.0F) * 0.2F;
+        }
+        mob.squidTentacleMovement += mob.squidTentacleSpeed;
+        if (mob.squidTentacleMovement > kTwoPi) {
+            mob.squidTentacleMovement -= kTwoPi;
+            if (dice.nextInt(10) == 0) {
+                mob.squidTentacleSpeed = 1.0F / (dice.nextFloat() + 1.0F) * 0.2F;
+            }
+            const wire::protocol::play::EntityEventPacket event{.entityId = mob.entityId(),
+                                                                .eventId = kSquidAnimSynch};
+            for (PlayerSession* player : watchersOf(world)) {
+                if (player->connection().sendPlayPacket) {
+                    player->connection().sendPlayPacket(wire::protocol::play::EntityEventPacket::kId,
+                                                        [&event](wire::io::ByteBuffer& buffer) { event.write(buffer); });
+                }
+            }
+        }
+        const bool wet = [&world, &mob] {
+            const world::WorldState::BlockReadScope readScope{world.state()};
+            const std::optional<std::int32_t> state = world.state().blockState(
+                wire::common::mth::floor(mob.x), wire::common::mth::floor(mob.y), wire::common::mth::floor(mob.z));
+            return state.has_value() && server::registry::blockFluids::hasWaterFluid(*state);
+        }();
+        if (wet) {
+            if (mob.squidTentacleMovement < kPi) {
+                if (mob.squidTentacleMovement / kPi > 0.75F) {
+                    mob.velocityX = mob.squidVectorX;
+                    mob.velocityY = mob.squidVectorY;
+                    mob.velocityZ = mob.squidVectorZ;
+                }
+            } else {
+                mob.velocityX *= kSquidCoast;
+                mob.velocityY *= kSquidCoast;
+                mob.velocityZ *= kSquidCoast;
+            }
+        } else {
+            const auto levitation = mob.effects.find(Identifier::vanilla("levitation"));
+            const double fall = levitation != mob.effects.end()
+                                    ? 0.05 * static_cast<double>(levitation->second.amplifier + 1)
+                                    : mob.velocityY - kSquidGravity;
+            mob.velocityX = 0.0;
+            mob.velocityY = fall * kSquidAirDrag;
+            mob.velocityZ = 0.0;
+        }
+    }
     // parity: `Blaze.aiStep`, which falls at six tenths of the speed.
     if (mob.type().path() == "blaze" && !mob.onGround && mob.velocityY < 0.0) {
         mob.velocityY *= 0.6;
@@ -436,6 +523,13 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
     }
     entity::ai::moveControl::tick(world.state(), mob, speed);
     entity::ai::lookControl::tick(mob);
+    // parity: `Guardian.setMoving`, synced entity data 16 for the tail, spikes and bubbles.
+    if (mob.guardianMoving != mob.guardianMovingSent) {
+        mob.guardianMovingSent = mob.guardianMoving;
+        sendEntityData(world, mob.entityId(),
+                       SetEntityDataPacket::Entry{.index = kGuardianMovingIndex,
+                                                  .value = SetEntityDataPacket::BoolValue{.value = mob.guardianMoving}});
+    }
 }
 
 void MobActionSystem::tickRidden(world::LoadedWorld& world, ServerEntity& mob, const PlayerSession& rider) {
