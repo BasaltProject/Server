@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/RandomPos.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -63,15 +64,21 @@ constexpr double kQuarterTurn = static_cast<double>(static_cast<float>(std::numb
     return below.has_value() && reg::blockShapes::isSolidRender(*below);
 }
 
-/// parity: `GoalUtils.hasMalus`.
-[[nodiscard]] bool hasMalus(world::WorldState& world, const Block& pos) {
+/// parity: `WaterBoundPathNavigation.isStableDestination`, the block itself must not be solid render.
+[[nodiscard]] bool stableInWater(world::WorldState& world, const Block& pos) {
+    const std::optional<std::int32_t> state = world.blockState(pos[0], pos[1], pos[2]);
+    return state.has_value() && !reg::blockShapes::isSolidRender(*state);
+}
+
+/// parity: `GoalUtils.hasMalus`. `waterMob`: `Guardian`/`WaterAnimal` `setPathfindingMalus(WATER, 0)`.
+[[nodiscard]] bool hasMalus(world::WorldState& world, const Block& pos, bool waterMob = false) {
     const std::optional<std::int32_t> state = world.blockState(pos[0], pos[1], pos[2]);
     if (!state.has_value()) {
         return true;
     }
     const std::string_view path = pathAt(world, pos);
-    if (path == "water" || path == "lava" || path == "fire" || path == "soul_fire" || path == "powder_snow" ||
-        path == "sweet_berry_bush" || path == "cobweb") {
+    if ((path == "water" && !waterMob) || path == "lava" || path == "fire" || path == "soul_fire" ||
+        path == "powder_snow" || path == "sweet_berry_bush" || path == "cobweb") {
         return true;
     }
     return !reg::blockShapes::isEmptyShape(*state) && !pathFinder::isMobDoor(*state);
@@ -125,8 +132,10 @@ constexpr double kQuarterTurn = static_cast<double>(static_cast<float>(std::numb
                                           bool restrict, const Block& offset, random::RandomSource& random,
                                           bool checkMalus) {
     const Block pos = towardDirection(mob, horizontal, random, offset);
+    const bool waterMob = isGuardian(mob) || isFish(mob);
     if (!world.blockState(pos[0], pos[1], pos[2]).has_value() || (restrict && !withinHome(mob, pos)) ||
-        !stable(world, pos) || (checkMalus && hasMalus(world, pos))) {
+        !(waterMob ? stableInWater(world, pos) : stable(world, pos)) ||
+        (checkMalus && hasMalus(world, pos, waterMob))) {
         return std::nullopt;
     }
     return pos;

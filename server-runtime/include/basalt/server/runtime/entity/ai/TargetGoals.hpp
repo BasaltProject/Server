@@ -54,6 +54,26 @@ private:
     std::int32_t randomInterval_;
 };
 
+/// parity: `Guardian.registerGoals`, `NearestAttackableTargetGoal` with `GuardianAttackSelector`: a player, squid or
+/// axolotl more than three blocks away, the nearest of them all.
+class GuardianTargetGoal final : public Goal {
+public:
+    explicit GuardianTargetGoal(std::int32_t randomInterval = 10);
+
+    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
+
+    [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
+
+    void start(MobContext& mob) override;
+
+    void stop(MobContext& mob) override;
+
+private:
+    std::int32_t randomInterval_;
+};
+
 /// parity: `Vindicator.VindicatorJohnnyAttackGoal`, which goes for anything alive once the vindicator is Johnny.
 class JohnnyAttackGoal final : public Goal {
 public:

@@ -131,6 +131,76 @@ void NearestAttackableEntityGoal::stop(MobContext& mob) { mob.mob.targetId.reset
 
 namespace {
 
+/// parity: `GuardianAttackSelector`, beyond `distanceToSqr > 9.0`.
+constexpr double kGuardianMinDistanceSquared = 9.0;
+
+[[nodiscard]] std::optional<std::int32_t> guardianTarget(MobContext& mob) {
+    static const std::set<std::string, std::less<>> kTargets{"squid", "glow_squid", "axolotl"};
+    static const std::string kKey = "axolotl,glow_squid,squid,";
+    const double range = followRange(mob);
+    double best = range * range;
+    std::optional<std::int32_t> found;
+    const world::EntityRegistry::Matches typed =
+        mob.world.entitySnapshotMatching(mob.entities, kKey, [](const ServerEntity& candidate) {
+            return kTargets.contains(candidate.type().path());
+        });
+    for (const ServerEntity* candidate : *typed) {
+        if (candidate == &mob.mob || candidate->removed || candidate->health <= 0.0) {
+            continue;
+        }
+        const double distance = mob.distanceSquaredTo(candidate->x, candidate->y, candidate->z);
+        if (distance > best || distance <= kGuardianMinDistanceSquared) {
+            continue;
+        }
+        best = distance;
+        found = candidate->entityId();
+    }
+    for (const PlayerView& player : mob.players) {
+        if (!player.targetable) {
+            continue;
+        }
+        const double distance = mob.distanceSquaredTo(player.x, player.y, player.z);
+        if (distance > best || distance <= kGuardianMinDistanceSquared) {
+            continue;
+        }
+        best = distance;
+        found = player.entityId;
+    }
+    return found;
+}
+
+} // namespace
+
+GuardianTargetGoal::GuardianTargetGoal(std::int32_t randomInterval) : randomInterval_(randomInterval) {}
+
+bool GuardianTargetGoal::canUse(MobContext& mob) {
+    if (mob.mob.targetId.has_value()) {
+        return false;
+    }
+    if (randomInterval_ > 0 && mob.random.nextInt(reducedTickDelay(randomInterval_)) != 0) {
+        return false;
+    }
+    return guardianTarget(mob).has_value();
+}
+
+bool GuardianTargetGoal::canContinueToUse(MobContext& mob) {
+    const std::optional<TargetView> target = targetOf(mob);
+    if (!target.has_value()) {
+        return false;
+    }
+    if (target->entity != nullptr && target->entity->health <= 0.0) {
+        return false;
+    }
+    const double range = followRange(mob);
+    return mob.distanceSquaredTo(target->x, target->y, target->z) <= range * range;
+}
+
+void GuardianTargetGoal::start(MobContext& mob) { mob.mob.targetId = guardianTarget(mob); }
+
+void GuardianTargetGoal::stop(MobContext& mob) { mob.mob.targetId.reset(); }
+
+namespace {
+
 [[nodiscard]] bool isJohnny(const ServerEntity& vindicator) {
     return vindicator.sourceNbt.has_value() && vindicator.sourceNbt->getBoolean("Johnny");
 }

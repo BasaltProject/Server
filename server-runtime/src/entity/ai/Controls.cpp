@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/CreakingNavigation.hpp>
+#include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
 #include <basalt/server/runtime/entity/FlyingPathFinder.hpp>
 #include <basalt/server/runtime/entity/LivingMovement.hpp>
@@ -190,24 +191,40 @@ void stop(ServerEntity& mob) {
 
 namespace {
 
-/// parity: `PathNavigation.shouldTargetNextNodeInDirection` without a direct line.
-[[nodiscard]] bool shouldTargetNextNode(const ServerEntity& mob) {
+/// parity: `PathNavigation` temp mob position, `WaterBoundPathNavigation` measures from the box centre.
+[[nodiscard]] bool usesWaterNavigation(const ServerEntity& mob) {
+    return isFish(mob) || isGuardian(mob) || mob.type().path() == "dolphin";
+}
+
+/// parity: `PathNavigation.shouldTargetNextNodeInDirection`, with `WaterBoundPathNavigation.canMoveDirectly`.
+[[nodiscard]] bool shouldTargetNextNode(world::WorldState& world, const ServerEntity& mob,
+                                        const std::array<double, 3>& position) {
     const auto next = static_cast<std::size_t>(mob.pathIndex) + 1;
     if (next >= mob.path->size()) {
         return false;
     }
     const std::array<std::int32_t, 3>& current = (*mob.path)[static_cast<std::size_t>(mob.pathIndex)];
     const std::array<std::int32_t, 3>& after = (*mob.path)[next];
-    const double toCurrentX = current[0] + 0.5 - mob.x;
-    const double toCurrentY = current[1] - mob.y;
-    const double toCurrentZ = current[2] + 0.5 - mob.z;
+    const double toCurrentX = current[0] + 0.5 - position[0];
+    const double toCurrentY = current[1] - position[1];
+    const double toCurrentZ = current[2] + 0.5 - position[2];
     const double toCurrent = (toCurrentX * toCurrentX) + (toCurrentY * toCurrentY) + (toCurrentZ * toCurrentZ);
     if (toCurrent >= 4.0) {
         return false;
     }
-    const double toNextX = after[0] + 0.5 - mob.x;
-    const double toNextY = after[1] - mob.y;
-    const double toNextZ = after[2] + 0.5 - mob.z;
+    if (usesWaterNavigation(mob)) {
+        // parity: `getNextEntityPos`, then `isClearForMovementBetween` with the collision shapes only.
+        const double offset = static_cast<double>(static_cast<std::int32_t>(mob.width() + 1.0)) * 0.5;
+        const entity::blockRay::ClipViewer viewer{.feetY = mob.y};
+        if (!entity::blockRay::clips(world, position[0], position[1], position[2], current[0] + offset,
+                                     current[1] + (mob.height() * 0.5), current[2] + offset,
+                                     entity::blockRay::ClipShape::Collider, viewer)) {
+            return true;
+        }
+    }
+    const double toNextX = after[0] + 0.5 - position[0];
+    const double toNextY = after[1] - position[1];
+    const double toNextZ = after[2] + 0.5 - position[2];
     const double toNext = (toNextX * toNextX) + (toNextY * toNextY) + (toNextZ * toNextZ);
     if (toNext >= toCurrent && toCurrent >= 0.5) {
         return false;
@@ -280,10 +297,12 @@ void tick(world::WorldState& world, ServerEntity& mob) {
     const std::array<std::int32_t, 3>& current = (*mob.path)[static_cast<std::size_t>(mob.pathIndex)];
     const bool close = std::abs(mob.x - (current[0] + 0.5)) < range && std::abs(mob.z - (current[2] + 0.5)) < range &&
                        std::abs(mob.y - current[1]) < vertical;
-    if (close || (canCutCorner(world, current) && shouldTargetNextNode(mob))) {
+    // parity: `getTempMobPos`, the box centre for `WaterBoundPathNavigation`, the feet otherwise.
+    const std::array<double, 3> mobPos{mob.x, usesWaterNavigation(mob) ? mob.y + (mob.height() * 0.5) : mob.y, mob.z};
+    if (close || (canCutCorner(world, current) && shouldTargetNextNode(world, mob, mobPos))) {
         mob.pathIndex++;
     }
-    detectStuck(mob, {mob.x, mob.y, mob.z}, mob.navigationWatch.tick);
+    detectStuck(mob, mobPos, mob.navigationWatch.tick);
     if (isDone(mob)) {
         stop(mob);
         return;

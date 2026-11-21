@@ -693,8 +693,8 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path) {
         add<RandomStrollGoal>(selector, 7, 1.0, 80, true);
         add<LookAtPlayerGoal>(selector, 8, kLookFar);
         add<RandomLookAroundGoal>(selector, 9);
-        add<HurtByTargetGoal>(selector, 1);
-        add<NearestAttackablePlayerGoal>(selector, 2);
+        // parity: Guardian.registerGoals, NearestAttackableTargetGoal with GuardianAttackSelector.
+        add<GuardianTargetGoal>(selector, 1);
         return true;
     }
     // parity: a boss runs on its own phases rather than goals, and neither exists yet.
