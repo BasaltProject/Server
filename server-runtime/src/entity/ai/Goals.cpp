@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/config/MobsConfig.hpp>
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <cstdint>
 #include <numbers>
+#include <optional>
 #include <utility>
 
 namespace basalt::server::runtime::entity::ai {
@@ -573,6 +575,16 @@ void SwimAboutGoal::tick(MobContext& mob) {
     constexpr std::int32_t kChangeInterval = 50;
     constexpr std::int32_t kIdleLimit = 100;
     constexpr double kLookAhead = 10.0;
+    // parity: `Squid.aiStep` only pushes along its vector `isInWater`, which is the fluid state, so seagrass and kelp count; out of it the mob just falls.
+    const std::optional<std::int32_t> feetState = mob.world.blockState(
+        static_cast<std::int32_t>(std::floor(mob.mob.x)),
+        static_cast<std::int32_t>(std::floor(mob.mob.y)),
+        static_cast<std::int32_t>(std::floor(mob.mob.z)));
+    if (!feetState.has_value() || !reg::blockFluids::hasWaterFluid(*feetState)) {
+        mob.mob.velocityX = 0.0;
+        mob.mob.velocityZ = 0.0;
+        return;
+    }
     if (mob.mob.idleTicks > kIdleLimit) {
         vectorX_ = 0.0;
         vectorY_ = 0.0;
