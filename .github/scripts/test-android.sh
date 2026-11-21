@@ -11,7 +11,7 @@ for attempt in {1..30}; do
     fi
     sleep 2
 done
-if [ "$connected" != 1 ]; then
+if [[ "$connected" != 1 ]]; then
     printf '%s\n' "$state"
     echo 'Android booted, but its network did not become ready'
     exit 1

@@ -6,12 +6,12 @@ set -euo pipefail
 mode="${1:?mode}"
 info="${2:?BuildInfo.hpp}"
 mc="$(sed -n 's/.*kMinecraftVersion = "\([^"]*\)".*/\1/p' "$info")"
-[ -n "$mc" ] || { echo "no Minecraft version in $info" >&2; exit 1; }
+[[ -n "$mc" ]] || { echo "no Minecraft version in $info" >&2; exit 1; }
 
 latest=0
 while read -r tag; do
     patch="${tag#v"$mc".}"
-    if [ "$patch" != "$tag" ] && [[ "$patch" =~ ^[0-9]+$ ]] && [ "$patch" -gt "$latest" ]; then
+    if [[ "$patch" != "$tag" ]] && [[ "$patch" =~ ^[0-9]+$ ]] && [[ "$patch" -gt "$latest" ]]; then
         latest="$patch"
     fi
 done < <(gh release list --exclude-pre-releases --limit 100 --json tagName --jq '.[].tagName')
@@ -35,4 +35,4 @@ nightly)
 esac
 
 echo "$version"
-[ -z "${GITHUB_OUTPUT:-}" ] || echo "version=$version" >>"$GITHUB_OUTPUT"
+[[ -z "${GITHUB_OUTPUT:-}" ]] || echo "version=$version" >>"$GITHUB_OUTPUT"

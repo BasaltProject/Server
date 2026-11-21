@@ -12,7 +12,7 @@ out="$(mktemp -d)"
 cp "$artifacts"/*/* "$out"/
 (cd "$out" && sha256sum -- * >SHA256SUMS)
 
-if [ "$mode" = release ]; then
+if [[ "$mode" = release ]]; then
     gh release create "v$version" "$out"/* --target "$sha" --title "$version" --generate-notes --latest
     exit 0
 fi
@@ -21,7 +21,7 @@ notes="Automatic build of $sha. It is replaced by the next push to main."
 if gh release view nightly >/dev/null 2>&1; then
     old="$(gh api repos/"$GITHUB_REPOSITORY"/git/ref/tags/nightly --jq .object.sha)"
     status="$(gh api repos/"$GITHUB_REPOSITORY"/compare/"$old"..."$sha" --jq .status)"
-    if [ "$status" = behind ]; then
+    if [[ "$status" = behind ]]; then
         echo "a newer nightly is already published"
         exit 0
     fi

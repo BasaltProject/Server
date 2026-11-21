@@ -6,7 +6,7 @@ retry() {
     local tries="$1" attempt=1
     shift
     until "$@"; do
-        if [ "$attempt" -ge "$tries" ]; then
+        if [[ "$attempt" -ge "$tries" ]]; then
             echo "giving up on: $*" >&2
             return 1
         fi
@@ -25,7 +25,7 @@ Linux)
     installed=0
     for attempt in 1 2 3 4 5; do
         # The Azure mirror is the one that stalls; from the second try on, go to Canonical's own servers.
-        if [ "$attempt" -ge 2 ]; then
+        if [[ "$attempt" -ge 2 ]]; then
             sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) \
                 -exec sed -i 's#//azure\.archive\.ubuntu\.com/#//archive.ubuntu.com/#g' {} +
         fi
@@ -39,7 +39,7 @@ Linux)
         sudo apt-get clean
         sleep $((attempt * 10))
     done
-    [ "$installed" = 1 ]
+    [[ "$installed" = 1 ]]
     echo "BASALT_CMAKE_ARGS=-DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19" >>"$GITHUB_ENV"
     ;;
 Darwin)
@@ -49,7 +49,7 @@ Darwin)
     echo "MACOSX_DEPLOYMENT_TARGET=$target" >>"$GITHUB_ENV"
     arch="${BASALT_TARGET_ARCH:-$(uname -m)}"
     cross=""
-    if [ "$arch" = x86_64 ] && [ "$(uname -m)" = arm64 ]; then
+    if [[ "$arch" = x86_64 ]] && [[ "$(uname -m)" = arm64 ]]; then
         sudo softwareupdate --install-rosetta --agree-to-license || true
         cross="-DCMAKE_OSX_ARCHITECTURES=x86_64"
         echo "BASALT_SHIM_ARCH=x86_64" >>"$GITHUB_ENV"
@@ -57,7 +57,7 @@ Darwin)
     version="$(brew list --versions llvm | awk '{ print $2 }')"
     version="${version%%_*}"
     prefix="$HOME/libcxx-$arch"
-    if [ ! -f "$prefix/built-$version-$target" ]; then
+    if [[ ! -f "$prefix/built-$version-$target" ]]; then
         rm -rf "$prefix" "$HOME/src-llvm"
         mkdir -p "$prefix"
         clone_llvm() {
@@ -83,12 +83,12 @@ MINGW* | MSYS* | CYGWIN*)
     args=""
     # The MSVC STL on the runner image rejects Clang older than 22.
     clang_major="$(clang --version 2>/dev/null | sed -n 's/.*clang version \([0-9]*\).*/\1/p' | head -1)"
-    if [ "${clang_major:-0}" -lt 22 ]; then
+    if [[ "${clang_major:-0}" -lt 22 ]]; then
         retry 4 choco upgrade llvm --no-progress -y || retry 4 choco install llvm --no-progress -y
         echo "C:\\Program Files\\LLVM\\bin" >>"$GITHUB_PATH"
         export PATH="/c/Program Files/LLVM/bin:$PATH"
     fi
-    if [ "${PROCESSOR_ARCHITECTURE:-}" = ARM64 ] || [ "${PROCESSOR_ARCHITEW6432:-}" = ARM64 ]; then
+    if [[ "${PROCESSOR_ARCHITECTURE:-}" = ARM64 ]] || [[ "${PROCESSOR_ARCHITEW6432:-}" = ARM64 ]]; then
         # An emulated x64 Clang targets x64 unless told otherwise.
         if ! command -v clang >/dev/null; then
             retry 4 choco install llvm --no-progress -y

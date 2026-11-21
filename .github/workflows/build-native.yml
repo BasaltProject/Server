@@ -33,21 +33,21 @@ jobs:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
           ref: ${{ inputs.ref }}
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: ${{ inputs.target == 'Windows-arm64' && 'microsoft' || 'temurin' }}
           java-version: "25"
 
       - name: Install the toolchain
-        uses: lukka/get-cmake@latest
+        uses: lukka/get-cmake@16e8153a8b4918849d92aad131befe67a3705daa # latest
 
       - name: Install ccache
-        uses: hendrikmuhs/ccache-action@v1
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1
         with:
           job-summary: ''
           max-size: 1200M
@@ -55,7 +55,7 @@ jobs:
 
       - name: Restore the libc++
         if: runner.os == 'macOS'
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/libcxx-*
           key: libcxx-${{ inputs.target }}-${{ hashFiles('.github/scripts/select-compiler.sh') }}
@@ -63,7 +63,7 @@ jobs:
       - name: Install the MinGW toolchain for Shim
         if: runner.os == 'Windows'
         id: msys2
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         with:
           msystem: ${{ inputs.target == 'Windows-arm64' && 'CLANGARM64' || 'CLANG64' }}
           update: false
@@ -117,7 +117,7 @@ jobs:
           done
 
       - name: Upload the binary
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: basalt-server-${{ inputs.target }}
           path: build/release/bin/

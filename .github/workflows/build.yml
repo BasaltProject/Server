@@ -36,7 +36,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.ref }}
 
@@ -87,11 +87,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
           ref: ${{ inputs.ref }}
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: build/musl-ccache
           key: ccache-${{ matrix.target }}-clang20-${{ github.sha }}
@@ -125,7 +125,7 @@ jobs:
               .github/scripts/smoke-binary.sh "$binary"
             done
           '
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: basalt-server-${{ matrix.target }}
           path: build/linux-musl/bin/
@@ -192,21 +192,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
           ref: ${{ inputs.ref }}
-      - uses: lukka/get-cmake@latest
-      - uses: hendrikmuhs/ccache-action@v1
+      - uses: lukka/get-cmake@16e8153a8b4918849d92aad131befe67a3705daa # latest
+      - uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1
         with:
           job-summary: ''
           max-size: 800M
           key: ${{ matrix.target }}
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: temurin
           java-version: '25'
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
       - name: Install the Android NDK
         run: |
           n=0
@@ -243,13 +243,13 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Test on Android 10
         if: matrix.preset == 'android-x64'
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 29
           arch: x86_64
           disk-size: 3072M
           script: .github/scripts/test-android.sh build/android-x64
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: basalt-server-${{ matrix.target }}
           path: build/${{ matrix.preset }}/bin/
@@ -280,18 +280,18 @@ jobs:
     env:
       VERSION: ${{ needs.plan.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
           ref: ${{ inputs.ref }}
-      - uses: lukka/get-cmake@latest
+      - uses: lukka/get-cmake@16e8153a8b4918849d92aad131befe67a3705daa # latest
         if: matrix.cross
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         if: matrix.cross
         with:
           distribution: temurin
           java-version: '25'
-      - uses: hendrikmuhs/ccache-action@v1
+      - uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1
         if: matrix.cross
         with:
           job-summary: ''
@@ -334,14 +334,14 @@ jobs:
               readelf -l "$binary" | grep -F /libexec/ld-elf.so.1
               if readelf -d "$binary" | grep NEEDED | grep -E 'libc\+\+|libcxxrt'; then exit 1; fi
           done
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: ${{ !matrix.cross }}
         with:
           path: build/freebsd-ccache
           key: ccache-${{ matrix.target }}-clang21-${{ github.sha }}
           restore-keys: ccache-${{ matrix.target }}-clang21-
       - name: Verify on FreeBSD
-        uses: vmactions/freebsd-vm@v1
+        uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b # v1
         env:
           CCACHE_DIR: ${{ github.workspace }}/build/freebsd-ccache
           CCACHE_MAXSIZE: 1200M
@@ -372,7 +372,7 @@ jobs:
                 ldd "$binary"
                 .github/scripts/smoke-binary.sh "$binary"
             done
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: basalt-server-${{ matrix.target }}
           path: build/freebsd/bin/
@@ -392,19 +392,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
 
-      - uses: lukka/get-cmake@latest
+      - uses: lukka/get-cmake@16e8153a8b4918849d92aad131befe67a3705daa # latest
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: temurin
           java-version: "25"
 
       - name: Install ccache
-        uses: hendrikmuhs/ccache-action@v1
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1
         with:
           job-summary: ''
           max-size: 800M
@@ -435,7 +435,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
 
@@ -460,9 +460,9 @@ jobs:
       group: nightly-publish
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: artifacts
           pattern: basalt-server-*
