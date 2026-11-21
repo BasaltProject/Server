@@ -1,3 +1,5 @@
+#include "decoration/DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -73,11 +75,6 @@ constexpr std::array<std::string_view, 20> kOceanHulls{"shipwreck/with_mast",
         return "minecraft:chests/shipwreck_treasure";
     }
     return metadata == "supply_chest" ? "minecraft:chests/shipwreck_supply" : std::string_view{};
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 [[nodiscard]] std::int32_t floorDiv(std::int32_t value, std::int32_t divisor) {

@@ -1,3 +1,5 @@
+#include "decoration/DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -51,11 +53,6 @@ constexpr std::array<std::string_view, 4> kHorizontal{"north", "east", "south", 
         return "south";
     }
     return facing == "south" ? "west" : "north";
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 [[nodiscard]] bool isLiquid(std::int32_t stateId) {

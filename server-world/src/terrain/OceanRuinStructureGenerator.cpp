@@ -1,3 +1,5 @@
+#include "decoration/DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -50,11 +52,6 @@ constexpr std::array<StructureRotation, 4> kRotations{StructureRotation::None, S
 
 [[nodiscard]] bool isIce(std::string_view path) {
     return path == "ice" || path == "packed_ice" || path == "blue_ice" || path == "frosted_ice";
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 [[nodiscard]] bool isOpen(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {

@@ -1,3 +1,5 @@
+#include "decoration/DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -119,11 +121,6 @@ constexpr std::array<std::pair<std::int32_t, std::int32_t>, 4> kFacingOffsets{st
         return "north";
     }
     return facing == "east" ? "west" : "east";
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 /// parity: `StructurePiece.reorient`.

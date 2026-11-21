@@ -1,3 +1,5 @@
+#include "../DecorationSupport.hpp"
+
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -23,14 +25,6 @@ constexpr float kRandomSkewChance = 0.2F;
 constexpr float kAboveRootChance = 0.5F;
 
 using PathSet = std::set<std::string, std::less<>>;
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"missing vanilla block minecraft:" + std::string{path}};
-    }
-    return found->stateId;
-}
 
 [[nodiscard]] std::string pathOf(const std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);

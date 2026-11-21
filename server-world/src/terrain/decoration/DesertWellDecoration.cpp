@@ -1,3 +1,5 @@
+#include "DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/structure/StructureProcessor.hpp>
@@ -26,14 +28,6 @@ constexpr std::array<StructureRotation, 4> kRotations{StructureRotation::None, S
 
 /// parity: the suspicious sand's five spots, the centre first and then west, south, east and north.
 constexpr std::array<std::pair<std::int32_t, std::int32_t>, 5> kSandOffsets{{{0, 0}, {-1, 0}, {0, 1}, {1, 0}, {0, -1}}};
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
-    const registry::BlockState* found = registry::blocks::named(path);
-    if (found == nullptr) {
-        throw std::runtime_error{"missing vanilla block minecraft:" + std::string{path}};
-    }
-    return found->stateId;
-}
 
 [[nodiscard]] std::int32_t get(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();

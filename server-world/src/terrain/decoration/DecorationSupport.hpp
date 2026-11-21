@@ -8,7 +8,7 @@
 #include <string>
 #include <string_view>
 
-namespace basalt::server::world::terrain::decoration {
+namespace basalt::server::world::terrain {
 
 inline constexpr std::int32_t kVegetalDecorationStep = 9;
 
@@ -30,4 +30,4 @@ inline constexpr std::int32_t kVegetalDecorationStep = 9;
     return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
-} // namespace basalt::server::world::terrain::decoration
+} // namespace basalt::server::world::terrain

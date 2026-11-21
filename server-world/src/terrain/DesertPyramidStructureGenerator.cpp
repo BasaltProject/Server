@@ -1,3 +1,5 @@
+#include "decoration/DecorationSupport.hpp"
+
 #include <basalt/server/random/PositionalRandomFactory.hpp>
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -63,11 +65,6 @@ constexpr std::array<StructureDirection, 4> kHorizontal{StructureDirection::Nort
 [[nodiscard]] StructureBoundingBox chunkClip(std::int32_t chunkX, std::int32_t chunkZ) {
     return StructureBoundingBox{chunkX * 16,      kOverworldHeight.minY(), chunkZ * 16,
                                 chunkX * 16 + 15, kOverworldHeight.maxY(), chunkZ * 16 + 15};
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
 [[nodiscard]] std::int32_t floorDiv(std::int32_t value, std::int32_t divisor) {

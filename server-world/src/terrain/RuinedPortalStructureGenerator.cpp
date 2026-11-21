@@ -1,3 +1,5 @@
+#include "decoration/DecorationSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -92,11 +94,6 @@ constexpr std::array<float, 14> kNetherrackByDistance{1.0F, 1.0F, 1.0F, 1.0F, 1.
 [[nodiscard]] std::optional<std::int32_t> vineTowards(BlockFace face) {
     const std::map<std::string, std::string> properties{{std::string{faceName(face)}, "true"}};
     return registry::blocks::stateIdOf(wire::common::Identifier::vanilla("vine"), properties);
-}
-
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
 }
 
 [[nodiscard]] const std::set<std::string, std::less<>>& featuresCannotReplace() {

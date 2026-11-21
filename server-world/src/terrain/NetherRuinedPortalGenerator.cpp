@@ -1,3 +1,5 @@
+#include "decoration/DecorationSupport.hpp"
+
 #include <basalt/server/random/PositionalHashing.hpp>
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -56,11 +58,6 @@ constexpr std::array<float, 14> kNetherrackByDistance{1.0F, 1.0F, 1.0F, 1.0F, 1.
     return id;
 }
 
-[[nodiscard]] std::string pathOf(std::int32_t stateId) {
-    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block == nullptr ? std::string{} : block->path();
-}
-
 [[nodiscard]] const std::set<std::string, std::less<>>& protectedBlocks() {
     static const std::set<std::string, std::less<>> built{
         "bedrock", "spawner", "chest", "end_portal_frame", "reinforced_deepslate", "trial_spawner", "vault"};
@@ -71,11 +68,6 @@ constexpr std::array<float, 14> kNetherrackByDistance{1.0F, 1.0F, 1.0F, 1.0F, 1.
     static const std::set<std::string, std::less<>> built{"crimson_forest", "nether_wastes", "soul_sand_valley",
                                                           "warped_forest", "basalt_deltas"};
     return built;
-}
-
-[[nodiscard]] std::string_view biomePath(std::string_view id) {
-    const std::size_t colon = id.find(':');
-    return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
 [[nodiscard]] const std::vector<std::string>& portals() {
