@@ -72,6 +72,12 @@ public:
                        float yaw, random::RandomSource& random,
                        world::MobSpawnReason reason = world::MobSpawnReason::Spawner);
 
+    /// parity: `EntityType.spawn` with `finalizeSpawn`, as a spawn egg, a dispenser and `/summon` call it.
+    /// Null when the spawn event refuses it.
+    entity::ServerEntity* spawnFinalized(world::LoadedWorld& world, const wire::common::Identifier& type, double x,
+                                         double y, double z, world::MobSpawnReason reason,
+                                         std::string_view eventReason);
+
     entity::ServerEntity* spawnSkeletonTrap(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
     bool activateSkeletonTrap(world::LoadedWorld& world, entity::ServerEntity& horse, random::RandomSource& random);

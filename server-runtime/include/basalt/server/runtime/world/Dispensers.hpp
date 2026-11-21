@@ -66,6 +66,8 @@ struct Hooks {
         equipEntity;
     /// parity: `Armadillo.brushOffScute`, the loot, sound and interaction event of a brushing.
     std::function<bool(entity::ServerEntity& armadillo)> brushArmadillo;
+    /// parity: `SpawnEggItemBehavior`, the mob finalized with `EntitySpawnReason.DISPENSER`. Unset, it spawns bare.
+    std::function<void(const wire::common::Identifier& type, double x, double y, double z)> spawnEgg;
 };
 
 struct Result {

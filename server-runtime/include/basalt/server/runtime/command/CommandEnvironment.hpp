@@ -69,6 +69,10 @@ public:
         std::function<void(world::LoadedWorld& world, std::string_view type, double x, double y, double z)> summonGolem;
         /// parity: `EnderDragon.kill`.
         std::function<bool(world::LoadedWorld& world, entity::ServerEntity& entity)> killOutright;
+        /// parity: `SummonCommand` without NBT, the mob finalized with `EntitySpawnReason.COMMAND`. False when refused.
+        std::function<bool(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
+                           double z)>
+            summonMob;
         wire::text::LangTable lang;
         storage::PlayerRepository* playerRepository = nullptr;
         storage::ProgressRepository* progressRepository = nullptr;

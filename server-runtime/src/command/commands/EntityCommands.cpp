@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/MobSpawnChecks.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
@@ -135,6 +136,16 @@ void SummonCommand::build(const CommandNodeBuilder& root) const {
                     CommandSyntaxError{.component = Component::translatable("commands.summon.failed")}};
             }
             static_cast<void>((*world)->state().spawnItem(*dropped));
+            context.success(Component::translatable("commands.summon.success", {Component::text(id->toString())}),
+                            true);
+            return 1;
+        }
+        // parity: `SummonCommand` finalizes a mob with `EntitySpawnReason.COMMAND` only when no NBT was given.
+        if (!withNbt && world::mobSpawnChecks::isMob(*id) && context.environment().options().summonMob) {
+            if (!context.environment().options().summonMob(**world, *id, at[0], at[1], at[2])) {
+                return std::unexpected{
+                    CommandSyntaxError{.component = Component::translatable("commands.summon.failed")}};
+            }
             context.success(Component::translatable("commands.summon.success", {Component::text(id->toString())}),
                             true);
             return 1;

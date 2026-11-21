@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
+#include <basalt/server/runtime/entity/DragonNavigation.hpp>
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -150,6 +151,20 @@ ServerEntity* NaturalSpawningSystem::spawnMob(world::LoadedWorld& world, const I
         hooks_.spawned(world, added, reason);
     }
     return &added;
+}
+
+ServerEntity* NaturalSpawningSystem::spawnFinalized(world::LoadedWorld& world, const Identifier& type, double x,
+                                                    double y, double z, world::MobSpawnReason reason,
+                                                    std::string_view eventReason) {
+    random::RandomSource random = freshRandom();
+    // parity: `EntityType.create` snaps the mob to `Mth.wrapDegrees(random.nextFloat() * 360)`.
+    const float yaw = entity::enderDragon::wrapDegrees(random.nextFloat() * kFullRotation);
+    const world::MobSpawnForest forest = finalizeForSpawner(world, type, x, y, z, yaw, random, reason);
+    ServerEntity* spawned = materializeForest(world, forest, eventReason, true);
+    if (spawned != nullptr) {
+        spawned->spawnReason = std::string{eventReason};
+    }
+    return spawned;
 }
 
 ServerEntity* NaturalSpawningSystem::spawnSkeletonTrap(world::LoadedWorld& world, std::int32_t x, std::int32_t y,

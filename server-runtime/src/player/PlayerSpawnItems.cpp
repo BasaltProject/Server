@@ -70,7 +70,7 @@ constexpr std::array<std::string_view, 6> kPlaceFaces{"down", "up", "north", "so
 [[nodiscard]] bool spawnFromItem(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                                  const Identifier& type, const std::int32_t heldSlot,
                                  const storage::StoredItemStack& held, const double x, const double y, const double z,
-                                 const BlockHit* placed = nullptr) {
+                                 const BlockHit* placed = nullptr, const bool fromEgg = false) {
     const reg::EntityTypeEntry* entry = reg::entityTypes::of(type);
     if (entry == nullptr || context.registry == nullptr) {
         return false;
@@ -79,8 +79,15 @@ constexpr std::array<std::string_view, 6> kPlaceFaces{"down", "up", "north", "so
     if (placed != nullptr && !entityPlaceAllowed(world, player, type, heldSlot, *placed, x, y, z)) {
         return false;
     }
-    world.state().spawnEntity(std::make_unique<entity::ServerEntity>(
-        context.registry->allocateEntityId(), wire::common::Uuid::random(), type, entry->protocolId, x, y, z));
+    if (fromEgg && context.spawnFromEgg) {
+        // parity: `SpawnEggItem.spawnMob` finalizes the mob with `EntitySpawnReason.SPAWN_ITEM_USE`.
+        if (!context.spawnFromEgg(world, type, x, y, z)) {
+            return false;
+        }
+    } else {
+        world.state().spawnEntity(std::make_unique<entity::ServerEntity>(
+            context.registry->allocateEntityId(), wire::common::Uuid::random(), type, entry->protocolId, x, y, z));
+    }
     if (player.gamemode == Gamemode::Creative) {
         return true;
     }
@@ -378,7 +385,7 @@ bool useSpawnEggFor(const BreakContext& context, PlayerSession& player, world::L
     const std::array<std::int32_t, 3> at =
         reg::blockShapes::isEmptyShape(*clicked) ? std::array<std::int32_t, 3>{hit.x, hit.y, hit.z} : beyond(hit);
     if (!spawnFromItem(context, player, world, type, heldSlot, held, at[0] + 0.5, static_cast<double>(at[1]),
-                       at[2] + 0.5)) {
+                       at[2] + 0.5, nullptr, true)) {
         return false;
     }
     // parity: `SpawnEggItem.spawnsFrom` raises `ENTITY_PLACE` at the square the mob lands on.

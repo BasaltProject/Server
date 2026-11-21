@@ -203,6 +203,7 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.cauldronAllowed = hooks_.cauldronAllowed;
     context.flowerPotAllowed = hooks_.flowerPotAllowed;
     context.lecternInsertAllowed = hooks_.lecternInsertAllowed;
+    context.spawnFromEgg = owner_->options().spawnFromEgg;
     context.putBack = [this](const PlayerSession&, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                              const std::int32_t stateId) {
         owner_->sendPlayPacket(play::ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {

@@ -98,6 +98,10 @@ public:
         std::function<bool(const player::PlayerSession& player, std::string_view type, std::int32_t x, std::int32_t y,
                            std::int32_t z, std::string_view face)>
             hangingAllowed;
+        /// parity: `SpawnEggItem.spawnMob`, which finalizes the mob with `SPAWN_ITEM_USE`. False when it was refused.
+        std::function<bool(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
+                           double z)>
+            spawnFromEgg;
     };
 
     struct Options {

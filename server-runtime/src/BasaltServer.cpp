@@ -716,6 +716,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.killOutright = [this](world::LoadedWorld& world, entity::ServerEntity& entity) {
         return endFight_ != nullptr && endFight_->killOutright(world, entity);
     };
+    wiring.summonMob = [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
+                              double z) {
+        return spawning_ != nullptr &&
+               spawning_->spawnFinalized(world, type, x, y, z, world::MobSpawnReason::Command, "command") != nullptr;
+    };
     wiring.requestRestart = [this] { requestRestart(); };
     wiring.onConfigsReloaded = [this] {
         worldRegistry_->onConfigsReloaded();
@@ -1230,6 +1235,12 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                        .biomeTag = [loader = std::make_shared<world::BiomeTagLoader>(jar.readText)](
                                                        const std::string& tag) { return loader->biomesIn(tag); }});
+    blockHooks_.spawnFromEgg = [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x,
+                                      double y, double z) {
+        return spawning_ != nullptr &&
+               spawning_->spawnFinalized(world, type, x, y, z, world::MobSpawnReason::SpawnItemUse, "spawner_egg") !=
+                   nullptr;
+    };
     // parity: the biome tags a spawner's rules ask, read once: `BiomeTagLoader` caches as it goes.
     auto spawnerBiomes = std::make_shared<std::map<std::string, std::set<std::string>, std::less<>>>();
     world::BiomeTagLoader biomeTags{jar.readText};
@@ -1535,6 +1546,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             .brushArmadillo =
                 [this](world::LoadedWorld& world, entity::ServerEntity& armadillo) {
                     return mobActions_ != nullptr && mobActions_->brushArmadillo(world, armadillo);
+                },
+            .dispenseSpawnEgg =
+                [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y, double z) {
+                    if (spawning_ != nullptr) {
+                        static_cast<void>(spawning_->spawnFinalized(world, type, x, y, z,
+                                                                    world::MobSpawnReason::Dispenser, "dispense_egg"));
+                    }
                 },
             .equipEntityAt =
                 [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t dx,

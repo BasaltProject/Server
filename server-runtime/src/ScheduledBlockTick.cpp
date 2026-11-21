@@ -437,7 +437,11 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                  .brushArmadillo =
                      [this, &world](entity::ServerEntity& armadillo) {
                          return options_.brushArmadillo != nullptr && options_.brushArmadillo(world, armadillo);
-                     }});
+                     },
+                 .spawnEgg = options_.dispenseSpawnEgg == nullptr
+                                 ? std::function<void(const wire::common::Identifier&, double, double, double)>{}
+                                 : [this, &world](const wire::common::Identifier& type, double sx, double sy,
+                                                  double sz) { options_.dispenseSpawnEgg(world, type, sx, sy, sz); }});
             if (!result.effects.empty()) {
                 broadcaster_->sendEffects(watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),
                                           result.effects);

@@ -519,10 +519,14 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
         if (!protocolType.has_value()) {
             return {};
         }
-        auto spawned =
-            std::make_unique<entity::ServerEntity>(nextEntityId(hooks), wire::common::Uuid::random(), animal,
-                                                   *protocolType, tx + 0.5, static_cast<double>(ty), tz + 0.5);
-        static_cast<void>(context.world.spawnEntity(std::move(spawned)));
+        if (hooks.spawnEgg) {
+            hooks.spawnEgg(animal, tx + 0.5, static_cast<double>(ty), tz + 0.5);
+        } else {
+            auto spawned =
+                std::make_unique<entity::ServerEntity>(nextEntityId(hooks), wire::common::Uuid::random(), animal,
+                                                       *protocolType, tx + 0.5, static_cast<double>(ty), tz + 0.5);
+            static_cast<void>(context.world.spawnEntity(std::move(spawned)));
+        }
         // parity: the `ENTITY_PLACE` of this one comes from the **dispenser's** square.
         heard(context.world, "entity_place", x, y, z, hooks.gameTime);
         return Special{.handled = true, .left = minusOne(stack)};

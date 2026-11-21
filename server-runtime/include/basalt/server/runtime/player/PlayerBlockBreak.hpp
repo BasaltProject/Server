@@ -96,6 +96,9 @@ struct BreakContext {
     std::function<std::optional<std::int32_t>(const PlayerSession& player, const std::string& item, std::int32_t now,
                                               std::int32_t before)>
         foodEaten;
+    /// parity: `SpawnEggItem.spawnMob`, which finalizes the mob with `SPAWN_ITEM_USE`. False when it was refused.
+    std::function<bool(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y, double z)>
+        spawnFromEgg;
 };
 
 [[nodiscard]] std::vector<PlayerSession*> playersIn(const BreakContext& context, std::string_view worldName);

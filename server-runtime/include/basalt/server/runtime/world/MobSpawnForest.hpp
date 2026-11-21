@@ -23,6 +23,9 @@ enum class MobSpawnReason : std::uint8_t {
     Reinforcement,
     Spawner,
     TrialSpawner,
+    SpawnItemUse,
+    Dispenser,
+    Command,
 };
 
 /// Nodes are owned by the builder and referred to by pointer: a finalizer mounts one on another while both still grow.

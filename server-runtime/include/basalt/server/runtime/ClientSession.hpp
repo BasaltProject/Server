@@ -288,6 +288,10 @@ public:
             awardExperience;
         /// parity: `new ExperienceOrb`.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t value)> spawnOrb;
+        /// parity: `SpawnEggItem.useOn` spawns through `EntityType.spawn`, which runs `finalizeSpawn`.
+        std::function<bool(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
+                           double z)>
+            spawnFromEgg;
         PluginHooks plugins;
         /// Where the session tells the plugins what happens; null in a test, and then nobody hears.
         plugins::EventSink* events = nullptr;

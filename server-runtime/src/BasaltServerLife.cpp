@@ -526,6 +526,7 @@ player::BreakContext BasaltServer::breakContext() {
     context.cauldronAllowed = blockHooks_.cauldronAllowed;
     context.flowerPotAllowed = blockHooks_.flowerPotAllowed;
     context.lecternInsertAllowed = blockHooks_.lecternInsertAllowed;
+    context.spawnFromEgg = blockHooks_.spawnFromEgg;
     context.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
         if (orbs_ != nullptr) {
             const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::BlockBreak};

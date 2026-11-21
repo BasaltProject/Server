@@ -129,6 +129,10 @@ public:
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
         /// parity: `Armadillo.brushOffScute` from the dispenser's brush behaviour.
         std::function<bool(world::LoadedWorld& world, entity::ServerEntity& armadillo)> brushArmadillo;
+        /// parity: `SpawnEggItemBehavior`, the mob finalized with `EntitySpawnReason.DISPENSER`.
+        std::function<void(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
+                           double z)>
+            dispenseSpawnEgg;
         std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t dx,
                            std::int32_t dy, std::int32_t dz, const server::world::loot::ItemStack& stack)>
             equipEntityAt;

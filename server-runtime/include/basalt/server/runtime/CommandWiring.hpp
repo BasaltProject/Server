@@ -79,6 +79,9 @@ struct CommandWiring {
     /// parity: `CarvedPumpkinBlock.trySpawnGolem`.
     std::function<void(world::LoadedWorld& world, std::string_view type, double x, double y, double z)> summonGolem;
     std::function<bool(world::LoadedWorld& world, entity::ServerEntity& entity)> killOutright;
+    /// parity: `SummonCommand` without NBT, the mob finalized with `EntitySpawnReason.COMMAND`. False when refused.
+    std::function<bool(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y, double z)>
+        summonMob;
     std::function<void()> requestRestart;
     std::function<void()> onConfigsReloaded;
     std::function<std::int64_t()> nowNanos;
