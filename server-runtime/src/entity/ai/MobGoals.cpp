@@ -654,7 +654,12 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path) {
     }
     static const Names kFish{"cod", "salmon", "tropical_fish", "pufferfish", "tadpole"};
     if (kFish.contains(path)) {
-        add<SwimAboutGoal>(selector, 4, kFishPush);
+        // parity: `AbstractFish.FishSwimGoal`; a tadpole keeps the random push.
+        if (path == "tadpole") {
+            add<SwimAboutGoal>(selector, 4, kFishPush);
+        } else {
+            add<RandomSwimmingGoal>(selector, 4, 1.0, 40, true);
+        }
         if (path == "cod" || path == "salmon" || path == "tropical_fish") {
             add<FollowFlockLeaderGoal>(selector, 3);
         }

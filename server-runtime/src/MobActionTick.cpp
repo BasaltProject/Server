@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
@@ -399,6 +400,28 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
         entity::flyingMovement::tick(world.state(), mob, random != nullptr ? *random : scratch, target);
         entity::ai::lookControl::tick(mob);
         return;
+    }
+    // parity: `AbstractFish.aiStep`, the flop of a fish stranded on dry ground.
+    if (entity::ai::isFish(mob) && mob.onGround) {
+        const bool wet = [&world, &mob] {
+            const world::WorldState::BlockReadScope readScope{world.state()};
+            const std::optional<std::int32_t> state = world.state().blockState(
+                wire::common::mth::floor(mob.x), wire::common::mth::floor(mob.y), wire::common::mth::floor(mob.z));
+            return state.has_value() && server::registry::blockFluids::hasWaterFluid(*state);
+        }();
+        if (!wet) {
+            random::RandomSource scratch = freshRandom();
+            random::RandomSource& dice = random != nullptr ? *random : scratch;
+            mob.velocityX += static_cast<double>((dice.nextFloat() * 2.0F - 1.0F) * 0.05F);
+            mob.velocityY += 0.4;
+            mob.velocityZ += static_cast<double>((dice.nextFloat() * 2.0F - 1.0F) * 0.05F);
+            mob.onGround = false;
+            const std::string_view kind = mob.type().path();
+            playSound(world, mob,
+                      kind == "pufferfish" ? std::string{"entity.puffer_fish.flop"} : "entity." + std::string{kind} + ".flop",
+                      1.0F, 1.0F + ((dice.nextFloat() - dice.nextFloat()) * 0.2F),
+                      wire::protocol::play::SoundSource::Neutral);
+        }
     }
     // parity: `Blaze.aiStep`, which falls at six tenths of the speed.
     if (mob.type().path() == "blaze" && !mob.onGround && mob.velocityY < 0.0) {

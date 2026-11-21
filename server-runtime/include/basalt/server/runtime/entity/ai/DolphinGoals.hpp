@@ -36,7 +36,8 @@ public:
 /// parity: `RandomSwimmingGoal` over `BehaviorUtils.getRandomSwimmablePos`.
 class RandomSwimmingGoal final : public Goal {
 public:
-    RandomSwimmingGoal(double speedModifier, std::int32_t interval);
+    /// `fish` adds `AbstractFish.FishSwimGoal`'s `canRandomSwim`, which a school follower does not have.
+    RandomSwimmingGoal(double speedModifier, std::int32_t interval, bool fish = false);
 
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
 
@@ -51,6 +52,7 @@ public:
 private:
     double speedModifier_;
     std::int32_t interval_;
+    bool fish_;
     std::array<double, 3> wanted_{};
 };
 

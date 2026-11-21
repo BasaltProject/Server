@@ -235,6 +235,42 @@ void travelInWater(world::WorldState& world, ServerEntity& entity, double forwar
     entity.velocityY = (entity.velocityY * kVerticalWaterDrag) - (kGravity / kSinkShare);
 }
 
+void travelInWaterFish(world::WorldState& world, ServerEntity& entity, double forward, bool noTarget) {
+    // parity: `moveRelative(0.01F, input)`, `move`, then 0.9 of the speed kept on every axis.
+    constexpr double kFishInput = 0.01;
+    constexpr double kFishDrag = 0.9;
+    constexpr double kFishSink = 0.005;
+    const world::WorldState::BlockReadScope readScope{world};
+    addInput(entity, forward, 0.0, kFishInput);
+
+    const Aabb box = Aabb::of(entity.x, entity.y, entity.z, entity.width(), entity.height());
+    const std::array<double, 3> moved =
+        entityCollision::collide(blocksOf(world), box, entity.velocityX, entity.velocityY, entity.velocityZ);
+    entity.x += moved[0];
+    entity.y += moved[1];
+    entity.z += moved[2];
+    entity.onGround = moved[1] != entity.velocityY && entity.velocityY < 0.0;
+    const bool collidedX = !nearlyEqual(moved[0], entity.velocityX);
+    const bool collidedZ = !nearlyEqual(moved[2], entity.velocityZ);
+    entity.horizontallyBlocked = collidedX || collidedZ;
+    if (collidedX) {
+        entity.velocityX = 0.0;
+    }
+    if (collidedZ) {
+        entity.velocityZ = 0.0;
+    }
+    if (moved[1] != entity.velocityY) {
+        entity.velocityY = 0.0;
+    }
+
+    entity.velocityX *= kFishDrag;
+    entity.velocityY *= kFishDrag;
+    entity.velocityZ *= kFishDrag;
+    if (noTarget) {
+        entity.velocityY -= kFishSink;
+    }
+}
+
 void swimStep(world::WorldState& world, ServerEntity& entity, double forward, double up, double speed) {
     const world::WorldState::BlockReadScope readScope{world};
     const double length = (forward * forward) + (up * up);

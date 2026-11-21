@@ -1,9 +1,11 @@
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/CreakingNavigation.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
 #include <basalt/server/runtime/entity/FlyingPathFinder.hpp>
 #include <basalt/server/runtime/entity/LivingMovement.hpp>
+#include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/SwimPath.hpp>
@@ -48,6 +50,12 @@ pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, d
         const double half = mob.width() / 2.0;
         return swimPath::find(world, {blockOf(mob.x - half), blockOf(mob.y + 0.5), blockOf(mob.z - half)},
                               {blockOf(x), blockOf(y), blockOf(z)}, true);
+    }
+    // parity: `WaterBoundPathNavigation` over `SwimNodeEvaluator(false)`, water only and no breaching.
+    if (isFish(mob)) {
+        const double half = mob.width() / 2.0;
+        return swimPath::find(world, {blockOf(mob.x - half), blockOf(mob.y + 0.5), blockOf(mob.z - half)},
+                              {blockOf(x), blockOf(y), blockOf(z)}, false);
     }
     // parity: `FlyingPathNavigation`, a path through the air from half a block over the feet.
     if (flyingMovement::usesFlyingPath(mob.type())) {
@@ -268,7 +276,7 @@ void tick(world::WorldState& world, ServerEntity& mob) {
     // parity: `followThePath`: one node a tick at most, then the stuck check.
     const double range = waypointRange(mob);
     // parity: `WaterBoundPathNavigation.getMaxVerticalDistanceToWaypoint`.
-    const double vertical = swimsSmoothly(mob) ? 0.5 : 1.0;
+    const double vertical = swimsSmoothly(mob) || isFish(mob) ? 0.5 : 1.0;
     const std::array<std::int32_t, 3>& current = (*mob.path)[static_cast<std::size_t>(mob.pathIndex)];
     const bool close = std::abs(mob.x - (current[0] + 0.5)) < range && std::abs(mob.z - (current[2] + 0.5)) < range &&
                        std::abs(mob.y - current[1]) < vertical;
@@ -295,6 +303,41 @@ constexpr float kArrivedFloat = 2.5000003E-7F;
 
 /// parity: `rotlerp`'s own ninety degrees a tick.
 constexpr float kTurnRate = 90.0F;
+
+/// parity: `Entity.isInWater` and `isEyeInFluid(WATER)` of a fish, which count the fluid state of the block.
+[[nodiscard]] bool holdsWater(world::WorldState& world, double x, double y, double z) {
+    const std::optional<std::int32_t> state = world.blockState(blockOf(x), blockOf(y), blockOf(z));
+    return state.has_value() && reg::blockFluids::hasWaterFluid(*state);
+}
+
+/// parity: `FishMoveControl.tick` with `AbstractFish.travelInWater`.
+void tickFish(world::WorldState& world, ServerEntity& mob, double speed) {
+    constexpr double kLift = 0.005;
+    constexpr float kSpeedLerp = 0.125F;
+    constexpr double kClimb = 0.1;
+    if (holdsWater(world, mob.x, mob.y + mobBreathing::eyeHeightOf(mob), mob.z)) {
+        mob.velocityY += kLift;
+    }
+    if (mob.moving && !navigation::isDone(mob)) {
+        const auto wanted = static_cast<float>(mob.moveSpeed * speed);
+        mob.aiSpeed = mob.aiSpeed + (kSpeedLerp * (wanted - mob.aiSpeed));
+        const double dx = mob.wantedX - mob.x;
+        const double dy = mob.wantedY - mob.y;
+        const double dz = mob.wantedZ - mob.z;
+        if (dy != 0.0) {
+            const double distance = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+            mob.velocityY += static_cast<double>(mob.aiSpeed) * (dy / distance) * kClimb;
+        }
+        if (dx != 0.0 || dz != 0.0) {
+            mob.yaw = rotlerp(mob.yaw, static_cast<float>(std::atan2(dz, dx) * kDegrees) - 90.0F, kTurnRate);
+        }
+    } else {
+        mob.aiSpeed = 0.0F;
+    }
+    mob.moving = false;
+    // parity: `Mob.setSpeed` also sets the forward input to the same number.
+    livingMovement::travelInWaterFish(world, mob, static_cast<double>(mob.aiSpeed), !mob.targetId.has_value());
+}
 
 } // namespace
 
@@ -343,6 +386,11 @@ float rotlerp(float from, float to, float max) {
 void tick(world::WorldState& world, ServerEntity& mob, double speed) {
     if (swimsSmoothly(mob)) {
         tickSwimming(world, mob, speed);
+        return;
+    }
+    // parity: `AbstractFish.travel` swims only in water; out of it the land travel below runs.
+    if (isFish(mob) && holdsWater(world, mob.x, mob.y, mob.z)) {
+        tickFish(world, mob, speed);
         return;
     }
     // parity: `LivingEntity.travel` picks the fluid path first.
@@ -525,6 +573,11 @@ void tickSwimming(ServerEntity& mob) {
 } // namespace lookControl
 
 bool swimsSmoothly(const ServerEntity& mob) { return mob.type().path() == "dolphin" || mob.smoothSwimming; }
+
+bool isFish(const ServerEntity& mob) {
+    const std::string_view path = mob.type().path();
+    return path == "cod" || path == "salmon" || path == "tropical_fish" || path == "pufferfish";
+}
 
 bool inWater(world::WorldState& world, const ServerEntity& mob) {
     const std::optional<std::int32_t> state = world.blockState(blockOf(mob.x), blockOf(mob.y), blockOf(mob.z));

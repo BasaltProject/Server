@@ -83,6 +83,9 @@ void tickSwimming(ServerEntity& mob);
 
 [[nodiscard]] bool swimsSmoothly(const ServerEntity& mob);
 
+/// parity: `AbstractFish`, the four that swim on `FishMoveControl` and `WaterBoundPathNavigation`.
+[[nodiscard]] bool isFish(const ServerEntity& mob);
+
 /// parity: `Entity.isInWater`, which is the block its feet are in.
 [[nodiscard]] bool inWater(world::WorldState& world, const ServerEntity& mob);
 

@@ -34,6 +34,9 @@ void travel(world::WorldState& world, ServerEntity& entity, double forward, doub
 
 void travelInWater(world::WorldState& world, ServerEntity& entity, double forward, double strafe);
 
+/// parity: `AbstractFish.travelInWater`, a hundredth of input, 0.9 drag and a sinking of 0.005 without a target.
+void travelInWaterFish(world::WorldState& world, ServerEntity& entity, double forward, bool noTarget);
+
 /// parity: `moveRelative` with an upward input, then `move(SELF)`, and nothing else.
 void swimStep(world::WorldState& world, ServerEntity& entity, double forward, double up, double speed);
 

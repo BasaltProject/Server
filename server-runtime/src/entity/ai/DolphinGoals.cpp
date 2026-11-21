@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/entity/LivingMovement.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/SwimPath.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
@@ -113,8 +114,8 @@ void TryFindWaterGoal::start(MobContext& mob) {
     }
 }
 
-RandomSwimmingGoal::RandomSwimmingGoal(double speedModifier, std::int32_t interval)
-    : speedModifier_(speedModifier), interval_(interval) {}
+RandomSwimmingGoal::RandomSwimmingGoal(double speedModifier, std::int32_t interval, bool fish)
+    : speedModifier_(speedModifier), interval_(interval), fish_(fish) {}
 
 bool RandomSwimmingGoal::canUse(MobContext& mob) {
     if (mob.mob.idleTicks >= 100 || mob.random.nextInt(reducedTickDelay(interval_)) != 0) {
@@ -131,7 +132,9 @@ bool RandomSwimmingGoal::canUse(MobContext& mob) {
         return false;
     }
     wanted_ = {(*target)[0] + 0.5, static_cast<double>((*target)[1]), (*target)[2] + 0.5};
-    return true;
+    // parity: `AbstractFish.FishSwimGoal.canUse` also asks `AbstractSchoolingFish.canRandomSwim`.
+    return !fish_ || !mobMisc::isSchooling(mob.mob) ||
+           !mobMisc::isFollower(mob.mob, [&mob](std::int32_t id) { return mob.entityById(id); });
 }
 
 bool RandomSwimmingGoal::canContinueToUse(MobContext& mob) { return !navigation::isDone(mob.mob); }
