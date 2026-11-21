@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/NaturalSpawnPredicates.hpp>
 #include <basalt/server/runtime/world/NaturalSpawner.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/SpawnPlacementRules.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 
 #include <algorithm>
@@ -488,13 +489,12 @@ bool canSpawnAt(LoadedWorld& world, const Identifier* type, MobCategory category
     }
 
     if (category == MobCategory::Monster) {
-        // parity: `Monster.isDarkEnoughToSpawn`: the sky has to be dark where it stands, and the.
+        // parity: `Monster.isDarkEnoughToSpawn`, sky roll, dimension block-light limit and the raw-brightness test.
         const std::int32_t maxLight = world.mobSettings().monsterSpawnMaxLightLevel;
         const bool dark =
             monstersIgnoringLight().contains(typePath) ||
             (maxLight >= 0 ? worldLight::rawBrightness(world.state(), x, y, z, true, world.skyDarken()) <= maxLight
-                           : worldLight::skyLight(world.state(), x, y, z) <= random.nextInt(32) &&
-                                 worldLight::blockLight(world.state(), x, y, z) <= 0);
+                           : spawnPlacements::isDarkEnoughToSpawn(world, x, y, z, random));
         return dark && monsterTypeRule(typePath, *ground, world, x, y, z, random);
     }
     if (category == MobCategory::Creature) {

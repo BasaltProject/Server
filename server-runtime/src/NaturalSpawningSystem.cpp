@@ -57,6 +57,18 @@ std::int64_t chunkKey(std::int32_t chunkX, std::int32_t chunkZ) {
     return (static_cast<std::int64_t>(chunkX) & 0xFFFFFFFFL) | (static_cast<std::int64_t>(chunkZ) << 32);
 }
 
+// parity: natural spawning runs only in entity-ticking chunks, whose light is done; an unlit chunk reads as darkness.
+[[nodiscard]] bool lightSettled(world::LoadedWorld& world, std::int32_t chunkX, std::int32_t chunkZ) {
+    for (std::int32_t dx = -1; dx <= 1; ++dx) {
+        for (std::int32_t dz = -1; dz <= 1; ++dz) {
+            if (world.state().chunkIfLoaded(chunkX + dx, chunkZ + dz) == nullptr) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 entity::Aabb entityBox(const ServerEntity& entity) {
     return entity::Aabb::of(entity.x, entity.y, entity.z, entity.width(), entity.height());
 }
@@ -350,6 +362,9 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
         std::swap(chunks[index - 1], chunks[swap]);
     }
     for (const std::array<std::int32_t, 2>& chunk : chunks) {
+        if (!lightSettled(world, chunk[0], chunk[1])) {
+            continue;
+        }
         for (const MobCategory category : categories) {
             if ((!mobs.perPlayerMobSpawns && counts[category] >= caps[category]) ||
                 !localCaps.canSpawn(category, chunk[0], chunk[1])) {
@@ -387,8 +402,9 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
                     return nearest;
                 },
                 .canSpawnEntitiesInChunk =
-                    [&spawnableChunks](std::int32_t chunkX, std::int32_t chunkZ) {
-                        return spawnableChunks.contains(chunkKey(chunkX, chunkZ));
+                    [&spawnableChunks, &world](std::int32_t chunkX, std::int32_t chunkZ) {
+                        return spawnableChunks.contains(chunkKey(chunkX, chunkZ)) &&
+                               lightSettled(world, chunkX, chunkZ);
                     },
                 .requestAccepted =
                     [&](const world::SpawnRequest& request) {
