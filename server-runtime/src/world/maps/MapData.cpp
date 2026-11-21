@@ -328,7 +328,11 @@ std::optional<wire::protocol::play::MapItemDataPacket> MapData::nextUpdate(std::
         packet.patch = std::move(patch);
     }
     // parity: decorations go out at most every fifth tick they are dirty on.
-    if (holder.dirtyDecorations && holder.tick++ % 5 == 0) {
+    bool gate1 = holder.dirtyDecorations;
+    if (gate1) {
+        gate1 = holder.tick++ % 5 == 0;
+    }
+    if (gate1) {
         holder.dirtyDecorations = false;
         std::vector<wire::protocol::play::MapDecorationEntry> entries;
         entries.reserve(decorations_.size());

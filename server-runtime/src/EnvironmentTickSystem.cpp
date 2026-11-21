@@ -125,7 +125,11 @@ void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
         }
         players.push_back(player);
         // parity: `Player.tick`.
-        if (!player->sleepingBed.has_value() && player->sleepTicks > 0 && ++player->sleepTicks >= 110) {
+        bool gate1 = !player->sleepingBed.has_value() && player->sleepTicks > 0;
+        if (gate1) {
+            gate1 = ++player->sleepTicks >= 110;
+        }
+        if (gate1) {
             player->sleepTicks = 0;
         }
         if (player->gamemode == Gamemode::Spectator) {

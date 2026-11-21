@@ -96,7 +96,11 @@ void lookAtTarget(MobContext& mob, Look& look) {
     if (look.entity.has_value()) {
         at = positionOf(mob, *look.entity, true);
     }
-    if (!at.has_value() || --look.ticksLeft <= 0) {
+    bool gate1 = !at.has_value();
+    if (!gate1) {
+        gate1 = --look.ticksLeft <= 0;
+    }
+    if (gate1) {
         look = {};
         return;
     }

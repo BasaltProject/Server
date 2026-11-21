@@ -296,7 +296,11 @@ void MobActionSystem::tickFrog(world::LoadedWorld& world, entity::ai::MobContext
     }
     frogJumps(world, context, state);
     // parity: `Croak.tick`.
-    if (state.croaking && ++state.croakCounter > frogs::kCroakTicks) {
+    bool gate1 = state.croaking;
+    if (gate1) {
+        gate1 = ++state.croakCounter > frogs::kCroakTicks;
+    }
+    if (gate1) {
         state.croaking = false;
         state.pose = frogs::Pose::Standing;
     }

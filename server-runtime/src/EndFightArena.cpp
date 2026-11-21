@@ -122,7 +122,11 @@ void EndFightSystem::tickFight(world::LoadedWorld& world, const std::vector<Play
     if (fight->dragonKilled) {
         return;
     }
-    if (!fight->dragonUuid.has_value() || ++fight->ticksSinceDragonSeen >= kDragonLostTicks) {
+    bool gate1 = !fight->dragonUuid.has_value();
+    if (!gate1) {
+        gate1 = ++fight->ticksSinceDragonSeen >= kDragonLostTicks;
+    }
+    if (gate1) {
         findOrCreateDragon(world, *fight, living);
         fight->ticksSinceDragonSeen = 0;
     }

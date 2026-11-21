@@ -234,7 +234,11 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         std::size_t splitIndex = 0;
         for (const entity::cubeMobs::Split& split : splits) {
-            if (spawning_ == nullptr || splitIndex++ >= splitCount) {
+            bool gate1 = spawning_ == nullptr;
+            if (!gate1) {
+                gate1 = splitIndex++ >= splitCount;
+            }
+            if (gate1) {
                 break;
             }
             static_cast<void>(spawning_->spawnMob(

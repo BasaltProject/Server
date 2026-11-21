@@ -77,7 +77,11 @@ void BlockTests::leave(Run& run) {
     }
     const auto found = active_.find(run.environmentKey);
     run.environmentKey.clear();
-    if (found == active_.end() || --found->second.users > 0) {
+    bool gate1 = found == active_.end();
+    if (!gate1) {
+        gate1 = --found->second.users > 0;
+    }
+    if (gate1) {
         return;
     }
     if (found->second.undo) {

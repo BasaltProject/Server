@@ -100,8 +100,14 @@ void MobActionSystem::tickAxolotl(world::LoadedWorld& world, entity::ai::MobCont
             state.look = {};
             villagersIn(world).addEffect(axolotl, "regeneration", 200, 0);
         }
-        if (state.playDeadRun > 0 && (!inWater || !state.playDeadTicks.has_value() || --state.playDeadRun == 0)) {
-            state.playDeadRun = 0;
+        if (state.playDeadRun > 0) {
+            bool ended = !inWater || !state.playDeadTicks.has_value();
+            if (!ended) {
+                ended = --state.playDeadRun == 0;
+            }
+            if (ended) {
+                state.playDeadRun = 0;
+            }
         }
         // parity: breeding cuts it short.
         if (kit::makeLove(context, state.motion, state.look, 0.2F, 2).has_value()) {

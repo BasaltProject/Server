@@ -324,7 +324,11 @@ void FollowParentGoal::stop(MobContext& mob) {
 }
 
 void FollowParentGoal::tick(MobContext& mob) {
-    if (parent_ == nullptr || --repathCooldown_ > 0) {
+    bool gate1 = parent_ == nullptr;
+    if (!gate1) {
+        gate1 = --repathCooldown_ > 0;
+    }
+    if (gate1) {
         return;
     }
     repathCooldown_ = adjustedTickDelay(10);

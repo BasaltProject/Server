@@ -25,7 +25,11 @@ void MobActionSystem::tickChicken(world::LoadedWorld& world, ServerEntity& chick
     }
     const bool jockey = chicken.sourceNbt.has_value() && chicken.sourceNbt->getBoolean("IsChickenJockey");
     // parity: `Chicken.aiStep`, an egg every five to ten minutes unless it is a baby or a jockey.
-    if (chicken.health <= 0.0 || chicken.removed || chicken.age < 0 || jockey || --chicken.eggLayTime > 0) {
+    bool gate1 = chicken.health <= 0.0 || chicken.removed || chicken.age < 0 || jockey;
+    if (!gate1) {
+        gate1 = --chicken.eggLayTime > 0;
+    }
+    if (gate1) {
         return;
     }
     if (armadilloDrops(world, chicken, "gameplay/chicken_lay")) {

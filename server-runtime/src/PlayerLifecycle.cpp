@@ -88,7 +88,11 @@ void PlayerLifecycle::tickPlayer() {
         return;
     }
     // parity: `LivingEntity.aiStep` counts a riptide's spin down, and it stops at nothing.
-    if (session->autoSpinTicks > 0 && --session->autoSpinTicks <= 0) {
+    bool gate1 = session->autoSpinTicks > 0;
+    if (gate1) {
+        gate1 = --session->autoSpinTicks <= 0;
+    }
+    if (gate1) {
         session->autoSpinDamage = 0.0F;
         session->autoSpinItem.reset();
     }

@@ -251,7 +251,11 @@ void MobActionSystem::tickArmadillo(world::LoadedWorld& world, entity::ai::MobCo
     }
     armadilloBallsUp(world, context, state);
     // parity: `customServerAiStep`'s scute, shed every five to ten minutes.
-    if (armadillo.health > 0.0 && --*state.scuteTime <= 0) {
+    bool gate1 = armadillo.health > 0.0;
+    if (gate1) {
+        gate1 = --*state.scuteTime <= 0;
+    }
+    if (gate1) {
         if (armadilloDrops(world, armadillo, "gameplay/armadillo_shed")) {
             random::RandomSource voice = freshRandom();
             playSound(world, armadillo, "entity.armadillo.scute_drop", 1.0F,

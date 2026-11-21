@@ -571,7 +571,11 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     if (mob.type().path() == "strider") {
         tickStriderWarmth(world, mob);
     }
-    if (mob.misc != nullptr && mob.misc->boosting && mob.misc->boostTime++ > mob.misc->boostTotal) {
+    bool gate1 = mob.misc != nullptr && mob.misc->boosting;
+    if (gate1) {
+        gate1 = mob.misc->boostTime++ > mob.misc->boostTotal;
+    }
+    if (gate1) {
         mob.misc->boosting = false;
     }
     const BrainTick brain = brainOf(mob.type());

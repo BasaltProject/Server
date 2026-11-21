@@ -335,7 +335,11 @@ void MobActionSystem::goatRam(world::LoadedWorld& world, entity::ai::MobContext&
     }
     const std::optional<Vec> target =
         state.ramEntity.has_value() ? kit::positionOf(context, *state.ramEntity, false) : std::nullopt;
-    if (!state.ramStart.has_value() || !target.has_value() || ++state.prepareRun > 160) {
+    bool gate2 = !state.ramStart.has_value() || !target.has_value();
+    if (!gate2) {
+        gate2 = ++state.prepareRun > 160;
+    }
+    if (gate2) {
         // parity: `stop` without a target: the head back up and the shorter cooldown.
         state.preparing = false;
         entityEvent(goat, 59);

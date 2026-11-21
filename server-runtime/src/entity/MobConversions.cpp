@@ -122,7 +122,11 @@ std::optional<Conversion> tick(ServerEntity& mob, const Around& around) {
     }
     // parity: `Tadpole.aiStep` ages every turn.
     if (path == "tadpole") {
-        if (alive && !mob.ageLocked && ++mob.conversionClock >= kTadpoleTicks) {
+        bool gate1 = alive && !mob.ageLocked;
+        if (gate1) {
+            gate1 = ++mob.conversionClock >= kTadpoleTicks;
+        }
+        if (gate1) {
             return Conversion{.into = Identifier::vanilla("frog"),
                               .keepEquipment = false,
                               .keepCanPickUpLoot = false,

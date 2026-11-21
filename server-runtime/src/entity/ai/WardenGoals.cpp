@@ -113,7 +113,11 @@ void WardenSniffGoal::stop(MobContext& mob) { mob.mob.warden->sniffTicks = 0; }
 
 void WardenSniffGoal::tick(MobContext& mob) {
     brain::WardenState& state = *mob.mob.warden;
-    if (state.sniffTicks <= 0 || --state.sniffTicks > 0) {
+    bool gate1 = state.sniffTicks <= 0;
+    if (!gate1) {
+        gate1 = --state.sniffTicks > 0;
+    }
+    if (gate1) {
         return;
     }
     const std::optional<Nearest> nearest = nearestAttackable(mob);

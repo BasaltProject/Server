@@ -310,7 +310,11 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
 
 void MobActionSystem::tickAmbientSound(world::LoadedWorld& world, ServerEntity& mob, random::RandomSource& random) {
     // parity: `Mob.baseTick`.
-    if (mob.dying || mob.health <= 0.0 || random.nextInt(1000) >= mob.ambientSoundTime++) {
+    bool gate1 = mob.dying || mob.health <= 0.0;
+    if (!gate1) {
+        gate1 = random.nextInt(1000) >= mob.ambientSoundTime++;
+    }
+    if (gate1) {
         return;
     }
     mob.ambientSoundTime = -entity::mobSounds::ambientInterval(mob);

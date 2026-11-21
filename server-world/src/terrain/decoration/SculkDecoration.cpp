@@ -137,7 +137,11 @@ bool attemptPlaceSculk(SculkRegion& region, const DecorationPos& position, rando
         for (std::int32_t y = position.y; y <= position.y + 2; ++y) {
             for (std::int32_t x = position.x - 4; x <= position.x + 4; ++x) {
                 const std::string path = region.blockPath(DecorationPos{.x = x, .y = y, .z = z});
-                if ((path == "sculk_sensor" || path == "sculk_shrieker") && ++growthCount > 2) {
+                bool gate1 = (path == "sculk_sensor" || path == "sculk_shrieker");
+                if (gate1) {
+                    gate1 = ++growthCount > 2;
+                }
+                if (gate1) {
                     return false;
                 }
             }

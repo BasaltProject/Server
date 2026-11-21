@@ -111,7 +111,11 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
     }
     allayHears(world, allay, state, watchersOf(world));
     // parity: `CountDownCooldownTicks` for both cooldowns, gone once they reach nothing.
-    if (state.noteblockCooldown.has_value() && --*state.noteblockCooldown <= 0) {
+    bool gate1 = state.noteblockCooldown.has_value();
+    if (gate1) {
+        gate1 = --*state.noteblockCooldown <= 0;
+    }
+    if (gate1) {
         state.noteblockCooldown.reset();
     }
     state.pickupCooldown = std::max(state.pickupCooldown - 1, 0);
