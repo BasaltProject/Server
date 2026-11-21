@@ -188,6 +188,7 @@ void EntityVisibilityTracker::forgetEverythingDrawn() {
     lastNpcLook_.clear();
     trackedEquipment_.clear();
     lastEntityPositions_.clear();
+    lastSentMotion_.clear();
     lastRuntimeEntityMetadata_.clear();
     sentSourceVersion_.clear();
     lastPassengers_.clear();
@@ -216,6 +217,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                 mobSettings)) {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
+                lastSentMotion_.erase(entity->entityId());
                 lastRuntimeEntityMetadata_.erase(entity->entityId());
                 sentSourceVersion_.erase(entity->entityId());
                 lastPassengers_.erase(entity->entityId());
@@ -250,6 +252,8 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                         .write(buffer);
                 });
             }
+            lastSentMotion_.insert_or_assign(entity->entityId(),
+                                             std::array<double, 3>{entity->velocityX, entity->velocityY, entity->velocityZ});
             owner_->sendPlayPacket(SpawnEntityPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                 SpawnEntityPacket{.entityId = entity->entityId(),
                                   .uuid = entity->uuid(),
@@ -376,6 +380,27 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                                                                         static_cast<double>(entity->headYaw)});
             continue;
         }
+        // parity: `ServerEntity.sendChanges` sends `ClientboundSetEntityMotionPacket` when the delta movement drifts
+        // from the last one sent, independently of whether the position changed. A rider sends none.
+        if (!entity->vehicleId.has_value()) {
+            std::array<double, 3>& sent = lastSentMotion_[entity->entityId()];
+            const double dx = entity->velocityX - sent[0];
+            const double dy = entity->velocityY - sent[1];
+            const double dz = entity->velocityZ - sent[2];
+            const double diff = dx * dx + dy * dy + dz * dz;
+            const bool zero = entity->velocityX == 0.0 && entity->velocityY == 0.0 && entity->velocityZ == 0.0;
+            if (diff > 1.0E-7 || (diff > 0.0 && zero)) {
+                sent = {entity->velocityX, entity->velocityY, entity->velocityZ};
+                owner_->sendPlayPacket(
+                    wire::protocol::play::SetEntityMotionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                        wire::protocol::play::SetEntityMotionPacket{.entityId = entity->entityId(),
+                                                                    .velocityX = entity->velocityX,
+                                                                    .velocityY = entity->velocityY,
+                                                                    .velocityZ = entity->velocityZ}
+                            .write(buffer);
+                    });
+            }
+        }
         if (!moved) {
             continue;
         }
@@ -418,6 +443,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
         if (trackedEntities_.erase(entityId) > 0) {
             gone.push_back(entityId);
             lastEntityPositions_.erase(entityId);
+            lastSentMotion_.erase(entityId);
             lastRuntimeEntityMetadata_.erase(entityId);
             sentSourceVersion_.erase(entityId);
             lastPassengers_.erase(entityId);

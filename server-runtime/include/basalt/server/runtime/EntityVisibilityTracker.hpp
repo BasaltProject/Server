@@ -129,6 +129,8 @@ private:
     std::map<std::string, SentNameTag> sentNameTags_;
     std::map<std::int32_t, std::pair<float, float>> lastNpcLook_;
     std::unordered_map<std::int32_t, std::array<double, 5>> lastEntityPositions_;
+    // parity: `ServerEntity.lastSentMovement`.
+    std::unordered_map<std::int32_t, std::array<double, 3>> lastSentMotion_;
     std::unordered_map<std::int32_t, entity::RuntimeEntityMetadata> lastRuntimeEntityMetadata_;
     std::unordered_map<std::int32_t, std::uint32_t> sentSourceVersion_;
     std::unordered_map<std::int32_t, std::vector<std::int32_t>> lastPassengers_;
