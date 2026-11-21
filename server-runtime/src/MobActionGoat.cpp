@@ -130,7 +130,11 @@ void MobActionSystem::tickGoat(world::LoadedWorld& world, entity::ai::MobContext
     }
     const bool panicking = kit::panic(context, state.motion, state.panicTicks, 2.0F);
     entity::ai::longJump::countDown(state.jump);
-    if (state.ramCooldown.has_value() && --*state.ramCooldown <= 0) {
+    bool gate1 = false;
+    if (state.ramCooldown.has_value()) {
+        gate1 = --*state.ramCooldown <= 0;
+    }
+    if (gate1) {
         state.ramCooldown.reset();
     }
     const bool tempted = state.temptation.following;

@@ -102,7 +102,11 @@ RavagerTurn tickRavager(ServerEntity& ravager, bool hasTarget) {
     ravager.attributeValues[std::string{attribute::kMovementSpeed}] =
         ravagerImmobile(ravager) ? 0.0 : base + (kSpeedLerp * ((hasTarget ? kAttackSpeed : kBaseSpeed) - base));
     RavagerTurn turn = RavagerTurn::Nothing;
-    if (ravager.ravagerRoarTicks > 0 && --ravager.ravagerRoarTicks == kRoarAt) {
+    bool gate1 = false;
+    if (ravager.ravagerRoarTicks > 0) {
+        gate1 = --ravager.ravagerRoarTicks == kRoarAt;
+    }
+    if (gate1) {
         turn = RavagerTurn::Roars;
     }
     if (ravager.ravagerAttackTicks > 0) {

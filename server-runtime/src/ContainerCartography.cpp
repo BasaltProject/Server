@@ -73,7 +73,11 @@ void ContainerMenuController::recomputeCartographyResult() {
 void ContainerMenuController::takeCartographyResult() {
     for (const std::int32_t slot : {Menu::kCartographyMap, Menu::kCartographyAdditional}) {
         std::optional<storage::StoredItemStack>& input = cartographySlots_[static_cast<std::size_t>(slot)];
-        if (input.has_value() && --input->count <= 0) {
+        bool gate1 = false;
+        if (input.has_value()) {
+            gate1 = --input->count <= 0;
+        }
+        if (gate1) {
             input.reset();
         }
     }

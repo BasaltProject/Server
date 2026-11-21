@@ -424,7 +424,11 @@ void showTick(Ctx& ctx, const Node& /*node*/, NodeState& state) {
         }
     }
     if (!extra.display.empty()) {
-        if (extra.display.size() >= 2 && ++state.i0 >= 40) {
+        bool gate1 = false;
+        if (extra.display.size() >= 2) {
+            gate1 = ++state.i0 >= 40;
+        }
+        if (gate1) {
             ++state.i1;
             state.i0 = 0;
             if (state.i1 > static_cast<std::int32_t>(extra.display.size()) - 1) {

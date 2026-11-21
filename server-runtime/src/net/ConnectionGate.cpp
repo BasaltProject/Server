@@ -39,7 +39,11 @@ std::optional<ConnectionGate::Slot> ConnectionGate::open(const std::string& addr
 void ConnectionGate::release(const std::string& address) {
     const std::lock_guard<std::mutex> lock{mutex_};
     const auto found = open_.find(address);
-    if (found != open_.end() && --found->second <= 0) {
+    bool gate1 = false;
+    if (found != open_.end()) {
+        gate1 = --found->second <= 0;
+    }
+    if (gate1) {
         open_.erase(found);
     }
 }

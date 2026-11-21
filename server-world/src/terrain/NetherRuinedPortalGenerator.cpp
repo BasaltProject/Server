@@ -368,7 +368,11 @@ std::int32_t NetherRuinedPortalGenerator::findSuitableY(random::RandomSource& ra
     while (y > kMinProjectedY) {
         std::int32_t solidCorners = 0;
         for (const auto& [x, z] : corners) {
-            if (!registry::blocks::isAir(baseStateAt_(x, y, z)) && ++solidCorners == 3) {
+            bool gate1 = false;
+            if (!registry::blocks::isAir(baseStateAt_(x, y, z))) {
+                gate1 = ++solidCorners == 3;
+            }
+            if (gate1) {
                 return y;
             }
         }

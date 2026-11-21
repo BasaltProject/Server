@@ -139,7 +139,11 @@ void TraderUseItemGoal::start(MobContext& mob) {
 }
 
 void TraderUseItemGoal::tick(MobContext& mob) {
-    if (remaining_ > 0 && --remaining_ == 0) {
+    bool gate1 = false;
+    if (remaining_ > 0) {
+        gate1 = --remaining_ == 0;
+    }
+    if (gate1) {
         mob.actions.traderUsesItem(mob.mob, potion_, UsePhase::Finish);
     }
 }

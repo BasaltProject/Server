@@ -238,7 +238,11 @@ void ExperienceOrbSystem::tickPlayers(const std::vector<PlayerSession*>& players
     const std::scoped_lock guard{lock_};
     for (const PlayerSession* player : players) {
         const auto found = takeDelays_.find(player->entityId());
-        if (found != takeDelays_.end() && --found->second <= 0) {
+        bool gate1 = false;
+        if (found != takeDelays_.end()) {
+            gate1 = --found->second <= 0;
+        }
+        if (gate1) {
             takeDelays_.erase(found);
         }
     }

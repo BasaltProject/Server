@@ -289,7 +289,11 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
             const config::MobSettings& mobs = world.mobSettings();
             const std::int32_t limit =
                 entity.type().path() == "trident" ? mobs.tridentDespawnTicks : mobs.arrowDespawnTicks;
-            if (!keeps && ++entity.arrowLife >= limit) {
+            bool gate1 = false;
+            if (!keeps) {
+                gate1 = ++entity.arrowLife >= limit;
+            }
+            if (gate1) {
                 entity.removed = true;
             }
             ++entity.inGroundTime;

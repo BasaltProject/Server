@@ -275,7 +275,11 @@ void WitherSystem::tickHeads(world::LoadedWorld& world, const std::vector<Server
             continue;
         }
         state.nextHeadUpdate[slot] = wither.tickCount + 10 + state.random.nextInt(10);
-        if (fierce && state.idleHeadUpdates[slot]++ > 15) {
+        bool gate1 = false;
+        if (fierce) {
+            gate1 = state.idleHeadUpdates[slot]++ > 15;
+        }
+        if (gate1) {
             const double x = nextDouble(state.random, wither.x - 10.0, wither.x + 10.0);
             const double y = nextDouble(state.random, wither.y - 5.0, wither.y + 5.0);
             const double z = nextDouble(state.random, wither.z - 10.0, wither.z + 10.0);

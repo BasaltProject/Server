@@ -337,7 +337,11 @@ public:
         for (std::int32_t x = pos[0] - 4; x <= pos[0] + 4; ++x) {
             for (std::int32_t y = pos[1]; y <= pos[1] + 2; ++y) {
                 for (std::int32_t z = pos[2] - 4; z <= pos[2] + 4; ++z) {
-                    if (is("minecraft:sculk_growth_inhibitors", at({x, y, z})) && ++found > 2) {
+                    bool gate1 = false;
+                    if (is("minecraft:sculk_growth_inhibitors", at({x, y, z}))) {
+                        gate1 = ++found > 2;
+                    }
+                    if (gate1) {
                         return false;
                     }
                 }

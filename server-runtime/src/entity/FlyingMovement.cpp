@@ -112,7 +112,11 @@ void flyingControl(world::WorldState& world, ServerEntity& mob, float maxTurn, b
 
 /// parity: `GhastMoveControl.tick` and `Ghast.travel`.
 void ghastControl(world::WorldState& world, ServerEntity& mob, random::RandomSource& random) {
-    if (mob.moving && mob.flight.floatDuration-- <= 0) {
+    bool gate1 = false;
+    if (mob.moving) {
+        gate1 = mob.flight.floatDuration-- <= 0;
+    }
+    if (gate1) {
         mob.flight.floatDuration += random.nextInt(5) + 2;
         const double dx = mob.wantedX - mob.x;
         const double dy = mob.wantedY - mob.y;

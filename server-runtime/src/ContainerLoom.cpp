@@ -156,7 +156,11 @@ void ContainerMenuController::takeLoomResult() {
     // parity: `LoomMenu.ResultSlot.onTake`.
     const auto eat = [this](const std::int32_t slot) {
         std::optional<storage::StoredItemStack>& held = loomSlots_[static_cast<std::size_t>(slot)];
-        if (held.has_value() && --held->count <= 0) {
+        bool gate1 = false;
+        if (held.has_value()) {
+            gate1 = --held->count <= 0;
+        }
+        if (gate1) {
             held.reset();
         }
     };

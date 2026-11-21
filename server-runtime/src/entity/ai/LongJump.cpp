@@ -157,7 +157,11 @@ bool defaultAcceptable(const MobContext& mob, const Block& target) {
 }
 
 void countDown(State& state) {
-    if (state.cooldown.has_value() && --*state.cooldown <= 0) {
+    bool gate1 = false;
+    if (state.cooldown.has_value()) {
+        gate1 = --*state.cooldown <= 0;
+    }
+    if (gate1) {
         state.cooldown.reset();
     }
 }
