@@ -911,18 +911,24 @@ void EnvironmentTickSystem::tickGatewayCooldowns(const world::LoadedWorld& world
 void EnvironmentTickSystem::tickTime(world::LoadedWorld& world) {
     const bool wasRaining = world.weather().raining;
     const bool wasThundering = world.weather().thundering;
+    const float rainBefore = world.weather().rainLevel();
+    const float thunderBefore = world.weather().thunderLevel();
     random::RandomSource weatherRandom = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     world.tickTime(weatherRandom);
     if (world.settings().rules.environment.disableThunder) {
         world.weather().thundering = false;
     }
-    if (world.weather().raining != wasRaining || world.weather().thundering != wasThundering) {
+    const bool flagsChanged = world.weather().raining != wasRaining || world.weather().thundering != wasThundering;
+    if (flagsChanged) {
         if (hooks_.weatherChangeAllowed &&
             !hooks_.weatherChangeAllowed(world, world.weather().raining, world.weather().thundering, wasRaining,
                                          wasThundering)) {
             world.weather().raining = wasRaining;
             world.weather().thundering = wasThundering;
         }
+    }
+    // parity: `ServerLevel.advanceWeatherCycle` sends the rain and thunder levels every tick they move, not only when the flags flip.
+    if (flagsChanged || world.weather().rainLevel() != rainBefore || world.weather().thunderLevel() != thunderBefore) {
         environment_->syncWeather(world);
     }
     if (world.gameTime() % kTimeSyncIntervalTicks == 0) {
