@@ -85,7 +85,10 @@ std::optional<std::vector<Position>> find(world::WorldState& world, const Positi
     // parity: `moveTo(x, y, z, speed)` asks for an accuracy of one block.
     bool reached = manhattan(from, to) <= 1;
     std::int32_t examined = 0;
-    while (!reached && !open.empty() && examined++ < kMaxNodes) {
+    while (!reached && !open.empty()) {
+        if (examined++ >= kMaxNodes) {
+            break;
+        }
         const auto cheapest = std::ranges::min_element(open, [&](const Position& one, const Position& other) {
             return valueOr(score, one) < valueOr(score, other);
         });

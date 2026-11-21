@@ -900,8 +900,12 @@ bool EnvironmentTickSystem::triggerGatewayCooldown(const world::LoadedWorld& wor
 
 void EnvironmentTickSystem::tickGatewayCooldowns(const world::LoadedWorld& world) {
     const std::scoped_lock guard{gatewayLock_};
-    std::erase_if(gatewayCooldowns_,
-                  [&world](auto& entry) { return entry.first.first == world.name() && --entry.second <= 0; });
+    std::erase_if(gatewayCooldowns_, [&world](auto& entry) {
+        if (entry.first.first != world.name()) {
+            return false;
+        }
+        return --entry.second <= 0;
+    });
 }
 
 void EnvironmentTickSystem::tickTime(world::LoadedWorld& world) {

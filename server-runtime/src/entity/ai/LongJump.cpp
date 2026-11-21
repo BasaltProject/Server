@@ -221,8 +221,11 @@ Event tick(MobContext& mob, State& state, const Spec& spec, brainKit::Look& look
         state.wantsPreferred = spec.preferred && mob.random.nextFloat() < spec.preferredChance;
     }
     // parity: `canStillUse`: still where it started, tries left and something to try.
-    const bool valid = state.from.has_value() && *state.from == Vec{body.x, body.y, body.z} && state.tries > 0 &&
-                       !submerged && (state.chosen.has_value() || !state.candidates.empty()) && ++state.run <= 200;
+    bool valid = state.from.has_value() && *state.from == Vec{body.x, body.y, body.z} && state.tries > 0 &&
+                 !submerged && (state.chosen.has_value() || !state.candidates.empty());
+    if (valid) {
+        valid = ++state.run <= 200;
+    }
     if (!valid) {
         state.jumping = false;
         cooldown(true);

@@ -493,7 +493,10 @@ std::optional<std::vector<Position>> find(world::WorldState& world, std::int32_t
     };
 
     std::int32_t examined = 0;
-    while (!open.empty() && examined++ < kMaxNodes) {
+    while (!open.empty()) {
+        if (examined++ >= kMaxNodes) {
+            break;
+        }
         // A plain scan for the cheapest open node: a path this short never pays for a heap.
         const auto cheapest = std::ranges::min_element(open, [&](std::int64_t one, std::int64_t other) {
             return scoreOf(table.find(one)) < scoreOf(table.find(other));

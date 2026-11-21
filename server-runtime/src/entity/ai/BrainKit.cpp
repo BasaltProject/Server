@@ -132,7 +132,10 @@ std::optional<Vec> swimSpot(MobContext& mob) {
     // parity: `BehaviorUtils.getRandomSwimmablePos`: ten more tries for a spot in water.
     const auto swimmable = [&](std::int32_t horizontal, std::int32_t vertical) {
         std::optional<Vec> at = randomPos::defaultPos(mob.world, mob.mob, mob.random, horizontal, vertical);
-        for (std::int32_t count = 0; at.has_value() && !fluidAt(*at, true) && count++ < 10;) {
+        for (std::int32_t count = 0; at.has_value() && !fluidAt(*at, true);) {
+            if (count++ >= 10) {
+                break;
+            }
             at = randomPos::defaultPos(mob.world, mob.mob, mob.random, horizontal, vertical);
         }
         return at;

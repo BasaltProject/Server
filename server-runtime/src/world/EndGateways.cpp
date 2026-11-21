@@ -131,11 +131,17 @@ void setBlock(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
     const double dirZ = length < 1.0E-5 ? 0.0 : z / length;
     double atX = dirX * kTeleportDistance;
     double atZ = dirZ * kTeleportDistance;
-    for (std::int32_t limit = kChunkLimit; !isEmpty(world, atX, atZ) && limit-- > 0;) {
+    for (std::int32_t limit = kChunkLimit; !isEmpty(world, atX, atZ);) {
+        if (limit-- <= 0) {
+            break;
+        }
         atX += dirX * -16.0;
         atZ += dirZ * -16.0;
     }
-    for (std::int32_t limit = kChunkLimit; isEmpty(world, atX, atZ) && limit-- > 0;) {
+    for (std::int32_t limit = kChunkLimit; isEmpty(world, atX, atZ);) {
+        if (limit-- <= 0) {
+            break;
+        }
         atX += dirX * 16.0;
         atZ += dirZ * 16.0;
     }

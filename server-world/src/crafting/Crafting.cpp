@@ -224,7 +224,9 @@ namespace {
                     return std::nullopt;
                 }
                 found = stack;
-            } else if (!recipe.ingredients[1].test(stack) || ++materials > recipe.materialMax) {
+            } else if (!recipe.ingredients[1].test(stack)) {
+                return std::nullopt;
+            } else if (++materials > recipe.materialMax) {
                 return std::nullopt;
             }
         }

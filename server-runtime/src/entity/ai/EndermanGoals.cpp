@@ -202,9 +202,11 @@ void EndermanLookForPlayerGoal::tick(MobContext& mob) {
             static_cast<void>(teleportEndermanRandomly(mob));
         }
         teleportTime_ = 0;
-    } else if (distanceSquared(mob.mob, *target) > kFarSquared && teleportTime_++ >= adjustedTickDelay(30) &&
-               endermanGaze::teleportTowards(mob, target->x, target->y + playerEyeHeight(*target), target->z)) {
-        teleportTime_ = 0;
+    } else if (distanceSquared(mob.mob, *target) > kFarSquared) {
+        if (teleportTime_++ >= adjustedTickDelay(30) &&
+            endermanGaze::teleportTowards(mob, target->x, target->y + playerEyeHeight(*target), target->z)) {
+            teleportTime_ = 0;
+        }
     }
 }
 

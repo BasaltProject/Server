@@ -172,7 +172,11 @@ MonumentRoomGraph generateMonumentRoomGraph(random::RandomSource& random) {
             room->setOpening(face, false);
             neighbour->setOpening(back, false);
             // The doorway stays shut only if both rooms can still reach the entrance without it.
-            if (room->findSource(scan++) && neighbour->findSource(scan++)) {
+            bool reachable = room->findSource(scan++);
+            if (reachable) {
+                reachable = neighbour->findSource(scan++);
+            }
+            if (reachable) {
                 ++closed;
             } else {
                 room->setOpening(face, true);
