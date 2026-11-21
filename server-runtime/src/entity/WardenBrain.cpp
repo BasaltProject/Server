@@ -142,7 +142,11 @@ std::vector<Action> tick(ServerEntity& warden, const View& view) {
     if (state.sniffCooldown > 0) {
         state.sniffCooldown--;
     }
-    if (state.disturbanceTicks > 0 && --state.disturbanceTicks == 0) {
+    bool gate1 = false;
+    if (state.disturbanceTicks > 0) {
+        gate1 = --state.disturbanceTicks == 0;
+    }
+    if (gate1) {
         state.disturbance.reset();
     }
     // parity: `EMERGE` comes first and holds everything else until it is done.

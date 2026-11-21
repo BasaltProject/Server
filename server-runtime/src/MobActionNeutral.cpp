@@ -162,7 +162,11 @@ void MobActionSystem::tickZombifiedPiglin(world::LoadedWorld& world, ServerEntit
             speed[std::string{kAttackingModifier}] =
                 entity::AttributeModifier{.id = std::string{kAttackingModifier}, .amount = 0.05};
         }
-        if (anger.firstSoundIn > 0 && --anger.firstSoundIn == 0) {
+        bool gate1 = false;
+        if (anger.firstSoundIn > 0) {
+            gate1 = --anger.firstSoundIn == 0;
+        }
+        if (gate1) {
             random::RandomSource voice = freshRandom();
             const float pitch = ((voice.nextFloat() - voice.nextFloat()) * 0.2F) + (mob.age < 0 ? 1.5F : 1.0F);
             playSound(world, mob, "entity.zombified_piglin.angry", 2.0F, pitch * 1.8F);

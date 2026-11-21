@@ -112,7 +112,11 @@ RavagerTurn tickRavager(ServerEntity& ravager, bool hasTarget) {
     if (ravager.ravagerAttackTicks > 0) {
         --ravager.ravagerAttackTicks;
     }
-    if (ravager.ravagerStunTicks > 0 && --ravager.ravagerStunTicks == 0) {
+    bool gate2 = false;
+    if (ravager.ravagerStunTicks > 0) {
+        gate2 = --ravager.ravagerStunTicks == 0;
+    }
+    if (gate2) {
         ravager.ravagerRoarTicks = kRoarTicks;
         turn = RavagerTurn::StunEnds;
     }

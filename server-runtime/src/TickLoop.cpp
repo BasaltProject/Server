@@ -182,12 +182,20 @@ void TickLoop::runTicks() {
         if (options_.onTick) {
             options_.onTick(!skip);
         }
-        if (options_.saveIntervalSeconds > 0 && --ticksUntilSave <= 0) {
+        bool gate1 = false;
+        if (options_.saveIntervalSeconds > 0) {
+            gate1 = --ticksUntilSave <= 0;
+        }
+        if (gate1) {
             // parity: `MinecraftServer.autoSave`.
             ticksUntilSave = nextAutosaveInterval();
             sweepRequested_.store(true, std::memory_order_relaxed);
         }
-        if (playerSaveTicks > 0 && --ticksUntilPlayerSave <= 0) {
+        bool gate2 = false;
+        if (playerSaveTicks > 0) {
+            gate2 = --ticksUntilPlayerSave <= 0;
+        }
+        if (gate2) {
             ticksUntilPlayerSave = playerSaveTicks;
             playersRequested_.store(true, std::memory_order_relaxed);
         }

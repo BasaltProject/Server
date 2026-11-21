@@ -147,17 +147,29 @@ void MobActionSystem::tickHorse(world::LoadedWorld& world, ServerEntity& horse, 
                     state.eating = true;
                 }
             }
-            if (state.eating && ++state.eatingCounter > kGrazeTicks) {
+            bool gate1 = false;
+            if (state.eating) {
+                gate1 = ++state.eatingCounter > kGrazeTicks;
+            }
+            if (gate1) {
                 state.eatingCounter = 0;
                 state.eating = false;
             }
         }
     }
-    if (state.mouthCounter > 0 && ++state.mouthCounter > kMouthTicks) {
+    bool gate2 = false;
+    if (state.mouthCounter > 0) {
+        gate2 = ++state.mouthCounter > kMouthTicks;
+    }
+    if (gate2) {
         state.mouthCounter = 0;
         state.mouthOpen = false;
     }
-    if (state.standCounter > 0 && --state.standCounter <= 0) {
+    bool gate3 = false;
+    if (state.standCounter > 0) {
+        gate3 = --state.standCounter <= 0;
+    }
+    if (gate3) {
         state.standing = false;
         state.standCounter = 0;
     }
@@ -173,7 +185,11 @@ void MobActionSystem::tickHorse(world::LoadedWorld& world, ServerEntity& horse, 
     if (state.dashing && state.dashCooldown < kDashLands && (horse.onGround || horse.vehicleId.has_value())) {
         state.dashing = false;
     }
-    if (state.dashCooldown > 0 && --state.dashCooldown == 0) {
+    bool gate4 = false;
+    if (state.dashCooldown > 0) {
+        gate4 = --state.dashCooldown == 0;
+    }
+    if (gate4) {
         playSound(world, horse,
                   horse.type().path() == "camel_husk" ? "minecraft:entity.camel_husk.dash_ready"
                                                       : "minecraft:entity.camel.dash_ready",

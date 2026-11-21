@@ -354,7 +354,11 @@ void tickCharging(ServerEntity& dragon, DragonState& state, DragonWorld& world) 
         setPhase(state, Phase::HoldingPattern, world);
         return;
     }
-    if (memory.timeSinceCharge > 0 && memory.timeSinceCharge++ >= 10) {
+    bool gate1 = false;
+    if (memory.timeSinceCharge > 0) {
+        gate1 = memory.timeSinceCharge++ >= 10;
+    }
+    if (gate1) {
         setPhase(state, Phase::HoldingPattern, world);
         return;
     }
