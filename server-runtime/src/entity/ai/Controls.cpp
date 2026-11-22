@@ -1,8 +1,8 @@
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
-#include <basalt/server/runtime/entity/CreakingNavigation.hpp>
 #include <basalt/server/runtime/entity/BlockRay.hpp>
+#include <basalt/server/runtime/entity/CreakingNavigation.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
 #include <basalt/server/runtime/entity/FlyingPathFinder.hpp>
 #include <basalt/server/runtime/entity/LivingMovement.hpp>

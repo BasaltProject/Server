@@ -153,7 +153,8 @@ void addFlags(Table& table) {
     table["parrot_dancing"] = miscField(&misc::State::partyParrot, isParrot);
     table["wither_portals"] = miscField(&misc::State::canUsePortals, isWither);
     table["cube_wander"] = miscField(&misc::State::cubeWanders, isCube);
-    table["guardian_moving"] = Accessor{[](const ServerEntity& entity) -> Value { return entity.guardianMoving; }, nullptr};
+    table["guardian_moving"] =
+        Accessor{[](const ServerEntity& entity) -> Value { return entity.guardianMoving; }, nullptr};
     table["boost_total"] = miscField(&misc::State::boostTotal, isSteerable);
     table["boost_time"] = miscField(&misc::State::boostTime, isSteerable);
     table["boost_active"] = Accessor{[](const ServerEntity& entity) -> Value {

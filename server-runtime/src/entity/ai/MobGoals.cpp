@@ -689,7 +689,8 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path) {
     }
     if (path == "guardian" || path == "elder_guardian") {
         add<BeamAttackGoal>(selector, 4);
-        // parity: Guardian.registerGoals `RandomStrollGoal(this, 1.0, 80)`, one DefaultRandomPos pick with no water check.
+        // parity: Guardian.registerGoals `RandomStrollGoal(this, 1.0, 80)`, one DefaultRandomPos pick with no water
+        // check.
         add<RandomStrollGoal>(selector, 7, 1.0, 80, true);
         add<LookAtPlayerGoal>(selector, 8, kLookFar);
         add<RandomLookAroundGoal>(selector, 9);

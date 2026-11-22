@@ -421,11 +421,11 @@ bool AvoidEntityGoal::canUse(MobContext& mob) {
     // parity: `DefaultRandomPos.getPosAway`, a spot roughly away from what it is avoiding.
     // parity: `DefaultRandomPos.getPosAway(mob, 16, 7, threatPos)` for a fish, which swims rather than walks.
     const std::optional<std::array<double, 3>> away =
-        isFish(mob.mob) ? randomPos::defaultPosAway(
-                              mob.world, mob.mob, mob.random, 16, 7,
-                              threat_ != nullptr ? std::array<double, 3>{threat_->x, threat_->y, threat_->z}
-                                                 : *playerThreat_)
-                        : mobBrain::strollTarget(mob.world, mob.mob, mob.random);
+        isFish(mob.mob)
+            ? randomPos::defaultPosAway(mob.world, mob.mob, mob.random, 16, 7,
+                                        threat_ != nullptr ? std::array<double, 3>{threat_->x, threat_->y, threat_->z}
+                                                           : *playerThreat_)
+            : mobBrain::strollTarget(mob.world, mob.mob, mob.random);
     if (!away.has_value()) {
         return false;
     }
@@ -459,9 +459,8 @@ void AvoidEntityGoal::tick(MobContext& mob) {
         return;
     }
     // parity: it breaks into a run once whatever it is avoiding is close.
-    mob.mob.moveSpeed = mob.distanceSquaredTo((*at)[0], (*at)[1], (*at)[2]) < kSprintRange * kSprintRange
-                            ? sprintSpeed_
-                            : walkSpeed_;
+    mob.mob.moveSpeed =
+        mob.distanceSquaredTo((*at)[0], (*at)[1], (*at)[2]) < kSprintRange * kSprintRange ? sprintSpeed_ : walkSpeed_;
 }
 
 void AvoidEntityGoal::stop(MobContext& mob) {
@@ -611,10 +610,10 @@ void SwimAboutGoal::tick(MobContext& mob) {
     constexpr std::int32_t kChangeInterval = 50;
     constexpr std::int32_t kIdleLimit = 100;
     constexpr double kLookAhead = 10.0;
-    // parity: `Squid.aiStep` only pushes along its vector `isInWater`, which is the fluid state, so seagrass and kelp count; out of it the mob just falls.
+    // parity: `Squid.aiStep` only pushes along its vector `isInWater`, which is the fluid state, so seagrass and kelp
+    // count; out of it the mob just falls.
     const std::optional<std::int32_t> feetState = mob.world.blockState(
-        static_cast<std::int32_t>(std::floor(mob.mob.x)),
-        static_cast<std::int32_t>(std::floor(mob.mob.y)),
+        static_cast<std::int32_t>(std::floor(mob.mob.x)), static_cast<std::int32_t>(std::floor(mob.mob.y)),
         static_cast<std::int32_t>(std::floor(mob.mob.z)));
     const bool wet = feetState.has_value() && reg::blockFluids::hasWaterFluid(*feetState);
     if (!wet && claimsFlags_) {
@@ -630,7 +629,8 @@ void SwimAboutGoal::tick(MobContext& mob) {
         mob.mob.squidVectorX = 0.0;
         mob.mob.squidVectorY = 0.0;
         mob.mob.squidVectorZ = 0.0;
-    } else if (mob.random.nextInt(reducedTickDelay(kChangeInterval)) == 0 || (mob.mob.squidVectorX == 0.0 && mob.mob.squidVectorZ == 0.0)) {
+    } else if (mob.random.nextInt(reducedTickDelay(kChangeInterval)) == 0 ||
+               (mob.mob.squidVectorX == 0.0 && mob.mob.squidVectorZ == 0.0)) {
         const auto angle = mob.random.nextFloat() * 2.0F * static_cast<float>(std::numbers::pi);
         mob.mob.squidVectorX = static_cast<double>(std::cos(angle)) * push_;
         mob.mob.squidVectorY = -kRise + static_cast<double>(mob.random.nextFloat()) * (2 * kRise);
@@ -655,9 +655,9 @@ bool SquidFleeGoal::canUse(MobContext& mob) {
     if (!self.lastHurtByMob.has_value() || self.tickCount - self.lastHurtByMobTimestamp > kHurtMemoryTicks) {
         return false;
     }
-    const std::optional<std::int32_t> feetState =
-        mob.world.blockState(static_cast<std::int32_t>(std::floor(self.x)), static_cast<std::int32_t>(std::floor(self.y)),
-                             static_cast<std::int32_t>(std::floor(self.z)));
+    const std::optional<std::int32_t> feetState = mob.world.blockState(static_cast<std::int32_t>(std::floor(self.x)),
+                                                                       static_cast<std::int32_t>(std::floor(self.y)),
+                                                                       static_cast<std::int32_t>(std::floor(self.z)));
     if (!feetState.has_value() || !reg::blockFluids::hasWaterFluid(*feetState)) {
         return false;
     }
@@ -676,11 +676,13 @@ void SquidFleeGoal::tick(MobContext& mob) {
     constexpr double kFalloffStart = 5.0;
     constexpr double kVectorDivisor = 20.0;
     std::array<double, 3> from{};
-    if (const ServerEntity* attacker = mob.mob.lastHurtByMob.has_value() ? mob.entityById(*mob.mob.lastHurtByMob) : nullptr;
+    if (const ServerEntity* attacker =
+            mob.mob.lastHurtByMob.has_value() ? mob.entityById(*mob.mob.lastHurtByMob) : nullptr;
         attacker != nullptr) {
         from = {attacker->x, attacker->y, attacker->z};
-    } else if (const PlayerView* player = mob.mob.lastHurtByMob.has_value() ? mob.playerById(*mob.mob.lastHurtByMob) : nullptr;
-              player != nullptr) {
+    } else if (const PlayerView* player =
+                   mob.mob.lastHurtByMob.has_value() ? mob.playerById(*mob.mob.lastHurtByMob) : nullptr;
+               player != nullptr) {
         from = {player->x, player->y, player->z};
     } else {
         return;

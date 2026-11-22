@@ -426,7 +426,8 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
             mob.onGround = false;
             const std::string_view kind = mob.type().path();
             playSound(world, mob,
-                      kind == "pufferfish" ? std::string{"entity.puffer_fish.flop"} : "entity." + std::string{kind} + ".flop",
+                      kind == "pufferfish" ? std::string{"entity.puffer_fish.flop"}
+                                           : "entity." + std::string{kind} + ".flop",
                       1.0F, 1.0F + ((dice.nextFloat() - dice.nextFloat()) * 0.2F),
                       wire::protocol::play::SoundSource::Neutral);
         }
@@ -473,12 +474,12 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
             if (dice.nextInt(10) == 0) {
                 mob.squidTentacleSpeed = 1.0F / (dice.nextFloat() + 1.0F) * 0.2F;
             }
-            const wire::protocol::play::EntityEventPacket event{.entityId = mob.entityId(),
-                                                                .eventId = kSquidAnimSynch};
+            const wire::protocol::play::EntityEventPacket event{.entityId = mob.entityId(), .eventId = kSquidAnimSynch};
             for (PlayerSession* player : watchersOf(world)) {
                 if (player->connection().sendPlayPacket) {
-                    player->connection().sendPlayPacket(wire::protocol::play::EntityEventPacket::kId,
-                                                        [&event](wire::io::ByteBuffer& buffer) { event.write(buffer); });
+                    player->connection().sendPlayPacket(
+                        wire::protocol::play::EntityEventPacket::kId,
+                        [&event](wire::io::ByteBuffer& buffer) { event.write(buffer); });
                 }
             }
         }
@@ -526,9 +527,10 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
     // parity: `Guardian.setMoving`, synced entity data 16 for the tail, spikes and bubbles.
     if (mob.guardianMoving != mob.guardianMovingSent) {
         mob.guardianMovingSent = mob.guardianMoving;
-        sendEntityData(world, mob.entityId(),
-                       SetEntityDataPacket::Entry{.index = kGuardianMovingIndex,
-                                                  .value = SetEntityDataPacket::BoolValue{.value = mob.guardianMoving}});
+        sendEntityData(
+            world, mob.entityId(),
+            SetEntityDataPacket::Entry{.index = kGuardianMovingIndex,
+                                       .value = SetEntityDataPacket::BoolValue{.value = mob.guardianMoving}});
     }
 }
 

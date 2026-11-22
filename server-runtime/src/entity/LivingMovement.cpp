@@ -294,8 +294,7 @@ void travelInWaterFish(world::WorldState& world, ServerEntity& entity, double fo
     }
 }
 
-void travelInWaterGuardian(world::WorldState& world, ServerEntity& entity, double forward, bool moving,
-                           bool noTarget) {
+void travelInWaterGuardian(world::WorldState& world, ServerEntity& entity, double forward, bool moving, bool noTarget) {
     // parity: `moveRelative(0.1F, input)`, `move`, then 0.9 of the speed kept on every axis.
     constexpr double kGuardianInput = 0.1;
     constexpr double kGuardianDrag = 0.9;

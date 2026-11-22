@@ -252,8 +252,8 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                         .write(buffer);
                 });
             }
-            lastSentMotion_.insert_or_assign(entity->entityId(),
-                                             std::array<double, 3>{entity->velocityX, entity->velocityY, entity->velocityZ});
+            lastSentMotion_.insert_or_assign(
+                entity->entityId(), std::array<double, 3>{entity->velocityX, entity->velocityY, entity->velocityZ});
             owner_->sendPlayPacket(SpawnEntityPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                 SpawnEntityPacket{.entityId = entity->entityId(),
                                   .uuid = entity->uuid(),
@@ -391,14 +391,14 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             const bool zero = entity->velocityX == 0.0 && entity->velocityY == 0.0 && entity->velocityZ == 0.0;
             if (diff > 1.0E-7 || (diff > 0.0 && zero)) {
                 sent = {entity->velocityX, entity->velocityY, entity->velocityZ};
-                owner_->sendPlayPacket(
-                    wire::protocol::play::SetEntityMotionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-                        wire::protocol::play::SetEntityMotionPacket{.entityId = entity->entityId(),
-                                                                    .velocityX = entity->velocityX,
-                                                                    .velocityY = entity->velocityY,
-                                                                    .velocityZ = entity->velocityZ}
-                            .write(buffer);
-                    });
+                owner_->sendPlayPacket(wire::protocol::play::SetEntityMotionPacket::kId,
+                                       [&](wire::io::ByteBuffer& buffer) {
+                                           wire::protocol::play::SetEntityMotionPacket{.entityId = entity->entityId(),
+                                                                                       .velocityX = entity->velocityX,
+                                                                                       .velocityY = entity->velocityY,
+                                                                                       .velocityZ = entity->velocityZ}
+                                               .write(buffer);
+                                       });
             }
         }
         if (!moved) {

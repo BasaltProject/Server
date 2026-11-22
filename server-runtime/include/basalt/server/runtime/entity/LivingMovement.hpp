@@ -41,8 +41,7 @@ void moveByVelocity(world::WorldState& world, ServerEntity& entity);
 void travelInWaterFish(world::WorldState& world, ServerEntity& entity, double forward, bool noTarget);
 
 /// parity: `Guardian.travelInWater`, a tenth of input, 0.9 drag and a sinking of 0.005 idle and without a target.
-void travelInWaterGuardian(world::WorldState& world, ServerEntity& entity, double forward, bool moving,
-                           bool noTarget);
+void travelInWaterGuardian(world::WorldState& world, ServerEntity& entity, double forward, bool moving, bool noTarget);
 
 /// parity: `moveRelative` with an upward input, then `move(SELF)`, and nothing else.
 void swimStep(world::WorldState& world, ServerEntity& entity, double forward, double up, double speed);

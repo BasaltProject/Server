@@ -927,7 +927,8 @@ void EnvironmentTickSystem::tickTime(world::LoadedWorld& world) {
             world.weather().thundering = wasThundering;
         }
     }
-    // parity: `ServerLevel.advanceWeatherCycle` sends the rain and thunder levels every tick they move, not only when the flags flip.
+    // parity: `ServerLevel.advanceWeatherCycle` sends the rain and thunder levels every tick they move, not only when
+    // the flags flip.
     if (flagsChanged || world.weather().rainLevel() != rainBefore || world.weather().thunderLevel() != thunderBefore) {
         environment_->syncWeather(world);
     }

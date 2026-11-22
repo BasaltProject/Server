@@ -140,10 +140,8 @@ constexpr double kGuardianMinDistanceSquared = 9.0;
     const double range = followRange(mob);
     double best = range * range;
     std::optional<std::int32_t> found;
-    const world::EntityRegistry::Matches typed =
-        mob.world.entitySnapshotMatching(mob.entities, kKey, [](const ServerEntity& candidate) {
-            return kTargets.contains(candidate.type().path());
-        });
+    const world::EntityRegistry::Matches typed = mob.world.entitySnapshotMatching(
+        mob.entities, kKey, [](const ServerEntity& candidate) { return kTargets.contains(candidate.type().path()); });
     for (const ServerEntity* candidate : *typed) {
         if (candidate == &mob.mob || candidate->removed || candidate->health <= 0.0) {
             continue;
