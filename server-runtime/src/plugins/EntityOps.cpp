@@ -29,6 +29,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <set>
 #include <span>
 #include <string>
 #include <utility>
@@ -729,6 +730,37 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
         return true;
     }
     return mobState::invoke(environment, entity, operation, arguments);
+}
+
+std::vector<server::plugins::EntityName> propertyNames() {
+    std::map<std::string, bool> merged;
+    for (const auto& [name, accessor] : accessors()) {
+        merged[std::string{name}] = static_cast<bool>(accessor.write) || name == "target" || name == "leash_holder";
+    }
+    std::vector<server::plugins::EntityName> mob;
+    std::vector<std::string> unused;
+    mobState::names(mob, unused);
+    for (server::plugins::EntityName& entry : mob) {
+        merged.try_emplace(std::move(entry.name), entry.writable);
+    }
+    std::vector<server::plugins::EntityName> names;
+    names.reserve(merged.size());
+    for (auto& [name, writable] : merged) {
+        names.push_back({name, writable});
+    }
+    return names;
+}
+
+std::vector<std::string> operationNames() {
+    std::set<std::string> merged;
+    for (const server::plugins::EntityOperationSpec& spec : server::plugins::kEntityOperations) {
+        merged.emplace(spec.name);
+    }
+    std::vector<server::plugins::EntityName> unused;
+    std::vector<std::string> mob;
+    mobState::names(unused, mob);
+    merged.insert(mob.begin(), mob.end());
+    return {merged.begin(), merged.end()};
 }
 
 } // namespace basalt::server::runtime::plugins::entityOps

@@ -432,23 +432,15 @@ region-threads = "auto"
 # Whether the plugins folder is looked at. Off means nothing is loaded or compiled.
 enabled = true
 
-# What one plugin may run in a single turn, in Lua instructions. Refilled on every entry,
-# so it caps one handler and not the whole tick. Measured: 250,000 is about 13ms here.
-instructions-per-turn = 250000
-
 # The most memory one plugin's own objects may take, in megabytes.
 memory-mb = 32
-
-# How many copies of each plugin run at once. One is what a server wants; more is a
-# development switch that makes a plugin assuming there is only one of it fail here.
-test-lanes = 1
 
 # The data of a plugin that is no longer installed: "warn" names it at every startup,
 # "quiet" stops asking. Nothing is ever deleted on its own: /plugins purge does that.
 orphan-data = "warn"
 
-# The public keys, in hex, whose signature lets a plugin's compiled Lua (.luac) load. A package with
-# bytecode and no signature from one of these is refused, because bytecode is not checked the way source is.
+# The public keys, in hex, whose signature lets a signed plugin package load. A package carrying a
+# signature that no one of these made is refused.
 trusted-keys = []
 
 # What each plugin may reach beyond its own sandbox: "packets" sees everyone's chat,

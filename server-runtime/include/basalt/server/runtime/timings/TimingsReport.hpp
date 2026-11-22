@@ -33,8 +33,8 @@ struct PluginFacts {
     std::string version;
     std::int32_t errors = 0;
     bool disabled = false;
-    /// "lua" or "bukkit": what the plugin runs on, so a viewer can tell them apart.
-    std::string kind = "lua";
+    /// "wasm" or "bukkit": what the plugin runs on, so a viewer can tell them apart.
+    std::string kind = "wasm";
 };
 
 /// What is true right now, sampled once a second while the profiler runs.

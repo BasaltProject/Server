@@ -31,6 +31,9 @@ public:
 
     [[nodiscard]] virtual std::string name() const = 0;
 
+    /// Equal for every reference to the same live world.
+    [[nodiscard]] virtual const void* identity() const { return this; }
+
     [[nodiscard]] virtual std::int64_t time() const = 0;
 
     [[nodiscard]] virtual bool raining() const = 0;

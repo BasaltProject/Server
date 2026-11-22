@@ -601,11 +601,6 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         for (std::string& java : javaProfile()) {
             threads.push_back(std::move(java));
         }
-        if (plugins_ != nullptr) {
-            for (std::string& lua : plugins_->luaProfile()) {
-                threads.push_back(std::move(lua));
-            }
-        }
         return threads;
     };
     sources.backgroundThreads = [this] { return nativeSampler_.threadsJson(); };
@@ -625,7 +620,6 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             {"regional", flag(config_->regional)},
             {"region-threads", std::to_string(config_->regionThreads)},
             {"plugins-enabled", flag(config_->pluginsEnabled)},
-            {"plugin-lanes", std::to_string(config_->pluginLanes)},
             {"compression-threshold", std::to_string(config_->tuning.compressionThreshold)},
             {"watchdog-seconds", std::to_string(config_->tuning.watchdogSeconds)},
         };
@@ -1091,11 +1085,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     });
 
     // Read once, not swapped by a reload: the limits are baked into a plugin's state when it loads.
-    plugins_ = std::make_unique<server::plugins::PluginHost>(
-        *pluginServices_, config.pluginLanes,
-        wire::lua::LuaLimits{.instructionsPerTurn = config.pluginInstructionsPerTurn,
-                             .memoryBytes = static_cast<std::size_t>(config.pluginMemoryBytes)});
-    plugins_->setApiInstaller(&server::plugins::pluginApi::install);
+    plugins_ = std::make_unique<server::plugins::PluginHost>(*pluginServices_, config.pluginMemoryBytes);
+    plugins_->setWasmCacheDirectory(".basalt/wasm-cache");
     static_cast<void>(wired_.dispatcher->registerCommand(std::make_shared<plugins::PluginsCommand>(
         *plugins_,
         [this]() -> std::optional<std::string> {

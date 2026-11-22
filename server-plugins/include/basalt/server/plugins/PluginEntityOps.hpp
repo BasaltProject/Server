@@ -92,6 +92,11 @@ inline constexpr std::array kEntityProperties{
     EntityPropertySpec{"eye_drops", EntityValueKind::Bool, true},
 };
 
+struct EntityName {
+    std::string name;
+    bool writable = false;
+};
+
 struct EntityOperationSpec {
     std::string_view name;
     /// Comma separated column names when the operation returns a list of rows, empty otherwise.
@@ -130,6 +135,14 @@ inline constexpr std::array kEntityOperations{
     EntityOperationSpec{"nbt_set", ""},
     EntityOperationSpec{"nbt_remove", ""},
     EntityOperationSpec{"push", ""},
+    EntityOperationSpec{"look_at", ""},
+    EntityOperationSpec{"move_to", ""},
+    EntityOperationSpec{"can_reach", ""},
+    EntityOperationSpec{"find_path", ""},
+    EntityOperationSpec{"path_nodes", ""},
+    EntityOperationSpec{"stop_path", ""},
+    EntityOperationSpec{"has_path", ""},
+    EntityOperationSpec{"is_breed_item", ""},
     EntityOperationSpec{"knockback", ""},
     EntityOperationSpec{"hit_entity", ""},
     EntityOperationSpec{"hook_own", ""},

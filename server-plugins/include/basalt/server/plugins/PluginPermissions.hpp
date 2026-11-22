@@ -27,7 +27,7 @@ inline constexpr std::int32_t kPriorityAdapter = 200;
 using Check = std::function<std::int32_t(std::string_view uuid, std::string_view node)>;
 using Meta = std::function<std::optional<std::string>(std::string_view uuid, std::string_view key)>;
 
-/// The server's permission chain without Wire types, for Lua and for the Java adapters. Callable from any thread.
+/// The server's permission chain without Wire types, for plugins and for the Java adapters. Callable from any thread.
 class PluginPermissions {
 public:
     PluginPermissions() = default;

@@ -65,4 +65,13 @@ invoke(const Environment& environment, entity::ServerEntity& entity, std::string
     return found == operations.end() ? std::nullopt : found->second(environment, entity, arguments);
 }
 
+void names(std::vector<server::plugins::EntityName>& properties, std::vector<std::string>& operations) {
+    for (const auto& [name, accessor] : tables().properties) {
+        properties.push_back({std::string{name}, static_cast<bool>(accessor.write)});
+    }
+    for (const auto& [name, operation] : tables().operations) {
+        operations.emplace_back(name);
+    }
+}
+
 } // namespace basalt::server::runtime::plugins::entityOps::mobState

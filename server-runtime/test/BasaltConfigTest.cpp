@@ -80,9 +80,7 @@ TEST_CASE("the commented default is what a vanilla server would have been") {
     CHECK_FALSE(config.regional);
     CHECK(config.regionThreads == 0);
     CHECK(config.pluginsEnabled);
-    CHECK(config.pluginInstructionsPerTurn == 250000);
     CHECK(config.pluginMemoryBytes == 32LL * 1024 * 1024);
-    CHECK(config.pluginLanes == 1);
     CHECK(config.orphanData == "warn");
     CHECK(config.pluginAllowances.empty());
 }
@@ -123,9 +121,7 @@ region-threads = "4"
 
 [plugins]
 enabled = false
-instructions-per-turn = 900000
 memory-mb = 64
-test-lanes = 3
 orphan-data = "quiet"
 
 [plugins.allow]
@@ -148,23 +144,16 @@ other = []
     CHECK(config.regionThreads == 4);
 
     CHECK_FALSE(config.pluginsEnabled);
-    CHECK(config.pluginInstructionsPerTurn == 900000);
     CHECK(config.pluginMemoryBytes == 64LL * 1024 * 1024);
-    CHECK(config.pluginLanes == 3);
     CHECK(config.orphanData == "quiet");
     REQUIRE(config.pluginAllowances.size() == 2);
     CHECK(config.pluginAllowances.at("example") == std::vector<std::string>{"packets", "commands"});
     CHECK(config.pluginAllowances.at("other").empty());
 }
 
-TEST_CASE("a number that would stop every plugin is floored rather than taken as written") {
-    const BasaltConfig tiny = parsed("[plugins]\ninstructions-per-turn = 5\nmemory-mb = 0\n");
-    CHECK(tiny.pluginInstructionsPerTurn == 1000);
+TEST_CASE("a memory limit that would stop every plugin is floored") {
+    const BasaltConfig tiny = parsed("[plugins]\nmemory-mb = 0\n");
     CHECK(tiny.pluginMemoryBytes == 1024 * 1024);
-    CHECK(parsed("[plugins]\ntest-lanes = 0\n").pluginLanes == 1);
-    CHECK(parsed("[plugins]\ntest-lanes = -4\n").pluginLanes == 1);
-
-    CHECK(parsed("[plugins]\ninstructions-per-turn = 1001\n").pluginInstructionsPerTurn == 1001);
 }
 
 TEST_CASE("region threads is a number or the word that means work it out") {

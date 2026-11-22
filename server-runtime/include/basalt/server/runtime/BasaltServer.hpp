@@ -1,6 +1,5 @@
 #pragma once
 
-#include <basalt/server/plugins/PluginApi.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/remote/ManagementNotifier.hpp>
 #include <basalt/server/remote/RemoteHost.hpp>

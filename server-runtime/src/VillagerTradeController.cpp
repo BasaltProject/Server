@@ -218,7 +218,7 @@ void VillagerTradeController::menuClosed() {
     }
     custom_ = false;
     PlayerSession* session = owner_->playerSession();
-    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr && openTradingWith_.has_value()) {
         if (entity::ServerEntity* villager = world->state().entity(*openTradingWith_); villager != nullptr) {
             const entity::villager::VillagerState& state = entity::villager::villagerBrain::stateOf(*villager);
             if (session != nullptr && state.tradingPlayer == session->entityId()) {

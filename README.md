@@ -36,7 +36,8 @@ world, with the same drops, damage, redstone and mobs.
 
 - **Cross-play out of the box.** Java and Bedrock clients join the same server and play together.
 - **Native and light.** One binary and a `config/` folder. No JVM to install, no garbage collector pausing the tick.
-- **Lua plugins.** The native API, sandboxed and packaged as `.bspkg`.
+- **WebAssembly plugins.** The native API, sandboxed and packaged as `.bspkg`, in C++, Zig, Rust or any language that
+  compiles to wasm32.
 - **Bukkit, Spigot and Paper plugins.** Run through [Shim](https://github.com/BasaltProject/Shim), a JVM built into
   the binary that only starts when a jar is present.
 

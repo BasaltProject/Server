@@ -15,4 +15,7 @@ std::optional<server::plugins::PluginEntityValue>
 invoke(const Environment& environment, entity::ServerEntity& entity, std::string_view operation,
        const std::vector<server::plugins::PluginEntityValue>& arguments);
 
+/// Appends the property names and the operation names of the mob state tables.
+void names(std::vector<server::plugins::EntityName>& properties, std::vector<std::string>& operations);
+
 } // namespace basalt::server::runtime::plugins::entityOps::mobState

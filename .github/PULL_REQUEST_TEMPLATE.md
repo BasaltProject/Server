@@ -14,7 +14,7 @@ State what was not tested; do not imply all CI platforms were run locally. -->
 
 ## Vanilla parity, plugins and worlds
 
-<!-- Describe vanilla behavior, generic Bukkit/Lua API implications, and world/save-format effects.
+<!-- Describe vanilla behavior, generic Bukkit/WASM API implications, and world/save-format effects.
 Include a generic reproducer for compatibility fixes, not a patch for one named plugin.
 Mark this section N/A if it does not apply. -->
 

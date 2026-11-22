@@ -28,13 +28,13 @@ Nightlies are development builds, not a guarantee of production readiness.
 Report the exact affected release or commit even if you cannot test a newer build.
 
 Potential vulnerabilities include remote code execution or memory-safety failures,
-authentication or permission bypasses, unsafe packet handling, Lua sandbox escapes,
+authentication or permission bypasses, unsafe packet handling, WebAssembly sandbox escapes,
 compatibility-layer boundary failures, unauthorized remote-management access, and
 file or world access outside the intended permissions.
 
 Bukkit-style plugins execute code through the compatibility runtime and must be
 chosen carefully. Do not assume that an untrusted plugin jar is safely isolated
-just because Lua plugins have a sandbox. A sandbox or permission-boundary bypass
+just because WebAssembly plugins have a sandbox. A sandbox or permission-boundary bypass
 in Basalt itself is still in scope.
 
 A denial of service is potentially security-relevant when an untrusted client or

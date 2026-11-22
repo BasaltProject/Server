@@ -71,6 +71,8 @@ server::plugins::PluginWorldEnv* LoadedWorldRef::env() { return &env_; }
 
 std::string LoadedWorldRef::name() const { return world_->name(); }
 
+const void* LoadedWorldRef::identity() const { return world_.get(); }
+
 std::int64_t LoadedWorldRef::time() const { return world_->gameTime(); }
 
 bool LoadedWorldRef::raining() const { return world_->weather().raining; }

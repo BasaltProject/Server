@@ -6,18 +6,18 @@
 #include <basalt/server/plugins/PluginPacketRegistry.hpp>
 #include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/plugins/PluginRegistrations.hpp>
-#include <basalt/server/plugins/PluginServiceRegistry.hpp>
 #include <basalt/server/plugins/PluginServices.hpp>
 #include <basalt/server/plugins/PluginSurfaces.hpp>
 #include <basalt/server/plugins/PluginText.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/common/timings/Timings.hpp>
 #include <basalt/wire/common/toml/Toml.hpp>
-#include <basalt/wire/lua/LuaRef.hpp>
-#include <basalt/wire/lua/LuaSandbox.hpp>
+#include <basalt/wire/plugins/PluginFailure.hpp>
 #include <basalt/wire/plugins/PluginManifest.hpp>
 #include <basalt/wire/plugins/PluginPackage.hpp>
 #include <basalt/wire/plugins/PluginSignature.hpp>
+#include <basalt/wire/wasm/Engine.hpp>
+#include <basalt/wire/wasm/Error.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -36,36 +36,14 @@
 
 namespace basalt::server::plugins {
 class PluginHost;
-class PluginCommandDispatch;
-class PluginEventDispatch;
-
-struct PluginInstance {
-    std::int32_t lane = 0;
-    std::unique_ptr<wire::lua::LuaSandbox> sandbox;
-    std::vector<wire::lua::LuaRef> onEnable;
-    std::vector<wire::lua::LuaRef> onDisable;
-
-    std::int32_t deciderDepth = 0;
-};
-
-struct CommandEntry {
-    explicit CommandEntry(PluginCommandSpec commandSpec) : spec(std::move(commandSpec)) {}
-
-    CommandEntry(const CommandEntry&) = delete;
-    CommandEntry& operator=(const CommandEntry&) = delete;
-    CommandEntry(CommandEntry&&) noexcept = default;
-    CommandEntry& operator=(CommandEntry&&) noexcept = default;
-
-    PluginCommandSpec spec;
-    std::map<std::int32_t, wire::lua::LuaRef> handlers;
-    std::int32_t nextLane = 0;
-};
+class WasmPlugin;
 
 class LoadedPlugin {
 public:
     LoadedPlugin(wire::plugins::PluginManifest manifest, std::shared_ptr<wire::plugins::PluginPackage> pkg,
                  wire::common::Logger log, wire::common::toml::TomlTable config, std::string folder,
                  std::map<std::string, std::string, std::less<>> files);
+    ~LoadedPlugin();
 
     wire::plugins::PluginManifest manifest;
     std::shared_ptr<wire::plugins::PluginPackage> pkg;
@@ -76,8 +54,8 @@ public:
 
     PluginRegistrations registrations;
     PluginText text;
-    std::vector<std::unique_ptr<PluginInstance>> instances;
-    std::vector<std::pair<std::string, CommandEntry>> commands;
+    std::unique_ptr<WasmPlugin> wasm;
+    std::vector<std::pair<std::string, PluginCommandSpec>> commands;
 
     std::int32_t strikes = 0;
 
@@ -85,10 +63,10 @@ public:
 
     bool disabled = false;
 
-    /// Its bytecode carries a signature from a key the operator trusts.
+    /// Its package carries a signature from a key the operator trusts.
     bool bytecodeVerified = false;
 
-    [[nodiscard]] CommandEntry* commandNamed(std::string_view name);
+    [[nodiscard]] const PluginCommandSpec* commandNamed(std::string_view name) const;
 };
 
 struct PluginStatus {
@@ -96,8 +74,8 @@ struct PluginStatus {
     std::string name;
     std::string version;
     std::string origin;
+    std::string runtime = "WASM";
     bool editable = false;
-    std::int32_t lanes = 0;
     std::int32_t registrations = 0;
     std::int32_t errorStreak = 0;
     std::int32_t errors = 0;
@@ -130,32 +108,11 @@ private:
     std::int64_t since_ = 0;
 };
 
-class PluginAnnouncements {
-public:
-    void announce(PluginHost& host, LoadedPlugin& plugin, const std::string& name, wire::lua::LuaRef handler);
-
-    std::int32_t emit(PluginHost& host, const std::string& name,
-                      const std::function<void(wire::lua::LuaArgs&)>& pushPayload);
-
-private:
-    struct Listener {
-        LoadedPlugin* plugin = nullptr;
-        wire::lua::LuaRef handler;
-        std::int64_t id = 0;
-    };
-
-    std::map<std::string, std::vector<Listener>, std::less<>> listeners_;
-    std::int64_t nextId_ = 0;
-};
-
 class PluginHost {
 public:
     using Allowed = std::function<std::set<wire::plugins::PluginPermission>(const std::string& pluginId)>;
 
-    using InstallApi =
-        std::function<void(PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, std::int32_t lanes)>;
-
-    explicit PluginHost(PluginServices& services, std::int32_t lanes = 1, wire::lua::LuaLimits limits = {},
+    explicit PluginHost(PluginServices& services, std::int64_t memoryBytes = 32LL * 1024 * 1024,
                         std::int32_t strikeLimit = 3);
 
     PluginHost(const PluginHost&) = delete;
@@ -168,9 +125,10 @@ public:
 
     [[nodiscard]] const wire::common::Logger& log() const noexcept { return log_; }
 
-    void setApiInstaller(InstallApi install) { installApi_ = std::move(install); }
-
     void setAllowed(Allowed allowed) { allowed_ = std::move(allowed); }
+
+    /// Where compiled WebAssembly modules are kept between runs; empty compiles every time.
+    void setWasmCacheDirectory(std::string directory) { wasmCache_ = std::move(directory); }
 
     void setTrustedKeys(std::vector<wire::plugins::signature::PublicKey> keys) { trustedKeys_ = std::move(keys); }
 
@@ -185,9 +143,6 @@ public:
     [[nodiscard]] PluginEventBus& events() noexcept { return events_; }
 
     [[nodiscard]] std::vector<PluginStatus> statuses() const;
-
-    /// The Lua call trees sampled while the profiler ran, as one report thread (empty when nothing was sampled).
-    [[nodiscard]] std::vector<std::string> luaProfile() const;
 
     [[nodiscard]] bool isLoaded(std::string_view id) const;
 
@@ -207,58 +162,25 @@ public:
 
     void interruptAll();
 
+    /// Server work that is slow by nature (making a world) is not charged to the plugin's turn.
+    void pauseWatchdog();
+
+    void resumeWatchdog(std::string_view pluginId);
+
     [[nodiscard]] LoadedPlugin* pluginById(std::string_view id) const;
 
-    void enter(LoadedPlugin& plugin, PluginInstance& instance, const wire::lua::LuaRef& fn, std::string_view why,
-               const std::function<std::int32_t(wire::lua::LuaArgs&)>& pushArguments = {});
+    /// The one lock every plugin call runs under; a WebAssembly instance is driven from one thread at a time.
+    [[nodiscard]] std::recursive_mutex& turnMutex() noexcept { return turnMutex_; }
 
-    bool ask(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, std::string_view why,
-             const std::function<std::int32_t(wire::lua::LuaArgs&)>& pushArguments,
-             const std::function<void(wire::lua::LuaArgs&)>& read);
+    void beginWasmTurn(LoadedPlugin& plugin);
 
-    void report(LoadedPlugin& plugin, const wire::lua::LuaFailure& failure, std::string_view why);
+    void endWasmTurn(LoadedPlugin& plugin, std::int64_t nanos);
 
-    /// Runs `body` holding the interpreter while `open` holds, for calls that come in from other threads.
-    void whileOpen(const std::atomic<bool>& open, const std::function<void()>& body);
+    void report(LoadedPlugin& plugin, const wire::plugins::PluginFailure& failure, std::string_view why);
 
-    void underLock(const std::function<void()>& body);
-
-    void resuming(LoadedPlugin& plugin, const std::function<void()>& resume);
-
-    [[nodiscard]] std::string answer(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPlayerRef* player,
-                                     std::string_view why);
-
-    [[nodiscard]] bool asks(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPlayerRef* player,
-                            std::string_view why);
-
-    void clicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, PluginPlayerRef& player, std::int32_t slot);
-
-    void formAnswered(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, PluginPlayerRef& player,
-                      const PluginForm& form, std::size_t button, const std::map<std::string, std::string>& values);
-
-    void npcClicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, const std::string& playerUuid);
-
-    void deliverPacket(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPacket& packet);
-
-    [[nodiscard]] PluginServiceRegistry& serviceRegistry() noexcept { return services_registry_; }
+    void reportWasm(LoadedPlugin& plugin, const wire::wasm::Failure& failure, std::string_view why);
 
     [[nodiscard]] PluginPacketRegistry& packets() noexcept { return packets_; }
-
-    void registerCommand(LoadedPlugin& plugin, PluginInstance& instance, const PluginCommandSpec& spec,
-                         wire::lua::LuaRef handler);
-
-    void registerEventHandler(LoadedPlugin& plugin, PluginInstance& instance, const PluginEventType& type,
-                              PluginEventPriority priority, bool observer, bool wantsCancelled,
-                              std::map<std::string, PluginEventValue, std::less<>> filters, wire::lua::LuaRef handler);
-
-    void announce(LoadedPlugin& plugin, const std::string& name, wire::lua::LuaRef handler);
-
-    [[nodiscard]] std::int32_t emit(const std::string& name, const wire::lua::LuaRef& payload);
-
-    /// For code outside a plugin: the listeners get `text` as a string.
-    [[nodiscard]] std::int32_t emitText(const std::string& name, const std::string& text);
-
-    void listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn);
 
     [[nodiscard]] PluginHandle listenNative(const std::string& channel, PluginChannelHost::NativeListener listener) {
         return channels_.listenNative(channel, std::move(listener));
@@ -272,12 +194,13 @@ public:
 
     void setTimings(RecordTime record) { recordTime_ = std::move(record); }
 
-    /// Where code that runs outside Lua, such as the Bukkit bridge, opens its own sections; measures nothing until set.
+    /// Where code that runs outside a plugin, such as the Bukkit bridge, opens its own sections; measures nothing until
+    /// set.
     void setProfiler(wire::common::Timings* timings) { profiler_ = timings == nullptr ? &idleProfiler_ : timings; }
 
     [[nodiscard]] wire::common::Timings& profiler() const noexcept { return *profiler_; }
 
-    /// Counts time spent for a plugin that does not run through Lua, such as a Bukkit one.
+    /// Counts time spent for a plugin that does not run as a WebAssembly module, such as a Bukkit one.
     void recordTime(const std::string& pluginId, std::int64_t nanos) const {
         if (recordTime_) {
             recordTime_(pluginId, nanos);
@@ -287,36 +210,25 @@ public:
 private:
     bool start(const wire::plugins::PluginManifest& manifest, const std::shared_ptr<wire::plugins::PluginPackage>& pkg);
 
+    bool startWasm(std::unique_ptr<LoadedPlugin> plugin, bool verified);
+
     void stop(LoadedPlugin& plugin);
 
-    [[nodiscard]] std::unique_ptr<wire::lua::LuaSandbox> sandboxFor(LoadedPlugin& plugin, std::int32_t lane);
-
-    [[nodiscard]] std::optional<std::vector<std::uint8_t>> moduleSource(LoadedPlugin& plugin,
-                                                                        std::string_view requested);
-
-    bool inside(LoadedPlugin& plugin, std::string_view why,
-                const std::function<std::optional<wire::lua::LuaFailure>(PluginInstance&)>& body);
-
     PluginServices* services_;
-    std::int32_t lanes_;
-    wire::lua::LuaLimits limits_;
+    std::int64_t memoryBytes_;
+    std::string wasmCache_;
+    std::optional<wire::wasm::Engine> wasmEngine_;
     std::int32_t strikeLimit_;
     wire::common::Logger log_{"plugins"};
     std::vector<std::unique_ptr<LoadedPlugin>> plugins_;
-    PluginAnnouncements announcements_;
-    PluginServiceRegistry services_registry_;
     PluginSurfaceRegistry surfaces_;
-    // Lua states are single threaded: a packet listener on a connection thread waits for the tick thread's call.
-    std::recursive_mutex luaMutex_;
+    std::recursive_mutex turnMutex_;
     PluginPacketRegistry packets_;
     PluginChannelHost channels_;
-    std::unique_ptr<PluginCommandDispatch> commandDispatch_;
-    std::unique_ptr<PluginEventDispatch> eventDispatch_;
     PluginEventBus events_;
     PluginWatchdog watchdog_;
     Allowed allowed_;
     std::vector<wire::plugins::signature::PublicKey> trustedKeys_;
-    InstallApi installApi_;
     std::function<bool()> onPluginThread_;
     RecordTime recordTime_;
     wire::common::Timings idleProfiler_;

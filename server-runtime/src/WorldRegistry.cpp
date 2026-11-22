@@ -230,7 +230,7 @@ world::LoadedWorld* WorldRegistry::createWorld(const std::string& name, config::
                std::string{config::worldTypeName(type)} + ", seed " + std::to_string(madeWith) + ").";
     });
     made->saveDirty();
-    // Next turn, not now: called from inside a plugin handler, firing here would re-enter the running Lua state.
+    // Next turn, not now: called from inside a plugin handler, firing here would re-enter the running plugin.
     if (hooks_.worldLoaded) {
         scheduler_->global().schedule(0, [this, name] { hooks_.worldLoaded(name); });
     }

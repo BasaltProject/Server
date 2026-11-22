@@ -2,17 +2,16 @@
 
 #include <basalt/server/plugins/PluginText.hpp>
 #include <basalt/wire/io/FileIO.hpp>
-#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <doctest.h>
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
 using namespace basalt::server::plugins;
-using namespace basalt::wire::lua;
 namespace fileIO = basalt::wire::io::fileIO;
 
 namespace {
@@ -25,38 +24,24 @@ void write(const std::string& path, std::string_view text) {
     fileIO::writeText(path, text);
 }
 
-class Arguments {
-public:
-    Arguments() {
-        sandbox_ = LuaSandbox::create("arena");
-        lua_ = std::make_unique<LuaArgs>(sandbox_->state());
-        lua_->pushTable();
-        lua_->pushString("Whiron");
-        lua_->setField("name");
-        lua_->pushString("Ana");
-        lua_->setField("player");
-        lua_->pushString("Sky");
-        lua_->setField("arena");
-        lua_->pushInteger(3);
-        lua_->setField("count");
-        lua_->pushBoolean(true);
-        lua_->setField("flag");
+const PluginText::Fields kFields = [](std::string_view name) -> std::optional<std::string> {
+    if (name == "name") {
+        return "Whiron";
     }
-
-    [[nodiscard]] LuaArgs& lua() { return *lua_; }
-
-    [[nodiscard]] std::int32_t notATable() {
-        lua_->pushString("nope");
-        return lua_->count();
+    if (name == "player") {
+        return "Ana";
     }
-
-private:
-    std::unique_ptr<LuaSandbox> sandbox_;
-    std::unique_ptr<LuaArgs> lua_;
+    if (name == "arena") {
+        return "Sky";
+    }
+    if (name == "count") {
+        return "3";
+    }
+    return std::nullopt;
 };
 } // namespace
 
-TEST_CASE("a plugin's own text resolves the way the frozen kotlin resolves it") {
+TEST_CASE("a plugin's own text resolves with its fields") {
     const std::string folder = scratch();
     std::error_code ignored;
     std::filesystem::remove_all(folder, ignored);
@@ -74,8 +59,7 @@ solo_espanol = "Solo aqui")");
     text.load();
     CHECK(text.localeCount() == 2);
 
-    Arguments arguments;
-    const auto resolve = [&](std::string_view message) { return text.resolve(message, &arguments.lua(), 1); };
+    const auto resolve = [&](std::string_view message) { return text.resolve(message, kFields); };
 
     CHECK(resolve("@greeting") == "Hello, Whiron!");
     CHECK(resolve("@arena.joined") == "Ana joined Sky");
@@ -85,26 +69,17 @@ solo_espanol = "Solo aqui")");
     CHECK(resolve("Plain text") == "Plain text");
     CHECK(resolve("Hello, {name}!") == "Hello, Whiron!");
     CHECK(resolve("Hello, {nobody}!") == "Hello, {nobody}!");
-    CHECK(resolve("{player} in {arena} with {count} and {flag}") == "Ana in Sky with 3 and true");
+    CHECK(resolve("{player} in {arena} with {count}") == "Ana in Sky with 3");
     CHECK(resolve("Hello, {name") == "Hello, {name");
     CHECK(resolve("").empty());
     CHECK(resolve("{}") == "{}");
 
-    CHECK(text.resolve("Hello, {name}!", nullptr, 0) == "Hello, {name}!");
-    const std::int32_t wrong = arguments.notATable();
-    CHECK(text.resolve("Hello, {name}!", &arguments.lua(), wrong) == "Hello, {name}!");
-    CHECK(text.resolve("Hello, {upper}!", &arguments.lua(), wrong) == "Hello, {upper}!");
+    CHECK(text.resolve("Hello, {name}!") == "Hello, {name}!");
 
     PluginText spanish{folder, "es_es"};
     spanish.load();
-    CHECK(spanish.resolve("@greeting", &arguments.lua(), 1) == "Hola, Whiron!");
-    CHECK(spanish.resolve("@plain", &arguments.lua(), 1) == "Nothing to fill");
-
-    const std::int32_t before = arguments.lua().count();
-    for (std::int32_t round = 0; round < 200; ++round) {
-        static_cast<void>(text.resolve("{name} {player} {arena} {count} {flag} {nobody}", &arguments.lua(), 1));
-    }
-    CHECK(arguments.lua().count() == before);
+    CHECK(spanish.resolve("@greeting", kFields) == "Hola, Whiron!");
+    CHECK(spanish.resolve("@plain", kFields) == "Nothing to fill");
 
     std::filesystem::remove_all(folder, ignored);
 }

@@ -207,6 +207,10 @@ WorldEntityRef::invoke(std::string_view operation, const std::vector<server::plu
     return found == nullptr ? std::nullopt : entityOps::invoke(environment(), *found, operation, arguments);
 }
 
+std::vector<server::plugins::EntityName> WorldEntityRef::propertyNames() const { return entityOps::propertyNames(); }
+
+std::vector<std::string> WorldEntityRef::operationNames() const { return entityOps::operationNames(); }
+
 entity::ServerEntity* WorldEntityRef::entity() const {
     entity::ServerEntity* found = world_->state().entity(entityId_);
     return found != nullptr && !found->removed ? found : nullptr;

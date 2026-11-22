@@ -1,4 +1,3 @@
-#include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/plugins/PluginPacketRegistry.hpp>
 
 #include <algorithm>
@@ -68,21 +67,6 @@ void PluginPacketRegistry::remove(std::int64_t id) {
     listeners_ = std::move(next);
 }
 
-PluginHandle PluginPacketRegistry::add(LoadedPlugin& plugin, const PacketScope& scope, wire::lua::LuaRef fn,
-                                       PluginEventPriority priority, bool observer) {
-    auto listener = std::make_shared<Listener>();
-    listener->scope = scope;
-    listener->plugin = &plugin;
-    listener->fn = std::move(fn);
-    listener->priority = static_cast<std::int32_t>(priority);
-    listener->observer = observer;
-    {
-        const std::lock_guard<std::mutex> guard{mutex_};
-        listener->id = nextId_++;
-    }
-    return insert(std::move(listener));
-}
-
 PluginHandle PluginPacketRegistry::addNative(const PacketScope& scope, std::int32_t priority, bool observer,
                                              NativePacketListener listener) {
     auto entry = std::make_shared<Listener>();
@@ -118,7 +102,6 @@ bool PluginPacketRegistry::fire(PluginPacket& packet) {
         snapshot = listeners_;
     }
     packet.clear();
-    bool named = false;
     for (const std::shared_ptr<const Listener>& listener : *snapshot) {
         if (!listener->scope.matches(packet.address)) {
             continue;
@@ -137,14 +120,6 @@ bool PluginPacketRegistry::fire(PluginPacket& packet) {
             } else {
                 listener->native(packet);
             }
-            continue;
-        }
-        if (listener->plugin != nullptr && deliver_) {
-            if (!named) {
-                packet.name = namer_ ? namer_(packet.address) : std::string{};
-                named = true;
-            }
-            deliver_(*listener->plugin, listener->fn, packet);
         }
     }
     return !packet.cancelled;

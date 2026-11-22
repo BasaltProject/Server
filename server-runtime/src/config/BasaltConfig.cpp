@@ -413,15 +413,10 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
 
     if (plugins != nullptr) {
         config.pluginsEnabled = plugins->boolean("enabled").value_or(defaults.pluginsEnabled);
-        // Floored: a budget of five instructions stops every plugin and reads as plugins broken, not as a typo.
-        config.pluginInstructionsPerTurn = std::max<std::int64_t>(
-            plugins->integer("instructions-per-turn").value_or(defaults.pluginInstructionsPerTurn), 1000);
         config.pluginMemoryBytes =
             std::max<std::int64_t>(plugins->integer("memory-mb").value_or(defaults.pluginMemoryBytes / 1024 / 1024),
                                    1) *
             1024 * 1024;
-        config.pluginLanes =
-            static_cast<std::int32_t>(std::max<std::int64_t>(plugins->integer("test-lanes").value_or(1), 1));
         config.orphanData = std::string{plugins->string("orphan-data").value_or(defaults.orphanData)};
         config.pluginTrustedKeys = plugins->stringList("trusted-keys");
         if (const TomlTable* allow = plugins->table("allow"); allow != nullptr) {

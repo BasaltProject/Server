@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -40,5 +41,10 @@ bool set(const Environment& environment, entity::ServerEntity& entity, std::stri
 std::optional<server::plugins::PluginEntityValue>
 invoke(const Environment& environment, entity::ServerEntity& entity, std::string_view operation,
        const std::vector<server::plugins::PluginEntityValue>& arguments);
+
+/// The names `get`, `set` and `invoke` answer, read off the real tables.
+[[nodiscard]] std::vector<server::plugins::EntityName> propertyNames();
+
+[[nodiscard]] std::vector<std::string> operationNames();
 
 } // namespace basalt::server::runtime::plugins::entityOps

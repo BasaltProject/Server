@@ -1,8 +1,7 @@
 #include <basalt/server/plugins/PluginConfig.hpp>
-#include <basalt/server/plugins/PluginDispatch.hpp>
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
-#include <basalt/wire/lua/LuaCall.hpp>
+#include <basalt/server/plugins/WasmPlugin.hpp>
 #include <basalt/wire/plugins/PluginFolder.hpp>
 #include <basalt/wire/plugins/PluginOrder.hpp>
 
@@ -11,17 +10,6 @@
 #include <utility>
 
 namespace basalt::server::plugins {
-namespace {
-/// A plugin's two lanes must not walk the same random sequence.
-[[nodiscard]] std::uint64_t seedFor(std::string_view pluginId, std::int32_t lane) {
-    std::uint64_t hash = 0;
-    for (const char letter : pluginId) {
-        hash = (hash * 31) + static_cast<std::uint64_t>(static_cast<unsigned char>(letter));
-    }
-    return (hash * 31) + static_cast<std::uint64_t>(lane);
-}
-} // namespace
-
 LoadedPlugin::LoadedPlugin(wire::plugins::PluginManifest manifest, std::shared_ptr<wire::plugins::PluginPackage> pkg,
                            wire::common::Logger log, wire::common::toml::TomlTable config, std::string folder,
                            std::map<std::string, std::string, std::less<>> files)
@@ -30,24 +18,20 @@ LoadedPlugin::LoadedPlugin(wire::plugins::PluginManifest manifest, std::shared_p
     text.load();
 }
 
-CommandEntry* LoadedPlugin::commandNamed(std::string_view name) {
-    for (auto& [key, entry] : commands) {
+LoadedPlugin::~LoadedPlugin() = default;
+
+const PluginCommandSpec* LoadedPlugin::commandNamed(std::string_view name) const {
+    for (const auto& [key, spec] : commands) {
         if (key == name) {
-            return &entry;
+            return &spec;
         }
     }
     return nullptr;
 }
 
-PluginHost::PluginHost(PluginServices& services, std::int32_t lanes, wire::lua::LuaLimits limits,
-                       std::int32_t strikeLimit)
-    : services_(&services), lanes_(lanes), limits_(limits), strikeLimit_(strikeLimit),
-      surfaces_([this](const std::string& message) { log_.warn([&message] { return message; }); }),
-      packets_([this](LoadedPlugin& plugin, const wire::lua::LuaRef& fn,
-                      PluginPacket& packet) { deliverPacket(plugin, fn, packet); },
-               [this](const PacketAddress& address) { return services_->packets().nameOf(address); }),
-      commandDispatch_(std::make_unique<PluginCommandDispatch>(*this)),
-      eventDispatch_(std::make_unique<PluginEventDispatch>(*this)) {
+PluginHost::PluginHost(PluginServices& services, std::int64_t memoryBytes, std::int32_t strikeLimit)
+    : services_(&services), memoryBytes_(memoryBytes), strikeLimit_(strikeLimit),
+      surfaces_([this](const std::string& message) { log_.warn([&message] { return message; }); }) {
     for (const PluginEventType* type : pluginEventTypes::all()) {
         events_.declare(*type);
     }
@@ -55,40 +39,11 @@ PluginHost::PluginHost(PluginServices& services, std::int32_t lanes, wire::lua::
 
 PluginHost::~PluginHost() { unloadAll(); }
 
-void PluginHost::registerCommand(LoadedPlugin& plugin, PluginInstance& instance, const PluginCommandSpec& spec,
-                                 wire::lua::LuaRef handler) {
-    commandDispatch_->registerCommand(plugin, instance, spec, std::move(handler));
-}
-
-void PluginHost::registerEventHandler(LoadedPlugin& plugin, PluginInstance& instance, const PluginEventType& type,
-                                      PluginEventPriority priority, bool observer, bool wantsCancelled,
-                                      std::map<std::string, PluginEventValue, std::less<>> filters,
-                                      wire::lua::LuaRef handler) {
-    eventDispatch_->registerEventHandler(plugin, instance, type, priority, observer, wantsCancelled, std::move(filters),
-                                         std::move(handler));
-}
-
-void PluginHost::announce(LoadedPlugin& plugin, const std::string& name, wire::lua::LuaRef handler) {
-    announcements_.announce(*this, plugin, name, std::move(handler));
-}
-
-std::int32_t PluginHost::emit(const std::string& name, const wire::lua::LuaRef& payload) {
-    return announcements_.emit(*this, name, [&payload](wire::lua::LuaArgs& lua) { payload.push(lua); });
-}
-
-std::int32_t PluginHost::emitText(const std::string& name, const std::string& text) {
-    return announcements_.emit(*this, name, [&text](wire::lua::LuaArgs& lua) { lua.pushString(text); });
-}
-
-void PluginHost::listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn) {
-    channels_.listenOn(plugin, channel, std::move(fn));
-}
-
 bool PluginHost::listeningOnChannel(std::string_view channel) const { return channels_.listeningOnChannel(channel); }
 
 void PluginHost::channelMessage(const std::string& channel, const std::string& playerUuid,
                                 std::span<const std::uint8_t> bytes) {
-    channels_.channelMessage(*this, channel, playerUuid, bytes);
+    channels_.channelMessage(channel, playerUuid, bytes);
 }
 
 std::set<wire::plugins::PluginPermission> PluginHost::allowed(const std::string& pluginId) const {
@@ -101,15 +56,14 @@ std::vector<PluginStatus> PluginHost::statuses() const {
     for (const std::unique_ptr<LoadedPlugin>& plugin : plugins_) {
         std::vector<std::string> usages;
         usages.reserve(plugin->commands.size());
-        for (const auto& [name, entry] : plugin->commands) {
-            usages.push_back(entry.spec.usage());
+        for (const auto& [name, spec] : plugin->commands) {
+            usages.push_back(spec.usage());
         }
         out.push_back(PluginStatus{.id = plugin->manifest.id,
                                    .name = plugin->manifest.name,
                                    .version = plugin->manifest.version,
                                    .origin = plugin->pkg->origin(),
                                    .editable = plugin->pkg->editable(),
-                                   .lanes = static_cast<std::int32_t>(plugin->instances.size()),
                                    .registrations = static_cast<std::int32_t>(plugin->registrations.size()),
                                    .errorStreak = plugin->strikes,
                                    .errors = plugin->failures,
@@ -117,35 +71,6 @@ std::vector<PluginStatus> PluginHost::statuses() const {
                                    .commands = std::move(usages)});
     }
     return out;
-}
-
-std::vector<std::string> PluginHost::luaProfile() const {
-    std::string children;
-    double total = 0;
-    for (const std::unique_ptr<LoadedPlugin>& plugin : plugins_) {
-        const std::string& id = plugin->manifest.id;
-        const double millis = static_cast<double>(profiler_->of("plugin." + id).snapshot().totalNanos) / 1'000'000.0;
-        for (const std::unique_ptr<PluginInstance>& instance : plugin->instances) {
-            if (millis <= 0 || instance->sandbox == nullptr || instance->sandbox->profile().samples() == 0) {
-                continue;
-            }
-            // Lanes of one plugin run the same code, so the first that was sampled stands for it.
-            std::string name = "plugin." + id;
-            const std::string frames = instance->sandbox->profile().childrenJson(millis);
-            children += (children.empty() ? "" : ",") + std::string{"{\"name\":\""} + name +
-                        "\",\"calls\":0,\"total_millis\":" + std::to_string(millis) +
-                        ",\"self_millis\":0,\"max_millis\":0," + instance->sandbox->profile().windowsJson(millis) +
-                        ",\"children\":[" + frames + "]}";
-            total += millis;
-            break;
-        }
-    }
-    if (children.empty()) {
-        return {};
-    }
-    return {"{\"name\":\"Lua plugins\",\"total_millis\":" + std::to_string(total) +
-            ",\"root\":{\"name\":\"root\",\"calls\":0,\"total_millis\":" + std::to_string(total) +
-            ",\"self_millis\":0,\"max_millis\":0,\"children\":[" + children + "]}}"};
 }
 
 bool PluginHost::isLoaded(std::string_view id) const { return pluginById(id) != nullptr; }
@@ -293,44 +218,21 @@ std::optional<std::string> PluginHost::interruptIfStuck(std::int64_t limitMillis
 
 void PluginHost::interruptAll() { watchdog_.interruptAll(plugins_); }
 
-std::unique_ptr<wire::lua::LuaSandbox> PluginHost::sandboxFor(LoadedPlugin& plugin, std::int32_t lane) {
-    auto sandbox = wire::lua::LuaSandbox::create(
-        plugin.manifest.id, limits_, seedFor(plugin.manifest.id, lane),
-        [this, &plugin](std::string_view name) { return moduleSource(plugin, name); },
-        [&plugin](std::string_view line) { plugin.log.info([&line] { return std::string{line}; }); });
-    if (sandbox != nullptr) {
-        sandbox->allowBytecode(plugin.bytecodeVerified);
-        sandbox->setProfiling([this] { return profiler_->enabled(); });
-    }
-    return sandbox;
-}
+void PluginHost::pauseWatchdog() { watchdog_.clear(); }
+
+void PluginHost::resumeWatchdog(std::string_view pluginId) { watchdog_.mark(pluginId); }
 
 bool PluginHost::start(const wire::plugins::PluginManifest& manifest,
                        const std::shared_ptr<wire::plugins::PluginPackage>& pkg) {
     wire::common::Logger log{"plugin/" + manifest.id};
     bool verified = false;
-    if (wire::plugins::signature::hasBytecode(*pkg)) {
+    if (wire::plugins::signature::carriesSignature(*pkg)) {
         const auto signer = wire::plugins::signature::verify(*pkg, trustedKeys_);
         if (!signer.has_value()) {
             log.error([&manifest, &signer] { return manifest.id + " was refused: " + signer.error(); });
             return false;
         }
         verified = true;
-    }
-    std::optional<std::string> source = pkg->readText(manifest.main);
-    std::optional<std::vector<std::uint8_t>> bytecode;
-    if (verified && manifest.main.ends_with(".lua")) {
-        bytecode = pkg->read(manifest.main + "c");
-        if (bytecode.has_value()) {
-            source.reset();
-        }
-    }
-    const bool library = !source.has_value() && !bytecode.has_value() && !manifest.exports.modules.empty();
-    if (!source.has_value() && !bytecode.has_value() && !library) {
-        log.error([&manifest] {
-            return manifest.id + " says its code is at " + manifest.main + " and there is nothing there";
-        });
-        return false;
     }
     const std::string folderPath = pkg->workingFolder().value_or(services_->paths().folder(manifest.id));
     const wire::plugins::PluginFolder folder{*pkg, manifest, folderPath};
@@ -370,118 +272,22 @@ bool PluginHost::start(const wire::plugins::PluginManifest& manifest,
         });
     }
 
-    const std::string chunkName = "@" + manifest.id + "/" + manifest.main;
-    std::unique_ptr<wire::lua::LuaSandbox> first = sandboxFor(*plugin, 0);
-    if (first == nullptr) {
-        plugin->log.error([&manifest] { return manifest.id + " could not be given a Lua state"; });
-        return false;
-    }
-    std::optional<wire::lua::LuaChunk> prototype;
-    if (source.has_value()) {
-        std::expected<wire::lua::LuaChunk, wire::lua::LuaFailure> compiled = first->compile(*source, chunkName);
-        if (!compiled.has_value()) {
-            plugin->log.error(
-                [&manifest, &compiled] { return manifest.id + " does not compile: " + compiled.error().message; });
-            return false;
-        }
-        prototype = std::move(*compiled);
-    } else if (bytecode.has_value()) {
-        prototype = wire::lua::LuaChunk{.chunkName = chunkName, .bytecode = std::move(*bytecode)};
-    }
-
-    LoadedPlugin& loaded = *plugin;
-    plugins_.push_back(std::move(plugin));
-    for (std::int32_t lane = 0; lane < lanes_; lane++) {
-        std::unique_ptr<wire::lua::LuaSandbox> sandbox = lane == 0 ? std::move(first) : sandboxFor(loaded, lane);
-        if (sandbox == nullptr) {
-            continue;
-        }
-        auto instance = std::make_unique<PluginInstance>();
-        instance->lane = lane;
-        instance->sandbox = std::move(sandbox);
-        PluginInstance& added = *instance;
-        loaded.instances.push_back(std::move(instance));
-        if (installApi_) {
-            installApi_(added, loaded, *this, lanes_);
-        }
-        if (prototype.has_value()) {
-            const std::expected<void, wire::lua::LuaFailure> bound = added.sandbox->bind(*prototype);
-            if (!bound.has_value()) {
-                report(loaded, bound.error(), "load");
-                continue;
-            }
-            const std::expected<void, wire::lua::LuaFailure> ran = added.sandbox->run(*prototype);
-            if (!ran.has_value()) {
-                report(loaded, ran.error(), "load");
-            }
-        }
-    }
-    if (loaded.failures > 0 || loaded.disabled) {
-        loaded.log.error([&manifest] { return manifest.id + " failed while loading and is off"; });
-        LoadedPlugin* target = &loaded;
-        stop(loaded);
-        std::erase_if(plugins_, [target](const std::unique_ptr<LoadedPlugin>& held) { return held.get() == target; });
-        return false;
-    }
-    for (const std::unique_ptr<PluginInstance>& instance : loaded.instances) {
-        for (const wire::lua::LuaRef& handler : instance->onEnable) {
-            enter(loaded, *instance, handler, "plugin.enable");
-        }
-    }
-    loaded.log.info(
-        [&manifest, &pkg] { return manifest.name + " " + manifest.version + " loaded from " + pkg->origin(); });
-    return true;
+    return startWasm(std::move(plugin), verified);
 }
 
 void PluginHost::stop(LoadedPlugin& plugin) {
-    for (const std::unique_ptr<PluginInstance>& instance : plugin.instances) {
-        for (const wire::lua::LuaRef& handler : instance->onDisable) {
-            enter(plugin, *instance, handler, "plugin.disable");
-        }
+    if (plugin.wasm != nullptr) {
+        plugin.wasm->stop();
     }
     plugin.registrations.retireAll([&plugin](std::string_view what, std::string_view error) {
         plugin.log.warn(
             [&what, &error] { return "could not retire " + std::string{what} + ": " + std::string{error}; });
     });
     events_.removeAll(plugin.manifest.id);
-    plugin.instances.clear();
-    plugin.commands.clear();
+    if (plugin.wasm != nullptr) {
+        plugin.wasm->close();
+        plugin.wasm.reset();
+    }
     plugin.log.info([&plugin] { return plugin.manifest.name + " unloaded"; });
-}
-
-std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& plugin, std::string_view requested) {
-    const std::optional<std::string> own = wire::plugins::packageLayout::moduleFile(requested);
-    if (!own.has_value()) {
-        return std::nullopt;
-    }
-    if (plugin.bytecodeVerified) {
-        if (std::optional<std::vector<std::uint8_t>> compiled = plugin.pkg->read(*own + "c"); compiled.has_value()) {
-            return compiled;
-        }
-    }
-    if (std::optional<std::vector<std::uint8_t>> found = plugin.pkg->read(*own); found.has_value()) {
-        return found;
-    }
-    const std::size_t dot = requested.find('.');
-    if (dot == std::string_view::npos) {
-        return std::nullopt;
-    }
-    const std::string id{requested.substr(0, dot)};
-    const std::string_view moduleName = requested.substr(dot + 1);
-    const std::optional<std::string> file = wire::plugins::packageLayout::moduleFile(moduleName);
-    if (!file.has_value()) {
-        return std::nullopt;
-    }
-    if (id == plugin.manifest.id) {
-        return plugin.pkg->read(*file);
-    }
-    const LoadedPlugin* owner = pluginById(id);
-    if (owner == nullptr) {
-        return std::nullopt;
-    }
-    if (!owner->manifest.exports.exportsModule(moduleName)) {
-        return std::nullopt;
-    }
-    return owner->pkg->read(*file);
 }
 } // namespace basalt::server::plugins

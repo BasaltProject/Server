@@ -843,7 +843,7 @@ basalt_module(server-runtime-core
         src/world/WorldStateSections.cpp
         src/world/WorldStateTicks.cpp
         src/world/SpawnPotential.cpp
-    DEPENDS basalt::metamorph-datafix basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io basalt::server-remote
+    DEPENDS basalt::metamorph-datafix basalt::server-assets basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io basalt::server-remote
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-permissions basalt::wire-protocol basalt::wire-text
 )
 

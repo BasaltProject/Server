@@ -58,8 +58,8 @@ void PluginsCommand::build(const command::CommandNodeBuilder& root) const {
                 state = yellow(" " + std::to_string(status.errors) + " error(s)");
             }
             context.success(white("  " + status.name + " " + status.version)
-                                .append(grey(" [Lua] " + std::to_string(status.registrations) + " registration(s)" +
-                                             (status.editable ? ", folder" : "")))
+                                .append(grey(" [" + status.runtime + "] " + std::to_string(status.registrations) +
+                                             " registration(s)" + (status.editable ? ", folder" : "")))
                                 .append(state));
         }
         for (const bukkit::JavaPluginJar& jar : java) {

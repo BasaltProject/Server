@@ -1,31 +1,16 @@
 #include <basalt/server/plugins/PluginChannelHost.hpp>
-#include <basalt/server/plugins/PluginHost.hpp>
-#include <basalt/server/plugins/PluginObjects.hpp>
 
 #include <algorithm>
 #include <cstdint>
 #include <utility>
 
 namespace basalt::server::plugins {
-void PluginChannelHost::listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn) {
-    const std::int64_t id = nextId_++;
-    channels_[channel].push_back(ChannelListener{.plugin = &plugin, .fn = std::move(fn), .id = id});
-    static_cast<void>(plugin.registrations.add("channel(" + channel + ")", [this, channel, id] {
-        const auto found = channels_.find(channel);
-        if (found == channels_.end()) {
-            return;
-        }
-        std::erase_if(found->second, [id](const ChannelListener& listener) { return listener.id == id; });
-        if (found->second.empty()) {
-            channels_.erase(found);
-        }
-    }));
-}
-
 PluginHandle PluginChannelHost::listenNative(const std::string& channel, NativeListener listener) {
+    const std::lock_guard<std::mutex> guard{mutex_};
     const std::int64_t id = nextId_++;
     native_[channel].push_back(NativeEntry{.id = id, .fn = std::move(listener)});
     return PluginHandle{[this, channel, id] {
+        const std::lock_guard<std::mutex> inner{mutex_};
         const auto found = native_.find(channel);
         if (found == native_.end()) {
             return;
@@ -38,53 +23,26 @@ PluginHandle PluginChannelHost::listenNative(const std::string& channel, NativeL
 }
 
 bool PluginChannelHost::listeningOnChannel(std::string_view channel) const {
-    return channels_.contains(channel) || native_.contains(channel);
+    const std::lock_guard<std::mutex> guard{mutex_};
+    return native_.contains(channel);
 }
 
-void PluginChannelHost::channelMessage(PluginHost& host, const std::string& channel, const std::string& playerUuid,
+void PluginChannelHost::channelMessage(const std::string& channel, const std::string& playerUuid,
                                        std::span<const std::uint8_t> bytes) {
-    if (const auto natives = native_.find(channel); natives != native_.end()) {
-        // A copy, because a listener may register or drop one while this runs.
-        std::vector<NativeListener> listeners;
+    // A copy, because a listener may register or drop one while this runs.
+    std::vector<NativeListener> listeners;
+    {
+        const std::lock_guard<std::mutex> guard{mutex_};
+        const auto natives = native_.find(channel);
+        if (natives == native_.end()) {
+            return;
+        }
         for (const NativeEntry& entry : natives->second) {
             listeners.push_back(entry.fn);
         }
-        for (const NativeListener& listener : listeners) {
-            listener(channel, playerUuid, bytes);
-        }
     }
-    const auto found = channels_.find(channel);
-    if (found == channels_.end()) {
-        return;
-    }
-    const std::shared_ptr<PluginPlayerRef> player = host.services().players().byUuid(playerUuid);
-    // A copy, because a listener may register or drop one while this runs.
-    std::vector<std::pair<LoadedPlugin*, const wire::lua::LuaRef*>> targets;
-    targets.reserve(found->second.size());
-    for (const ChannelListener& listener : found->second) {
-        targets.emplace_back(listener.plugin, &listener.fn);
-    }
-    for (const auto& [plugin, fn] : targets) {
-        if (plugin == nullptr || plugin->disabled) {
-            continue;
-        }
-        static_cast<void>(host.ask(*plugin, *fn, "channel " + channel,
-                                   [&host, plugin, &player, bytes](wire::lua::LuaArgs& args) {
-                                       if (player == nullptr) {
-                                           args.pushNil();
-                                       } else {
-                                           pushPlayer(args, player, &host.services().storage(), plugin->manifest.id,
-                                                      &plugin->text);
-                                       }
-                                       args.pushTable();
-                                       std::int64_t position = 1;
-                                       for (const std::uint8_t byte : bytes) {
-                                           args.pushInteger(byte);
-                                           args.setIndex(position++);
-                                       }
-                                       return 2;
-                                   },
-                                   {}));
+    for (const NativeListener& listener : listeners) {
+        listener(channel, playerUuid, bytes);
     }
 }
 } // namespace basalt::server::plugins

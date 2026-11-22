@@ -52,6 +52,8 @@ public:
     [[nodiscard]] std::optional<std::string> customName() const override;
     [[nodiscard]] std::optional<server::plugins::PluginEntityValue> property(std::string_view name) const override;
     bool setProperty(std::string_view name, const server::plugins::PluginEntityValue& value) override;
+    [[nodiscard]] std::vector<server::plugins::EntityName> propertyNames() const override;
+    [[nodiscard]] std::vector<std::string> operationNames() const override;
     std::optional<server::plugins::PluginEntityValue>
     invoke(std::string_view operation, const std::vector<server::plugins::PluginEntityValue>& arguments) override;
 
@@ -104,6 +106,7 @@ public:
                    std::function<std::vector<player::PlayerSession*>()> players);
     [[nodiscard]] server::plugins::PluginWorldEnv* env() override;
     [[nodiscard]] std::string name() const override;
+    [[nodiscard]] const void* identity() const override;
     [[nodiscard]] std::int64_t time() const override;
     [[nodiscard]] bool raining() const override;
     [[nodiscard]] bool thundering() const override;

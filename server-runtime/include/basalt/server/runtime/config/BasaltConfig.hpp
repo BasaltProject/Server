@@ -71,12 +71,10 @@ struct BasaltConfig {
     std::int32_t regionThreads = 0;
 
     bool pluginsEnabled = true;
-    std::int64_t pluginInstructionsPerTurn = 250000;
     std::int64_t pluginMemoryBytes = 32LL * 1024 * 1024;
     std::map<std::string, std::vector<std::string>, std::less<>> pluginAllowances;
     std::string orphanData = "warn";
     std::vector<std::string> pluginTrustedKeys;
-    std::int32_t pluginLanes = 1;
 
     /// parity: `initial-enabled-packs` and `initial-disabled-packs`.
     std::vector<std::string> initialEnabledPacks{"vanilla"};

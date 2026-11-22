@@ -269,6 +269,24 @@ public:
         return false;
     }
 
+    /// Every property name the entity answers, with whether it can be written.
+    [[nodiscard]] virtual std::vector<EntityName> propertyNames() const {
+        std::vector<EntityName> names;
+        for (const EntityPropertySpec& spec : kEntityProperties) {
+            names.push_back({std::string{spec.name}, spec.writable});
+        }
+        return names;
+    }
+
+    /// Every operation name `invoke` accepts.
+    [[nodiscard]] virtual std::vector<std::string> operationNames() const {
+        std::vector<std::string> names;
+        for (const EntityOperationSpec& spec : kEntityOperations) {
+            names.emplace_back(spec.name);
+        }
+        return names;
+    }
+
     /// A named operation, see `kEntityOperations`; nullopt when the entity cannot do it.
     virtual std::optional<PluginEntityValue> invoke(std::string_view operation,
                                                     const std::vector<PluginEntityValue>& arguments) {
