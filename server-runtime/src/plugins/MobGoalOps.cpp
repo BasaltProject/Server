@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/entity/ai/PluginGoal.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <memory>
 #include <set>
 #include <string>
@@ -31,6 +32,7 @@ constexpr std::string_view kVanillaPrefix = "minecraft:";
 [[nodiscard]] std::set<GoalFlag> flagsOf(const Value& value) {
     std::set<GoalFlag> flags;
     std::string text = asText(value).value_or("");
+    std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     for (std::size_t from = 0; from <= text.size();) {
         const std::size_t end = std::min(text.find(',', from), text.size());
         const std::string_view part{text.data() + from, end - from};

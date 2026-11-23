@@ -98,8 +98,8 @@ void ofEntity(void* user, abi::Call& c) {
         c.ret(status);
         return;
     }
-    c.ret(target->player == nullptr ? abi::kErrAbsent
-                                    : added(state, Target{.kind = Kind::Player, .player = target->player}));
+    const std::shared_ptr<PluginPlayerRef> player = entities::playerOf(state, *target);
+    c.ret(player == nullptr ? abi::kErrAbsent : added(state, Target{.kind = Kind::Player, .player = player}));
 }
 
 void release(void* user, abi::Call& c) {

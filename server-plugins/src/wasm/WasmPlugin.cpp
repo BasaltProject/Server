@@ -51,7 +51,7 @@ void runListeners(wasm::State& state, std::vector<std::pair<std::int32_t, std::i
 }
 } // namespace
 
-WasmPlugin::WasmPlugin(std::unique_ptr<wasm::State> state) : state_(std::move(state)) {}
+WasmPlugin::WasmPlugin(Key, std::unique_ptr<wasm::State> state) : state_(std::move(state)) {}
 
 WasmPlugin::~WasmPlugin() = default;
 
@@ -76,7 +76,7 @@ std::expected<std::unique_ptr<WasmPlugin>, std::string> WasmPlugin::create(Plugi
     state->instance.emplace(std::move(*instance));
     wasm::State* raw = state.get();
     static_cast<void>(plugin.registrations.add("menus", [raw] { raw->menus->closeAll(*raw); }));
-    return std::unique_ptr<WasmPlugin>{new WasmPlugin{std::move(state)}};
+    return std::make_unique<WasmPlugin>(Key{}, std::move(state));
 }
 
 bool WasmPlugin::start() {

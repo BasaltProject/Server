@@ -140,6 +140,8 @@ struct Reader {
 
 [[nodiscard]] Value real(double one) { return Value{one}; }
 
+[[nodiscard]] Value real(float one) { return Value{static_cast<double>(one)}; }
+
 [[nodiscard]] Value pointOf(const geometry::Point& at) {
     return Value{Value::List{Value{at[0]}, Value{at[1]}, Value{at[2]}}};
 }

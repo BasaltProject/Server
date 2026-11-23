@@ -12,6 +12,7 @@
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <string>
 
@@ -248,6 +249,18 @@ public:
             return std::vector<std::string>{};
         }
         return std::nullopt;
+    }
+
+    [[nodiscard]] std::vector<server::plugins::EntityName> propertyNames() const override {
+        constexpr std::array<std::string_view, 7> kWritable{"health", "max_health",   "absorption",     "fire_ticks",
+                                                            "air",    "frozen_ticks", "no_damage_ticks"};
+        std::vector<server::plugins::EntityName> names;
+        for (const server::plugins::EntityPropertySpec& spec : server::plugins::kEntityProperties) {
+            if (property(spec.name).has_value()) {
+                names.push_back({std::string{spec.name}, std::ranges::find(kWritable, spec.name) != kWritable.end()});
+            }
+        }
+        return names;
     }
 
     bool setProperty(std::string_view name, const Value& value) override {

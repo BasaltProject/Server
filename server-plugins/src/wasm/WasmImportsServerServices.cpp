@@ -1,5 +1,7 @@
 #include "WasmServerSupport.hpp"
 
+#include <basalt/wire/common/ByteView.hpp>
+
 #include <algorithm>
 
 namespace basalt::server::plugins::wasm {
@@ -170,8 +172,7 @@ void answer(State& caller, std::int32_t request, std::string_view name, Value ar
     }
     Value result;
     if (!reply.empty()) {
-        const auto* bytes = reinterpret_cast<const std::uint8_t*>(reply.data());
-        std::expected<Value, std::string> decoded = wire::wasm::decodeValue({bytes, reply.size()});
+        std::expected<Value, std::string> decoded = wire::wasm::decodeValue(wire::common::asBytes(reply));
         if (decoded) {
             result = std::move(*decoded);
         }

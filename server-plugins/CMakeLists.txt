@@ -18,6 +18,7 @@ basalt_module(server-plugins
         src/PluginConfig.cpp
         src/PluginHost.cpp
         src/PluginHostWasm.cpp
+        src/wasm/WasmEntities.cpp
         src/wasm/WasmPlugin.cpp
         src/wasm/WasmState.cpp
         src/PluginHostRuns.cpp

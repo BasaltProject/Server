@@ -2,10 +2,12 @@
 
 #include <basalt/server/plugins/PluginPlayerOps.hpp>
 #include <basalt/server/plugins/PluginWorldEnv.hpp>
+#include <basalt/wire/common/ByteView.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
 #include <algorithm>
-#include <set>
+#include <cmath>
+#include <map>
 
 namespace basalt::server::plugins::wasm {
 namespace {
@@ -20,8 +22,8 @@ constexpr std::array<std::string_view, 17> kBaseNames{"id",  "type",  "world",  
                                                       "y",   "z",     "yaw",    "pitch", "health",  "on_ground",
                                                       "age", "width", "height", "pos",   "velocity"};
 
-[[nodiscard]] bool baseWritable(std::string_view name) {
-    return name == "yaw" || name == "pitch" || name == "velocity";
+[[nodiscard]] bool baseWritable(const Target& target, std::string_view name) {
+    return name == "yaw" || name == "pitch" || name == "velocity" || (name == "health" && target.player != nullptr);
 }
 
 [[nodiscard]] std::array<float, 2> facing(const Target& target) {
@@ -139,13 +141,25 @@ void entitySet(void* user, abi::Call& c) {
         c.ret(setVelocityFrom(*target, *value));
         return;
     }
+    if (*name == "health" && target->player != nullptr) {
+        const double* real = value->asFloat();
+        const std::int64_t* whole = value->asInt();
+        const double health = real != nullptr ? *real : whole != nullptr ? static_cast<double>(*whole) : -1.0;
+        if (!std::isfinite(health) || health < 0.0) {
+            c.ret(abi::kErrInvalid);
+            return;
+        }
+        target->player->setHealth(health);
+        c.ret(abi::kOk);
+        return;
+    }
     if (*name == "yaw" || *name == "pitch") {
         const double angle = value->asFloat() != nullptr ? *value->asFloat()
                              : value->asInt() != nullptr ? static_cast<double>(*value->asInt())
                                                          : 0.0;
         const std::array<float, 2> now = facing(*target);
-        const auto yaw = static_cast<float>(*name == "yaw" ? angle : now[0]);
-        const auto pitch = static_cast<float>(*name == "pitch" ? angle : now[1]);
+        const auto yaw = static_cast<float>(*name == "yaw" ? angle : static_cast<double>(now[0]));
+        const auto pitch = static_cast<float>(*name == "pitch" ? angle : static_cast<double>(now[1]));
         const bool turned = target->entity != nullptr
                                 ? target->entity->setRotation(yaw, pitch)
                                 : target->player->teleport(target->player->world(), target->player->x(),
@@ -207,7 +221,7 @@ void entityProperties(void* user, abi::Call& c) {
     }
     std::vector<EntityName> names;
     for (const std::string_view base : kBaseNames) {
-        names.push_back({std::string{base}, baseWritable(base)});
+        names.push_back({std::string{base}, baseWritable(*target, base)});
     }
     if (target->entity != nullptr) {
         for (EntityName& name : target->entity->propertyNames()) {
@@ -218,12 +232,19 @@ void entityProperties(void* user, abi::Call& c) {
             names.push_back({std::string{spec.name}, spec.writable});
         }
     }
-    std::set<std::string> seen;
-    Value::List list;
+    std::map<std::string, bool> writable;
+    std::vector<std::string> order;
     for (const EntityName& name : names) {
-        if (seen.insert(name.name).second) {
-            list.emplace_back(Value::Map{{"name", Value{name.name}}, {"writable", Value{name.writable}}});
+        const auto [slot, added] = writable.try_emplace(name.name, name.writable);
+        if (added) {
+            order.push_back(name.name);
+        } else {
+            slot->second = slot->second || name.writable;
         }
+    }
+    Value::List list;
+    for (const std::string& name : order) {
+        list.emplace_back(Value::Map{{"name", Value{name}}, {"writable", Value{writable.at(name)}}});
     }
     c.ret(putValue(c.memory(), c.i32(1), c.i32(2), Value{std::move(list)}));
 }
@@ -260,7 +281,7 @@ void entitySnapshot(void* user, abi::Call& c) {
     State& state = stateOf(user);
     Target* target = nullptr;
     const std::int32_t status = entities::resolve(state, c.i32(0), target);
-    if (status != abi::kOk || target->entity == nullptr) {
+    if (status != abi::kOk || target->isPlayer()) {
         c.ret(status != abi::kOk ? status : abi::kErrInvalid);
         return;
     }
@@ -271,7 +292,7 @@ void entitySnapshot(void* user, abi::Call& c) {
         c.ret(abi::kErrInvalid);
         return;
     }
-    c.ret(c.memory().put(c.i32(1), c.i32(2), {reinterpret_cast<const char*>(bytes->data()), bytes->size()}));
+    c.ret(c.memory().put(c.i32(1), c.i32(2), wire::common::asText(*bytes)));
 }
 
 void entityRestore(void* user, abi::Call& c) {
@@ -281,7 +302,7 @@ void entityRestore(void* user, abi::Call& c) {
         memory.range(static_cast<std::uint32_t>(c.i32(1)), static_cast<std::uint32_t>(std::max(0, c.i32(2))));
     Target* target = nullptr;
     std::int32_t status = entities::resolve(state, c.i32(0), target);
-    if (status == abi::kOk && (!bytes || c.i32(2) <= 0 || target->entity == nullptr ||
+    if (status == abi::kOk && (!bytes || c.i32(2) <= 0 || target->isPlayer() ||
                                !wire::nbt::nbtIO::read(std::span<const std::uint8_t>{bytes->data(), bytes->size()}))) {
         status = abi::kErrInvalid;
     }

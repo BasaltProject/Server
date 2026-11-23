@@ -41,8 +41,14 @@ public:
     void interrupt() noexcept;
 
 private:
-    explicit WasmPlugin(std::unique_ptr<wasm::State> state);
+    struct Key {
+        explicit Key() = default;
+    };
 
+public:
+    WasmPlugin(Key, std::unique_ptr<wasm::State> state);
+
+private:
     std::unique_ptr<wasm::State> state_;
 };
 } // namespace basalt::server::plugins

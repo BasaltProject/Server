@@ -2,6 +2,7 @@
 #include "WasmServerSupport.hpp"
 
 #include <basalt/server/plugins/PluginFiles.hpp>
+#include <basalt/wire/common/ByteView.hpp>
 
 #include <algorithm>
 #include <set>
@@ -40,7 +41,7 @@ struct Resolved {
     return out == "." ? std::string{} : out;
 }
 
-[[nodiscard]] Resolved resolve(State& state, abi::Call& c, std::int32_t pathIndex) {
+[[nodiscard]] Resolved resolve(State& state, abi::Call& c, std::size_t pathIndex) {
     Resolved out;
     const std::optional<std::string_view> path = c.memory().string(c.i32(pathIndex), c.i32(pathIndex + 1));
     if (!state.capable("files")) {
@@ -80,8 +81,7 @@ void filesRead(void* user, abi::Call& c) {
         c.ret(abi::kErrAbsent);
         return;
     }
-    c.ret(c.memory().put(c.i32(2), c.i32(3),
-                         std::string_view{reinterpret_cast<const char*>(bytes->data()), bytes->size()}));
+    c.ret(c.memory().put(c.i32(2), c.i32(3), wire::common::asText(*bytes)));
 }
 
 void filesWrite(void* user, abi::Call& c) {
@@ -96,8 +96,8 @@ void filesWrite(void* user, abi::Call& c) {
     if (slash != std::string::npos) {
         static_cast<void>(files::makeDirectories(at.live.substr(0, slash)));
     }
-    const auto* first = reinterpret_cast<const std::uint8_t*>(data->data());
-    c.ret(files::write(at.live, std::vector<std::uint8_t>{first, first + data->size()}) ? abi::kOk : abi::kErrAbsent);
+    const std::span<const std::uint8_t> raw = wire::common::asBytes(*data);
+    c.ret(files::write(at.live, std::vector<std::uint8_t>{raw.begin(), raw.end()}) ? abi::kOk : abi::kErrAbsent);
 }
 
 void filesExists(void* user, abi::Call& c) {

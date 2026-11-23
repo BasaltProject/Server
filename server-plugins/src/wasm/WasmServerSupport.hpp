@@ -130,7 +130,7 @@ struct Subject {
 [[nodiscard]] Subject resolveSubject(PluginHost& host, std::string_view text);
 
 /// The result a buffer-returning import gives for a value, INVALID when the value breaks a limit.
-[[nodiscard]] inline std::int32_t returnValue(abi::Call& c, std::int32_t outIndex, const Value& value) {
+[[nodiscard]] inline std::int32_t returnValue(abi::Call& c, std::size_t outIndex, const Value& value) {
     return putValue(c.memory(), c.i32(outIndex), c.i32(outIndex + 1), value);
 }
 

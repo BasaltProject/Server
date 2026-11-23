@@ -1,6 +1,7 @@
 #include "WasmItemState.hpp"
 
 #include <basalt/server/plugins/PluginServices.hpp>
+#include <basalt/wire/common/ByteView.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
 #include <basalt/wire/text/ComponentNbt.hpp>
@@ -509,8 +510,7 @@ void clicked(PluginHost& host, const std::shared_ptr<State*>& link, std::int32_t
     if (result.empty() || menusOf(*state).menus.find(handle, menu) != abi::kOk) {
         return;
     }
-    const std::expected<Value, std::string> decoded =
-        wire::wasm::decodeValue({reinterpret_cast<const std::uint8_t*>(result.data()), result.size()});
+    const std::expected<Value, std::string> decoded = wire::wasm::decodeValue(wire::common::asBytes(result));
     const std::optional<PluginItem> replaced =
         decoded.has_value() && !decoded->isNull()
             ? fromValue(*decoded, [state](const std::string& id) { return knownItem(*state, id); })

@@ -5,6 +5,7 @@
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 #include <basalt/server/plugins/PluginWorldEnv.hpp>
 #include <basalt/server/plugins/PluginWorldgen.hpp>
+#include <basalt/wire/common/ByteView.hpp>
 
 #include <cstring>
 #include <map>
@@ -182,7 +183,7 @@ inline void put(Value::Map& map, std::string key, Value value) {
 
 [[nodiscard]] inline std::int32_t putBytes(const abi::GuestMemory& memory, std::int32_t ptr, std::int32_t cap,
                                            std::span<const std::uint8_t> data) {
-    return memory.put(ptr, cap, std::string_view{reinterpret_cast<const char*>(data.data()), data.size()});
+    return memory.put(ptr, cap, wire::common::asText(data));
 }
 
 /// A map argument, or the error to answer with; an empty buffer is an empty map.

@@ -1,5 +1,7 @@
 #include "WasmPackets.hpp"
 
+#include <basalt/wire/common/ByteView.hpp>
+
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -65,7 +67,7 @@ void ctxBody(void* user, abi::Call& c) {
         c.ret(status);
         return;
     }
-    const std::string_view bytes{reinterpret_cast<const char*>(active->bytes.data()), active->bytes.size()};
+    const std::string_view bytes = wire::common::asText(active->bytes);
     c.ret(c.memory().put(c.i32(1), c.i32(2), bytes));
 }
 

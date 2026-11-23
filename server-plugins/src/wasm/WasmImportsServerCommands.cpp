@@ -96,8 +96,8 @@ void commandRegisterEx(void* user, abi::Call& c) {
         c.ret(abi::kErrInvalid);
         return;
     }
-    const std::expected<PluginCommandSpec, wire::plugins::ManifestError> parsed = PluginCommandSpec::parse(
-        *spec, permission->empty() ? std::nullopt : std::optional<std::string>{std::string{*permission}});
+    const std::expected<PluginCommandSpec, wire::plugins::ManifestError> parsed =
+        PluginCommandSpec::parse(*spec, std::optional<std::string>{std::string{*permission}});
     if (!parsed.has_value()) {
         state.plugin->log.warn([&parsed] { return "command_register_ex: " + parsed.error().message; });
         c.ret(abi::kErrInvalid);
@@ -133,9 +133,6 @@ void commandAlias(void* user, abi::Call& c) {
     for (const CommandEntry& source : sources) {
         PluginCommandSpec spec = source.spec;
         spec.literals.front() = std::string{*alias};
-        if (!spec.permission) {
-            spec.permission = "basalt.plugin." + state.plugin->manifest.id + "." + source.name;
-        }
         if (state.plugin->commandNamed(keyOf(spec)) != nullptr) {
             c.ret(abi::kErrInvalid);
             return;
@@ -144,9 +141,6 @@ void commandAlias(void* user, abi::Call& c) {
     for (const CommandEntry& source : sources) {
         PluginCommandSpec spec = source.spec;
         spec.literals.front() = std::string{*alias};
-        if (!spec.permission) {
-            spec.permission = "basalt.plugin." + state.plugin->manifest.id + "." + source.name;
-        }
         static_cast<void>(add(state, std::string{*name}, std::move(spec), source.token, source.completeToken));
     }
     c.ret(abi::kOk);

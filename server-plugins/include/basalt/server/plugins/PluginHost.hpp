@@ -194,8 +194,7 @@ public:
 
     void setTimings(RecordTime record) { recordTime_ = std::move(record); }
 
-    /// Where code that runs outside a plugin, such as the Bukkit bridge, opens its own sections; measures nothing until
-    /// set.
+    /// Where code outside a plugin, such as the Bukkit bridge, opens its own sections; measures nothing until set.
     void setProfiler(wire::common::Timings* timings) { profiler_ = timings == nullptr ? &idleProfiler_ : timings; }
 
     [[nodiscard]] wire::common::Timings& profiler() const noexcept { return *profiler_; }

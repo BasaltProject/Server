@@ -24,6 +24,7 @@ struct Target {
     std::string key;
 
     [[nodiscard]] bool alive() const;
+    [[nodiscard]] bool isPlayer() const;
     [[nodiscard]] std::int32_t id() const;
     [[nodiscard]] std::string type() const;
     [[nodiscard]] std::string world() const;
@@ -56,6 +57,9 @@ private:
 [[nodiscard]] inline std::int32_t resolve(State& state, std::int32_t handle, Target*& out) {
     return table(state).resolve(handle, out);
 }
+
+/// The player a target is: its own ref, or the one behind the entity ref of a player; null for anything else.
+[[nodiscard]] std::shared_ptr<PluginPlayerRef> playerOf(State& state, const Target& target);
 
 /// The id with `minecraft:` in front when it has no namespace.
 [[nodiscard]] std::string withNamespaceId(std::string_view id);
