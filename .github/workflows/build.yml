@@ -197,7 +197,7 @@ jobs:
           submodules: true
           ref: ${{ inputs.ref }}
       - uses: lukka/get-cmake@16e8153a8b4918849d92aad131befe67a3705daa # latest
-      - uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1
+      - uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1
         with:
           job-summary: ''
           max-size: 800M
@@ -291,7 +291,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-      - uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1
+      - uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1
         if: matrix.cross
         with:
           job-summary: ''
@@ -404,7 +404,7 @@ jobs:
           java-version: "25"
 
       - name: Install ccache
-        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1
+        uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1
         with:
           job-summary: ''
           max-size: 800M
